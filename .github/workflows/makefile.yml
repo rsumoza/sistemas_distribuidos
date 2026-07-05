@@ -1,4 +1,4 @@
-name: Compilar PDFs
+name: Make
 
 on:
   push:
