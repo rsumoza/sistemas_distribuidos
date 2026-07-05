@@ -1,7 +1,7 @@
 .PHONY: all slides apuntes guias guias_resueltas docente clase% clean
 PROJECT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 LATEXMK=latexmk
-LATEXFLAGS=-xelatex -interaction=nonstopmode -halt-on-error
+LATEXFLAGS=-silent -xelatex -interaction=nonstopmode -halt-on-error
 
 SLIDES=$(wildcard slides/*.tex)
 SLIDES_DIR=$(PROJECT_ROOT)slides
@@ -66,11 +66,11 @@ clase%:
 			  $(BUILD_GUIAS_DIR) \
 			  $(BUILD_GUIAS_RESUELTAS_DIR) \
 			  $(BUILD_DOCENTE_DIR)
-	$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_SLIDES_DIR) -cd $(SLIDES_DIR)/clase$*.tex;
-	$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_APUNTES_DIR) -cd $(APUNTES_DIR)/clase$*-apuntes.tex;
-	$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_DIR) -cd $(GUIAS_DIR)/clase$*-guia.tex;
-	$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_RESUELTAS_DIR) -cd $(GUIAS_RESUELTAS_DIR)/clase$*-guiaresuelta.tex;
-	$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_DOCENTE_DIR) -cd $(DOCENTE_DIR)/clase$*-docente.tex;
+	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_SLIDES_DIR) -cd $(SLIDES_DIR)/clase$*.tex;
+	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_APUNTES_DIR) -cd $(APUNTES_DIR)/clase$*-apuntes.tex;
+	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_DIR) -cd $(GUIAS_DIR)/clase$*-guia.tex;
+	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_RESUELTAS_DIR) -cd $(GUIAS_RESUELTAS_DIR)/clase$*-guiaresuelta.tex;
+	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_DOCENTE_DIR) -cd $(DOCENTE_DIR)/clase$*-docente.tex;
 
 
 clean:
