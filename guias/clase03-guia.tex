@@ -2,23 +2,24 @@
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
 \UASetClassNumber{03}
-\UASetClassTitle{Estado y replicación}
-\title{Clase 03 --- Estado y replicación}
+\UASetClassTitle{Replicación de estado}
+\title{Clase 03 --- Replicación de estado}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
+
 \section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
+En cada ejercicio indicar qué se gana con replicar y qué problema de consistencia, latencia o disponibilidad aparece como costo.
 
 \section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 03.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Estado y replicación''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\begin{uaexercise}\textbf{1.} Explicar por qué replicar estado mejora disponibilidad y latencia, pero introduce el problema de inconsistencia entre copias.\end{uaexercise}
+\begin{uaexercise}\textbf{2.} Dibujar un esquema leader-follower con un líder y dos seguidores. Indicar qué nodo recibe escrituras, qué nodos podrían recibir lecturas y dónde aparece atraso de replicación.\end{uaexercise}
+\begin{uaexercise}\textbf{3.} Comparar replicación síncrona y asíncrona para una escritura. Indicar cuál reduce stale reads y cuál mejora latencia de respuesta.\end{uaexercise}
+\begin{uaexercise}\textbf{4.} Un usuario cambia su contraseña y luego intenta iniciar sesión contra una réplica atrasada. Explicar el síntoma, la causa y la garantía que faltó.\end{uaexercise}
+\begin{uaexercise}\textbf{5.} Analizar qué puede pasar si el líder confirma una escritura, cae antes de replicarla y luego se promueve un follower.\end{uaexercise}
+\begin{uaexercise}\textbf{6.} Elegir una política de lectura para un sistema de catálogo y para un sistema bancario: leer del líder o permitir followers. Justificar el trade-off.\end{uaexercise}
+\begin{uaexercise}\textbf{7.} Definir una métrica o señal operativa para detectar stale reads o atraso de réplicas.\end{uaexercise}
+\begin{uaexercise}\textbf{8.} Aplicar problema--fallas--garantía--solución--trade-off a un sistema replicado que debe tolerar caída de un nodo.\end{uaexercise}
 
 \end{document}

@@ -10,42 +10,43 @@
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Entender cómo la comunicación por red introduce timeouts, retries, idempotencia y ambigüedad operacional. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+Que el estudiante deje de pensar una llamada remota como una llamada local. La clase debe instalar que timeout, retry e idempotencia son decisiones de diseño bajo incertidumbre, no detalles de implementación.
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item distinguir falta de respuesta de falla comprobada;
+\item explicar por qué RPC oculta la red pero no elimina sus problemas;
+\item analizar retries en términos de recuperación y duplicación;
+\item diseñar operaciones idempotentes mediante claves de idempotencia;
+\item comparar at-most-once, at-least-once y exactly-once como garantías observables.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
+\section{Guion sugerido}
 \begin{enumerate}
-\item Abrir la clase 02 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
+\item Abrir con una llamada a pagos que no responde.
+\item Listar causas posibles antes de nombrar timeout.
+\item Mostrar que retry recupera algunas fallas y crea riesgo de duplicación.
+\item Introducir idempotencia como técnica para hacer seguro el retry.
+\item Cerrar con semánticas de entrega y el trade-off confiabilidad--complejidad.
 \end{enumerate}
 
 \section{Errores conceptuales frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item interpretar timeout como prueba de crash;
+\item asumir que retry siempre mejora el sistema;
+\item creer que idempotencia significa ``la operación no hace nada'';
+\item vender exactly-once sin explicar deduplicación, persistencia y transacciones.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\section{Preguntas disparadoras}
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué sabe el cliente cuando no recibe respuesta?
+\item ¿Qué puede haber pasado en el servidor aunque el cliente observe timeout?
+\item ¿Qué operación es segura de repetir y cuál no?
+\item ¿Dónde se guarda la evidencia para deduplicar?
 \end{itemize}
 
 \begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+Criterio de logro docente: la clase salió bien si el estudiante puede justificar cuándo reintentar, cuándo no y cómo hacer que un retry no duplique efectos.
 \end{uawarn}
 \end{document}

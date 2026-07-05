@@ -10,42 +10,44 @@
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Entender por qué el orden lógico y la causalidad reemplazan al tiempo global en sistemas distribuidos. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+Que el estudiante reemplace la intuición de reloj global por la noción de dependencia causal. El objetivo no es memorizar Lamport y vector clocks, sino saber qué permiten inferir sobre orden, concurrencia y conflictos.
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item explicar por qué el tiempo físico no alcanza para ordenar eventos distribuidos;
+\item aplicar la relación happened-before;
+\item calcular relojes de Lamport en una ejecución simple;
+\item explicar el límite de Lamport para detectar concurrencia;
+\item comparar vector clocks y decidir cuándo dos eventos son concurrentes.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
+\section{Guion sugerido}
 \begin{enumerate}
-\item Abrir la clase 05 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
+\item Abrir con dos eventos en nodos distintos y preguntar cuál ocurrió primero.
+\item Mostrar que timestamps físicos no prueban causalidad.
+\item Definir happened-before con orden local, mensajes y transitividad.
+\item Calcular Lamport y discutir su límite.
+\item Introducir vector clocks como mecanismo para detectar concurrencia.
+\item Cerrar con conflictos concurrentes en stores eventualmente consistentes.
 \end{enumerate}
 
 \section{Errores conceptuales frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item creer que NTP resuelve orden causal;
+\item confundir orden total arbitrario con causalidad;
+\item inferir causalidad solo porque un timestamp Lamport es menor;
+\item olvidar que vector clocks tienen costo de metadata.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\section{Preguntas disparadoras}
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Existe un mensaje o camino causal entre estos eventos?
+\item ¿Qué puede concluir Lamport y qué no?
+\item ¿Son comparables estos vectores?
+\item ¿Qué debería hacer una aplicación ante escrituras concurrentes?
 \end{itemize}
 
 \begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+Criterio de logro docente: la clase salió bien si el estudiante puede distinguir ``ocurrió antes en el reloj'' de ``causó o precedió lógicamente''.
 \end{uawarn}
 \end{document}

@@ -8,25 +8,26 @@
 \date{\UADate}
 \begin{document}
 \maketitle
+
 \section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
+Resolver cada ejercicio distinguiendo observación, causa posible, garantía buscada y trade-off aceptado. Cuando aparezcan timeouts o retries, indicar explícitamente si la operación remota pudo haber ocurrido.
 
 \section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 02.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Comunicación y fallas''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Comunicación y fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\begin{uaexercise}\textbf{1.} Una llamada RPC a un servicio de pagos no responde antes del timeout. Enumerar al menos cuatro causas compatibles con esa observación y marcar cuáles implican que el pago pudo haberse ejecutado.\end{uaexercise}
+\begin{uaanswer}Causas compatibles: request perdido antes de llegar, servidor caído, servidor lento, servidor procesó y se perdió la respuesta, congestión de red, cola interna saturada. En las causas donde el servidor recibió el request, el pago pudo haberse ejecutado; por eso timeout no equivale a operación no realizada.\end{uaanswer}
+\begin{uaexercise}\textbf{2.} Explicar por qué RPC es una abstracción útil pero peligrosa si se la piensa como una llamada local.\end{uaexercise}
+\begin{uaanswer}RPC simplifica la interfaz, pero oculta red, serialización, pérdida, duplicación, demora y falla parcial. Una llamada local tiene un resultado observable más directo; una llamada remota puede ejecutar efectos sin que el cliente reciba respuesta.\end{uaanswer}
+\begin{uaexercise}\textbf{3.} Diseñar una política de timeout para una consulta de saldo y otra para una transferencia. Comparar qué cambia en latencia tolerada, riesgo y experiencia de usuario.\end{uaexercise}
+\begin{uaanswer}Una consulta de saldo puede tolerar timeout más corto y fallback a error o cache con advertencia. Una transferencia requiere más cuidado: un timeout corto mejora UX pero aumenta incertidumbre y riesgo de retry peligroso; puede convenir dejar la operación pendiente y consultar estado por id.\end{uaanswer}
+\begin{uaexercise}\textbf{4.} Analizar un retry automático ante timeout en una operación de creación de orden. Indicar qué problema resuelve y qué problema nuevo puede introducir.\end{uaexercise}
+\begin{uaanswer}Resuelve pérdidas o demoras transitorias aumentando probabilidad de éxito. Introduce riesgo de duplicar la orden si la primera ejecución llegó al servidor y la respuesta se perdió. También puede amplificar carga si muchos clientes reintentan a la vez.\end{uaanswer}
+\begin{uaexercise}\textbf{5.} Clasificar estas operaciones como idempotentes o no idempotentes y justificar: actualizar email, crear pedido, cancelar reserva, sumar puntos a una cuenta.\end{uaexercise}
+\begin{uaanswer}Actualizar email a un valor fijo suele ser idempotente. Crear pedido no lo es si cada intento crea un pedido nuevo. Cancelar reserva puede ser idempotente si cancelar una reserva ya cancelada no cambia el estado. Sumar puntos no es idempotente porque repetirlo acumula puntos.\end{uaanswer}
+\begin{uaexercise}\textbf{6.} Proponer cómo convertir una operación no idempotente en segura ante retries usando un request id o clave de idempotencia.\end{uaexercise}
+\begin{uaanswer}El cliente envía una clave única por operación lógica. El servidor guarda el resultado asociado a esa clave. Si llega el mismo request id otra vez, devuelve el resultado anterior sin aplicar el efecto dos veces.\end{uaanswer}
+\begin{uaexercise}\textbf{7.} Comparar at-most-once, at-least-once y exactly-once desde el punto de vista del cliente. Indicar qué garantía ofrece cada una y qué costo introduce.\end{uaexercise}
+\begin{uaanswer}At-most-once evita duplicados pero puede perder operaciones. At-least-once reduce pérdida mediante retries pero puede duplicar efectos si no hay idempotencia. Exactly-once suele requerir coordinación, deduplicación y persistencia; en sistemas reales muchas veces es una abstracción construida con idempotencia y transacciones.\end{uaanswer}
+\begin{uaexercise}\textbf{8.} Dado un sistema que procesa pagos, proponer una decisión de diseño usando el esquema problema--fallas--garantía--solución--trade-off.\end{uaexercise}
+\begin{uaanswer}Problema: evitar pagos duplicados ante timeout. Fallas: pérdida de respuesta, demora, retry del cliente. Garantía: a lo sumo un débito por operación lógica. Solución: clave de idempotencia persistida con estado de operación. Trade-off: más almacenamiento, manejo de estados pendientes y complejidad operativa.\end{uaanswer}
 
 \end{document}

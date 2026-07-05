@@ -8,17 +8,18 @@
 \date{\UADate}
 \begin{document}
 \maketitle
+
 \section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
+Resolver cada ejercicio distinguiendo observación, causa posible, garantía buscada y trade-off aceptado. Cuando aparezcan timeouts o retries, indicar explícitamente si la operación remota pudo haber ocurrido.
 
 \section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 02.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Comunicación y fallas''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\begin{uaexercise}\textbf{1.} Una llamada RPC a un servicio de pagos no responde antes del timeout. Enumerar al menos cuatro causas compatibles con esa observación y marcar cuáles implican que el pago pudo haberse ejecutado.\end{uaexercise}
+\begin{uaexercise}\textbf{2.} Explicar por qué RPC es una abstracción útil pero peligrosa si se la piensa como una llamada local.\end{uaexercise}
+\begin{uaexercise}\textbf{3.} Diseñar una política de timeout para una consulta de saldo y otra para una transferencia. Comparar qué cambia en latencia tolerada, riesgo y experiencia de usuario.\end{uaexercise}
+\begin{uaexercise}\textbf{4.} Analizar un retry automático ante timeout en una operación de creación de orden. Indicar qué problema resuelve y qué problema nuevo puede introducir.\end{uaexercise}
+\begin{uaexercise}\textbf{5.} Clasificar estas operaciones como idempotentes o no idempotentes y justificar: actualizar email, crear pedido, cancelar reserva, sumar puntos a una cuenta.\end{uaexercise}
+\begin{uaexercise}\textbf{6.} Proponer cómo convertir una operación no idempotente en segura ante retries usando un request id o clave de idempotencia.\end{uaexercise}
+\begin{uaexercise}\textbf{7.} Comparar at-most-once, at-least-once y exactly-once desde el punto de vista del cliente. Indicar qué garantía ofrece cada una y qué costo introduce.\end{uaexercise}
+\begin{uaexercise}\textbf{8.} Dado un sistema que procesa pagos, proponer una decisión de diseño usando el esquema problema--fallas--garantía--solución--trade-off.\end{uaexercise}
 
 \end{document}

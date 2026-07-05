@@ -9,33 +9,85 @@
 \begin{document}
 \maketitle
 
-\section{Introducción}
-La clase 05 desarrolla el tema ``Tiempo y causalidad'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
+\section{Propósito de la clase}
+En sistemas distribuidos no existe un reloj global perfecto que permita ordenar todos los eventos con certeza. Cada nodo observa su propio reloj local, la red introduce demoras variables y los mensajes pueden llegar tarde, perderse o reordenarse. Por eso, muchas decisiones de diseño deben basarse en causalidad lógica y no solamente en timestamps físicos.
 
-\section{Desarrollo conceptual}
-Entender por qué el orden lógico y la causalidad reemplazan al tiempo global en sistemas distribuidos. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+\begin{uakeybox}
+El problema central de la clase es distinguir orden físico, orden lógico y dependencia causal.
+\end{uakeybox}
 
-\subsection{Preguntas guía}
+\section{Por qué el tiempo físico no alcanza}
+Comparar timestamps físicos entre nodos distintos puede ser engañoso:
 \begin{itemize}
-\item ¿Cómo aparece happens-before en un sistema real? \item ¿Cómo aparece Lamport en un sistema real? \item ¿Cómo aparece vector clocks en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item los relojes locales pueden derivar;
+\item una corrección de sincronización puede mover un reloj hacia adelante o hacia atrás;
+\item un mensaje enviado antes puede llegar después por latencia variable;
+\item dos eventos pueden tener timestamps comparables sin que exista relación causal entre ellos.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 05 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+La pregunta importante no siempre es ``qué hora marcaba el reloj'', sino ``qué evento pudo influir sobre qué otro evento''.
+
+\section{Relación happened-before}
+La relación happened-before, escrita $a \rightarrow b$, captura dependencia causal mínima:
+\begin{enumerate}
+\item si $a$ y $b$ ocurren en el mismo proceso y $a$ ocurre antes que $b$, entonces $a \rightarrow b$;
+\item si $a$ es el envío de un mensaje y $b$ su recepción, entonces $a \rightarrow b$;
+\item si $a \rightarrow b$ y $b \rightarrow c$, entonces $a \rightarrow c$.
+\end{enumerate}
+
+Si no se cumple $a \rightarrow b$ ni $b \rightarrow a$, los eventos son concurrentes. Concurrente no significa simultáneo en sentido físico; significa que no hay evidencia causal que ordene un evento antes que el otro.
+
+\section{Relojes de Lamport}
+Los relojes de Lamport asignan un contador lógico a cada evento. Cada proceso mantiene un contador $L_i$:
+\begin{itemize}
+\item antes de un evento local, incrementa $L_i$;
+\item al enviar un mensaje, adjunta el valor actual;
+\item al recibir un mensaje con timestamp $t$, actualiza $L_i \leftarrow \max(L_i,t)+1$.
+\end{itemize}
+
+La propiedad central es:
+\[
+a \rightarrow b \implies L(a) < L(b)
+\]
+
+Esto permite construir un orden compatible con la causalidad. Sin embargo, la implicación inversa no vale: si $L(a) < L(b)$, no necesariamente $a \rightarrow b$.
+
+\begin{uawarn}
+Lamport preserva causalidad conocida, pero no permite detectar concurrencia con precisión.
+\end{uawarn}
+
+\section{Vector clocks}
+Los vector clocks conservan más información. Cada proceso mantiene un vector con una componente por proceso. La intuición es que cada evento registra cuánto sabe ese proceso sobre el avance de todos los demás.
+
+Para comparar dos vectores $V(a)$ y $V(b)$:
+\begin{itemize}
+\item $V(a) < V(b)$ si todas las componentes de $V(a)$ son menores o iguales que las de $V(b)$ y al menos una es estrictamente menor;
+\item si $V(a) < V(b)$, entonces $a$ precede causalmente a $b$;
+\item si los vectores no son comparables, los eventos son concurrentes.
+\end{itemize}
+
+Ejemplo:
+\[
+(2,1,0) \quad \text{y} \quad (1,2,0)
+\]
+no son comparables; representan eventos concurrentes.
+
+\section{Aplicación: conflictos en stores replicados}
+Supongamos dos réplicas desconectadas que aceptan escrituras sobre el mismo objeto. Si se usan timestamps físicos, una escritura puede sobrescribir arbitrariamente a la otra. Con vector clocks, el sistema puede distinguir dos casos:
+\begin{itemize}
+\item una versión desciende causalmente de otra y puede reemplazarla;
+\item dos versiones son concurrentes y requieren reconciliación.
+\end{itemize}
+
+El costo de esta precisión es metadata adicional y mayor complejidad, especialmente cuando el número de procesos o actores crece.
 
 \section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+Al finalizar la clase, el estudiante debe poder explicar por qué el tiempo físico no alcanza, aplicar happened-before, calcular relojes de Lamport simples, reconocer el límite de Lamport y usar vector clocks para distinguir causalidad de concurrencia.
 
 \section{Bibliografía guía}
 \begin{itemize}
 \item Kleppmann, cap. 8.
-\item Tanenbaum, relojes lógicos y sincronización.
-\item Lecturas de causalidad y orden parcial.
+\item Tanenbaum y Van Steen, relojes lógicos y sincronización.
+\item Lamport, ``Time, Clocks, and the Ordering of Events in a Distributed System''.
 \end{itemize}
-
-\begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
-\end{uakeybox}
 \end{document}

@@ -2,50 +2,51 @@
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
 \UASetClassNumber{03}
-\UASetClassTitle{Estado y replicación}
-\title{Clase 03 --- Estado y replicación}
+\UASetClassTitle{Replicación de estado}
+\title{Clase 03 --- Replicación de estado}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Comprender que replicar estado exige decidir qué ve cada actor y bajo qué atraso o inconsistencia. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+Mostrar que replicar estado no es copiar gratis: cada réplica adicional mejora disponibilidad o latencia, pero obliga a decidir qué divergencias temporales se aceptan y cómo se comunican al usuario.
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item explicar por qué se replica estado;
+\item describir el patrón leader-follower;
+\item comparar replicación síncrona y asíncrona;
+\item reconocer stale reads y sus síntomas;
+\item razonar sobre caída del líder y durabilidad de escrituras confirmadas.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
+\section{Guion sugerido}
 \begin{enumerate}
-\item Abrir la clase 03 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
+\item Empezar con la motivación: disponibilidad, latencia y escala de lectura.
+\item Dibujar líder y followers, separando escrituras de lecturas.
+\item Contrastar sync y async con una escritura concreta.
+\item Trabajar un stale read, por ejemplo cambio de contraseña o saldo.
+\item Cerrar con la pregunta: ¿cuándo una escritura confirmada es durable?
 \end{enumerate}
 
 \section{Errores conceptuales frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item pensar que más réplicas siempre implican más corrección;
+\item olvidar que leer de followers puede devolver datos viejos;
+\item confundir baja latencia con garantía fuerte;
+\item no distinguir confirmación al cliente de propagación a réplicas.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\section{Preguntas disparadoras}
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Desde dónde lee el cliente después de escribir?
+\item ¿Qué pasa si el líder cae justo después de confirmar?
+\item ¿Qué métrica operativa revela atraso de réplica?
+\item ¿Qué preferimos para este dominio: frescura o disponibilidad?
 \end{itemize}
 
 \begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+Criterio de logro docente: la clase salió bien si el estudiante puede explicar una stale read sin llamarla simplemente ``bug''.
 \end{uawarn}
 \end{document}

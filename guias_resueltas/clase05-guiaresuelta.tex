@@ -8,25 +8,26 @@
 \date{\UADate}
 \begin{document}
 \maketitle
+
 \section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
+En cada ejercicio separar orden físico, orden lógico y causalidad. Cuando uses relojes de Lamport o vector clocks, indicar qué garantía dan y qué no pueden concluir.
 
 \section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 05.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Tiempo y causalidad''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Tiempo y causalidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\begin{uaexercise}\textbf{1.} Explicar por qué dos timestamps físicos de nodos distintos no alcanzan para decidir causalidad entre eventos.\end{uaexercise}
+\begin{uaanswer}Porque los relojes locales pueden derivar, corregirse o no estar sincronizados, y porque una marca física menor no prueba dependencia causal. La causalidad depende de orden local, mensajes y transitividad, no solo de hora de pared.\end{uaanswer}
+\begin{uaexercise}\textbf{2.} Dado dos procesos con eventos locales y dos mensajes, marcar las relaciones happened-before y señalar qué eventos son concurrentes.\end{uaexercise}
+\begin{uaanswer}Deben marcarse las relaciones por orden local, envío-recepción y transitividad. Dos eventos son concurrentes si no hay camino causal en ninguna dirección entre ellos.\end{uaanswer}
+\begin{uaexercise}\textbf{3.} Aplicar las reglas de relojes de Lamport a una secuencia de eventos con envío y recepción de mensajes. Mostrar los contadores resultantes.\end{uaexercise}
+\begin{uaanswer}En cada evento local se incrementa el contador. En un envío se adjunta el valor. En una recepción se asigna $\max(local, recibido)+1$. El resultado debe respetar que si $a \rightarrow b$, entonces $L(a)<L(b)$.\end{uaanswer}
+\begin{uaexercise}\textbf{4.} Dar un ejemplo donde $L(a) < L(b)$ pero no pueda concluirse que $a \rightarrow b$.\end{uaexercise}
+\begin{uaanswer}Dos procesos sin mensajes pueden producir eventos independientes con contadores 1 y 2 por desempate o avance local. Aunque $1<2$, no hay relación causal. Lamport preserva causalidad en una dirección, pero el orden numérico no prueba causalidad.\end{uaanswer}
+\begin{uaexercise}\textbf{5.} Comparar dos vector clocks e indicar si representan causalidad en algún sentido o concurrencia: $(2,1,0)$ y $(1,2,0)$; $(1,2,0)$ y $(2,3,0)$.\end{uaexercise}
+\begin{uaanswer}$(2,1,0)$ y $(1,2,0)$ son concurrentes porque ninguno domina al otro. $(1,2,0) < (2,3,0)$ porque cada componente es menor o igual y al menos una es estrictamente menor; por lo tanto, el primero puede preceder causalmente al segundo.\end{uaanswer}
+\begin{uaexercise}\textbf{6.} Explicar por qué vector clocks detectan concurrencia y Lamport no.\end{uaexercise}
+\begin{uaanswer}Lamport reduce la historia causal a un número, por eso impone un orden compatible pero puede ordenar eventos concurrentes. Vector clocks conservan conocimiento por proceso; si dos vectores no son comparables, revelan concurrencia.\end{uaanswer}
+\begin{uaexercise}\textbf{7.} En un store eventualmente consistente, dos réplicas aceptan escrituras concurrentes sobre el mismo objeto. Proponer cómo usar vector clocks para decidir si se sobrescribe o se reconcilia.\end{uaexercise}
+\begin{uaanswer}Si el vector de una versión domina al otro, puede reemplazarla como descendiente causal. Si son incomparables, hay conflicto concurrente y no debería sobrescribirse ciegamente; se conserva ambas versiones o se fuerza reconciliación por aplicación/usuario.\end{uaanswer}
+\begin{uaexercise}\textbf{8.} Identificar el trade-off de usar vector clocks en un sistema con muchos nodos.\end{uaexercise}
+\begin{uaanswer}Permiten detectar concurrencia con precisión, pero el metadata crece con el número de nodos o actores. Esto aumenta tamaño de mensajes, almacenamiento y complejidad de poda o compactación.\end{uaanswer}
 
 \end{document}

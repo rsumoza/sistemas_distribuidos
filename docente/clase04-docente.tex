@@ -10,42 +10,43 @@
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Formalizar qué significa que un sistema sea correcto bajo distintos modelos de consistencia. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+Que el estudiante entienda consistencia como una especificación observable de lecturas y escrituras, no como una palabra genérica para ``datos correctos''. La clase debe conectar modelos de consistencia con costo de coordinación, latencia y disponibilidad.
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item definir corrección en términos de historias observables;
+\item explicar linearizability como comportamiento de objeto único;
+\item explicar eventual consistency como convergencia con lecturas temporalmente obsoletas;
+\item clasificar casos de dominio según el modelo de consistencia requerido;
+\item relacionar consistencia fuerte con decisiones bajo partición.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
+\section{Guion sugerido}
 \begin{enumerate}
-\item Abrir la clase 04 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
+\item Abrir con la pregunta: ``¿qué significa que el sistema sea correcto?''.
+\item Presentar una escritura confirmada seguida de una lectura vieja.
+\item Usar ese caso para distinguir linearizability de modelos más débiles.
+\item Mostrar dominios donde la consistencia eventual es aceptable y dominios donde no.
+\item Cerrar con el trade-off latencia--corrección y la conexión con CAP.
 \end{enumerate}
 
 \section{Errores conceptuales frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item usar ``consistente'' sin especificar modelo;
+\item creer que eventual consistency significa ausencia de garantías;
+\item olvidar que linearizability respeta tiempo real entre operaciones no solapadas;
+\item analizar consistencia sin mirar el dominio.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\section{Preguntas disparadoras}
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué lectura esperaría un usuario después de una escritura confirmada?
+\item ¿Qué historia observable permite este modelo?
+\item ¿Qué costo tiene coordinar para preservar esa garantía?
+\item ¿Qué daño produce una lectura vieja en este dominio?
 \end{itemize}
 
 \begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+Criterio de logro docente: la clase salió bien si el estudiante deja de decir ``consistencia'' en abstracto y nombra la garantía observable.
 \end{uawarn}
 \end{document}
