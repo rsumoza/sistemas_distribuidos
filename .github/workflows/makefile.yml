@@ -1,4 +1,4 @@
-name: Build LaTeX
+name: Compilar PDFs
 
 on:
   push:
