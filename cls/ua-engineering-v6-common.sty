@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{PsiDirectory:cls/ua-engineering-v6-common}[2026/04/19 UA Ingeniería v6 common]
+\ProvidesPackage{ua-engineering-v6-common}[2026/04/19 UA Ingeniería v6 common]
 
 \RequirePackage{xcolor}
 \RequirePackage{graphicx}
@@ -82,6 +82,9 @@
 \newcommand{\UAClassTitle}{}
 \newcommand{\UADocKind}{Documento}
 \newcommand{\UALogoPath}{../assets/logo_computacion_austral.png}
+\newcommand{\UABuildNumber}{}
+\newcommand{\UABuildDate}{}
+\newcommand{\UABuildCommit}{}
 
 \newcommand{\UASetUniversity}[1]{\renewcommand{\UAUniversity}{#1}}
 \newcommand{\UASetFaculty}[1]{\renewcommand{\UAFaculty}{#1}}
@@ -97,6 +100,19 @@
 \newcommand{\UASetClassTitle}[1]{\renewcommand{\UAClassTitle}{#1}}
 \newcommand{\UASetDocKind}[1]{\renewcommand{\UADocKind}{#1}}
 \newcommand{\UASetLogo}[1]{\renewcommand{\UALogoPath}{#1}}
+\newcommand{\UASetBuildNumber}[1]{\renewcommand{\UABuildNumber}{#1}}
+\newcommand{\UASetBuildDate}[1]{\renewcommand{\UABuildDate}{#1}}
+\newcommand{\UASetBuildCommit}[1]{\renewcommand{\UABuildCommit}{#1}}
+
+\InputIfFileExists{../config/build-info.tex}{}{}
+
+\newcommand{\UABuildInfo}{%
+  \ifstrempty{\UABuildNumber}{}{%
+    Build \UABuildNumber%
+    \ifstrempty{\UABuildDate}{}{ --- \UABuildDate}%
+    \ifstrempty{\UABuildCommit}{}{ --- \UABuildCommit}%
+  }%
+}
 
 \newcommand{\UAPrintLogo}[1][1.5cm]{%
   \IfFileExists{\UALogoPath}{\includegraphics[height=#1]{\UALogoPath}}{%

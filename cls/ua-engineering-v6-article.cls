@@ -55,6 +55,7 @@
 {\large \UADocKind}\\[0.8cm]
 {\large \UAProfessor}\\[0.2cm]
 {\large \UADate}
+\ifstrempty{\UABuildNumber}{}{\\[0.45cm]{\small\color{UAIngMuted}\UABuildInfo}}
 \end{center}
 \vfill
 \end{titlepage}

@@ -41,6 +41,7 @@
 {\color{white}\normalsize \UADepartment}\\[0.12cm]
 {\color{white}\normalsize \UACareer\ --- \UACommission\ --- \UACampus}\\[0.12cm]
 {\color{white}\normalsize \UAProfessor\ --- \UADate}
+\ifstrempty{\UABuildNumber}{}{\\[0.35cm]{\color{white}\scriptsize \UABuildInfo}}
 };
 \end{tikzpicture}
 }
