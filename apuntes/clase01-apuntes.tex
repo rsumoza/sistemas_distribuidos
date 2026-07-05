@@ -1,5 +1,5 @@
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config.tex}
+\input{../config/course-config}
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
 \title{Clase 01 --- Pensamiento distribuido}
@@ -8,12 +8,17 @@
 \begin{document}
 \maketitle
 
-\section{Introducción}
-El propósito de esta primera clase es instalar el marco mental del curso. Un sistema distribuido no se define solo por tener varias máquinas, sino por el hecho de que dichas máquinas deben cooperar sin memoria compartida, sin reloj global confiable y bajo un canal de comunicación inherentemente incierto.
+\section{Introducción}\label{sec:introduccion}
+El propósito de esta primera clase es instalar el marco mental del curso.
+Un sistema distribuido no se define solo por tener varias máquinas, sino por el hecho de que dichas máquinas deben cooperar sin memoria compartida, sin reloj global confiable y bajo un canal de comunicación inherentemente incierto.
 
 La pregunta fundacional no es ``qué tecnología usar'', sino ``qué podemos garantizar cuando no sabemos exactamente qué está ocurriendo en cada instante del sistema''.
 
-\section{Definición operativa de sistema distribuido}
+Un objetivo central de la clase es aprender a razonar desde síntomas observables hacia posibles causas internas.
+El estudiante debe separar lo que efectivamente relevó del sistema, las hipótesis compatibles con esa evidencia y la conclusión que puede defender.
+Esa separación también debe quedar documentada: observaciones, supuestos, causas posibles, evidencias a favor o en contra y decisión adoptada.
+
+\section{Definición operativa de sistema distribuido}\label{sec:definicion-operativa-de-sistema-distribuido}
 Una definición útil es la siguiente: un sistema distribuido es un conjunto de procesos o nodos que se ejecutan en máquinas distintas, se comunican por intercambio de mensajes y colaboran para ofrecer una funcionalidad que, desde el punto de vista del usuario, aparece como una sola abstracción.
 
 Esta definición tiene consecuencias inmediatas:
@@ -23,8 +28,10 @@ Esta definición tiene consecuencias inmediatas:
 \item El conocimiento sobre el estado global es parcial, retrasado y potencialmente inconsistente.
 \end{enumerate}
 
-\section{Ejemplo motivador: pago con timeout}
-Supongamos un cliente que envía un pedido de pago a un servidor. El servidor procesa el pedido y luego intenta devolver una confirmación. El cliente no recibe la respuesta dentro del tiempo esperado y decide reintentar.
+\section{Ejemplo motivador: pago con timeout}\label{sec:ejemplo-motivador:-pago-con-timeout}
+Supongamos un cliente que envía un pedido de pago a un servidor.
+El servidor procesa el pedido y luego intenta devolver una confirmación.
+El cliente no recibe la respuesta dentro del tiempo esperado y decide reintentar.
 
 \begin{center}
 \begin{tikzpicture}[
@@ -45,8 +52,8 @@ Supongamos un cliente que envía un pedido de pago a un servidor. El servidor pr
 
 Desde la perspectiva del cliente, varias historias del sistema son compatibles con el mismo síntoma externo:
 \begin{itemize}
-\item el servidor nunca recibió el pedido;
-\item el servidor lo recibió pero cayó antes de terminar;
+\item El servidor nunca recibió el pedido;
+\item el servidor lo recibió, pero cayó antes de terminar;
 \item el servidor procesó correctamente y la respuesta se perdió;
 \item el servidor sigue vivo y la respuesta solo está demorada.
 \end{itemize}
@@ -55,30 +62,32 @@ Desde la perspectiva del cliente, varias historias del sistema son compatibles c
 Un timeout es un evento de observación, no una prueba de falla.
 \end{uawarn}
 
-\section{Modelo de sistema: sincronía y asincronía}
-En un modelo síncrono se asume la existencia de cotas superiores conocidas para el tiempo de cómputo y para la latencia de la red. En un modelo asíncrono no existen cotas superiores fiables o conocidas; en consecuencia, una demora arbitrariamente grande no puede distinguirse de una falla definitiva. Este segundo modelo es más severo, pero mucho más cercano al comportamiento real de Internet.
+\section{Modelo de sistema: sincronía y asincronía}\label{sec:modelo-de-sistema:-sincronia-y-asincronia}
+En un modelo síncrono se asume la existencia de cotas superiores conocidas para el tiempo de cómputo y para la latencia de la red.
+En un modelo asíncrono no existen cotas superiores fiables o conocidas; en consecuencia, una demora arbitrariamente grande no puede distinguirse de una falla definitiva.
+Este segundo modelo es más severo, pero mucho más cercano al comportamiento real de Internet.
 
-\section{Modelo de fallas}
+\section{Modelo de fallas}\label{sec:modelo-de-fallas}
 El tipo de fallas que aceptamos como plausibles determina el espacio de soluciones correctas.
-\subsection{Crash failures}
+\subsection{Crash failures}\label{subsec:crash-failures}
 Un proceso deja de responder por completo.
-\subsection{Omisión}
+\subsection{Omisión}\label{subsec:omision}
 Un mensaje no llega a destino.
-\subsection{Delay}
+\subsection{Delay}\label{subsec:delay}
 El mensaje llega, pero demasiado tarde para la política de espera del receptor.
-\subsection{Particiones}
+\subsection{Particiones}\label{subsec:particiones}
 La red queda dividida en componentes que no pueden intercambiar mensajes entre sí.
-\subsection{Byzantine}
+\subsection{Byzantine}\label{subsec:byzantine}
 Un proceso puede comportarse de manera arbitraria, inconsistente o incluso maliciosa.
 
-\section{Framework del curso}
+\section{Framework del curso}\label{sec:framework-del-curso}
 A lo largo de toda la materia vamos a estructurar cada decisión de diseño mediante el esquema
 \[
 D = (P,F,G,S,T)
 \]
 donde $P$ representa el problema, $F$ las fallas asumidas, $G$ la garantía requerida, $S$ la solución elegida y $T$ el trade-off aceptado.
 
-\subsection{Ejemplo con pagos duplicados}
+\subsection{Ejemplo con pagos duplicados}\label{subsec:ejemplo-con-pagos-duplicados}
 \begin{itemize}
 \item $P$: evitar débitos duplicados ante reintentos;
 \item $F$: timeout en el cliente y pérdida de respuestas;
@@ -87,17 +96,20 @@ donde $P$ representa el problema, $F$ las fallas asumidas, $G$ la garantía requ
 \item $T$: mayor costo de estado, validación y complejidad operativa.
 \end{itemize}
 
-\section{CAP: lectura correcta}
-La interpretación relevante para este curso es precisa: cuando existe partición de red, un sistema replicado no puede ofrecer simultáneamente disponibilidad total y consistencia fuerte observable para todas las operaciones. Eso obliga a decidir entre rechazar ciertas operaciones para preservar corrección o responder aun con posible desalineación temporal.
+\section{CAP: lectura correcta}\label{sec:cap:-lectura-correcta}
+La interpretación relevante para este curso es precisa: cuando existe partición de red, un sistema replicado no puede ofrecer simultáneamente disponibilidad total y consistencia fuerte observable para todas las operaciones.
+Eso obliga a decidir entre rechazar ciertas operaciones para preservar corrección o responder aún con posible desalineación temporal.
 
-\section{Bibliografía guía}
+\section{Bibliografía guía}\label{sec:bibliografia-guia}
 \begin{itemize}
-\item Kleppmann, cap. 1 y comienzo del cap. 8.
+\item Kleppmann, cap.
+1 y comienzo del cap.
+8.
 \item Tanenbaum y Van Steen, fundamentos e introducción.
 \item MIT 6.824, clases introductorias sobre RPC y fallas.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, razonar desde síntomas hacia causas posibles, documentar el relevamiento y el análisis, indicar qué garantía busca preservar y qué precio paga por hacerlo.
 \end{uakeybox}
 \end{document}

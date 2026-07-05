@@ -1,5 +1,5 @@
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config.tex}
+\input{../config/course-config}
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
 \title{Clase 01 --- Pensamiento distribuido}
@@ -8,19 +8,22 @@
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}
-Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+\section{Objetivo pedagógico profundo}\label{sec:objetivo-pedagogico-profundo}
+Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural.
+El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable: partir de síntomas, formular causas posibles, distinguir evidencia de inferencia y documentar qué relevó, qué analizó y qué conclusión puede sostener.
 
-\section{Resultados de aprendizaje esperados}
+\section{Resultados de aprendizaje esperados}\label{sec:resultados-de-aprendizaje-esperados}
 Al finalizar la clase, un estudiante debería poder:
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
+\item Reconocer el tipo de problema distribuido involucrado;
+\item razonar desde síntomas observables hacia causas posibles;
+\item documentar observaciones, hipótesis, evidencias y conclusiones;
 \item explicitar hipótesis de falla relevantes;
 \item justificar una garantía y no solo nombrarla;
 \item defender una solución junto con su trade-off dominante.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
+\section{Guion sugerido para un profesor nuevo}\label{sec:guion-sugerido-para-un-profesor-nuevo}
 \begin{enumerate}
 \item Abrir la clase 01 con un caso concreto antes de formalizar definiciones.
 \item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
@@ -29,19 +32,19 @@ Al finalizar la clase, un estudiante debería poder:
 \item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
 \end{enumerate}
 
-\section{Errores conceptuales frecuentes}
+\section{Errores conceptuales frecuentes}\label{sec:errores-conceptuales-frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa;
+\item Confundir síntoma con causa;
 \item repetir definiciones sin conectarlas con un caso operativo;
 \item proponer una técnica sin explicar por qué esa garantía vale el costo;
 \item olvidar la continuidad con clases anteriores.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\section{Preguntas disparadoras recomendadas}\label{sec:preguntas-disparadoras-recomendadas}
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué podés afirmar con certeza desde el borde del sistema?
+\item ¿Qué observación te falta para reducir incertidumbre?
+\item ¿Qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
 \end{itemize}
 
 \begin{uawarn}

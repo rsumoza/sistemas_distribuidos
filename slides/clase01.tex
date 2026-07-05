@@ -1,3 +1,4 @@
+% !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
 \UASetClassNumber{01}
@@ -17,6 +18,8 @@
 \begin{frame}{Objetivos de la clase}
 \begin{itemize}
 \item Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural.
+\item Razonar desde síntomas observables hacia posibles causas, sin confundir evidencia con certeza.
+\item Documentar qué se relevó, qué hipótesis se analizaron y qué conclusión queda justificada.
 \item Conectar el concepto con decisiones observables de diseño
 \item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
 \end{itemize}
@@ -27,7 +30,7 @@
 Un sistema distribuido es un conjunto de nodos independientes que cooperan por red para ofrecer una abstracción unificada.
 
 \begin{itemize}
-\item no hay memoria compartida global
+\item No hay memoria compartida global
 \item no hay reloj global confiable
 \item los componentes pueden fallar de manera independiente
 \item la red introduce demora, pérdida y reordenamiento
@@ -35,7 +38,9 @@ Un sistema distribuido es un conjunto de nodos independientes que cooperan por r
 \end{frame}
 
 \begin{frame}{Ejemplo motivador: pago con timeout}
-Un cliente envía un pago. El servidor procesa. La respuesta no vuelve.
+Un cliente envía un pago.
+El servidor procesa.
+La respuesta no vuelve.
 
 \begin{center}
 \begin{tikzpicture}[

@@ -1,5 +1,5 @@
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config.tex}
+\input{../config/course-config}
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
 \title{Clase 01 --- Pensamiento distribuido}
@@ -7,10 +7,11 @@
 \date{\UADate}
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
+\section{Indicaciones generales}\label{sec:indicaciones-generales}
 Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
+Documentar también qué síntomas se observaron, qué causas son compatibles con esos síntomas y qué evidencia permite sostener o descartar cada hipótesis.
 
-\section{Ejercicios}
+\section{Ejercicios}\label{sec:ejercicios}
 \begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 01.\end{uaexercise}
 \begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Pensamiento distribuido''.\end{uaexercise}
 \begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
@@ -18,6 +19,6 @@ Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--f
 \begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
 \begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
 \begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida, indicando qué observaciones se registrarían y cómo se documentaría el análisis.\end{uaexercise}
 
 \end{document}
