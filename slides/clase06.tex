@@ -1,0 +1,199 @@
+\documentclass{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+
+\UASetClassNumber{06}
+\UASetClassTitle{Quórums}
+
+\title{\UACourse}
+\subtitle{Clase 06 — Quórums}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Quórums}
+
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item entender el modelo de réplicas con parámetros $N$, $R$, $W$
+\item derivar la condición de intersección de quórums
+\item analizar consistencia, latencia y disponibilidad
+\item discutir límites prácticos de quórums
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Motivación}
+Si los datos están replicados en $N$ nodos:
+\begin{itemize}
+\item ¿hay que leer de todos?
+\item ¿hay que escribir en todos?
+\end{itemize}
+
+Quórums intentan responder:
+\begin{center}
+\Large
+¿cuál es el mínimo subconjunto suficiente?
+\end{center}
+\end{frame}
+
+\begin{frame}{Modelo básico}
+\begin{itemize}
+\item $N$: número total de réplicas
+\item $W$: cantidad de réplicas que deben confirmar una escritura
+\item $R$: cantidad de réplicas consultadas en una lectura
+\end{itemize}
+
+Condición clásica:
+\[
+R + W > N
+\]
+\end{frame}
+
+\begin{frame}{Intuición de la condición}
+Si
+\[
+R + W > N
+\]
+entonces todo conjunto de lectura intersecta a todo conjunto de escritura.
+
+\begin{block}{Consecuencia}
+La lectura ve al menos una réplica que participó de la última escritura exitosa.
+\end{block}
+\end{frame}
+
+\begin{frame}{Figura: caso con intersección}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\small}]
+\foreach \x/\label in {0/A,2/B,4/C}
+  \node[draw,circle,minimum size=0.9cm] (\label) at (\x,0) {\label};
+
+\draw[very thick,UAIngAccent] (-0.5,-1.2) ellipse (2.0 and 0.55);
+\draw[very thick,UAIngPrimary,dashed] (2.5,-1.2) ellipse (2.0 and 0.55);
+
+\node at (0.8,-2.0) {$W=2$};
+\node at (3.3,-2.0) {$R=2$};
+\end{tikzpicture}
+\end{center}
+
+Ejemplo: $N=3$, $W=2$, $R=2$.
+Siempre hay intersección.
+\end{frame}
+
+\begin{frame}{Figura: caso sin intersección garantizada}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\small}]
+\foreach \x/\label in {0/A,2/B,4/C}
+  \node[draw,circle,minimum size=0.9cm] (\label) at (\x,0) {\label};
+
+\draw[very thick,UAIngAccent] (0,-1.2) ellipse (0.7 and 0.45);
+\draw[very thick,UAIngPrimary,dashed] (4,-1.2) ellipse (0.7 and 0.45);
+
+\node at (0,-2.0) {$W=1$};
+\node at (4,-2.0) {$R=1$};
+\end{tikzpicture}
+\end{center}
+
+Ejemplo: $N=3$, $W=1$, $R=1$.
+No hay intersección garantizada.
+\end{frame}
+
+\begin{frame}{Trade-offs básicos}
+\begin{itemize}
+\item aumentar $W$ mejora visibilidad de escrituras, pero empeora latencia/disponibilidad de escritura
+\item aumentar $R$ mejora lecturas frescas, pero empeora latencia/disponibilidad de lectura
+\item disminuir ambos mejora rendimiento, pero debilita la consistencia observable
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Caso clásico}
+Para $N=3$:
+
+\begin{center}
+\begin{tabular}{c c c c}
+\toprule
+$R$ & $W$ & ¿$R+W>N$? & Lectura fresca garantizada \\
+\midrule
+1 & 1 & No & No \\
+1 & 2 & No & No garantizada \\
+2 & 2 & Sí & Sí, idealmente \\
+3 & 1 & Sí & Sí, pero lectura lenta \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Pero no todo termina en $R+W>N$}
+En sistemas reales todavía pueden aparecer:
+\begin{itemize}
+\item escrituras concurrentes
+\item réplicas lentas
+\item anti-entropy retrasada
+\item versiones múltiples
+\end{itemize}
+
+\begin{uawarn}
+La condición de intersección es necesaria para cierto tipo de garantía, pero no resuelve todos los problemas de consistencia.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Ejemplo tipo Dynamo}
+Dynamo usa:
+\begin{itemize}
+\item réplica parcial
+\item lectura/escritura sobre subconjuntos
+\item reconciliación posterior
+\end{itemize}
+
+Pregunta central:
+\begin{block}{}
+¿preferimos detectar conflicto y reconciliar o bloquear agresivamente para evitarlo?
+\end{block}
+\end{frame}
+
+\begin{frame}{Caso de stale read}
+Supongamos:
+\begin{itemize}
+\item una escritura llega a dos réplicas
+\item una lectura consulta una réplica atrasada y otra actualizada
+\item el sistema debe decidir qué versión devolver
+\end{itemize}
+
+Entonces ya no basta pensar solo en cardinalidades: también importan versiones y reconciliación.
+\end{frame}
+
+\begin{frame}{Ejemplo aplicado}
+Sistema de catálogo:
+\begin{itemize}
+\item lectura muy frecuente
+\item pequeñas inconsistencias tolerables
+\end{itemize}
+
+Sistema bancario:
+\begin{itemize}
+\item operaciones de débito con corrección prioritaria
+\item lecturas o escrituras más conservadoras
+\end{itemize}
+
+\begin{block}{Conclusión}
+La elección de $R$ y $W$ depende del dominio.
+\end{block}
+\end{frame}
+
+\begin{frame}{Errores frecuentes}
+\begin{itemize}
+\item creer que $R+W>N$ implica consistencia fuerte total
+\item elegir parámetros sin distinguir lectura y escritura
+\item ignorar fallas parciales y versiones concurrentes
+\item asumir que “más réplicas” implica automáticamente “más correcto”
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+Los quórums no eliminan trade-offs: los hacen explícitos y parametrizables.
+\end{block}
+\end{frame}
+
+\end{document}

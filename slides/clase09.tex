@@ -1,0 +1,73 @@
+\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+\UASetClassNumber{09}
+\UASetClassTitle{Logs y procesamiento distribuido}
+\title[\UACourse]{\UACourse}
+\subtitle{Clase 09 --- Logs y procesamiento distribuido}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Logs y procesamiento distribuido}
+
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados.
+\item conectar el concepto con decisiones observables de diseño
+\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Problema central}
+La clase 09 trabaja un tipo específico de dificultad distribuida: Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados.
+
+\begin{itemize}
+\item ¿qué parte del sistema observamos?
+\item ¿qué hipótesis de falla importan?
+\item ¿qué garantía vale la pena pagar?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Temas clave}
+\begin{itemize}
+\item topics
+\item partitions
+\item offsets
+\item consumer groups
+\item semánticas de entrega
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo guía}
+Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
+\end{frame}
+
+\begin{frame}{Preguntas para pensar}
+\begin{itemize}
+\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
+\item ¿qué fallas son plausibles en este contexto?
+\item ¿qué garantía sería innegociable y cuál negociable?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Errores frecuentes}
+\begin{itemize}
+\item confundir síntoma con causa
+\item describir una tecnología sin explicitar la garantía
+\item proponer una solución sin reconocer su costo
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+La clase 09 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\end{block}
+\end{frame}
+
+\end{document}

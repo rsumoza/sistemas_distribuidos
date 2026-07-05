@@ -1,0 +1,214 @@
+\documentclass{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+
+\UASetClassNumber{08}
+\UASetClassTitle{Particionado y escalabilidad}
+
+\title{\UACourse}
+\subtitle{Clase 08 — Particionado y escalabilidad}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Particionado y escalabilidad}
+
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item entender por qué escalar implica distribuir datos
+\item comparar hash mod $N$ con consistent hashing
+\item introducir virtual nodes
+\item discutir hotspots y rebalancing
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Motivación}
+Cuando los datos y el tráfico crecen:
+\begin{itemize}
+\item un solo nodo ya no alcanza
+\item hay que distribuir claves y carga
+\end{itemize}
+
+\begin{block}{Pregunta}
+¿Cómo asignamos claves a nodos sin rehacer todo cada vez que cambia el clúster?
+\end{block}
+\end{frame}
+
+\begin{frame}{Particionado}
+Particionar significa dividir el espacio de datos en fragmentos y asignarlos a nodos distintos.
+
+Objetivos:
+\begin{itemize}
+\item distribuir almacenamiento
+\item distribuir throughput
+\item reducir contención
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Hash mod N}
+Una idea simple:
+\[
+\text{nodo}(k) = h(k) \bmod N
+\]
+
+Ventaja:
+\begin{itemize}
+\item muy fácil de implementar
+\end{itemize}
+
+Problema:
+\begin{itemize}
+\item si cambia $N$, casi todas las claves se remapean
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo de problema}
+Supongamos que pasamos de $N=4$ a $N=5$.
+
+Entonces:
+\[
+h(k) \bmod 4 \neq h(k) \bmod 5
+\]
+para una fracción enorme de claves.
+
+\begin{uawarn}
+Escalar agregando un nodo puede implicar mover casi todo el sistema.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Consistent hashing}
+Idea:
+\begin{itemize}
+\item mapear claves y nodos sobre un anillo
+\item cada clave se asigna al primer nodo que aparece al avanzar en sentido horario
+\end{itemize}
+
+Ventaja:
+\begin{itemize}
+\item al agregar o quitar un nodo, solo se remapea una fracción limitada del espacio
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Figura: consistent hashing}
+\begin{center}
+\begin{tikzpicture}[scale=1.0,every node/.style={font=\small}]
+\draw[thick] (0,0) circle (2.4);
+
+\node[draw,circle,fill=UAIngAccent!20] (A) at (90:2.4) {A};
+\node[draw,circle,fill=UAIngAccent!20] (B) at (210:2.4) {B};
+\node[draw,circle,fill=UAIngAccent!20] (C) at (330:2.4) {C};
+
+\filldraw (40:2.0) circle (2pt) node[right] {$k_1$};
+\filldraw (170:2.0) circle (2pt) node[left] {$k_2$};
+\filldraw (280:2.0) circle (2pt) node[below] {$k_3$};
+
+\node at (0,-3.2) {cada clave va al primer nodo en sentido horario};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}{Agregar un nodo}
+Si agregamos un nuevo nodo $D$ en el anillo:
+\begin{itemize}
+\item no se remapean todas las claves
+\item solo se reasignan las del segmento que ahora cubre $D$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Figura: nodo nuevo y rango remapeado}
+\begin{center}
+\begin{tikzpicture}[scale=1.0,every node/.style={font=\small}]
+\draw[thick] (0,0) circle (2.4);
+
+\node[draw,circle,fill=UAIngAccent!20] (A) at (90:2.4) {A};
+\node[draw,circle,fill=UAIngAccent!20] (B) at (210:2.4) {B};
+\node[draw,circle,fill=UAIngAccent!20] (C) at (330:2.4) {C};
+\node[draw,circle,fill=UAIngPrimary!20] (D) at (20:2.4) {D};
+
+\draw[very thick,UAIngPrimary] (20:2.4) arc[start angle=20,end angle=90,radius=2.4];
+
+\node at (0,-3.2) {solo se remapea el rango sombreado/segmento asociado al nuevo nodo};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}{Virtual nodes}
+Problema:
+\begin{itemize}
+\item pocos nodos físicos pueden producir distribución desigual
+\end{itemize}
+
+Solución:
+\begin{itemize}
+\item representar cada nodo físico por múltiples posiciones virtuales en el anillo
+\item mejora balanceo y flexibilidad de rebalancing
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Hot keys}
+No todo problema de escala se resuelve con hashing.
+
+Puede haber:
+\begin{itemize}
+\item claves extremadamente populares
+\item skew de acceso
+\item desbalance entre particiones
+\end{itemize}
+
+\begin{block}{Conclusión}
+Particionar datos no garantiza particionar carga uniformemente.
+\end{block}
+\end{frame}
+
+\begin{frame}{Ejemplo tipo MIT}
+Supongamos una aplicación social:
+\begin{itemize}
+\item claves distribuidas por consistent hashing
+\item un usuario famoso recibe miles de requests por segundo
+\end{itemize}
+
+Pregunta:
+\begin{block}{}
+¿el anillo resuelve el hotspot?
+\end{block}
+
+No completamente. Hace falta:
+\begin{itemize}
+\item caching
+\item replication específica
+\item fanout/control de lectura
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Comparación rápida}
+\begin{center}
+\begin{tabular}{l l l}
+\toprule
+Método & Ventaja & Problema \\
+\midrule
+Hash mod N & simple & remapea casi todo \\
+Consistent hashing & remapeo limitado & requiere más diseño \\
+Virtual nodes & mejor balance & más complejidad operacional \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Errores frecuentes}
+\begin{itemize}
+\item pensar que particionar es solo “repartir datos”
+\item ignorar el costo de rebalancing
+\item suponer distribución uniforme de acceso
+\item olvidar que algunas claves concentran tráfico
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+Escalar un sistema distribuido exige diseñar cómo evolucionará la distribución de datos cuando cambie el tamaño y la carga del clúster.
+\end{block}
+\end{frame}
+
+\end{document}

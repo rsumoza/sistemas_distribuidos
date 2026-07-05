@@ -1,0 +1,40 @@
+\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\input{../config/course-config.tex}
+\UASetClassNumber{05}
+\UASetClassTitle{Tiempo y causalidad}
+\title{Clase 05 --- Tiempo y causalidad}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+
+\section{Introducción}
+La clase 05 desarrolla el tema ``Tiempo y causalidad'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
+
+\section{Desarrollo conceptual}
+Entender por qué el orden lógico y la causalidad reemplazan al tiempo global en sistemas distribuidos. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+
+\subsection{Preguntas guía}
+\begin{itemize}
+\item ¿Cómo aparece happens-before en un sistema real? \item ¿Cómo aparece Lamport en un sistema real? \item ¿Cómo aparece vector clocks en un sistema real? 
+\item ¿qué síntoma observaría un usuario o un operador?
+\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\end{itemize}
+
+\section{Conexión con el resto del curso}
+La clase 05 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+
+\section{Resultado de aprendizaje esperado}
+Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+
+\section{Bibliografía guía}
+\begin{itemize}
+\item Kleppmann, cap. 8.
+\item Tanenbaum, relojes lógicos y sincronización.
+\item Lecturas de causalidad y orden parcial.
+\end{itemize}
+
+\begin{uakeybox}
+Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+\end{uakeybox}
+\end{document}

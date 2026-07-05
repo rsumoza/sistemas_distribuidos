@@ -1,0 +1,162 @@
+\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+\UASetClassNumber{01}
+\UASetClassTitle{Pensamiento distribuido}
+\title[\UACourse]{\UACourse}
+\subtitle{Clase 01 --- Pensamiento distribuido}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Pensamiento distribuido}
+
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural.
+\item conectar el concepto con decisiones observables de diseño
+\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Definición operativa}
+Un sistema distribuido es un conjunto de nodos independientes que cooperan por red para ofrecer una abstracción unificada.
+
+\begin{itemize}
+\item no hay memoria compartida global
+\item no hay reloj global confiable
+\item los componentes pueden fallar de manera independiente
+\item la red introduce demora, pérdida y reordenamiento
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo motivador: pago con timeout}
+Un cliente envía un pago. El servidor procesa. La respuesta no vuelve.
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=4cm,
+  >=Latex,
+  every node/.style={font=\small}
+]
+\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm, right of=c] (s) {Servidor};
+\draw[->, thick]
+  (c.north east) -- (s.north west)
+  node[midway, above=4pt] {pago};
+\draw[->, thick, dashed]
+  (s.south west) -- (c.south east)
+  node[midway, below=6pt] {respuesta perdida / demorada};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item ¿el servidor nunca recibió el pedido?
+\item ¿procesó el pago y se perdió el ACK?
+\item ¿está caído o solo lento?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Insight central}
+\begin{block}{Afirmación}
+En un sistema distribuido asíncrono, un observador remoto no puede distinguir de manera perfecta entre una falla y una demora suficientemente larga.
+\end{block}
+
+Eso obliga a diseñar con hipótesis explícitas sobre fallas, garantías y recuperación.
+\end{frame}
+
+\begin{frame}{Tipos de fallas relevantes}
+\begin{columns}[T]
+\column{0.58\textwidth}
+\begin{itemize}
+\item crash: el nodo deja de responder
+\item omission: un mensaje no llega
+\item delay: un mensaje llega tarde
+\item partition: una parte de la red queda aislada
+\item byzantine: comportamiento arbitrario o malicioso
+\end{itemize}
+\column{0.38\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=1.2cm]
+\node[draw, rounded corners] (r) {Fallas};
+\node[draw, below left=of r] (c) {Crash};
+\node[draw, below=of r] (d) {Delay};
+\node[draw, below right=of r] (o) {Omisión};
+\node[draw, below=2.2cm of d] (p) {Partición};
+\draw (r)--(c);
+\draw (r)--(d);
+\draw (r)--(o);
+\draw (d)--(p);
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Formalización mínima}
+Podemos representar una decisión de diseño como:
+\[
+D = (P,F,G,S,T)
+\]
+\begin{itemize}
+\item $P$: problema
+\item $F$: fallas asumidas
+\item $G$: garantía requerida
+\item $S$: solución elegida
+\item $T$: trade-off aceptado
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo usando el framework}
+\textbf{Problema:} evitar duplicación de pagos.
+
+\begin{itemize}
+\item $F$: timeout y retry del cliente
+\item $G$: a lo sumo un débito efectivo
+\item $S$: idempotencia con request id único
+\item $T$: más estado, más validaciones, más complejidad operativa
+\end{itemize}
+\end{frame}
+
+\begin{frame}{CAP: intuición correcta}
+\begin{columns}[T]
+\column{0.54\textwidth}
+Bajo partición, un sistema replicado no puede dar simultáneamente:
+\begin{itemize}
+\item consistencia fuerte observable
+\item disponibilidad total de las operaciones
+\end{itemize}
+
+La decisión real es: rechazar para preservar corrección o responder sacrificando consistencia.
+\column{0.40\textwidth}
+\begin{center}
+\begin{tikzpicture}[scale=0.95,every node/.style={font=\small}]
+\node (C) at (0,0) {Consistencia};
+\node (A) at (3.1,0) {Disponibilidad};
+\node (P) at (1.55,2.4) {Particiones};
+\draw[thick] (C)--(A)--(P)--(C);
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Errores conceptuales frecuentes}
+\begin{itemize}
+\item creer que timeout implica crash
+\item pensar que la red es confiable salvo casos extremos
+\item asumir que siempre existe una solución perfecta
+\item usar CAP como slogan y no como restricción bajo partición
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+La clase 01 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\end{block}
+\end{frame}
+
+\end{document}

@@ -1,0 +1,50 @@
+\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\input{../config/course-config.tex}
+\UASetClassNumber{13}
+\UASetClassTitle{Resiliencia y tolerancia a fallas}
+\title{Clase 13 --- Resiliencia y tolerancia a fallas}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+
+\section{Objetivo pedagógico profundo}
+Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+\section{Resultados de aprendizaje esperados}
+Al finalizar la clase, un estudiante debería poder:
+\begin{itemize}
+\item reconocer el tipo de problema distribuido involucrado;
+\item explicitar hipótesis de falla relevantes;
+\item justificar una garantía y no solo nombrarla;
+\item defender una solución junto con su trade-off dominante.
+\end{itemize}
+
+\section{Guion sugerido para un profesor nuevo}
+\begin{enumerate}
+\item Abrir la clase 13 con un caso concreto antes de formalizar definiciones.
+\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
+\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
+\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
+\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
+\end{enumerate}
+
+\section{Errores conceptuales frecuentes}
+\begin{itemize}
+\item confundir síntoma con causa;
+\item repetir definiciones sin conectarlas con un caso operativo;
+\item proponer una técnica sin explicar por qué esa garantía vale el costo;
+\item olvidar la continuidad con clases anteriores.
+\end{itemize}
+
+\section{Preguntas disparadoras recomendadas}
+\begin{itemize}
+\item ¿qué podés afirmar con certeza desde el borde del sistema?
+\item ¿qué observación te falta para reducir incertidumbre?
+\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\end{itemize}
+
+\begin{uawarn}
+Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+\end{uawarn}
+\end{document}

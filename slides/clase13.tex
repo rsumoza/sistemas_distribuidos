@@ -1,0 +1,73 @@
+\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+\UASetClassNumber{13}
+\UASetClassTitle{Resiliencia y tolerancia a fallas}
+\title[\UACourse]{\UACourse}
+\subtitle{Clase 13 --- Resiliencia y tolerancia a fallas}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Resiliencia y tolerancia a fallas}
+
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos.
+\item conectar el concepto con decisiones observables de diseño
+\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Problema central}
+La clase 13 trabaja un tipo específico de dificultad distribuida: Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos.
+
+\begin{itemize}
+\item ¿qué parte del sistema observamos?
+\item ¿qué hipótesis de falla importan?
+\item ¿qué garantía vale la pena pagar?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Temas clave}
+\begin{itemize}
+\item timeout
+\item retry
+\item backoff
+\item circuit breaker
+\item chaos engineering
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo guía}
+Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
+\end{frame}
+
+\begin{frame}{Preguntas para pensar}
+\begin{itemize}
+\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
+\item ¿qué fallas son plausibles en este contexto?
+\item ¿qué garantía sería innegociable y cuál negociable?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Errores frecuentes}
+\begin{itemize}
+\item confundir síntoma con causa
+\item describir una tecnología sin explicitar la garantía
+\item proponer una solución sin reconocer su costo
+\end{itemize}
+\end{frame}
+
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+La clase 13 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\end{block}
+\end{frame}
+
+\end{document}

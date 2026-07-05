@@ -1,0 +1,295 @@
+\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\input{../config/course-config.tex}
+
+\UASetClassNumber{04}
+\UASetClassTitle{Consistencia}
+
+\title{Clase 04 --- Consistencia}
+\author{\UAProfessor}
+\date{\UADate}
+
+\begin{document}
+\maketitle
+
+\section{Propósito de la clase}
+
+La palabra ``consistencia'' se usa de manera muy amplia en la práctica, pero en sistemas distribuidos no designa una única propiedad simple. Existen múltiples modelos de consistencia, cada uno con distinto significado operacional, distintas garantías observables y distintos costos de implementación.
+
+El objetivo de esta clase es distinguir cuidadosamente esos modelos y entender que la pregunta correcta no es:
+
+\begin{quote}
+``¿mi sistema es consistente o inconsistente?''
+\end{quote}
+
+sino:
+
+\begin{quote}
+``¿qué tipo de comportamiento observable prometo a quien interactúa con el sistema, y cuánto cuesta mantener esa promesa?''
+\end{quote}
+
+\begin{uakeybox}
+Consistencia es una especificación del comportamiento observable de lecturas y escrituras, no simplemente una propiedad decorativa del almacenamiento.
+\end{uakeybox}
+
+\section{Qué significa ``corrección''}
+
+Supongamos que múltiples clientes leen y escriben sobre un mismo objeto replicado. La corrección no puede reducirse solo a que ``los datos estén bien'', porque hay una dimensión temporal y observacional:
+
+\begin{itemize}
+\item qué escritura debe ver una lectura;
+\item en qué orden deben percibirse operaciones concurrentes;
+\item si dos clientes deben observar la misma historia;
+\item cuándo una actualización se considera visible.
+\end{itemize}
+
+La consistencia formaliza esas expectativas.
+
+\section{Operaciones e historias}
+
+Sea un conjunto de operaciones de lectura y escritura sobre un objeto compartido. Una historia distribuida registra:
+
+\begin{itemize}
+\item invocación de cada operación;
+\item respuesta de cada operación;
+\item posible solapamiento entre operaciones;
+\item orden local en cada proceso;
+\item efectos observados.
+\end{itemize}
+
+Un modelo de consistencia establece qué historias observadas son aceptables y cuáles no.
+
+\section{Linearizability}
+
+La \emph{linearizability} es uno de los modelos más fuertes e intuitivos.
+
+\subsection{Intuición}
+
+Un sistema linearizable se comporta como si todas las operaciones ocurrieran instantáneamente en un punto entre su invocación y su respuesta, respetando el orden temporal real entre operaciones no solapadas.
+
+\subsection{Interpretación práctica}
+
+Si una escritura termina y luego una lectura comienza, la lectura debe ver al menos esa escritura o una posterior.
+
+\subsection{Importancia}
+
+Este modelo aproxima la intuición de ``un solo objeto, una sola historia, inmediatamente visible''.
+
+\subsection{Costo}
+
+Linearizability suele requerir:
+
+\begin{itemize}
+\item coordinación;
+\item espera por confirmaciones;
+\item restricciones sobre lecturas y escrituras;
+\item mayor latencia;
+\item menor disponibilidad bajo partición.
+\end{itemize}
+
+\section{Sequential consistency}
+
+La \emph{sequential consistency} también exige que todas las operaciones puedan explicarse mediante un orden secuencial único, pero no obliga a respetar el tiempo real entre operaciones no solapadas.
+
+\subsection{Consecuencia}
+
+Dos historias pueden ser secuencialmente consistentes aunque una lectura, cronológicamente posterior, no vea una escritura que ya terminó, siempre que exista algún orden global compatible con el orden programático de cada proceso.
+
+\subsection{Diferencia con linearizability}
+
+Linearizability impone:
+\begin{itemize}
+\item orden secuencial;
+\item y además respeto del tiempo real.
+\end{itemize}
+
+Sequential consistency impone:
+\begin{itemize}
+\item orden secuencial;
+\item pero no necesariamente respeto del tiempo real.
+\end{itemize}
+
+Por eso, linearizability implica sequential consistency, pero no a la inversa.
+
+\section{Eventual consistency}
+
+La \emph{eventual consistency} es mucho más débil. Intuitivamente, afirma que si dejan de ocurrir nuevas escrituras y el sistema sigue intercambiando información, entonces las réplicas eventualmente convergen al mismo estado.
+
+\subsection{Qué garantiza}
+
+\begin{itemize}
+\item convergencia eventual;
+\item no garantiza que una lectura inmediata vea la última escritura;
+\item no garantiza una única historia visible en todo instante.
+\end{itemize}
+
+\subsection{Por qué se usa}
+
+\begin{itemize}
+\item mejora disponibilidad;
+\item reduce coordinación síncrona;
+\item mejora latencia;
+\item encaja en dominios que toleran desalineación temporal.
+\end{itemize}
+
+\subsection{Qué exige}
+
+Aunque es débil, no significa ``cualquier cosa vale''. Para que eventual consistency sea útil, el sistema debe definir:
+
+\begin{itemize}
+\item cómo propaga actualizaciones;
+\item cómo detecta o resuelve conflictos;
+\item cómo garantiza convergencia;
+\item qué comportamiento espera del cliente frente a lecturas potencialmente obsoletas.
+\end{itemize}
+
+\section{Ejemplo comparativo}
+
+Consideremos una variable replicada inicialmente en valor 0.
+
+\subsection{Escenario 1}
+
+\begin{enumerate}
+\item Cliente A escribe 1.
+\item El sistema confirma la escritura.
+\item Cliente B lee inmediatamente después y obtiene 0.
+\end{enumerate}
+
+\subsection{Interpretación}
+
+\begin{itemize}
+\item no es linearizable, porque una lectura posterior a una escritura confirmada no vio su efecto;
+\item puede ser compatible con modelos más débiles;
+\item puede ser aceptable bajo eventual consistency si la convergencia ocurre más adelante.
+\end{itemize}
+
+\subsection{Escenario 2}
+
+\begin{enumerate}
+\item Cliente A escribe 1.
+\item Cliente B escribe 2 concurrentemente desde otra réplica.
+\item Réplicas distintas muestran temporalmente valores distintos.
+\item El sistema más tarde resuelve el conflicto y converge.
+\end{enumerate}
+
+Este escenario puede ser incompatible con modelos fuertes, pero compatible con modelos eventualmente consistentes si el mecanismo de reconciliación está bien definido.
+
+\section{Consistencia y dominio}
+
+No todos los dominios exigen el mismo modelo.
+
+\subsection{Ejemplos que suelen requerir consistencia fuerte}
+
+\begin{itemize}
+\item débito en cuenta bancaria;
+\item control de stock muy escaso;
+\item asignación exclusiva de recursos;
+\item locks distribuidos.
+\end{itemize}
+
+\subsection{Ejemplos que suelen tolerar consistencia más débil}
+
+\begin{itemize}
+\item contador de likes;
+\item feed social;
+\item cachés replicadas;
+\item presencia en línea;
+\item dashboards analíticos no críticos.
+\end{itemize}
+
+\begin{uakeybox}
+La pregunta correcta no es ``qué modelo es mejor'', sino ``qué modelo es suficiente para la semántica del problema''.
+\end{uakeybox}
+
+\section{Consistencia y CAP}
+
+La relación entre consistencia y CAP suele malinterpretarse. Bajo partición de red, un sistema replicado que quiera mantener linearizability o alguna forma fuerte de corrección observable deberá rechazar ciertas operaciones si no puede coordinarse adecuadamente.
+
+Por eso:
+
+\begin{itemize}
+\item consistencia fuerte suele empujar al sistema a sacrificar disponibilidad bajo partición;
+\item alta disponibilidad suele empujar a aceptar lecturas o respuestas potencialmente desalineadas.
+\end{itemize}
+
+Esto no implica que CAP sea ``elegir dos de tres'' como slogan, sino que bajo partición aparece una restricción estructural que obliga a decidir.
+
+\section{Modelo formal mínimo}
+
+Sea $H$ una historia de operaciones distribuidas. Un modelo de consistencia define un conjunto $\mathcal{C}$ de historias permitidas.
+
+Entonces:
+\[
+H \in \mathcal{C}
+\]
+si y solo si la historia observada satisface las reglas del modelo.
+
+La fuerza del modelo depende de cuántas historias prohíbe:
+
+\begin{itemize}
+\item linearizability prohíbe muchas más historias que eventual consistency;
+\item eventual consistency acepta muchas historias intermedias, siempre que preserve convergencia final.
+\end{itemize}
+
+\section{Ejemplo trabajado: saldo bancario vs feed social}
+
+\subsection{Saldo bancario}
+
+Si un usuario transfiere dinero y luego consulta saldo, leer un valor viejo puede inducir una acción financiera incorrecta. Por eso, la expectativa natural del usuario se alinea con una garantía fuerte.
+
+\subsection{Feed social}
+
+Si un usuario actualiza una foto y otro usuario la ve segundos después, el sistema puede seguir siendo aceptable aunque no haya visibilidad inmediata global. La experiencia se degrada poco y la reducción de coordinación puede valer la pena.
+
+\subsection{Conclusión}
+
+No se trata de que banca ``use bases serias'' y redes sociales ``usen bases malas''. Se trata de que cada dominio paga por el nivel de consistencia que necesita.
+
+\section{Qué debe saber hacer el estudiante al terminar esta clase}
+
+El estudiante debería poder:
+
+\begin{itemize}
+\item distinguir consistencia fuerte, sequential consistency y eventual consistency;
+\item explicar por qué linearizability es más fuerte que sequential consistency;
+\item construir ejemplos donde una lectura viole linearizability;
+\item razonar sobre qué modelo es adecuado según el dominio;
+\item conectar consistencia con disponibilidad, coordinación y latencia.
+\end{itemize}
+
+\section{Errores conceptuales frecuentes}
+
+\begin{itemize}
+\item usar ``consistente'' como sinónimo de ``correcto'' sin especificar modelo;
+\item creer que eventual consistency equivale a desorden total;
+\item asumir que strong consistency es siempre la mejor opción;
+\item ignorar el costo de coordinación que exige linearizability;
+\item confundir convergencia final con visibilidad inmediata.
+\end{itemize}
+
+\section{Guía de profundización bibliográfica}
+
+\subsection*{DDIA}
+\begin{itemize}
+\item \textbf{Capítulo 9}: leer para profundizar definiciones de consistency y la discusión sobre linearizability.
+\item Volver también a secciones relevantes del capítulo 5 para vincular consistencia con replicación y lecturas desde réplicas.
+\end{itemize}
+
+\subsection*{Tanenbaum}
+\begin{itemize}
+\item Leer la parte de consistencia y replicación para reforzar la clasificación de modelos y su relación con almacenamiento distribuido.
+\item Conviene usar Tanenbaum para ordenar taxonomías y DDIA para entender implicancias de diseño.
+\end{itemize}
+
+\subsection*{Material complementario}
+\begin{itemize}
+\item Al releer CAP, hacerlo con la siguiente pregunta: \emph{qué garantía observable quiero preservar cuando la red se parte}.
+\item Vincular esta clase con la futura discusión de quórums y consenso.
+\end{itemize}
+
+\section{Resumen final}
+
+\begin{uakeybox}
+Consistencia no es un rótulo binario, sino una familia de contratos sobre qué historia de lecturas y escrituras puede observar un cliente. Elegir un modelo de consistencia es elegir una promesa y aceptar el costo necesario para sostenerla.
+\end{uakeybox}
+
+\end{document}

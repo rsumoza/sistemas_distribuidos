@@ -1,0 +1,103 @@
+\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\input{../config/course-config.tex}
+\UASetClassNumber{01}
+\UASetClassTitle{Pensamiento distribuido}
+\title{Clase 01 --- Pensamiento distribuido}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+
+\section{Introducción}
+El propósito de esta primera clase es instalar el marco mental del curso. Un sistema distribuido no se define solo por tener varias máquinas, sino por el hecho de que dichas máquinas deben cooperar sin memoria compartida, sin reloj global confiable y bajo un canal de comunicación inherentemente incierto.
+
+La pregunta fundacional no es ``qué tecnología usar'', sino ``qué podemos garantizar cuando no sabemos exactamente qué está ocurriendo en cada instante del sistema''.
+
+\section{Definición operativa de sistema distribuido}
+Una definición útil es la siguiente: un sistema distribuido es un conjunto de procesos o nodos que se ejecutan en máquinas distintas, se comunican por intercambio de mensajes y colaboran para ofrecer una funcionalidad que, desde el punto de vista del usuario, aparece como una sola abstracción.
+
+Esta definición tiene consecuencias inmediatas:
+\begin{enumerate}
+\item La comunicación tiene costo y no es instantánea.
+\item El fracaso de un componente no implica el fracaso simultáneo de los demás.
+\item El conocimiento sobre el estado global es parcial, retrasado y potencialmente inconsistente.
+\end{enumerate}
+
+\section{Ejemplo motivador: pago con timeout}
+Supongamos un cliente que envía un pedido de pago a un servidor. El servidor procesa el pedido y luego intenta devolver una confirmación. El cliente no recibe la respuesta dentro del tiempo esperado y decide reintentar.
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=4cm,
+  >=Latex,
+  every node/.style={font=\small}
+]
+\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm, right of=c] (s) {Servidor};
+\draw[->, thick]
+  (c.north east) -- (s.north west)
+  node[midway, above=4pt] {pago};
+\draw[->, thick, dashed]
+  (s.south west) -- (c.south east)
+  node[midway, below=6pt] {respuesta perdida / demorada};
+\end{tikzpicture}
+\end{center}
+
+Desde la perspectiva del cliente, varias historias del sistema son compatibles con el mismo síntoma externo:
+\begin{itemize}
+\item el servidor nunca recibió el pedido;
+\item el servidor lo recibió pero cayó antes de terminar;
+\item el servidor procesó correctamente y la respuesta se perdió;
+\item el servidor sigue vivo y la respuesta solo está demorada.
+\end{itemize}
+
+\begin{uawarn}
+Un timeout es un evento de observación, no una prueba de falla.
+\end{uawarn}
+
+\section{Modelo de sistema: sincronía y asincronía}
+En un modelo síncrono se asume la existencia de cotas superiores conocidas para el tiempo de cómputo y para la latencia de la red. En un modelo asíncrono no existen cotas superiores fiables o conocidas; en consecuencia, una demora arbitrariamente grande no puede distinguirse de una falla definitiva. Este segundo modelo es más severo, pero mucho más cercano al comportamiento real de Internet.
+
+\section{Modelo de fallas}
+El tipo de fallas que aceptamos como plausibles determina el espacio de soluciones correctas.
+\subsection{Crash failures}
+Un proceso deja de responder por completo.
+\subsection{Omisión}
+Un mensaje no llega a destino.
+\subsection{Delay}
+El mensaje llega, pero demasiado tarde para la política de espera del receptor.
+\subsection{Particiones}
+La red queda dividida en componentes que no pueden intercambiar mensajes entre sí.
+\subsection{Byzantine}
+Un proceso puede comportarse de manera arbitraria, inconsistente o incluso maliciosa.
+
+\section{Framework del curso}
+A lo largo de toda la materia vamos a estructurar cada decisión de diseño mediante el esquema
+\[
+D = (P,F,G,S,T)
+\]
+donde $P$ representa el problema, $F$ las fallas asumidas, $G$ la garantía requerida, $S$ la solución elegida y $T$ el trade-off aceptado.
+
+\subsection{Ejemplo con pagos duplicados}
+\begin{itemize}
+\item $P$: evitar débitos duplicados ante reintentos;
+\item $F$: timeout en el cliente y pérdida de respuestas;
+\item $G$: a lo sumo un débito efectivo por operación lógica;
+\item $S$: request id único + almacenamiento de resultados idempotentes;
+\item $T$: mayor costo de estado, validación y complejidad operativa.
+\end{itemize}
+
+\section{CAP: lectura correcta}
+La interpretación relevante para este curso es precisa: cuando existe partición de red, un sistema replicado no puede ofrecer simultáneamente disponibilidad total y consistencia fuerte observable para todas las operaciones. Eso obliga a decidir entre rechazar ciertas operaciones para preservar corrección o responder aun con posible desalineación temporal.
+
+\section{Bibliografía guía}
+\begin{itemize}
+\item Kleppmann, cap. 1 y comienzo del cap. 8.
+\item Tanenbaum y Van Steen, fundamentos e introducción.
+\item MIT 6.824, clases introductorias sobre RPC y fallas.
+\end{itemize}
+
+\begin{uakeybox}
+Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+\end{uakeybox}
+\end{document}

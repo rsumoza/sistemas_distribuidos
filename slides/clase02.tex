@@ -1,0 +1,139 @@
+\documentclass{../cls/ua-engineering-v6-beamer}
+\input{../config/course-config.tex}
+
+\UASetClassNumber{02}
+\UASetClassTitle{Comunicación y fallas}
+
+\title{\UACourse}
+\subtitle{Clase 02 — Comunicación y fallas}
+
+\begin{document}
+
+\begin{frame}
+\titlepage
+\end{frame}
+
+\UASectionSlide{Comunicación en sistemas distribuidos}
+
+%------------------------------------------------
+
+\begin{frame}{Problema real}
+En sistemas distribuidos:
+
+\begin{itemize}
+\item todo ocurre mediante mensajes
+\item la red es incierta
+\item no hay garantía de entrega
+\end{itemize}
+
+\begin{block}{Pregunta}
+¿Qué significa “la operación ocurrió”?
+\end{block}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{RPC (Remote Procedure Call)}
+Abstracción:
+
+\begin{itemize}
+\item llamada local → función
+\item llamada remota → red
+\end{itemize}
+
+\begin{uawarn}
+RPC intenta ocultar la red… pero no puede.
+\end{uawarn}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Problema clave}
+\begin{center}
+\Large
+¿La operación se ejecutó o no?
+\end{center}
+
+\begin{itemize}
+\item request perdido
+\item response perdido
+\item servidor lento
+\item servidor caído
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Timeout}
+El cliente decide:
+
+\begin{itemize}
+\item esperar
+\item reintentar
+\end{itemize}
+
+\begin{block}{Clave}
+Timeout ≠ falla
+\end{block}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Retry}
+Retry introduce:
+
+\begin{itemize}
+\item duplicación
+\item inconsistencia
+\end{itemize}
+
+Ejemplo:
+\begin{itemize}
+\item pago duplicado
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Idempotencia}
+Definición:
+
+\begin{block}{}
+Aplicar la operación múltiples veces produce el mismo resultado
+\end{block}
+
+Ejemplo:
+\begin{itemize}
+\item PUT idempotente
+\item POST no necesariamente
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Semánticas de entrega}
+\begin{itemize}
+\item at-most-once
+\item at-least-once
+\item exactly-once (casi siempre ilusión)
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Trade-off}
+\begin{itemize}
+\item confiabilidad vs complejidad
+\item latencia vs corrección
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Cierre}
+\begin{block}{Idea clave}
+Comunicar en sistemas distribuidos es decidir bajo incertidumbre.
+\end{block}
+\end{frame}
+
+\end{document}

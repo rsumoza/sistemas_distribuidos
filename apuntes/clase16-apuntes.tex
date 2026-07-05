@@ -1,0 +1,40 @@
+\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\input{../config/course-config.tex}
+\UASetClassNumber{16}
+\UASetClassTitle{Defensa y cierre}
+\title{Clase 16 --- Defensa y cierre}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+
+\section{Introducción}
+La clase 16 desarrolla el tema ``Defensa y cierre'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
+
+\section{Desarrollo conceptual}
+Sintetizar el pensamiento distribuido y evaluar la madurez conceptual alcanzada en el curso. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+
+\subsection{Preguntas guía}
+\begin{itemize}
+\item ¿Cómo aparece síntesis en un sistema real? \item ¿Cómo aparece defensa en un sistema real? \item ¿Cómo aparece errores comunes en un sistema real? 
+\item ¿qué síntoma observaría un usuario o un operador?
+\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\end{itemize}
+
+\section{Conexión con el resto del curso}
+La clase 16 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+
+\section{Resultado de aprendizaje esperado}
+Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+
+\section{Bibliografía guía}
+\begin{itemize}
+\item Relectura de apuntes del curso.
+\item Defensas de proyectos.
+\item Síntesis de decisiones bajo incertidumbre.
+\end{itemize}
+
+\begin{uakeybox}
+Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+\end{uakeybox}
+\end{document}

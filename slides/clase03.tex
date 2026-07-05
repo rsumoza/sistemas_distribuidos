@@ -1,0 +1,46 @@
+\UASectionSlide{Replicación de estado}
+
+\begin{frame}{Problema}
+¿Por qué replicar?
+
+\begin{itemize}
+\item disponibilidad
+\item latencia
+\end{itemize}
+
+Problema:
+\begin{itemize}
+\item inconsistencia
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Leader-Follower}
+\begin{itemize}
+\item un nodo líder
+\item replicas seguidoras
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Sync vs Async}
+\begin{itemize}
+\item sync → consistente pero lento
+\item async → rápido pero inconsistente
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Stale Reads}
+\begin{itemize}
+\item lectura desactualizada
+\end{itemize}
+
+Ejemplo:
+\begin{itemize}
+\item saldo incorrecto
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Trade-off}
+\begin{itemize}
+\item disponibilidad vs consistencia
+\end{itemize}
+\end{frame}
