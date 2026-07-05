@@ -1,0 +1,47 @@
+name: Publicar PDFs
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag del release, por ejemplo v2026.1"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup workflow
+        run: ./workflow-setup.sh
+
+      - name: Build
+        uses: xu-cheng/texlive-action/full@v1
+        with:
+          run: make all
+
+      - name: Resolve release tag
+        id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          name: PDFs ${{ steps.release.outputs.tag }}
+          files: build/**/*.pdf
+          fail_on_unmatched_files: true
+          generate_release_notes: true
