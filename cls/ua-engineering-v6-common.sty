@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{ua-engineering-v6-common}[2026/04/19 UA Ingeniería v6 common]
+\ProvidesPackage{PsiDirectory:cls/ua-engineering-v6-common}[2026/04/19 UA Ingeniería v6 common]
 
 \RequirePackage{xcolor}
 \RequirePackage{graphicx}
@@ -28,9 +28,36 @@
 \else
   \RequirePackage{fontspec}
   \defaultfontfeatures{Ligatures=TeX}
-  \IfFontExistsTF{Montserrat}{\setsansfont{Montserrat}}{\setsansfont{Latin Modern Sans}}
-  \IfFontExistsTF{Open Sans}{\setmainfont{Open Sans}}{\setmainfont{TeX Gyre Termes}}
-  \IfFontExistsTF{JetBrains Mono}{\setmonofont{JetBrains Mono}}{\setmonofont{DejaVu Sans Mono}}
+  \IfFileExists{../fonts/texgyretermes-regular.otf}{%
+    \setsansfont{texgyretermes}[
+      Path=../fonts/,
+      Extension=.otf,
+      UprightFont=*-regular,
+      BoldFont=*-bold,
+      ItalicFont=*-italic,
+      BoldItalicFont=*-bolditalic
+    ]%
+    \setmainfont{texgyretermes}[
+      Path=../fonts/,
+      Extension=.otf,
+      UprightFont=*-regular,
+      BoldFont=*-bold,
+      ItalicFont=*-italic,
+      BoldItalicFont=*-bolditalic
+    ]%
+    \setmonofont{texgyretermes}[
+      Path=../fonts/,
+      Extension=.otf,
+      UprightFont=*-regular,
+      BoldFont=*-bold,
+      ItalicFont=*-italic,
+      BoldItalicFont=*-bolditalic
+    ]%
+  }{%
+    \IfFontExistsTF{Montserrat}{\setsansfont{Montserrat}}{\setsansfont{Latin Modern Sans}}%
+    \IfFontExistsTF{Open Sans}{\setmainfont{Open Sans}}{\setmainfont{TeX Gyre Termes}}%
+    \IfFontExistsTF{JetBrains Mono}{\setmonofont{JetBrains Mono}}{\setmonofont{DejaVu Sans Mono}}%
+  }
 \fi
 \renewcommand{\familydefault}{\sfdefault}
 
