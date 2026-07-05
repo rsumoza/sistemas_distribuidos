@@ -18,3 +18,10 @@ jobs:
 
       - name: Build
         run: make all
+
+      - name: Publish PDFs
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfs
+          path: build/**/*.pdf
+          if-no-files-found: error
