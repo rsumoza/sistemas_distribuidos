@@ -17,7 +17,9 @@ jobs:
         run: ./workflow-setup.sh
 
       - name: Build
-        run: make all
+        uses: xu-cheng/texlive-action/full@v1
+        with:
+          run: make all
 
       - name: Publish PDFs
         uses: actions/upload-artifact@v4
