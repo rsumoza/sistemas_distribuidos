@@ -22,7 +22,7 @@
 \item Documentar qué se relevó, qué hipótesis se analizaron y qué conclusión queda justificada.
 \item Relevar, analizar y proponer en forma aislada y conectada.
 \item Conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item Anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
 \end{itemize}
 \end{frame}
 
@@ -159,6 +159,36 @@ D = (P,F,G,S,T)
 \item $S$: idempotencia con request id único
 \item $T$: más estado, más validaciones, más complejidad operativa
 \end{itemize}
+\end{frame}
+
+\begin{frame}{CAP: qué significa ``bajo partición''}
+Una partición ocurre cuando dos partes del sistema siguen vivas, pero no pueden comunicarse entre sí de manera confiable.
+
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{itemize}
+\item los nodos no comparten una visión única del estado
+\item cada lado puede recibir pedidos de clientes
+\item no hay forma inmediata de coordinar una decisión global
+\end{itemize}
+
+\column{0.46\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=1.5cm,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=2.2cm] (a) {Replica A};
+\node[draw, rounded corners, minimum width=2.2cm, right=2.4cm of a] (b) {Replica B};
+\node[below=0.75cm of a] (ca) {Cliente 1};
+\node[below=0.75cm of b] (cb) {Cliente 2};
+\draw[->] (ca)--(a);
+\draw[->] (cb)--(b);
+\draw[thick,dashed,red] (a)-- node[above] {sin enlace} (b);
+\end{tikzpicture}
+\end{center}
+\end{columns}
+
+\begin{uawarn}
+CAP no dice que siempre hay que elegir dos letras. Dice que, si hay partición, responder en ambos lados puede sacrificar consistencia; coordinar o rechazar puede sacrificar disponibilidad.
+\end{uawarn}
 \end{frame}
 
 \begin{frame}{CAP: intuición correcta}
