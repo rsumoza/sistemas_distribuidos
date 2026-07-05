@@ -1,4 +1,4 @@
-name: Makefile CI
+name: Build LaTeX
 
 on:
   push:
@@ -8,20 +8,13 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-    - name: configure
-      run: ./configure
+      - name: Setup workflow
+        run: ./workflow-setup.sh
 
-    - name: Install dependencies
-      run: make
-
-    - name: Run check
-      run: make check
-
-    - name: Run distcheck
-      run: make distcheck
+      - name: Build
+        run: make all
