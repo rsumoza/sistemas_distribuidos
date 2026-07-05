@@ -180,7 +180,8 @@ Si los vectores no son comparables, los eventos son concurrentes.
 V(a)=(2,1,0), \qquad V(b)=(1,2,0)
 \]
 
-Ninguno domina al otro. Entonces:
+Ninguno domina al otro. 
+Entonces:
 \[
 a \parallel b
 \]
@@ -207,7 +208,7 @@ Vector clocks permiten distinguir entre:
 Supongamos dos réplicas desconectadas que aceptan escrituras concurrentes sobre el mismo objeto.
 
 \begin{itemize}
-\item con timestamps físicos: una puede sobrescribir arbitrariamente a la otra
+\item Con timestamps físicos: una puede sobrescribir arbitrariamente a la otra
 \item con vector clocks: se detecta concurrencia y se fuerza reconciliación
 \end{itemize}
 
@@ -218,7 +219,7 @@ Supongamos dos réplicas desconectadas que aceptan escrituras concurrentes sobre
 
 \begin{frame}{Errores frecuentes}
 \begin{itemize}
-\item creer que sincronizar relojes físicos resuelve el problema de orden
+\item Creer que sincronizar relojes físicos resuelve el problema de orden
 \item confundir orden total con causalidad
 \item pensar que Lamport detecta concurrencia
 \item olvidar que vector clocks crecen con el número de procesos
