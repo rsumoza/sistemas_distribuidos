@@ -18,6 +18,18 @@
 
 %------------------------------------------------
 
+\begin{frame}{Objetivos de la clase}
+\begin{itemize}
+\item Entender una comunicación distribuida como una interacción no inmediata.
+\item Razonar qué puede estar ocurriendo mientras el cliente todavía no observa respuesta.
+\item Identificar las capas que intervienen en una llamada remota.
+\item Analizar cómo cada capa puede detectar, ocultar, transformar o amplificar una falla.
+\item Conectar timeout, retry e idempotencia con decisiones de mitigación.
+\end{itemize}
+\end{frame}
+
+%------------------------------------------------
+
 \begin{frame}{Problema real}
 En sistemas distribuidos:
 
@@ -30,6 +42,36 @@ En sistemas distribuidos:
 \begin{block}{Pregunta}
 ¿Qué significa “la operación ocurrió”?
 \end{block}
+\end{frame}
+
+%------------------------------------------------
+
+\begin{frame}{Comunicar no es instantáneo}
+Una operación remota atraviesa varias capas, y cada una puede responder distinto ante una falla.
+
+\begin{center}
+\begin{tikzpicture}[
+  node distance=0.8cm,
+  every node/.style={font=\small},
+  box/.style={draw, rounded corners, minimum width=2.7cm, minimum height=0.7cm}
+]
+\node[box] (app) {Aplicación};
+\node[box, below=of app] (rpc) {RPC / cliente HTTP};
+\node[box, below=of rpc] (tcp) {Transporte};
+\node[box, below=of tcp] (net) {Red};
+\node[box, below=of net] (srv) {Servidor};
+\draw[->] (app)--(rpc);
+\draw[->] (rpc)--(tcp);
+\draw[->] (tcp)--(net);
+\draw[->] (net)--(srv);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item una capa puede reintentar mientras otra ya venció su timeout
+\item una capa puede ocultar pérdida y otra observar demora
+\item el servidor puede ejecutar aunque el cliente ya haya abandonado
+\end{itemize}
 \end{frame}
 
 %------------------------------------------------

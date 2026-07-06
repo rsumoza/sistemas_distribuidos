@@ -49,6 +49,26 @@ En cambio, una llamada remota (\emph{Remote Procedure Call}, RPC) involucra al m
 
 Cada una de estas etapas puede fallar parcial o temporalmente. Por lo tanto, la abstracción ``llamada remota como si fuera local'' es útil pedagógicamente, pero peligrosa si se toma literalmente.
 
+\section{No-inmediatez y capas de comunicación}
+
+Una comunicación distribuida no debe entenderse como un salto instantáneo entre cliente y servidor. Entre la intención de invocar una operación y la observación de una respuesta hay una trayectoria compuesta por capas: aplicación, librería RPC o cliente HTTP, serialización, transporte, red, balanceadores, servidor, almacenamiento y camino de regreso.
+
+Cada capa puede tener su propia forma de reaccionar ante una falla:
+\begin{itemize}
+\item la aplicación puede abandonar la espera y mostrar error;
+\item el cliente RPC puede reintentar automáticamente;
+\item TCP puede retransmitir segmentos sin que la aplicación lo observe directamente;
+\item un balanceador puede redirigir a otra instancia;
+\item el servidor puede seguir procesando aunque el cliente ya haya vencido su timeout;
+\item la base de datos puede confirmar o abortar una operación de manera independiente de la respuesta de red.
+\end{itemize}
+
+Esto introduce una forma práctica de concurrencia: mientras una capa decide que ``ya esperó suficiente'', otra capa puede seguir intentando, entregando, ejecutando o confirmando efectos. Por eso, para diagnosticar un problema de comunicación no alcanza con preguntar ``falló o no falló''. Hay que reconstruir qué observó cada capa, qué acción tomó y qué efectos pudo producir.
+
+\begin{uakeybox}
+La no-inmediatez de la comunicación obliga a razonar con líneas de tiempo: lo que el cliente observa, lo que la red transporta, lo que el servidor ejecuta y lo que el almacenamiento confirma pueden no coincidir en el mismo instante.
+\end{uakeybox}
+
 \subsection{Error conceptual fundamental}
 
 Uno de los errores más comunes en sistemas distribuidos es razonar así:

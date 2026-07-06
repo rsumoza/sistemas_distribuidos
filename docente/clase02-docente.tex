@@ -10,12 +10,14 @@
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Que el estudiante deje de pensar una llamada remota como una llamada local. La clase debe instalar que timeout, retry e idempotencia son decisiones de diseño bajo incertidumbre, no detalles de implementación.
+Que el estudiante deje de pensar una llamada remota como una llamada local. La clase debe instalar que una comunicación distribuida no es inmediata ni atómica: atraviesa capas, ocurre en el tiempo y cada capa puede observar o responder de manera distinta ante una falla. Timeout, retry e idempotencia son decisiones de diseño bajo esa incertidumbre, no detalles de implementación.
 
 \section{Resultados de aprendizaje esperados}
 \begin{itemize}
 \item distinguir falta de respuesta de falla comprobada;
 \item explicar por qué RPC oculta la red pero no elimina sus problemas;
+\item razonar una comunicación como línea de tiempo, identificando qué puede ocurrir después de que el cliente deja de esperar;
+\item identificar capas de una llamada remota y respuestas posibles ante falla;
 \item analizar retries en términos de recuperación y duplicación;
 \item diseñar operaciones idempotentes mediante claves de idempotencia;
 \item comparar at-most-once, at-least-once y exactly-once como garantías observables.
@@ -25,6 +27,8 @@ Que el estudiante deje de pensar una llamada remota como una llamada local. La c
 \begin{enumerate}
 \item Abrir con una llamada a pagos que no responde.
 \item Listar causas posibles antes de nombrar timeout.
+\item Dibujar una línea de tiempo y mostrar que cliente, red, servidor y almacenamiento no avanzan como un único paso atómico.
+\item Enumerar capas de la comunicación y preguntar qué hace cada una ante pérdida, demora o saturación.
 \item Mostrar que retry recupera algunas fallas y crea riesgo de duplicación.
 \item Introducir idempotencia como técnica para hacer seguro el retry.
 \item Cerrar con semánticas de entrega y el trade-off confiabilidad--complejidad.
@@ -33,6 +37,8 @@ Que el estudiante deje de pensar una llamada remota como una llamada local. La c
 \section{Errores conceptuales frecuentes}
 \begin{itemize}
 \item interpretar timeout como prueba de crash;
+\item pensar que la comunicación remota es instantánea;
+\item atribuir la falla a ``la red'' sin separar capas y observaciones;
 \item asumir que retry siempre mejora el sistema;
 \item creer que idempotencia significa ``la operación no hace nada'';
 \item vender exactly-once sin explicar deduplicación, persistencia y transacciones.
@@ -41,6 +47,8 @@ Que el estudiante deje de pensar una llamada remota como una llamada local. La c
 \section{Preguntas disparadoras}
 \begin{itemize}
 \item ¿Qué sabe el cliente cuando no recibe respuesta?
+\item ¿Qué puede seguir ocurriendo después de que el cliente venció su timeout?
+\item ¿Qué observó cada capa y qué acción tomó?
 \item ¿Qué puede haber pasado en el servidor aunque el cliente observe timeout?
 \item ¿Qué operación es segura de repetir y cuál no?
 \item ¿Dónde se guarda la evidencia para deduplicar?

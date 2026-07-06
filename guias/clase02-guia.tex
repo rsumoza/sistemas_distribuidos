@@ -21,5 +21,7 @@ Resolver cada ejercicio distinguiendo observación, causa posible, garantía bus
 \begin{uaexercise}\textbf{6.} Proponer cómo convertir una operación no idempotente en segura ante retries usando un request id o clave de idempotencia.\end{uaexercise}
 \begin{uaexercise}\textbf{7.} Comparar at-most-once, at-least-once y exactly-once desde el punto de vista del cliente. Indicar qué garantía ofrece cada una y qué costo introduce.\end{uaexercise}
 \begin{uaexercise}\textbf{8.} Dado un sistema que procesa pagos, proponer una decisión de diseño usando el esquema problema--fallas--garantía--solución--trade-off.\end{uaexercise}
+\begin{uaexercise}\textbf{9.} Para una llamada remota que vence por timeout, construir una línea de tiempo con al menos cuatro eventos posibles: decisión del cliente, retransmisión o retry, ejecución del servidor y respuesta tardía. Indicar qué eventos pueden ocurrir después de que el cliente dejó de esperar.\end{uaexercise}
+\begin{uaexercise}\textbf{10.} Elegir una comunicación realista y listar las capas involucradas. Para cada capa, indicar qué respuesta puede tener ante una falla y cómo esa respuesta ayuda o complica el diagnóstico.\end{uaexercise}
 
 \end{document}
