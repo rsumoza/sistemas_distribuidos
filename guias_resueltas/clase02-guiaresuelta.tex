@@ -1,37 +1,75 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{02}
-\UASetClassTitle{Comunicación y fallas}
-\title{Clase 02 --- Comunicación y fallas}
+\UASetClassTitle{RPC, timeouts, retries e idempotencia}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 02 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Indicaciones generales}
-Resolver cada ejercicio distinguiendo observación, causa posible, garantía buscada y trade-off aceptado. Cuando aparezcan timeouts o retries, indicar explícitamente si la operación remota pudo haber ocurrido.
+\section{Respuestas seleccionadas}
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Una llamada RPC a un servicio de pagos no responde antes del timeout. Enumerar al menos cuatro causas compatibles con esa observación y marcar cuáles implican que el pago pudo haberse ejecutado.\end{uaexercise}
-\begin{uaanswer}Causas compatibles: request perdido antes de llegar, servidor caído, servidor lento, servidor procesó y se perdió la respuesta, congestión de red, cola interna saturada. En las causas donde el servidor recibió el request, el pago pudo haberse ejecutado; por eso timeout no equivale a operación no realizada.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Explicar por qué RPC es una abstracción útil pero peligrosa si se la piensa como una llamada local.\end{uaexercise}
-\begin{uaanswer}RPC simplifica la interfaz, pero oculta red, serialización, pérdida, duplicación, demora y falla parcial. Una llamada local tiene un resultado observable más directo; una llamada remota puede ejecutar efectos sin que el cliente reciba respuesta.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Diseñar una política de timeout para una consulta de saldo y otra para una transferencia. Comparar qué cambia en latencia tolerada, riesgo y experiencia de usuario.\end{uaexercise}
-\begin{uaanswer}Una consulta de saldo puede tolerar timeout más corto y fallback a error o cache con advertencia. Una transferencia requiere más cuidado: un timeout corto mejora UX pero aumenta incertidumbre y riesgo de retry peligroso; puede convenir dejar la operación pendiente y consultar estado por id.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Analizar un retry automático ante timeout en una operación de creación de orden. Indicar qué problema resuelve y qué problema nuevo puede introducir.\end{uaexercise}
-\begin{uaanswer}Resuelve pérdidas o demoras transitorias aumentando probabilidad de éxito. Introduce riesgo de duplicar la orden si la primera ejecución llegó al servidor y la respuesta se perdió. También puede amplificar carga si muchos clientes reintentan a la vez.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Clasificar estas operaciones como idempotentes o no idempotentes y justificar: actualizar email, crear pedido, cancelar reserva, sumar puntos a una cuenta.\end{uaexercise}
-\begin{uaanswer}Actualizar email a un valor fijo suele ser idempotente. Crear pedido no lo es si cada intento crea un pedido nuevo. Cancelar reserva puede ser idempotente si cancelar una reserva ya cancelada no cambia el estado. Sumar puntos no es idempotente porque repetirlo acumula puntos.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Proponer cómo convertir una operación no idempotente en segura ante retries usando un request id o clave de idempotencia.\end{uaexercise}
-\begin{uaanswer}El cliente envía una clave única por operación lógica. El servidor guarda el resultado asociado a esa clave. Si llega el mismo request id otra vez, devuelve el resultado anterior sin aplicar el efecto dos veces.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Comparar at-most-once, at-least-once y exactly-once desde el punto de vista del cliente. Indicar qué garantía ofrece cada una y qué costo introduce.\end{uaexercise}
-\begin{uaanswer}At-most-once evita duplicados pero puede perder operaciones. At-least-once reduce pérdida mediante retries pero puede duplicar efectos si no hay idempotencia. Exactly-once suele requerir coordinación, deduplicación y persistencia; en sistemas reales muchas veces es una abstracción construida con idempotencia y transacciones.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Dado un sistema que procesa pagos, proponer una decisión de diseño usando el esquema problema--fallas--garantía--solución--trade-off.\end{uaexercise}
-\begin{uaanswer}Problema: evitar pagos duplicados ante timeout. Fallas: pérdida de respuesta, demora, retry del cliente. Garantía: a lo sumo un débito por operación lógica. Solución: clave de idempotencia persistida con estado de operación. Trade-off: más almacenamiento, manejo de estados pendientes y complejidad operativa.\end{uaanswer}
-\begin{uaexercise}\textbf{9.} Para una llamada remota que vence por timeout, construir una línea de tiempo con al menos cuatro eventos posibles: decisión del cliente, retransmisión o retry, ejecución del servidor y respuesta tardía. Indicar qué eventos pueden ocurrir después de que el cliente dejó de esperar.\end{uaexercise}
-\begin{uaanswer}Una línea posible: $t_0$ el cliente envía request; $t_1$ TCP retransmite o el cliente RPC reintenta; $t_2$ la aplicación cliente vence su timeout y devuelve error; $t_3$ el servidor ejecuta la operación; $t_4$ la respuesta llega tarde o se pierde. Después de $t_2$ todavía pueden ocurrir retransmisiones, ejecución del servidor, confirmación en base de datos y llegada tardía de respuesta.\end{uaanswer}
-\begin{uaexercise}\textbf{10.} Elegir una comunicación realista y listar las capas involucradas. Para cada capa, indicar qué respuesta puede tener ante una falla y cómo esa respuesta ayuda o complica el diagnóstico.\end{uaexercise}
-\begin{uaanswer}Ejemplo: checkout de compra. Capas: aplicación web, cliente HTTP/RPC, transporte, balanceador, servicio de órdenes, base de datos y servicio de pagos. La aplicación puede mostrar error; el cliente HTTP puede reintentar; el transporte puede retransmitir; el balanceador puede enviar a otra instancia; el servicio puede procesar igual; la base puede confirmar la orden. Cada respuesta puede mitigar una pérdida puntual, pero también complica el diagnóstico porque distintas capas conservan estados y observaciones diferentes.\end{uaanswer}
+\begin{uaexercise}
+Definir RPC.
+\end{uaexercise}
+
+\begin{uaanswer}
+RPC es un mecanismo que permite invocar procedimientos en otra máquina como si fueran locales, ocultando la comunicación de red.
+
+El problema es que esta abstracción oculta latencia, fallas y duplicación, lo que puede llevar a errores de diseño.
+\end{uaanswer}
+
+\begin{uaexercise}
+¿Por qué retry introduce duplicación?
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque el cliente no puede distinguir si la ejecución anterior ocurrió.
+
+Formalmente:
+
+\begin{itemize}
+\item ejecución A: operación no ejecutada
+\item ejecución B: operación ejecutada pero respuesta perdida
+\end{itemize}
+
+Ambas son indistinguibles → el cliente reintenta → posible doble ejecución.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñar idempotencia para pagos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Solución:
+
+\begin{itemize}
+\item generar request ID único
+\item persistir resultado
+\item rechazar duplicados
+\end{itemize}
+
+Esto convierte múltiples ejecuciones en una sola operación lógica.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplicar el modelo D.
+\end{uaexercise}
+
+\begin{uaanswer}
+\begin{itemize}
+\item $P$: RPC
+\item $F$: timeout + pérdida
+\item $G$: evitar duplicación
+\item $S$: idempotencia
+\item $T$: más estado
+\end{itemize}
+\end{uaanswer}
 
 \end{document}

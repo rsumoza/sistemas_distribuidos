@@ -1,25 +1,146 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{04}
-\UASetClassTitle{Consistencia}
-\title{Clase 04 --- Consistencia}
+\UASetClassTitle{Consenso distribuido}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 04 --- Consenso distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Indicaciones generales}
-Resolver cada ejercicio especificando qué comportamiento observable se promete para lecturas y escrituras. No alcanza con decir ``consistente'' o ``eventual'': hay que explicar qué ve el usuario.
+\section{Indicaciones}
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar qué significa que un sistema sea ``correcto'' cuando hay lecturas y escrituras concurrentes sobre estado replicado.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Dado el caso: A escribe $x=1$, recibe confirmación, luego B lee $x=0$. Indicar si viola linearizability y justificar.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Comparar linearizability y eventual consistency en términos de garantía observable, costo de coordinación y latencia.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Proponer un dominio donde eventual consistency sea aceptable y otro donde sea peligrosa. Justificar en términos de riesgo.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Construir una historia simple de operaciones que sea compatible con eventual consistency pero no con consistencia fuerte.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Explicar por qué una lectura inconsistente puede ser síntoma de réplica atrasada, conflicto concurrente o modelo de consistencia débil.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Relacionar consistencia fuerte con CAP: bajo partición, ¿qué operación convendría rechazar para preservar corrección?\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Aplicar problema--fallas--garantía--solución--trade-off a una elección entre latencia baja y corrección fuerte.\end{uaexercise}
+Justificar todas las respuestas.  
+Se espera modelado formal, no intuiciones vagas.
+
+\section{Nivel 1: fundamentos}
+
+\begin{uaexercise}
+Definir formalmente el problema de consenso. Indicar claramente entradas, salidas y condiciones del sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar con precisión las propiedades:
+Agreement, Validity y Termination.  
+Dar un ejemplo concreto donde se viole cada una.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué consenso es necesario en sistemas replicados.
+Relacionar con la clase anterior.
+\end{uaexercise}
+
+\begin{uaexercise}
+Dado un sistema con 3 nodos, construir una ejecución donde dos nodos decidan valores distintos.
+¿Qué propiedad se viola?
+\end{uaexercise}
+
+\section{Nivel 2: FLP}
+
+\begin{uaexercise}
+Definir estado univalente y bivalente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué el estado inicial puede ser bivalente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar el rol del scheduler adversario en la prueba FLP.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir una ejecución donde el sistema nunca decide.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué agregar timeouts rompe el modelo de FLP.
+\end{uaexercise}
+
+\section{Nivel 3: Raft}
+
+\begin{uaexercise}
+Describir detalladamente el proceso de elección de líder en Raft.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar el rol de los términos (terms).
+\end{uaexercise}
+
+\begin{uaexercise}
+Describir el protocolo AppendEntries.
+\end{uaexercise}
+
+\begin{uaexercise}
+Definir formalmente la propiedad de Log Matching.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué el commit requiere mayoría.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir una ejecución donde un líder cae y otro lo reemplaza.
+\end{uaexercise}
+
+\section{Nivel 4: Paxos}
+
+\begin{uaexercise}
+Describir los roles de Paxos: proposer, acceptor, learner.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar la fase Prepare.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar la fase Accept.
+\end{uaexercise}
+
+\begin{uaexercise}
+Definir formalmente qué significa que un valor sea elegido.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué dos valores distintos no pueden ser elegidos.
+\end{uaexercise}
+
+\section{Nivel 5: quorum y pruebas}
+
+\begin{uaexercise}
+Probar que dos mayorías siempre intersectan.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué esta propiedad garantiza seguridad.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir un contraejemplo si no se usa mayoría.
+\end{uaexercise}
+
+\section{Nivel 6: integración}
+
+\begin{uaexercise}
+Aplicar el modelo $D=(P,F,G,S,T)$ al consenso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Comparar Raft y Paxos en términos de:
+\begin{itemize}
+\item complejidad
+\item implementación
+\item garantías
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar cómo consenso permite implementar linearizabilidad.
+\end{uaexercise}
 
 \end{document}

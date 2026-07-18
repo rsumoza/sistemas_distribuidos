@@ -1,55 +1,193 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
+\UASetDocKind{Guía docente}
+
 \title{Clase 01 --- Pensamiento distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}\label{sec:objetivo-pedagogico-profundo}
-Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural.
-El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable: partir de síntomas, formular causas posibles, distinguir evidencia de inferencia y documentar qué relevó, qué analizó y qué conclusión puede sostener.
+\section{Objetivo pedagógico profundo}
 
-\section{Resultados de aprendizaje esperados}\label{sec:resultados-de-aprendizaje-esperados}
-Al finalizar la clase, un estudiante debería poder:
+La meta de esta clase es producir una ruptura conceptual. El estudiante debe dejar de razonar como si el sistema tuviera un estado global único, inmediatamente observable y perfectamente interpretable.
+
+La clase no debe medirse por cuántos términos nuevos aparecen, sino por si el estudiante logra aceptar esta afirmación:
+
+\begin{center}
+\textbf{“Desde un borde remoto del sistema, a veces no puedo saber qué pasó realmente.”}
+\end{center}
+
+Si esa idea no queda instalada, el resto del curso se vuelve una colección de técnicas sin fundamento.
+
+\section{Resultado de aprendizaje esperado}
+
+Al terminar la clase, el estudiante debería poder:
+
 \begin{itemize}
-\item Reconocer el tipo de problema distribuido involucrado;
-\item razonar desde síntomas observables hacia causas posibles;
-\item documentar observaciones, hipótesis, evidencias y conclusiones;
-\item relevar, analizar y proponer separando cada dimensión y conectándolas en una decisión coherente;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item explicar qué vuelve distribuido a un problema;
+\item construir dos historias indistinguibles para un observador remoto;
+\item distinguir síntoma observado de causa subyacente;
+\item usar el esquema $D=(P,F,G,S,T)$ para ordenar una discusión técnica;
+\item leer CAP como una restricción bajo partición.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}\label{sec:guion-sugerido-para-un-profesor-nuevo}
-\begin{enumerate}
-\item Abrir la clase 01 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Duración sugerida}
 
-\section{Errores conceptuales frecuentes}\label{sec:errores-conceptuales-frecuentes}
+Clase de 90 minutos.
+
+\section{Estructura sugerida}
+
+\subsection*{Bloque 1 (10--15 min): abrir con un caso, no con una definición}
+
+No empezar diciendo “un sistema distribuido es...”.  
+Empezar con el ejemplo del pago que no devuelve respuesta.
+
+Preguntar al curso:
+
+\begin{quote}
+¿El pago se realizó o no?
+\end{quote}
+
+Lo esperable es que haya respuestas rápidas e intuitivas. Esa intuición debe ser tensionada.
+
+\subsection*{Bloque 2 (15--20 min): construir la indistinguibilidad}
+
+Presentar dos historias:
+
 \begin{itemize}
-\item Confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item el servidor nunca recibió la solicitud;
+\item el servidor sí procesó el pago, pero la respuesta se perdió.
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}\label{sec:preguntas-disparadoras-recomendadas}
+Preguntar:
+
+\begin{quote}
+¿Qué ve el cliente en cada caso?
+\end{quote}
+
+El objetivo es que el grupo vea que la observación puede ser la misma aunque la historia interna sea distinta.
+
+\subsection*{Bloque 3 (15 min): formalizar qué vuelve distribuido a un problema}
+
+Recién después del shock conceptual, introducir la definición operativa.
+
+Explicar que lo distribuido no es solo “varias máquinas”, sino coordinación bajo observación parcial, sin reloj global y con comunicación no confiable.
+
+\subsection*{Bloque 4 (15 min): sincronía y asincronía}
+
+Mostrar que la intuición de muchos estudiantes está más cerca de un modelo síncrono ideal que de un sistema realista.
+
+El objetivo no es hacer teoría de modelos en profundidad todavía, sino dejar claro por qué una demora arbitrariamente larga ya destruye varias intuiciones locales.
+
+\subsection*{Bloque 5 (15 min): framework del curso}
+
+Presentar:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+y usarlo inmediatamente sobre el caso del pago.
+
+Este momento es clave porque instala una disciplina intelectual: no empezar por la solución, sino por el problema, las fallas y la garantía.
+
+\subsection*{Bloque 6 (10 min): cierre con CAP}
+
+Usar CAP para cerrar la clase de forma fuerte, pero correcta.
+
+No enseñar CAP como trivia. Enseñarlo como una forma de verbalizar la restricción que aparece cuando la partición impide coordinación.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. El ejemplo del pago}
+Debe explicarse porque es accesible, realista y rompe rápido la ilusión de certeza.
+
+\subsection*{2. Indistinguibilidad}
+Debe explicarse porque es la idea fundacional del curso. Sin esto, el alumno no entiende por qué aparecen retries, idempotencia, consenso o CAP.
+
+\subsection*{3. Modelo asíncrono}
+Debe explicarse porque fuerza a abandonar la intuición de que el tiempo siempre sirve para distinguir causas.
+
+\subsection*{4. Framework del curso}
+Debe explicarse porque ordena toda la materia y evita que la discusión tecnológica tape el problema conceptual.
+
+\subsection*{5. CAP}
+Debe explicarse porque da cierre y muestra que las restricciones del curso no son caprichosas, sino estructurales.
+
+\section{Qué no hacer}
+
 \begin{itemize}
-\item ¿Qué podés afirmar con certeza desde el borde del sistema?
-\item ¿Qué observación te falta para reducir incertidumbre?
-\item ¿Qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item No abrir la clase con una definición enciclopédica.
+\item No usar CAP como slogan.
+\item No apresurarse a introducir algoritmos o tecnologías.
+\item No resolver la incertidumbre demasiado rápido con “ponemos un timeout y listo”.
+\end{itemize}
+
+\section{Preguntas disparadoras recomendadas}
+
+\begin{itemize}
+\item ¿Qué sabe realmente el cliente?
+\item ¿Qué parte de tu respuesta depende de una suposición no garantizada?
+\item ¿Qué historia interna distinta podría ser compatible con la misma observación?
+\item ¿Qué garantía querés preservar en este caso concreto?
+\item ¿Qué estarías dispuesto a sacrificar para preservarla?
+\end{itemize}
+
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que timeout implica crash;
+\item pensar que siempre puede saberse “qué pasó realmente”;
+\item asumir que toda garantía importante puede obtenerse sin costo;
+\item usar CAP como frase de moda;
+\item creer que el curso trata sobre herramientas y no sobre decisiones bajo incertidumbre.
+\end{itemize}
+
+\section{Momento crítico de la clase}
+
+El momento crucial ocurre cuando el estudiante deja de insistir en responder “sí” o “no” a la pregunta del pago y acepta la respuesta correcta:
+
+\begin{center}
+\textbf{“No puedo saberlo con certeza desde acá.”}
+\end{center}
+
+Ese momento debe señalarse explícitamente. Si el alumno no atraviesa esa ruptura, la clase puede parecer interesante, pero no transforma su forma de razonar.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item construir dos historias indistinguibles;
+\item explicar por qué una observación no identifica por sí sola una causa;
+\item usar el esquema $D=(P,F,G,S,T)$ sin mezclar niveles;
+\item defender una garantía junto con el trade-off que requiere.
 \end{itemize}
 
 \begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
+No evaluar esta clase por memorización de términos, sino por cambio de modelo mental.
 \end{uawarn}
+
+\section{Conexión con la clase 2}
+
+La clase 1 debe dejar preparada la siguiente pregunta:
+
+\begin{quote}
+Si no puedo saber exactamente qué pasó, ¿cómo diseño comunicación remota razonable?
+\end{quote}
+
+Esa pregunta abre naturalmente la clase 2 sobre:
+\begin{itemize}
+\item RPC,
+\item timeout,
+\item retry,
+\item idempotencia.
+\end{itemize}
+
 \end{document}
