@@ -1,302 +1,154 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{03}
-\UASetClassTitle{Estado y replicación}
+\UASetClassTitle{Consistencia y replicación}
+\UASetDocKind{Apuntes}
 
-\title{Clase 03 --- Estado y replicación}
+\title{Clase 03 --- Consistencia, replicación y modelos de estado}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
+\section{Introducción}
 
-La clase 3 introduce una de las tensiones más profundas de los sistemas distribuidos: la necesidad de replicar estado para mejorar disponibilidad, latencia y tolerancia a fallas, y el costo conceptual y operativo que esto introduce sobre la consistencia observable.
-
-La idea intuitiva ``si tengo varias copias, estoy más seguro'' es parcialmente cierta, pero incompleta. Tener varias copias no resuelve automáticamente el problema; lo transforma. Desde ese momento, el sistema debe responder preguntas adicionales:
-
-\begin{itemize}
-\item ¿quién puede escribir?
-\item ¿cómo se propagan las actualizaciones?
-\item ¿cuándo una réplica se considera al día?
-\item ¿qué ve un cliente si consulta una réplica atrasada?
-\item ¿qué garantía promete el sistema sobre el estado observado?
-\end{itemize}
-
-\begin{uakeybox}
-Replicar no es duplicar sin costo. Replicar es decidir qué divergencias temporales estamos dispuestos a tolerar entre copias de un mismo estado.
-\end{uakeybox}
-
-\section{Por qué replicar}
-
-La replicación suele justificarse por tres motivos principales.
-
-\subsection{Disponibilidad}
-
-Si una copia cae, otras pueden seguir respondiendo. Esto reduce dependencia de un único nodo y mejora tolerancia a fallas parciales.
-
-\subsection{Latencia}
-
-Tener réplicas geográficamente más cercanas al usuario permite reducir tiempos de lectura o respuesta.
-
-\subsection{Escalabilidad de lectura}
-
-Muchos sistemas reciben muchas más lecturas que escrituras. Replicar permite distribuir las lecturas entre múltiples nodos.
-
-\subsection{Pero aparece un nuevo problema}
-
-Cuando existe una sola copia, la noción de estado actual es relativamente simple. Cuando existen varias, aparece una pregunta nueva:
+Una vez resuelta la comunicación (RPC), el problema central es el \textbf{estado}. Para mejorar disponibilidad y latencia, los sistemas replican datos. Esto introduce una tensión fundamental:
 
 \begin{quote}
-¿Cuál de las copias representa el estado correcto en este instante?
+No es posible mantener múltiples copias perfectamente sincronizadas sin coordinación.
 \end{quote}
 
-\section{Modelo leader-follower}
+\section{Modelo}
 
-Un patrón muy común es la replicación \emph{leader-follower}. Una réplica se designa como líder y concentra las escrituras. Las demás se actualizan a partir del líder.
-
-\subsection{Esquema básico}
-
+Consideremos un objeto replicado en $N$ nodos. Las operaciones son:
 \begin{itemize}
-\item el líder recibe escrituras;
-\item actualiza su estado local;
-\item propaga la actualización a los followers;
-\item los followers aplican la actualización con cierto atraso.
+\item \texttt{write(k, v)}
+\item \texttt{read(k)}
 \end{itemize}
 
-\subsection{Ventaja}
+La red es asíncrona: mensajes pueden retrasarse, perderse o reordenarse.
 
-La serialización de escrituras en el líder simplifica la resolución de conflictos.
+\section{Divergencia}
 
-\subsection{Costo}
-
-Toda garantía fuerte de actualización visible depende de:
-
+Dos réplicas $R_i$ y $R_j$ divergen si almacenan valores distintos para la misma clave en el mismo tiempo lógico. Esto ocurre por:
 \begin{itemize}
-\item velocidad de propagación;
-\item política de confirmación;
-\item disponibilidad del líder;
-\item elección de desde dónde se permiten lecturas.
+\item latencias distintas
+\item concurrencia
+\item particiones
 \end{itemize}
 
-\section{Replicación síncrona y asíncrona}
+\section{Consistencia}
 
-Una distinción fundamental es si el líder espera o no confirmación de las réplicas antes de considerar completada una escritura.
+\subsection{Linearizabilidad}
 
-\subsection{Replicación síncrona}
-
-La escritura solo se considera exitosa cuando una o más réplicas confirmaron la actualización.
-
-Ventajas:
+Una historia es linearizable si existe un orden total que:
 \begin{itemize}
-\item mayor seguridad frente a pérdida inmediata del líder;
-\item menor atraso entre copias;
-\item mejor consistencia observable.
+\item respeta el tiempo real
+\item es consistente con la especificación secuencial
 \end{itemize}
 
-Costos:
+\paragraph{Propiedad}
+Cada operación tiene un punto de linearización entre invocación y respuesta.
+
+\subsection{Consistencia causal}
+
+Definimos la relación \emph{happens-before} ($\rightarrow$):
 \begin{itemize}
-\item mayor latencia de escritura;
-\item menor disponibilidad si réplicas necesarias no responden;
-\item mayor sensibilidad a demoras de red.
+\item orden de programa
+\item envío/recepción de mensajes
 \end{itemize}
 
-\subsection{Replicación asíncrona}
+La consistencia causal exige que si $a \rightarrow b$, entonces todo proceso observa $a$ antes que $b$.
 
-El líder responde al cliente antes de que las réplicas hayan incorporado la actualización.
+\subsection{Consistencia eventual}
 
-Ventajas:
+Garantiza convergencia:
+\begin{quote}
+Si no hay nuevas escrituras, todas las réplicas convergen al mismo valor.
+\end{quote}
+
+No garantiza orden ni lecturas recientes.
+
+\section{Arquitecturas de replicación}
+
+\subsection{Leader-based}
+
+Un líder serializa escrituras. Replicación:
 \begin{itemize}
-\item menor latencia de escritura;
-\item mayor throughput;
-\item menor acoplamiento temporal entre líder y followers.
+\item síncrona: mayor consistencia, más latencia
+\item asíncrona: menor latencia, riesgo de pérdida
 \end{itemize}
 
-Costos:
+\subsection{Multi-leader}
+
+Cada región acepta escrituras. Problema:
 \begin{itemize}
-\item posibilidad de pérdida de actualizaciones recientes si el líder cae;
-\item lecturas potencialmente obsoletas;
-\item divergencia temporal entre copias.
+\item conflictos concurrentes
 \end{itemize}
 
-\begin{uawarn}
-La replicación asíncrona no es un error de implementación: es una decisión explícita de intercambio entre rendimiento y frescura del estado.
-\end{uawarn}
+\subsection{Leaderless (Dynamo)}
 
-\section{Lecturas y visibilidad del estado}
-
-Una vez replicado el estado, no solo importa cómo se escriben los datos, sino también desde dónde se leen.
-
-\subsection{Lectura del líder}
-
-Si toda lectura se hace contra el líder:
+Parámetros:
 \begin{itemize}
-\item disminuye la probabilidad de leer estado viejo;
-\item aumenta carga sobre el nodo central;
-\item se pierde parte del beneficio de escalado de lectura.
+\item $N$: número de réplicas
+\item $W$: write quorum
+\item $R$: read quorum
 \end{itemize}
 
-\subsection{Lectura de followers}
+\paragraph{Intersección}
+Si $R+W>N$, los quorums se intersectan.
 
-Si se permite leer desde followers:
+\section{Conflictos}
+
+Dos escrituras concurrentes generan versiones divergentes.
+
+\subsection{Versionado}
+
+Vector clocks:
 \begin{itemize}
-\item se mejora escalabilidad y latencia;
-\item se acepta riesgo de \emph{stale reads}.
+\item detectan concurrencia
+\item permiten merge explícito
 \end{itemize}
 
-\subsection{Definición operativa de stale read}
-
-Una lectura es obsoleta cuando devuelve una versión del estado que ya fue superada por una escritura aceptada por el sistema, pero aún no visible en la réplica consultada.
-
-\section{Ejemplo trabajado: cambio de contraseña}
-
-Consideremos un sistema con un líder $L$ y un follower $F$.
-
-\begin{enumerate}
-\item el usuario cambia su contraseña;
-\item la escritura llega al líder;
-\item el líder responde ``operación exitosa'';
-\item la propagación hacia $F$ se retrasa;
-\item el usuario intenta autenticarse a través de un balanceador que lo envía a $F$;
-\item $F$ aún conoce la contraseña vieja;
-\item el sistema rechaza la nueva credencial.
-\end{enumerate}
-
-Desde el punto de vista del usuario, el comportamiento parece contradictorio:
+\subsection{Resolución}
 
 \begin{itemize}
-\item el sistema dijo haber actualizado el estado;
-\item una lectura posterior parece negarlo.
+\item LWW: simple, puede perder datos
+\item merge semántico
 \end{itemize}
 
-En realidad, el problema no es que el sistema ``mintió'', sino que la garantía ofrecida por la escritura y la política de lectura no fueron compatibles con la expectativa del usuario.
+\section{Anti-entropy}
 
-\section{Replicación y caída del líder}
+Mecanismos:
+\begin{itemize}
+\item gossip
+\item read-repair
+\item hinted handoff
+\end{itemize}
 
-Un escenario particularmente importante es la caída del líder antes de que una actualización se haya propagado a réplicas suficientes.
+\section{Trade-offs}
 
-Supongamos:
+\begin{itemize}
+\item consistencia fuerte → coordinación → latencia
+\item consistencia débil → disponibilidad → anomalías
+\end{itemize}
 
-\begin{enumerate}
-\item el líder acepta una escritura;
-\item responde al cliente;
-\item aún no propagó la actualización a ninguna réplica;
-\item el líder cae;
-\item un follower es promovido o elegido como nuevo líder.
-\end{enumerate}
+\section{Marco $D=(P,F,G,S,T)$}
 
-Entonces puede ocurrir que el nuevo líder no contenga la actualización más reciente.
+\begin{itemize}
+\item $P$: mantener estado replicado
+\item $F$: delay, pérdida, partición
+\item $G$: modelo de consistencia
+\item $S$: arquitectura (leader, quorum)
+\item $T$: latencia, disponibilidad, complejidad
+\end{itemize}
 
-\subsection{Implicancia}
-
-La pregunta relevante no es simplemente:
+\section{Conclusión}
 
 \begin{quote}
-``¿la escritura ocurrió?''
+La consistencia no es una propiedad binaria: es un contrato explícito entre el sistema y sus clientes.
 \end{quote}
-
-sino:
-
-\begin{quote}
-``¿qué significa que una escritura haya ocurrido de manera durable y visible para el sistema?''
-\end{quote}
-
-Esta pregunta conecta directamente con clases posteriores sobre quórums, consenso y consistencia.
-
-\section{Modelo formal mínimo}
-
-Sea $S(t)$ el estado lógico más actualizado aceptado por el líder en el instante $t$. Sea $S_i(t)$ el estado observado en la réplica $i$.
-
-En un sistema con replicación atrasada, puede ocurrir:
-
-\[
-S_i(t) \neq S(t)
-\]
-
-para alguna réplica $i$ y para ciertos intervalos temporales. El problema de replicación consiste en controlar:
-
-\begin{itemize}
-\item cuánto tiempo puede persistir esa desigualdad;
-\item qué operaciones pueden observarla;
-\item si el sistema la tolera o la evita;
-\item qué garantías promete mientras esa desigualdad existe.
-\end{itemize}
-
-\section{Replicación y modelo de fallas}
-
-La política de replicación correcta depende del modelo de fallas asumido:
-
-\begin{itemize}
-\item si esperamos fallas de nodo poco frecuentes pero costosas, puede convenir mayor sincronía;
-\item si esperamos cargas altas y lecturas masivas, puede convenir replicación asíncrona con reconciliación posterior;
-\item si el dominio penaliza gravemente estado viejo, habrá que restringir lecturas o endurecer confirmaciones;
-\item si el dominio tolera pequeñas inconsistencias temporales, la replicación asíncrona puede ser una decisión correcta.
-\end{itemize}
-
-\section{Ejemplo comparativo: banca vs red social}
-
-\subsection{Banca}
-
-Para mostrar saldo o confirmar una transferencia, una lectura obsoleta puede inducir decisiones incorrectas del usuario. Por lo tanto, se prefieren políticas más conservadoras.
-
-\subsection{Red social}
-
-Para mostrar un contador de likes o una biografía recién editada, un atraso corto puede ser aceptable si a cambio se obtiene menor latencia y mayor disponibilidad.
-
-\begin{uakeybox}
-El mismo mecanismo técnico puede ser correcto en un dominio y equivocado en otro. La diferencia la define la garantía necesaria, no la tecnología aislada.
-\end{uakeybox}
-
-\section{Qué debe saber hacer el estudiante al terminar esta clase}
-
-El estudiante debería poder:
-
-\begin{itemize}
-\item explicar por qué replicar mejora disponibilidad pero complica consistencia;
-\item comparar replicación síncrona y asíncrona;
-\item definir y ejemplificar stale reads;
-\item razonar sobre el efecto de una caída del líder;
-\item justificar cuándo conviene restringir lecturas al líder;
-\item conectar políticas de replicación con necesidades del dominio.
-\end{itemize}
-
-\section{Errores conceptuales frecuentes}
-
-\begin{itemize}
-\item creer que toda réplica refleja instantáneamente el mismo estado;
-\item suponer que replicación equivale automáticamente a mayor corrección;
-\item ignorar que una escritura ``exitosa'' puede no estar durablemente reflejada en todas las copias;
-\item pensar que stale reads son solo bugs y no consecuencias posibles de un diseño deliberado;
-\item evaluar replicación sin distinguir cargas de lectura, escritura y criticidad del dato.
-\end{itemize}
-
-\section{Guía de profundización bibliográfica}
-
-\subsection*{DDIA}
-\begin{itemize}
-\item \textbf{Capítulo 5}: leer para profundizar replicación, lag entre réplicas, consistencia de lectura y consecuencias de distintas estrategias de propagación.
-\item Prestar atención a ejemplos de leader-based replication y a la discusión sobre followers atrasados.
-\end{itemize}
-
-\subsection*{Tanenbaum}
-\begin{itemize}
-\item Leer las secciones de replicación y coherencia para reforzar la diferencia entre tener múltiples copias y mantener múltiples copias consistentes.
-\item Conviene usar Tanenbaum como complemento estructural: ayuda a ordenar tipos de replicación y su relación con el modelo de sistema.
-\end{itemize}
-
-\subsection*{Material de TP / MIT}
-\begin{itemize}
-\item Vincular esta clase con las futuras implementaciones o simulaciones de leader-follower.
-\item La pregunta clave al leer material práctico debe ser: \emph{qué ve un cliente cuando las réplicas no están alineadas}. 
-\end{itemize}
-
-\section{Resumen final}
-
-\begin{uakeybox}
-Replicar estado no consiste en hacer copias idénticas que siempre avanzan juntas. Consiste en administrar divergencias temporales entre copias y decidir qué garantías ofrece el sistema mientras esas divergencias existen.
-\end{uakeybox}
 
 \end{document}

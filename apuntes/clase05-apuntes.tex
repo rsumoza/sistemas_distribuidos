@@ -1,93 +1,125 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{05}
-\UASetClassTitle{Tiempo y causalidad}
-\title{Clase 05 --- Tiempo y causalidad}
+\UASetClassTitle{Transacciones distribuidas}
+\UASetDocKind{Apuntes}
+
+\title{Clase 05 --- Transacciones distribuidas y serializabilidad}
 \author{\UAProfessor}
-\date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
-En sistemas distribuidos no existe un reloj global perfecto que permita ordenar todos los eventos con certeza. Cada nodo observa su propio reloj local, la red introduce demoras variables y los mensajes pueden llegar tarde, perderse o reordenarse. Por eso, muchas decisiones de diseño deben basarse en causalidad lógica y no solamente en timestamps físicos.
+\section{Introducción}
 
-\begin{uakeybox}
-El problema central de la clase es distinguir orden físico, orden lógico y dependencia causal.
-\end{uakeybox}
+Las transacciones permiten agrupar operaciones de forma que el sistema preserve invariantes incluso bajo concurrencia.
 
-\section{Por qué el tiempo físico no alcanza}
-Comparar timestamps físicos entre nodos distintos puede ser engañoso:
+En sistemas distribuidos, esto implica:
 \begin{itemize}
-\item los relojes locales pueden derivar;
-\item una corrección de sincronización puede mover un reloj hacia adelante o hacia atrás;
-\item un mensaje enviado antes puede llegar después por latencia variable;
-\item dos eventos pueden tener timestamps comparables sin que exista relación causal entre ellos.
+\item múltiples nodos
+\item múltiples copias
+\item latencias y fallas
 \end{itemize}
 
-La pregunta importante no siempre es ``qué hora marcaba el reloj'', sino ``qué evento pudo influir sobre qué otro evento''.
+\section{Modelo de transacciones}
 
-\section{Relación happened-before}
-La relación happened-before, escrita $a \rightarrow b$, captura dependencia causal mínima:
+Una transacción $T$ es una secuencia:
+\[
+T = \{r(x), w(x), commit\}
+\]
+
+Conflictos:
+\begin{itemize}
+\item Read-Write (RW)
+\item Write-Read (WR)
+\item Write-Write (WW)
+\end{itemize}
+
+\section{Serializabilidad}
+
+\subsection{Definición}
+Una ejecución es serializable si existe una ejecución secuencial equivalente.
+
+\subsection{Grafo de precedencia}
+
+Nodos: transacciones  
+Aristas: dependencias por conflicto
+
+\paragraph{Teorema}
+El schedule es serializable ⇔ el grafo es acíclico.
+
+\section{Anomalías}
+
+\subsection{Dirty read}
+Lectura de datos no confirmados.
+
+\subsection{Non-repeatable read}
+Lecturas inconsistentes dentro de la misma transacción.
+
+\subsection{Phantom}
+Cambios en conjuntos de resultados.
+
+\subsection{Write skew}
+Dos transacciones leen el mismo estado y escriben sin conflicto directo.
+
+\paragraph{Ejemplo}
+Dos médicos verifican guardia:
+\begin{itemize}
+\item ambos leen que hay otro médico
+\item ambos se retiran
+\end{itemize}
+Resultado: ningún médico.
+
+\section{Snapshot Isolation}
+
+Cada transacción observa un snapshot consistente.
+
+\subsection{Propiedad}
+Evita:
+\begin{itemize}
+\item dirty read
+\item non-repeatable read
+\end{itemize}
+
+No evita:
+\begin{itemize}
+\item write skew
+\end{itemize}
+
+\section{Commit distribuido}
+
+\subsection{2PC}
+
+Fases:
 \begin{enumerate}
-\item si $a$ y $b$ ocurren en el mismo proceso y $a$ ocurre antes que $b$, entonces $a \rightarrow b$;
-\item si $a$ es el envío de un mensaje y $b$ su recepción, entonces $a \rightarrow b$;
-\item si $a \rightarrow b$ y $b \rightarrow c$, entonces $a \rightarrow c$.
+\item Prepare
+\item Commit
 \end{enumerate}
 
-Si no se cumple $a \rightarrow b$ ni $b \rightarrow a$, los eventos son concurrentes. Concurrente no significa simultáneo en sentido físico; significa que no hay evidencia causal que ordene un evento antes que el otro.
+\subsection{Problema}
+Bloqueo si el coordinador falla.
 
-\section{Relojes de Lamport}
-Los relojes de Lamport asignan un contador lógico a cada evento. Cada proceso mantiene un contador $L_i$:
+\section{3PC}
+
+Introduce fase:
 \begin{itemize}
-\item antes de un evento local, incrementa $L_i$;
-\item al enviar un mensaje, adjunta el valor actual;
-\item al recibir un mensaje con timestamp $t$, actualiza $L_i \leftarrow \max(L_i,t)+1$.
+\item pre-commit
 \end{itemize}
 
-La propiedad central es:
-\[
-a \rightarrow b \implies L(a) < L(b)
-\]
+Reduce bloqueo pero requiere sincronía.
 
-Esto permite construir un orden compatible con la causalidad. Sin embargo, la implicación inversa no vale: si $L(a) < L(b)$, no necesariamente $a \rightarrow b$.
+\section{Relación con consenso}
 
-\begin{uawarn}
-Lamport preserva causalidad conocida, pero no permite detectar concurrencia con precisión.
-\end{uawarn}
-
-\section{Vector clocks}
-Los vector clocks conservan más información. Cada proceso mantiene un vector con una componente por proceso. La intuición es que cada evento registra cuánto sabe ese proceso sobre el avance de todos los demás.
-
-Para comparar dos vectores $V(a)$ y $V(b)$:
 \begin{itemize}
-\item $V(a) < V(b)$ si todas las componentes de $V(a)$ son menores o iguales que las de $V(b)$ y al menos una es estrictamente menor;
-\item si $V(a) < V(b)$, entonces $a$ precede causalmente a $b$;
-\item si los vectores no son comparables, los eventos son concurrentes.
+\item consenso ⇒ orden global
+\item transacciones ⇒ consistencia lógica
 \end{itemize}
 
-Ejemplo:
-\[
-(2,1,0) \quad \text{y} \quad (1,2,0)
-\]
-no son comparables; representan eventos concurrentes.
+\section{Conclusión}
 
-\section{Aplicación: conflictos en stores replicados}
-Supongamos dos réplicas desconectadas que aceptan escrituras sobre el mismo objeto. Si se usan timestamps físicos, una escritura puede sobrescribir arbitrariamente a la otra. Con vector clocks, el sistema puede distinguir dos casos:
-\begin{itemize}
-\item una versión desciende causalmente de otra y puede reemplazarla;
-\item dos versiones son concurrentes y requieren reconciliación.
-\end{itemize}
+\begin{quote}
+La serializabilidad garantiza correctitud, pero requiere coordinación fuerte y tiene costo.
+\end{quote}
 
-El costo de esta precisión es metadata adicional y mayor complejidad, especialmente cuando el número de procesos o actores crece.
-
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debe poder explicar por qué el tiempo físico no alcanza, aplicar happened-before, calcular relojes de Lamport simples, reconocer el límite de Lamport y usar vector clocks para distinguir causalidad de concurrencia.
-
-\section{Bibliografía guía}
-\begin{itemize}
-\item Kleppmann, cap. 8.
-\item Tanenbaum y Van Steen, relojes lógicos y sincronización.
-\item Lamport, ``Time, Clocks, and the Ordering of Events in a Distributed System''.
-\end{itemize}
 \end{document}

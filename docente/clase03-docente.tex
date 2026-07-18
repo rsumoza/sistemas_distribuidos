@@ -1,52 +1,60 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{03}
-\UASetClassTitle{Replicación de estado}
-\title{Clase 03 --- Replicación de estado}
+\UASetClassTitle{Consistencia y replicación}
+\UASetDocKind{Guía docente}
+
+\title{Clase 03 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}
-Mostrar que replicar estado no es copiar gratis: cada réplica adicional mejora disponibilidad o latencia, pero obliga a decidir qué divergencias temporales se aceptan y cómo se comunican al usuario.
+\section{Objetivo profundo}
 
-\section{Resultados de aprendizaje esperados}
+Que el estudiante internalice:
 \begin{itemize}
-\item explicar por qué se replica estado;
-\item describir el patrón leader-follower;
-\item comparar replicación síncrona y asíncrona;
-\item reconocer stale reads y sus síntomas;
-\item razonar sobre caída del líder y durabilidad de escrituras confirmadas.
+\item replicar estado introduce divergencia
+\item consistencia es un contrato observable
+\item no existe solución perfecta bajo partición
 \end{itemize}
 
-\section{Guion sugerido}
-\begin{enumerate}
-\item Empezar con la motivación: disponibilidad, latencia y escala de lectura.
-\item Dibujar líder y followers, separando escrituras de lecturas.
-\item Contrastar sync y async con una escritura concreta.
-\item Trabajar un stale read, por ejemplo cambio de contraseña o saldo.
-\item Cerrar con la pregunta: ¿cuándo una escritura confirmada es durable?
-\end{enumerate}
+\section{Estructura sugerida (90 min)}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): problema}
+Arrancar con dos réplicas que divergen (ejemplo en pizarra). Forzar a los estudiantes a aceptar que no hay “estado único”.
+
+\subsection*{Bloque 2 (20 min): modelos}
+Introducir linearizabilidad (intuición + contraejemplo), luego causalidad (happens-before) y cerrar con eventual.
+
+\subsection*{Bloque 3 (20 min): arquitecturas}
+Leader, multi-leader, leaderless. Hacer énfasis en dónde aparecen conflictos.
+
+\subsection*{Bloque 4 (20 min): quorums y conflictos}
+Explicar $N,W,R$ y $R+W>N$. Hacer un ejemplo numérico. Introducir vector clocks a nivel conceptual.
+
+\subsection*{Bloque 5 (15 min): integración}
+Aplicar $D=(P,F,G,S,T)$ a dos dominios: banco vs red social.
+
+\section{Momento crítico}
+
+Cuando el estudiante entiende:
+\begin{center}
+\textbf{“No hay estado global instantáneo: solo vistas locales con garantías elegidas.”}
+\end{center}
+
+\section{Errores frecuentes}
+
 \begin{itemize}
-\item pensar que más réplicas siempre implican más corrección;
-\item olvidar que leer de followers puede devolver datos viejos;
-\item confundir baja latencia con garantía fuerte;
-\item no distinguir confirmación al cliente de propagación a réplicas.
+\item asumir orden global implícito
+\item creer que quorums garantizan frescura absoluta sin considerar retrasos
+\item ignorar resolución de conflictos
 \end{itemize}
 
-\section{Preguntas disparadoras}
-\begin{itemize}
-\item ¿Desde dónde lee el cliente después de escribir?
-\item ¿Qué pasa si el líder cae justo después de confirmar?
-\item ¿Qué métrica operativa revela atraso de réplica?
-\item ¿Qué preferimos para este dominio: frescura o disponibilidad?
-\end{itemize}
+\section{Conexión con la clase 4}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante puede explicar una stale read sin llamarla simplemente ``bug''.
-\end{uawarn}
+Consenso (Raft/Paxos) como mecanismo para aproximar linearizabilidad bajo fallas.
+
 \end{document}

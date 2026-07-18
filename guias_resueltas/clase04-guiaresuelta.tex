@@ -1,33 +1,110 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{04}
-\UASetClassTitle{Consistencia}
-\title{Clase 04 --- Consistencia}
+\UASetClassTitle{Consenso distribuido}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 04 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Indicaciones generales}
-Resolver cada ejercicio especificando qué comportamiento observable se promete para lecturas y escrituras. No alcanza con decir ``consistente'' o ``eventual'': hay que explicar qué ve el usuario.
+\section{Respuestas seleccionadas (desarrolladas)}
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar qué significa que un sistema sea ``correcto'' cuando hay lecturas y escrituras concurrentes sobre estado replicado.\end{uaexercise}
-\begin{uaanswer}Significa que las respuestas observadas pertenecen a un conjunto de historias permitido por el modelo elegido. La corrección no es solo guardar datos, sino definir qué escritura debe ver cada lectura y qué órdenes son aceptables.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Dado el caso: A escribe $x=1$, recibe confirmación, luego B lee $x=0$. Indicar si viola linearizability y justificar.\end{uaexercise}
-\begin{uaanswer}Sí, viola linearizability si la lectura empieza después de que la escritura terminó, porque una lectura posterior debe ver esa escritura o una posterior. Podría ser compatible con modelos más débiles si luego converge.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Comparar linearizability y eventual consistency en términos de garantía observable, costo de coordinación y latencia.\end{uaexercise}
-\begin{uaanswer}Linearizability ofrece una visión similar a un único objeto actualizado, pero requiere coordinación y suele aumentar latencia. Eventual consistency permite respuestas más rápidas y disponibles, pero admite lecturas desactualizadas y exige reconciliación.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Proponer un dominio donde eventual consistency sea aceptable y otro donde sea peligrosa. Justificar en términos de riesgo.\end{uaexercise}
-\begin{uaanswer}Es aceptable en likes, feeds o métricas no críticas, donde una demora temporal no rompe la semántica. Es peligrosa en débitos, stock escaso o locks, donde observar estado viejo puede habilitar decisiones incorrectas.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Construir una historia simple de operaciones que sea compatible con eventual consistency pero no con consistencia fuerte.\end{uaexercise}
-\begin{uaanswer}A escribe `perfil=actualizado` y recibe OK. B lee inmediatamente desde otra réplica y ve el perfil viejo. Minutos después ambas réplicas convergen. Esa historia no es linearizable, pero puede ser eventualmente consistente.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Explicar por qué una lectura inconsistente puede ser síntoma de réplica atrasada, conflicto concurrente o modelo de consistencia débil.\end{uaexercise}
-\begin{uaanswer}El síntoma observable es un valor inesperado. La causa puede ser lag de replicación, escrituras concurrentes aún no reconciliadas o una decisión explícita del sistema de permitir lecturas locales rápidas sin coordinación fuerte.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Relacionar consistencia fuerte con CAP: bajo partición, ¿qué operación convendría rechazar para preservar corrección?\end{uaexercise}
-\begin{uaanswer}En dominios críticos conviene rechazar o dejar pendientes escrituras que no puedan coordinarse con mayoría o líder confiable. Eso sacrifica disponibilidad total para evitar aceptar historias contradictorias.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Aplicar problema--fallas--garantía--solución--trade-off a una elección entre latencia baja y corrección fuerte.\end{uaexercise}
-\begin{uaanswer}Problema: lecturas rápidas sobre estado replicado. Fallas: atraso y partición. Garantía: lectura siempre actual o lectura disponible con posible atraso. Solución: leer del líder/quórum o permitir followers. Trade-off: latencia y disponibilidad contra corrección observable.\end{uaanswer}
+\begin{uaexercise}
+Definir consenso.
+\end{uaexercise}
+
+\begin{uaanswer}
+El problema de consenso consiste en que un conjunto de procesos distribuidos acuerden un único valor a partir de propuestas iniciales, bajo condiciones de asincronía y posibles fallas.
+
+Formalmente, cada proceso $p_i$ propone un valor $v_i$ y eventualmente decide un valor $v$ tal que:
+\begin{itemize}
+\item Agreement: todos los procesos correctos deciden el mismo valor
+\item Validity: $v$ fue propuesto por algún proceso
+\item Termination: todo proceso correcto decide eventualmente
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar FLP.
+\end{uaexercise}
+
+\begin{uaanswer}
+El teorema FLP establece que en un sistema asíncrono con al menos una posible falla, no existe un algoritmo determinista que garantice la terminación del consenso.
+
+La prueba se basa en:
+\begin{itemize}
+\item estados bivalentes (donde el resultado no está determinado)
+\item un scheduler que retrasa mensajes críticos
+\end{itemize}
+
+Esto permite construir ejecuciones infinitas donde el sistema nunca decide.
+\end{uaanswer}
+
+\begin{uaexercise}
+Probar intersección de mayorías.
+\end{uaexercise}
+
+\begin{uaanswer}
+Sea $N$ el número total de nodos.
+
+Una mayoría es cualquier conjunto de tamaño $> N/2$.
+
+Sean $Q_1$ y $Q_2$ dos mayorías.
+
+Supongamos que no intersectan:
+\[
+|Q_1| + |Q_2| \le N
+\]
+
+Pero:
+\[
+|Q_1| > N/2, \quad |Q_2| > N/2
+\]
+
+Entonces:
+\[
+|Q_1| + |Q_2| > N
+\]
+
+Contradicción.
+
+Por lo tanto:
+\[
+Q_1 \cap Q_2 \neq \emptyset
+\]
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar Log Matching en Raft.
+\end{uaexercise}
+
+\begin{uaanswer}
+La propiedad establece que si dos logs contienen una entrada con el mismo índice y término, entonces todos los elementos anteriores son idénticos.
+
+Esto se garantiza porque:
+\begin{itemize}
+\item el líder solo añade entradas a partir de logs consistentes
+\item los followers rechazan entradas inconsistentes
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplicar modelo D.
+\end{uaexercise}
+
+\begin{uaanswer}
+\begin{itemize}
+\item $P$: mantener estado consistente
+\item $F$: fallas de nodos y delay
+\item $G$: consenso
+\item $S$: Raft/Paxos
+\item $T$: latencia y menor disponibilidad
+\end{itemize}
+\end{uaanswer}
 
 \end{document}

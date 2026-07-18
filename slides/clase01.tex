@@ -1,232 +1,569 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
-\title[\UACourse]{\UACourse}
+
+\title{\UACourse}
 \subtitle{Clase 01 --- Pensamiento distribuido}
-\author{\UAProfessor}
-\date{\UADate}
+
 \begin{document}
 
-\begin{frame}
+% -------------------------------------------------
+% Portada sin footline
+% -------------------------------------------------
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Pensamiento distribuido}
+\UASectionSlide{El problema fundamental}
 
-\begin{frame}{Objetivos de la clase}
-\begin{itemize}
-\item Reconocer qué vuelve distribuido a un problema y por qué la incertidumbre es estructural.
-\item Razonar desde síntomas observables hacia posibles causas, sin confundir evidencia con certeza.
-\item Documentar qué se relevó, qué hipótesis se analizaron y qué conclusión queda justificada.
-\item Relevar, analizar y proponer en forma aislada y conectada.
-\item Conectar el concepto con decisiones observables de diseño
-\item Anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Relevar, analizar, proponer}
-\begin{columns}[T]
-\column{0.32\textwidth}
-\textbf{Relevar}
-\begin{itemize}
-\item síntomas observables
-\item contexto y restricciones
-\item datos que faltan
-\end{itemize}
-
-\column{0.32\textwidth}
-\textbf{Analizar}
-\begin{itemize}
-\item causas compatibles
-\item evidencia disponible
-\item hipótesis descartadas
-\end{itemize}
-
-\column{0.32\textwidth}
-\textbf{Proponer}
-\begin{itemize}
-\item garantía buscada
-\item solución elegida
-\item trade-off aceptado
-\end{itemize}
-\end{columns}
-
-\vspace{0.5em}
-\begin{uainfo}
-Primero se separa cada dimensión para no confundir observación, inferencia y decisión.
-Después se conectan para justificar una propuesta coherente.
-\end{uainfo}
-\end{frame}
-
-
-\begin{frame}{Definición operativa}
-Un sistema distribuido es un conjunto de nodos independientes que cooperan por red para ofrecer una abstracción unificada.
+\begin{frame}{Un problema aparentemente simple}
+Un usuario hace click en \emph{“pagar”}.
 
 \begin{itemize}
-\item No hay memoria compartida global
-\item no hay reloj global confiable
-\item los componentes pueden fallar de manera independiente
-\item la red introduce demora, pérdida y reordenamiento
+\item El cliente envía la solicitud.
+\item El servidor procesa el pago.
+\item La respuesta no llega.
 \end{itemize}
-\end{frame}
 
-\begin{frame}{Ejemplo motivador: pago con timeout}
-Un cliente envía un pago.
-El servidor procesa.
-La respuesta no vuelve.
+\pause
 
-\begin{center}
-\begin{tikzpicture}[
-  node distance=4cm,
-  >=Latex,
-  every node/.style={font=\small}
-]
-\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm] (c) {Cliente};
-\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm, right of=c] (s) {Servidor};
-\draw[->, thick]
-  (c.north east) -- (s.north west)
-  node[midway, above=4pt] {pago};
-\draw[->, thick, dashed]
-  (s.south west) -- (c.south east)
-  node[midway, below=6pt] {respuesta perdida / demorada};
-\end{tikzpicture}
-\end{center}
-
-\begin{itemize}
-\item ¿el servidor nunca recibió el pedido?
-\item ¿procesó el pago y se perdió el ACK?
-\item ¿está caído o solo lento?
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Insight central}
-\begin{block}{Afirmación}
-En un sistema distribuido asíncrono, un observador remoto no puede distinguir de manera perfecta entre una falla y una demora suficientemente larga.
+\begin{block}{Pregunta}
+¿El pago se realizó o no?
 \end{block}
 
-Eso obliga a diseñar con hipótesis explícitas sobre fallas, garantías y recuperación.
+\pause
+
+\begin{alertblock}{Respuesta correcta}
+No lo sabemos. Y, en general, no podemos saberlo con certeza.
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Tipos de fallas relevantes}
-\begin{columns}[T]
-\column{0.58\textwidth}
-\begin{itemize}
-\item crash: el nodo deja de responder
-\item omission: un mensaje no llega
-\item delay: un mensaje llega tarde
-\item partition: una parte de la red queda aislada
-\item byzantine: comportamiento arbitrario o malicioso
-\end{itemize}
-\column{0.38\textwidth}
+\begin{frame}{Visualización del problema}
 \begin{center}
-\begin{tikzpicture}[node distance=1.2cm]
-\node[draw, rounded corners] (r) {Fallas};
-\node[draw, below left=of r] (c) {Crash};
-\node[draw, below=of r] (d) {Delay};
-\node[draw, below right=of r] (o) {Omisión};
-\node[draw, below=2.2cm of d] (p) {Partición};
-\draw (r)--(c);
-\draw (r)--(d);
-\draw (r)--(o);
-\draw (d)--(p);
+\begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm, right of=c] (s) {Servidor};
+
+\draw[->, thick] (c.north east) -- (s.north west) node[midway, above=4pt] {solicitud de pago};
+\draw[->, thick, dashed] (s.south west) -- (c.south east) node[midway, below=6pt] {respuesta perdida / demorada};
 \end{tikzpicture}
 \end{center}
-\end{columns}
+
+\pause
+
+Lo único observable para el cliente es la falta de confirmación en un cierto intervalo.
 \end{frame}
 
-\begin{frame}{Formalización mínima}
-Podemos representar una decisión de diseño como:
-\[
-D = (P,F,G,S,T)
-\]
-\begin{itemize}
-\item $P$: problema
-\item $F$: fallas asumidas
-\item $G$: garantía requerida
-\item $S$: solución elegida
-\item $T$: trade-off aceptado
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Ejemplo usando el framework}
-\textbf{Problema:} evitar duplicación de pagos.
-
-\begin{itemize}
-\item $F$: timeout y retry del cliente
-\item $G$: a lo sumo un débito efectivo
-\item $S$: idempotencia con request id único
-\item $T$: más estado, más validaciones, más complejidad operativa
-\end{itemize}
-\end{frame}
-
-\begin{frame}{CAP: qué significa ``bajo partición''}
-Una partición ocurre cuando dos partes del sistema siguen vivas, pero no pueden comunicarse entre sí de manera confiable.
-
+\begin{frame}{Dos historias, una misma observación}
 \begin{columns}[T]
 \column{0.48\textwidth}
+\textbf{Historia A}
 \begin{itemize}
-\item los nodos no comparten una visión única del estado
-\item cada lado puede recibir pedidos de clientes
-\item no hay forma inmediata de coordinar una decisión global
+\item el servidor nunca recibió la solicitud;
+\item no hubo procesamiento;
+\item el cliente observa timeout.
 \end{itemize}
 
-\column{0.46\textwidth}
-\begin{center}
-\begin{tikzpicture}[node distance=1.5cm,every node/.style={font=\small}]
-\node[draw, rounded corners, minimum width=2.2cm] (a) {Replica A};
-\node[draw, rounded corners, minimum width=2.2cm, right=2.4cm of a] (b) {Replica B};
-\node[below=0.75cm of a] (ca) {Cliente 1};
-\node[below=0.75cm of b] (cb) {Cliente 2};
-\draw[->] (ca)--(a);
-\draw[->] (cb)--(b);
-\draw[thick,dashed,red] (a)-- node[above] {sin enlace} (b);
-\end{tikzpicture}
-\end{center}
+\column{0.48\textwidth}
+\textbf{Historia B}
+\begin{itemize}
+\item el servidor sí procesó el pago;
+\item la respuesta se perdió;
+\item el cliente observa timeout.
+\end{itemize}
 \end{columns}
 
-\begin{uawarn}
-CAP no dice que siempre hay que elegir dos letras. Dice que, si hay partición, responder en ambos lados puede sacrificar consistencia; coordinar o rechazar puede sacrificar disponibilidad.
-\end{uawarn}
+\pause
+
+\begin{block}{Idea clave}
+Para el cliente, ambas historias son indistinguibles.
+\end{block}
 \end{frame}
 
-\begin{frame}{CAP: intuición correcta}
-\begin{columns}[T]
-\column{0.54\textwidth}
-Bajo partición, un sistema replicado no puede dar simultáneamente:
+\UASectionSlide{La ruptura conceptual}
+
+\begin{frame}{La idea más importante del curso}
+\begin{block}{Afirmación}
+En sistemas distribuidos, un observador remoto no puede distinguir perfectamente entre:
+\end{block}
+
 \begin{itemize}
-\item consistencia fuerte observable
-\item disponibilidad total de las operaciones
+\item una falla real;
+\item una demora suficientemente larga.
 \end{itemize}
 
-La decisión real es: rechazar para preservar corrección o responder sacrificando consistencia.
-\column{0.40\textwidth}
+\pause
+
+\begin{uakeybox}
+El problema central no es solo técnico. Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Qué significa esto en la práctica}
+Si no podés saber con certeza qué pasó, entonces:
+
+\begin{itemize}
+\item no podés basarte en una visión global perfecta;
+\item no podés exigir soluciones que dependan de información imposible;
+\item tenés que diseñar bajo incertidumbre.
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Cambio de paradigma}
+El objetivo deja de ser “adivinar el estado real” y pasa a ser “garantizar un comportamiento razonable bajo información incompleta”.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Qué vuelve distribuido a un problema}
+
+\begin{frame}{Definición operativa}
+Un sistema distribuido es un conjunto de procesos o nodos que:
+
+\begin{itemize}
+\item se ejecutan en máquinas distintas;
+\item se comunican por intercambio de mensajes;
+\item cooperan para ofrecer una abstracción que el usuario percibe como un solo sistema.
+\end{itemize}
+
+\pause
+
+Consecuencias:
+\begin{itemize}
+\item la comunicación no es instantánea;
+\item las fallas son parciales;
+\item el conocimiento del estado global es limitado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué no alcanza con decir}
+No alcanza con afirmar:
+\begin{itemize}
+\item “hay varias máquinas”;
+\item “hay red”;
+\item “hay paralelismo”.
+\end{itemize}
+
+\pause
+
+Lo importante es esto:
+
+\begin{block}{}
+El problema se vuelve distribuido cuando la corrección depende de coordinar componentes que no comparten memoria, reloj ni observación perfecta.
+\end{block}
+\end{frame}
+
+\begin{frame}{Modelo síncrono y modelo asíncrono}
+\textbf{Modelo síncrono:}
+\begin{itemize}
+\item existen cotas conocidas para red y cómputo;
+\item una demora fuera de cota puede interpretarse como falla.
+\end{itemize}
+
+\pause
+
+\textbf{Modelo asíncrono:}
+\begin{itemize}
+\item no existen cotas confiables conocidas;
+\item una demora arbitrariamente grande es indistinguible de una falla.
+\end{itemize}
+
+\pause
+
+Internet real se parece mucho más al segundo caso.
+\end{frame}
+
+\UASectionSlide{Cómo pensaremos el resto del curso}
+
+\begin{frame}{Framework del curso}
+Vamos a organizar toda decisión técnica con el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+\begin{itemize}
+\item $P$: problema;
+\item $F$: fallas asumidas;
+\item $G$: garantía requerida;
+\item $S$: solución elegida;
+\item $T$: trade-off aceptado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo con el framework}
+\textbf{Caso: evitar pagos duplicados}
+
+\begin{itemize}
+\item $P$: pago remoto con timeout;
+\item $F$: pérdida de respuesta, delay, retry del cliente;
+\item $G$: no más de un débito efectivo;
+\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $T$: mayor complejidad y más estado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué significa pensar distributivamente}
+Pensar distributivamente no es memorizar algoritmos.
+
+\pause
+
+Es saber:
+
+\begin{itemize}
+\item qué información no tenés;
+\item qué falla estás modelando;
+\item qué garantía necesitás realmente;
+\item qué costo aceptás pagar por ella.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{CAP bien entendido}
+
+\begin{frame}{CAP: interpretación correcta}
+CAP no significa “elegir dos de tres” como slogan.
+
+\pause
+
+Significa que, bajo partición de red, un sistema replicado no puede ofrecer simultáneamente:
+
+\begin{itemize}
+\item consistencia fuerte observable;
+\item disponibilidad total de las operaciones.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{La decisión real bajo partición}
+Ante partición:
+
+\begin{itemize}
+\item o rechazás operaciones para preservar corrección;
+\item o respondés igual para preservar disponibilidad, aceptando posible inconsistencia.
+\end{itemize}
+
+\pause
+
 \begin{center}
 \begin{tikzpicture}[scale=0.95,every node/.style={font=\small}]
 \node (C) at (0,0) {Consistencia};
-\node (A) at (3.1,0) {Disponibilidad};
-\node (P) at (1.55,2.4) {Particiones};
+\node (A) at (3.2,0) {Disponibilidad};
+\node (P) at (1.6,2.4) {Particiones};
 \draw[thick] (C)--(A)--(P)--(C);
 \end{tikzpicture}
 \end{center}
-\end{columns}
 \end{frame}
 
 \begin{frame}{Errores conceptuales frecuentes}
 \begin{itemize}
-\item creer que timeout implica crash
-\item pensar que la red es confiable salvo casos extremos
-\item asumir que siempre existe una solución perfecta
-\item usar CAP como slogan y no como restricción bajo partición
+\item creer que timeout implica crash;
+\item creer que la red es confiable salvo casos extremos;
+\item asumir una visión global perfecta del sistema;
+\item tratar CAP como slogan y no como restricción bajo partición.
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Cierre}
+\begin{block}{Idea final}
+El pensamiento distribuido consiste en decidir correctamente bajo incertidumbre.
+\end{block}
+
+\pause
+
+No se trata de encontrar una solución perfecta, sino de:
+\begin{itemize}
+\item explicitar supuestos;
+\item elegir garantías;
+\item y defender el trade-off que se acepta.
+\end{itemize}
+\end{frame}
+
+\end{document}\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
+\UASetClassNumber{01}
+\UASetClassTitle{Pensamiento distribuido}
+
+\title{\UACourse}
+\subtitle{Clase 01 --- Pensamiento distribuido}
+
+\begin{document}
+
+% -------------------------------------------------
+% Portada sin footline
+% -------------------------------------------------
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
+\titlepage
+\end{frame}
+}
+
+\UASectionSlide{El problema fundamental}
+
+\begin{frame}{Un problema aparentemente simple}
+Un usuario hace click en \emph{“pagar”}.
+
+\begin{itemize}
+\item El cliente envía la solicitud.
+\item El servidor procesa el pago.
+\item La respuesta no llega.
+\end{itemize}
+
+\pause
+
+\begin{block}{Pregunta}
+¿El pago se realizó o no?
+\end{block}
+
+\pause
+
+\begin{alertblock}{Respuesta correcta}
+No lo sabemos. Y, en general, no podemos saberlo con certeza.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Visualización del problema}
+\begin{center}
+\begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm, right of=c] (s) {Servidor};
+
+\draw[->, thick] (c.north east) -- (s.north west) node[midway, above=4pt] {solicitud de pago};
+\draw[->, thick, dashed] (s.south west) -- (c.south east) node[midway, below=6pt] {respuesta perdida / demorada};
+\end{tikzpicture}
+\end{center}
+
+\pause
+
+Lo único observable para el cliente es la falta de confirmación en un cierto intervalo.
+\end{frame}
+
+\begin{frame}{Dos historias, una misma observación}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\textbf{Historia A}
+\begin{itemize}
+\item el servidor nunca recibió la solicitud;
+\item no hubo procesamiento;
+\item el cliente observa timeout.
+\end{itemize}
+
+\column{0.48\textwidth}
+\textbf{Historia B}
+\begin{itemize}
+\item el servidor sí procesó el pago;
+\item la respuesta se perdió;
+\item el cliente observa timeout.
+\end{itemize}
+\end{columns}
+
+\pause
+
+\begin{block}{Idea clave}
+Para el cliente, ambas historias son indistinguibles.
+\end{block}
+\end{frame}
+
+\UASectionSlide{La ruptura conceptual}
+
+\begin{frame}{La idea más importante del curso}
+\begin{block}{Afirmación}
+En sistemas distribuidos, un observador remoto no puede distinguir perfectamente entre:
+\end{block}
+
+\begin{itemize}
+\item una falla real;
+\item una demora suficientemente larga.
+\end{itemize}
+
+\pause
+
+\begin{uakeybox}
+El problema central no es solo técnico. Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Qué significa esto en la práctica}
+Si no podés saber con certeza qué pasó, entonces:
+
+\begin{itemize}
+\item no podés basarte en una visión global perfecta;
+\item no podés exigir soluciones que dependan de información imposible;
+\item tenés que diseñar bajo incertidumbre.
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Cambio de paradigma}
+El objetivo deja de ser “adivinar el estado real” y pasa a ser “garantizar un comportamiento razonable bajo información incompleta”.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Qué vuelve distribuido a un problema}
+
+\begin{frame}{Definición operativa}
+Un sistema distribuido es un conjunto de procesos o nodos que:
+
+\begin{itemize}
+\item se ejecutan en máquinas distintas;
+\item se comunican por intercambio de mensajes;
+\item cooperan para ofrecer una abstracción que el usuario percibe como un solo sistema.
+\end{itemize}
+
+\pause
+
+Consecuencias:
+\begin{itemize}
+\item la comunicación no es instantánea;
+\item las fallas son parciales;
+\item el conocimiento del estado global es limitado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué no alcanza con decir}
+No alcanza con afirmar:
+\begin{itemize}
+\item “hay varias máquinas”;
+\item “hay red”;
+\item “hay paralelismo”.
+\end{itemize}
+
+\pause
+
+Lo importante es esto:
+
+\begin{block}{}
+El problema se vuelve distribuido cuando la corrección depende de coordinar componentes que no comparten memoria, reloj ni observación perfecta.
+\end{block}
+\end{frame}
+
+\begin{frame}{Modelo síncrono y modelo asíncrono}
+\textbf{Modelo síncrono:}
+\begin{itemize}
+\item existen cotas conocidas para red y cómputo;
+\item una demora fuera de cota puede interpretarse como falla.
+\end{itemize}
+
+\pause
+
+\textbf{Modelo asíncrono:}
+\begin{itemize}
+\item no existen cotas confiables conocidas;
+\item una demora arbitrariamente grande es indistinguible de una falla.
+\end{itemize}
+
+\pause
+
+Internet real se parece mucho más al segundo caso.
+\end{frame}
+
+\UASectionSlide{Cómo pensaremos el resto del curso}
+
+\begin{frame}{Framework del curso}
+Vamos a organizar toda decisión técnica con el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+\begin{itemize}
+\item $P$: problema;
+\item $F$: fallas asumidas;
+\item $G$: garantía requerida;
+\item $S$: solución elegida;
+\item $T$: trade-off aceptado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo con el framework}
+\textbf{Caso: evitar pagos duplicados}
+
+\begin{itemize}
+\item $P$: pago remoto con timeout;
+\item $F$: pérdida de respuesta, delay, retry del cliente;
+\item $G$: no más de un débito efectivo;
+\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $T$: mayor complejidad y más estado.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué significa pensar distributivamente}
+Pensar distributivamente no es memorizar algoritmos.
+
+\pause
+
+Es saber:
+
+\begin{itemize}
+\item qué información no tenés;
+\item qué falla estás modelando;
+\item qué garantía necesitás realmente;
+\item qué costo aceptás pagar por ella.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{CAP bien entendido}
+
+\begin{frame}{CAP: interpretación correcta}
+CAP no significa “elegir dos de tres” como slogan.
+
+\pause
+
+Significa que, bajo partición de red, un sistema replicado no puede ofrecer simultáneamente:
+
+\begin{itemize}
+\item consistencia fuerte observable;
+\item disponibilidad total de las operaciones.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{La decisión real bajo partición}
+Ante partición:
+
+\begin{itemize}
+\item o rechazás operaciones para preservar corrección;
+\item o respondés igual para preservar disponibilidad, aceptando posible inconsistencia.
+\end{itemize}
+
+\pause
+
+\begin{center}
+\begin{tikzpicture}[scale=0.95,every node/.style={font=\small}]
+\node (C) at (0,0) {Consistencia};
+\node (A) at (3.2,0) {Disponibilidad};
+\node (P) at (1.6,2.4) {Particiones};
+\draw[thick] (C)--(A)--(P)--(C);
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}{Errores conceptuales frecuentes}
+\begin{itemize}
+\item creer que timeout implica crash;
+\item creer que la red es confiable salvo casos extremos;
+\item asumir una visión global perfecta del sistema;
+\item tratar CAP como slogan y no como restricción bajo partición.
+\end{itemize}
+\end{frame}
 
 \begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 01 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{block}{Idea final}
+El pensamiento distribuido consiste en decidir correctamente bajo incertidumbre.
 \end{block}
+
+\pause
+
+No se trata de encontrar una solución perfecta, sino de:
+\begin{itemize}
+\item explicitar supuestos;
+\item elegir garantías;
+\item y defender el trade-off que se acepta.
+\end{itemize}
 \end{frame}
 
 \end{document}

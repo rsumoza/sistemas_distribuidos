@@ -1,64 +1,193 @@
-% !TeX encoding = UTF-8
-\documentclass{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{03}
-\UASetClassTitle{Replicación de estado}
+\UASetClassTitle{Consistencia y replicación}
 
 \title{\UACourse}
-\subtitle{Clase 03 --- Replicación de estado}
+\subtitle{Clase 03 --- Consistencia, replicación y modelos de estado}
 
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Replicación de estado}
+\UASectionSlide{Del RPC al estado}
 
-\begin{frame}{Problema}
-¿Por qué replicar?
-
+\begin{frame}{De la comunicación al estado}
+Clase 2:
 \begin{itemize}
-\item Disponibilidad
-\item Latencia
+\item RPC bajo incertidumbre
+\item timeouts, retries, idempotencia
 \end{itemize}
 
-Problema:
-\begin{itemize}
-\item inconsistencia
-\end{itemize}
+\pause
+
+\begin{block}{Nuevo problema}
+¿Cómo mantenemos \textbf{estado} cuando hay múltiples copias?
+\end{block}
 \end{frame}
 
-\begin{frame}{Leader-Follower}
+\begin{frame}{Replicación}
+Replicación = múltiples nodos mantienen el mismo \emph{estado lógico}.
+
+\pause
+Motivaciones:
 \begin{itemize}
-\item un nodo líder
-\item réplicas seguidoras
+\item disponibilidad
+\item latencia (lecturas cercanas)
+\item tolerancia a fallas
 \end{itemize}
+
+\pause
+\begin{alertblock}{Hecho estructural}
+Sin coordinación perfecta, las réplicas \textbf{divergen}.
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Sync vs Async}
+\begin{frame}{Por qué divergen}
 \begin{itemize}
-\item sync → consistente pero lento
-\item async → rápido pero inconsistente
+\item latencias variables
+\item pérdidas/reintentos
+\item escrituras concurrentes
+\item particiones
 \end{itemize}
+
+\pause
+\begin{block}{Conclusión}
+La divergencia no es un bug: es una consecuencia del modelo.
+\end{block}
 \end{frame}
 
-\begin{frame}{Stale Reads}
+\UASectionSlide{Modelos de consistencia}
+
+\begin{frame}{¿Qué es consistencia?}
+Consistencia define:
+\begin{block}{}
+qué valores pueden observar los clientes y en qué orden.
+\end{block}
+\end{frame}
+
+\begin{frame}{Linearizabilidad (consistencia fuerte)}
 \begin{itemize}
-\item lectura desactualizada
+\item equivalente a una sola copia
+\item respeta orden de tiempo real
 \end{itemize}
 
-Ejemplo:
+\pause
+\begin{block}{Intuición}
+Cada operación ocurre en un punto único entre invocación y respuesta.
+\end{block}
+\end{frame}
+
+\begin{frame}{Causalidad (happens-before)}
+Relación $a \rightarrow b$ si:
 \begin{itemize}
-\item saldo incorrecto
+\item mismo proceso y $a$ ocurre antes que $b$
+\item $a$ envía mensaje que causa $b$
+\end{itemize}
+
+\pause
+\begin{block}{Consistencia causal}
+Respeta dependencias causales, no impone orden total.
+\end{block}
+\end{frame}
+
+\begin{frame}{Eventual consistency}
+\begin{itemize}
+\item sin nuevas escrituras, las réplicas convergen
+\item no hay garantías inmediatas de lectura
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Trade-off}
 \begin{itemize}
-\item disponibilidad versus consistencia
+\item fuerte: coordinación + latencia + menor disponibilidad
+\item débil: disponibilidad + anomalías temporales
 \end{itemize}
+\end{frame}
+
+\UASectionSlide{Arquitecturas de replicación}
+
+\begin{frame}{Leader-based}
+\begin{itemize}
+\item un líder serializa escrituras
+\item followers replican (sync/async)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Multi-leader}
+\begin{itemize}
+\item múltiples líderes
+\item escritura local rápida
+\item conflictos inevitables
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Leaderless (Dynamo)}
+\begin{itemize}
+\item $N$ réplicas
+\item escribir a $W$, leer de $R$
+\item condición clásica: $R+W>N$
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Quorums}
+\begin{itemize}
+\item write quorum $W$
+\item read quorum $R$
+\end{itemize}
+
+\pause
+\begin{block}{Propiedad}
+Si $R+W>N$, hay intersección de quorums.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Conflictos y convergencia}
+
+\begin{frame}{Conflictos}
+\begin{itemize}
+\item escrituras concurrentes sobre mismo objeto
+\item orden global no definido
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Resolución}
+\begin{itemize}
+\item LWW (last-write-wins)
+\item merge semántico
+\item versionado (vector clocks)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Anti-entropy}
+\begin{itemize}
+\item sincronización periódica entre réplicas
+\item gossip / read-repair
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Modelo del curso}
+
+\begin{frame}{Aplicación de $D=(P,F,G,S,T)$}
+\begin{itemize}
+\item $P$: estado replicado
+\item $F$: delay, pérdida, partición
+\item $G$: (linearizable / causal / eventual)
+\item $S$: leader, multi-leader, quorum
+\item $T$: latencia, disponibilidad, complejidad
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cierre}
+\begin{block}{Idea central}
+Replicar estado obliga a elegir \emph{qué inconsistencias aceptar} y \emph{cuándo}.
+\end{block}
 \end{frame}
 
 \end{document}

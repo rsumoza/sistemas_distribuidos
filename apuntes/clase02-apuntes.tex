@@ -1,431 +1,148 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{02}
-\UASetClassTitle{Comunicación y fallas}
+\UASetClassTitle{RPC, timeouts, retries e idempotencia}
+\UASetDocKind{Apuntes}
 
-\title{Clase 02 --- Comunicación y fallas}
+\title{Clase 02 --- RPC, timeouts, retries e idempotencia}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
+\section{Introducción}
 
-La clase 2 introduce una idea central de toda la materia: en un sistema distribuido, toda coordinación entre componentes depende de mensajes que atraviesan una red no confiable. Esto significa que una operación remota nunca tiene la simplicidad semántica de una llamada local. Aun cuando la sintaxis se parezca a una invocación ordinaria, la semántica real está condicionada por demoras, pérdidas, reintentos, duplicaciones y fallas parciales.
+La clase 1 mostró que el problema central de los sistemas distribuidos es la \textbf{indistinguibilidad observacional}. La clase 2 estudia cómo esa limitación impacta directamente en el diseño de llamadas remotas.
 
-La tesis principal de esta clase es la siguiente:
-
-\begin{uakeybox}
-Toda comunicación distribuida introduce incertidumbre sobre el estado remoto, y toda estrategia para reducir esa incertidumbre introduce a su vez nuevos trade-offs.
-\end{uakeybox}
-
-En consecuencia, no basta con aprender términos como \emph{timeout}, \emph{retry} o \emph{idempotencia}. Es necesario entender qué problema intenta resolver cada mecanismo, qué nuevas dificultades introduce y bajo qué supuestos puede considerarse correcto.
-
-\section{De llamada local a llamada remota}
-
-En un programa secuencial o concurrente dentro de una misma máquina, una llamada a función tiene propiedades intuitivas fuertes:
-
-\begin{itemize}
-\item el programador asume una pila de ejecución consistente;
-\item si la llamada retorna, el control vuelve al punto esperado;
-\item si la llamada falla, en general la falla es localmente observable;
-\item no existe una red entre invocante e invocado.
-\end{itemize}
-
-En cambio, una llamada remota (\emph{Remote Procedure Call}, RPC) involucra al menos las siguientes etapas:
-
-\begin{enumerate}
-\item serialización de parámetros;
-\item envío del mensaje por la red;
-\item recepción por el servidor;
-\item ejecución de la operación;
-\item serialización de la respuesta;
-\item envío de la respuesta;
-\item recepción y deserialización por el cliente.
-\end{enumerate}
-
-Cada una de estas etapas puede fallar parcial o temporalmente. Por lo tanto, la abstracción ``llamada remota como si fuera local'' es útil pedagógicamente, pero peligrosa si se toma literalmente.
-
-\section{No-inmediatez y capas de comunicación}
-
-Una comunicación distribuida no debe entenderse como un salto instantáneo entre cliente y servidor. Entre la intención de invocar una operación y la observación de una respuesta hay una trayectoria compuesta por capas: aplicación, librería RPC o cliente HTTP, serialización, transporte, red, balanceadores, servidor, almacenamiento y camino de regreso.
-
-Cada capa puede tener su propia forma de reaccionar ante una falla:
-\begin{itemize}
-\item la aplicación puede abandonar la espera y mostrar error;
-\item el cliente RPC puede reintentar automáticamente;
-\item TCP puede retransmitir segmentos sin que la aplicación lo observe directamente;
-\item un balanceador puede redirigir a otra instancia;
-\item el servidor puede seguir procesando aunque el cliente ya haya vencido su timeout;
-\item la base de datos puede confirmar o abortar una operación de manera independiente de la respuesta de red.
-\end{itemize}
-
-Esto introduce una forma práctica de concurrencia: mientras una capa decide que ``ya esperó suficiente'', otra capa puede seguir intentando, entregando, ejecutando o confirmando efectos. Por eso, para diagnosticar un problema de comunicación no alcanza con preguntar ``falló o no falló''. Hay que reconstruir qué observó cada capa, qué acción tomó y qué efectos pudo producir.
+El objetivo es entender que:
 
 \begin{uakeybox}
-La no-inmediatez de la comunicación obliga a razonar con líneas de tiempo: lo que el cliente observa, lo que la red transporta, lo que el servidor ejecuta y lo que el almacenamiento confirma pueden no coincidir en el mismo instante.
+Una llamada remota no es una función distribuida: es una interacción bajo incertidumbre.
 \end{uakeybox}
 
-\subsection{Error conceptual fundamental}
+\section{RPC: abstracción y límites}
 
-Uno de los errores más comunes en sistemas distribuidos es razonar así:
+RPC (Remote Procedure Call) busca abstraer una invocación remota como si fuera una llamada local. Sin embargo, esta abstracción es incompleta.
 
-\begin{quote}
-``Si llamo a un servicio y no obtengo respuesta, entonces el servicio falló.''
-\end{quote}
-
-Ese razonamiento es incorrecto. La falta de respuesta puede deberse a múltiples causas:
+\subsection{Diferencias fundamentales}
 
 \begin{itemize}
-\item el request nunca salió del cliente;
-\item salió pero se perdió en la red;
-\item llegó al servidor pero no se ejecutó;
-\item se ejecutó pero la respuesta se perdió;
-\item se ejecutó y la respuesta está demorada;
-\item el servidor está vivo pero sobrecargado;
-\item el servidor efectivamente cayó.
+\item una llamada local no falla parcialmente;
+\item una llamada remota sí;
+\item una llamada local tiene semántica clara;
+\item una llamada remota depende de la red.
 \end{itemize}
 
-\begin{uawarn}
-La observación ``no recibí respuesta'' no identifica la causa. Solo informa una ausencia de evidencia dentro de una ventana temporal determinada.
-\end{uawarn}
+\section{Modelo de ejecución}
 
-\section{RPC como abstracción y como problema}
+Sea una operación remota $op$.
 
-RPC busca ofrecer una interfaz procedural sobre una operación remota. El objetivo histórico fue simplificar la programación distribuida ocultando detalles de red. Sin embargo, desde el punto de vista conceptual, lo importante es entender que RPC no elimina el problema distribuido; solo lo encapsula.
-
-Formalmente, una operación RPC puede representarse como una tupla:
-
-\[
-\mathcal{R} = (req, net_{out}, exec, net_{in}, resp)
-\]
-
-donde:
+Eventos posibles:
 
 \begin{itemize}
-\item $req$ representa la solicitud emitida por el cliente;
-\item $net_{out}$ representa el trayecto de ida por la red;
-\item $exec$ representa la ejecución en el servidor;
-\item $net_{in}$ representa el trayecto de vuelta;
-\item $resp$ representa la respuesta observada por el cliente.
+\item envío del request
+\item recepción en servidor
+\item ejecución
+\item envío de respuesta
+\item recepción en cliente
 \end{itemize}
 
-El problema es que el cliente no observa directamente cada componente de la tupla. Solo observa, a lo sumo, el hecho de recibir o no una respuesta antes de que expire una política de espera.
+Cada etapa puede fallar independientemente.
 
-\section{Timeout}
-
-Un \emph{timeout} es una política de observación, no una prueba causal. El cliente fija un umbral temporal $\tau$ y decide:
-
-\[
-\text{si no llega respuesta antes de } \tau, \text{ entonces actuar}
-\]
-
-La acción puede ser:
-
-\begin{itemize}
-\item reintentar;
-\item fallar hacia arriba;
-\item degradar funcionalidad;
-\item usar un valor alternativo;
-\item redirigir a otra réplica o servicio.
-\end{itemize}
-
-\subsection{Interpretación correcta de un timeout}
-
-Sea $T$ el tiempo real de finalización de una operación remota y $\tau$ el timeout configurado. Entonces:
-
-\[
-T > \tau
-\]
-
-solo implica que la operación no fue observada por el cliente dentro de la ventana de espera. No implica:
-
-\begin{itemize}
-\item que la operación no haya comenzado;
-\item que la operación no haya terminado;
-\item que el servidor haya fallado;
-\item que el request no vaya a producir efectos más adelante.
-\end{itemize}
-
-\begin{uakeybox}
-Un timeout divide el mundo entre ``observable a tiempo'' y ``no observable a tiempo'', no entre ``correcto'' y ``fallido''.
-\end{uakeybox}
-
-\subsection{Trade-off del timeout}
-
-Timeouts cortos:
-\begin{itemize}
-\item mejoran capacidad de reacción;
-\item reducen espera percibida;
-\item aumentan falsos positivos de falla.
-\end{itemize}
-
-Timeouts largos:
-\begin{itemize}
-\item reducen reintentos innecesarios;
-\item empeoran experiencia de usuario;
-\item pueden retrasar detección de fallas reales.
-\end{itemize}
-
-No existe un timeout universalmente óptimo. El valor correcto depende de:
-
-\begin{itemize}
-\item latencia esperada del sistema;
-\item criticidad de la operación;
-\item costo de reintento;
-\item tolerancia a demora;
-\item perfil de carga;
-\item modelo de fallas asumido.
-\end{itemize}
-
-\section{Retry}
-
-Dado un timeout, una reacción natural es reintentar. Si una operación puede no haber ocurrido, repetirla parece razonable. Sin embargo, el retry no solo recupera de ciertas fallas; también puede amplificar problemas.
-
-\subsection{Beneficio del retry}
-
-El retry es útil cuando la falla es transitoria:
-
-\begin{itemize}
-\item pérdida ocasional de paquetes;
-\item congestión momentánea;
-\item reinicio rápido de un servicio;
-\item failover entre instancias.
-\end{itemize}
-
-En estos casos, repetir puede aumentar significativamente la probabilidad de éxito.
-
-\subsection{Riesgo del retry}
-
-Si la operación original sí ocurrió y el cliente no lo sabe, entonces reintentar puede:
-
-\begin{itemize}
-\item duplicar pagos;
-\item generar doble creación de recursos;
-\item aplicar dos veces una mutación;
-\item producir inconsistencia observable.
-\end{itemize}
-
-Además, retries masivos pueden generar \emph{retry storms}: la infraestructura, ya degradada, recibe todavía más tráfico debido a los propios mecanismos de recuperación.
-
-\subsection{Retry y modelo de fallas}
-
-El retry es correcto solo si se razona junto con:
-
-\begin{itemize}
-\item la naturaleza del efecto remoto;
-\item la posibilidad de duplicación;
-\item la capacidad del servidor para reconocer repeticiones;
-\item la idempotencia de la operación;
-\item una política de backoff.
-\end{itemize}
-
-\section{Idempotencia}
-
-Una operación es idempotente si aplicarla varias veces produce el mismo efecto observable que aplicarla una sola vez.
-
-Formalmente, si $f$ representa una operación sobre el estado $x$, entonces $f$ es idempotente si:
-
-\[
-f(f(x)) = f(x)
-\]
-
-\subsection{Ejemplos}
-
-Ejemplos típicos de idempotencia:
-
-\begin{itemize}
-\item \texttt{setBalance(100)}: repetir la asignación sigue dejando saldo en 100;
-\item \texttt{markAsRead(msg42)}: repetir no cambia el resultado final;
-\item \texttt{PUT /resource/id} con el mismo contenido.
-\end{itemize}
-
-Ejemplos típicamente no idempotentes:
-
-\begin{itemize}
-\item \texttt{incrementBalance(100)};
-\item \texttt{chargeCard(100)};
-\item \texttt{createOrder()} sin clave de deduplicación.
-\end{itemize}
-
-\subsection{Idempotencia de protocolo vs idempotencia semántica}
-
-Es importante distinguir:
-
-\begin{itemize}
-\item \textbf{idempotencia semántica}: la operación por su significado no cambia al repetirse;
-\item \textbf{idempotencia implementada}: la operación no es naturalmente idempotente, pero el sistema la vuelve idempotente mediante IDs únicos, deduplicación o almacenamiento de resultados previos.
-\end{itemize}
-
-Por ejemplo, cobrar una tarjeta no es semánticamente idempotente. Sin embargo, puede implementarse de forma idempotente si toda operación lógica lleva una clave única y el servidor reconoce reintentos del mismo pedido.
-
-\section{Semánticas de entrega}
-
-En comunicación distribuida se suele hablar de tres familias de garantías.
-
-\subsection{At-most-once}
-
-La operación se ejecuta a lo sumo una vez.
-
-Ventaja:
-\begin{itemize}
-\item evita duplicación.
-\end{itemize}
-
-Costo:
-\begin{itemize}
-\item si se pierde el request o la respuesta, puede perderse también la operación sin recuperación transparente.
-\end{itemize}
+\section{Semánticas}
 
 \subsection{At-least-once}
 
-La operación se reintenta hasta asegurar ejecución, aceptando la posibilidad de duplicados.
+El sistema reintenta hasta obtener respuesta.
 
 Ventaja:
 \begin{itemize}
-\item reduce riesgo de no ejecución.
+\item mejora liveness
 \end{itemize}
 
-Costo:
+Problema:
 \begin{itemize}
-\item exige idempotencia o reconciliación.
+\item múltiples ejecuciones
+\end{itemize}
+
+\subsection{At-most-once}
+
+Evita duplicación.
+
+Problema:
+\begin{itemize}
+\item puede perder ejecución
 \end{itemize}
 
 \subsection{Exactly-once}
 
-La operación ocurre exactamente una vez desde el punto de vista lógico.
+\begin{uakeybox}
+En sistemas distribuidos reales, exactly-once requiere coordinación fuerte o se implementa como combinación de at-least-once + idempotencia.
+\end{uakeybox}
 
-Esta semántica es la más deseada, pero también la más difícil. En la práctica, suele implementarse como una combinación de:
+\section{Timeouts}
 
-\begin{itemize}
-\item reintentos;
-\item deduplicación;
-\item identificadores únicos;
-\item registro durable del resultado lógico;
-\item coordinación adicional.
-\end{itemize}
+Un timeout define cuándo el cliente deja de esperar.
 
-\begin{uawarn}
-En muchos sistemas reales, ``exactly-once'' no es una propiedad física simple de la red, sino una garantía lógica conseguida a costa de más estado, coordinación y complejidad.
-\end{uawarn}
-
-\section{Ejemplo trabajado: pago remoto}
-
-Consideremos una operación \texttt{charge(requestId, amount)}.
-
-\subsection{Escenario A: sin requestId}
-
-\begin{enumerate}
-\item el cliente envía cobro por \$100;
-\item el servidor debita correctamente;
-\item la respuesta se pierde;
-\item el cliente expira;
-\item el cliente reintenta;
-\item el servidor interpreta el segundo request como uno nuevo;
-\item se produce doble débito.
-\end{enumerate}
-
-\subsection{Escenario B: con requestId único}
-
-\begin{enumerate}
-\item el cliente envía \texttt{requestId=abc123};
-\item el servidor procesa y registra que \texttt{abc123} ya produjo un débito;
-\item la respuesta se pierde;
-\item el cliente reintenta con el mismo \texttt{requestId};
-\item el servidor detecta repetición y devuelve el resultado previo.
-\end{enumerate}
-
-\subsection{Conclusión}
-
-La garantía deseada no surge del retry solo, sino del acoplamiento entre:
+\subsection{Propiedades}
 
 \begin{itemize}
-\item retry;
-\item request ID;
-\item almacenamiento de resultados;
-\item política de deduplicación.
+\item decisión local
+\item basada en tiempo
+\item introduce incertidumbre
 \end{itemize}
 
-\section{Backoff}
+\section{Retries}
 
-Los retries no deberían hacerse con intervalo fijo e inmediato. Una política de \emph{backoff} aumenta el tiempo entre reintentos, típicamente de forma exponencial.
+Retry = reintento tras timeout.
 
-Si $d_0$ es el delay inicial, un esquema clásico es:
+\subsection{Problema estructural}
+
+Retry introduce duplicación potencial porque:
+
+\begin{itemize}
+\item no se sabe si la ejecución ocurrió
+\item se reintenta igual
+\end{itemize}
+
+\section{Idempotencia}
+
+Una operación es idempotente si múltiples ejecuciones producen el mismo estado final.
+
+\subsection{Formalización}
 
 \[
-d_k = d_0 \cdot 2^k
+op(op(s)) = op(s)
 \]
 
-para el reintento $k$.
-
-A menudo se agrega \emph{jitter}, es decir, aleatoriedad controlada, para evitar sincronización de clientes.
-
-\subsection{Por qué importa}
-
-Sin backoff:
-\begin{itemize}
-\item muchos clientes reintentan simultáneamente;
-\item se agrava la sobrecarga;
-\item se crean cascadas de falla.
-\end{itemize}
-
-Con backoff:
-\begin{itemize}
-\item se amortigua la presión sobre el sistema;
-\item aumenta la probabilidad de recuperación;
-\item se distribuye mejor la demanda en el tiempo.
-\end{itemize}
-
-\section{Qué debe saber hacer el estudiante al terminar esta clase}
-
-El estudiante debería poder:
+\subsection{Implementación}
 
 \begin{itemize}
-\item explicar por qué una llamada remota no es semánticamente equivalente a una local;
-\item justificar por qué un timeout no identifica por sí mismo la causa de una falla;
-\item distinguir retry como mecanismo útil y como fuente de nuevos riesgos;
-\item definir idempotencia formal e intuitivamente;
-\item comparar at-most-once, at-least-once y exactly-once;
-\item diseñar conceptualmente una operación remota segura ante reintentos.
+\item request ID
+\item log de operaciones
+\item cache de resultados
 \end{itemize}
 
-\section{Errores conceptuales frecuentes}
+\section{Trade-offs}
 
 \begin{itemize}
-\item creer que ``sin respuesta'' equivale a ``no ocurrió'';
-\item usar retry sin razonar sobre efectos duplicados;
-\item confundir idempotencia con inmutabilidad;
-\item creer que exactly-once es una propiedad trivial de la red;
-\item fijar timeouts sin relación con dominio, latencia ni costo de error.
+\item idempotencia → más estado
+\item retries → más robustez
+\item timeouts → más incertidumbre
 \end{itemize}
 
-\section{Guía de profundización bibliográfica}
-
-\subsection*{DDIA}
-\begin{itemize}
-\item \textbf{Capítulo 8}: leer para profundizar la imposibilidad práctica de distinguir fallas de demoras y para entender cómo los sistemas reales operan bajo esa incertidumbre.
-\item Buscar especialmente las discusiones sobre fallas de red, detección imperfecta y límites del conocimiento distribuido.
-\end{itemize}
-
-\subsection*{MIT 6.824}
-\begin{itemize}
-\item Revisar las notas introductorias de RPC y manejo de fallas.
-\item El objetivo no es memorizar la API, sino observar cómo un sistema didáctico introduce reintentos, duplicación y semánticas de invocación.
-\end{itemize}
-
-\subsection*{Tanenbaum}
-\begin{itemize}
-\item Leer la parte de comunicación y transparencia para contrastar el ideal de ``transparencia de acceso'' con la realidad de las fallas.
-\item Prestar atención a cómo la abstracción distribuida simplifica el uso, pero no elimina las consecuencias del modelo de red.
-\end{itemize}
-
-\section{Resumen final}
+\section{Conclusión}
 
 \begin{uakeybox}
-La comunicación distribuida no consiste en mover bytes solamente, sino en decidir qué creer sobre operaciones remotas cuando la observación es incompleta. Timeouts, retries e idempotencia no son trucos de implementación: son respuestas parciales a una incertidumbre estructural.
+El diseño de RPC consiste en elegir explícitamente:
+\begin{itemize}
+\item semántica de ejecución
+\item política de timeout
+\item política de retry
+\item mecanismo de idempotencia
+\end{itemize}
 \end{uakeybox}
 
 \end{document}
