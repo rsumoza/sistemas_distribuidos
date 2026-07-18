@@ -1,73 +1,196 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{13}
-\UASetClassTitle{Resiliencia y tolerancia a fallas}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 13 --- Resiliencia y tolerancia a fallas}
-\author{\UAProfessor}
-\date{\UADate}
+\UASetClassTitle{Confiabilidad operativa}
+\title{\UACourse}
+\subtitle{Clase 13 --- SLI, SLO, SLA, error budgets y operación guiada por objetivos}
+
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Resiliencia y tolerancia a fallas}
+\UASectionSlide{Del sistema al servicio}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{La pregunta correcta}
+Después de diseñar, observar y probar fallas, queda una pregunta:
+
+\begin{block}{}
+¿Qué significa, en términos operativos, que el sistema esté funcionando suficientemente bien?
+\end{block}
+\end{frame}
+
+\begin{frame}{Confiabilidad no es perfección}
+Un sistema confiable no es uno que:
 \begin{itemize}
-\item Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item nunca falla
+\item nunca degrada
+\item siempre responde idealmente
+\end{itemize}
+
+\pause
+
+Es uno que:
+\begin{itemize}
+\item cumple objetivos explícitos
+\item dentro de una tolerancia aceptada
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{SLI}
 
-\begin{frame}{Problema central}
-La clase 13 trabaja un tipo específico de dificultad distribuida: Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos.
+\begin{frame}{SLI}
+\begin{block}{}
+Service Level Indicator = métrica que captura una propiedad relevante del servicio desde la perspectiva del usuario.
+\end{block}
 
+\pause
+
+Ejemplos:
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item porcentaje de requests exitosas
+\item latencia p95
+\item tiempo de procesamiento
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\begin{frame}{Un buen SLI}
+Debe ser:
 \begin{itemize}
-\item timeout
-\item retry
-\item backoff
-\item circuit breaker
-\item chaos engineering
+\item medible
+\item relevante para el usuario
+\item estable
+\item accionable
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
+\UASectionSlide{SLO}
 
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{SLO}
+\begin{block}{}
+Service Level Objective = objetivo cuantitativo sobre un SLI.
+\end{block}
+
+\pause
+
+Ejemplo:
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item 99.9\% de requests exitosas en 30 días
+\item p95 de latencia menor a 300 ms
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Por qué importa}
+Un SLO convierte una intuición vaga de “calidad” en:
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item objetivo explícito
+\item criterio de operación
+\item base para priorización
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{SLA}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 13 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{frame}{SLA}
+\begin{block}{}
+Service Level Agreement = compromiso formal con una parte externa, normalmente con implicancias contractuales.
+\end{block}
+
+\pause
+
+Diferencia:
+\begin{itemize}
+\item SLI = métrica
+\item SLO = objetivo interno
+\item SLA = compromiso externo
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Error Budget}
+
+\begin{frame}{Error Budget}
+\begin{block}{}
+Si el SLO no exige perfección, entonces existe una cantidad tolerada de falla.
+\end{block}
+
+\pause
+
+Ejemplo:
+\begin{itemize}
+\item SLO = 99.9\%
+\item error budget = 0.1\%
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Interpretación}
+El error budget no autoriza “hacer mal las cosas”.
+
+\pause
+
+Sirve para:
+\begin{itemize}
+\item equilibrar confiabilidad e innovación
+\item decidir ritmo de cambios
+\item guiar operación
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Operación guiada por objetivos}
+
+\begin{frame}{Sin SLOs}
+Operar sin SLOs lleva a:
+\begin{itemize}
+\item discusiones vagas
+\item prioridades arbitrarias
+\item incidentes interpretados sin marco
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Con SLOs}
+Operar con SLOs permite:
+\begin{itemize}
+\item medir desviación
+\item decidir cuándo frenar cambios
+\item justificar inversión en confiabilidad
+\item alinear técnica y negocio
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Diseño de buenos objetivos}
+
+\begin{frame}{Errores típicos}
+\begin{itemize}
+\item elegir métricas internas irrelevantes para usuarios
+\item fijar objetivos imposibles
+\item confundir promedio con percentiles
+\item mezclar múltiples propiedades en un solo indicador confuso
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplos de SLI/SLO}
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Servicio & SLO ejemplo \\
+\midrule
+Checkout & 99.95\% éxito en 30 días \\
+API pública & p95 < 250 ms \\
+Streaming & 99.9\% eventos procesados < 5 s \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+La confiabilidad operativa no se gestiona con intuiciones, sino con objetivos explícitos y presupuestos de error.
 \end{block}
 \end{frame}
 

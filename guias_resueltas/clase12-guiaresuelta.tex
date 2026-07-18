@@ -1,32 +1,178 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{12}
-\UASetClassTitle{Observabilidad y debugging}
-\title{Clase 12 --- Observabilidad y debugging}
+\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 12 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 12.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Observabilidad y debugging''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Observabilidad y debugging'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Las respuestas deben entenderse como modelos de razonamiento experimental. La clave no es solo inyectar una falla, sino saber qué propiedad se intenta validar y cómo se interpreta el resultado.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Explique por qué testing clásico no alcanza para validar propiedades distribuidas bajo falla.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los errores distribuidos suelen emerger de interacción, sincronización, latencia variable y fallas parciales. Los tests clásicos tienden a validar lógica local o integración idealizada, pero no siempre reproducen:
+\begin{itemize}
+\item timeouts;
+\item reorder;
+\item retry storms;
+\item colapso de colas;
+\item particiones parciales.
+\end{itemize}
+Por eso un sistema puede pasar tests convencionales y aun así degradar muy mal en producción.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina Chaos Engineering.
+\end{uaexercise}
+
+\begin{uaanswer}
+Chaos Engineering es una disciplina experimental que introduce perturbaciones controladas en un sistema para validar si el comportamiento observable se mantiene dentro de un rango aceptable. No se trata de dañar indiscriminadamente, sino de producir evidencia empírica sobre resiliencia bajo hipótesis concretas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué es un steady state.
+\end{uaexercise}
+
+\begin{uaanswer}
+El steady state es una representación medible del comportamiento normal aceptable del sistema. Ejemplos:
+\begin{itemize}
+\item tasa de checkouts exitosos;
+\item latencia p95;
+\item throughput;
+\item tasa de error.
+\end{itemize}
+Es indispensable porque sin él no existe criterio claro para decidir si el experimento mantuvo, degradó o destruyó el comportamiento esperado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un experimento de latencia artificial sobre una dependencia crítica.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo:
+\begin{itemize}
+\item dependencia: Payments;
+\item perturbación: +800 ms artificiales;
+\item steady state observado: tasa de checkout exitoso, latencia p95, error rate;
+\item hipótesis: el sistema degrada parcialmente, el breaker abre y no hay colapso general.
+\end{itemize}
+
+Lo importante es que la perturbación, la hipótesis y la medición estén explícitamente conectadas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique diferencias entre latencia y caída total.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una caída total genera fallo explícito y rápido. Una latencia alta puede ser peor porque consume recursos mientras el sistema sigue esperando, acumulando colas y activando retries. Por eso, en validación bajo falla, ambas perturbaciones prueban propiedades distintas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Formule una hipótesis experimental correcta para pagos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una buena hipótesis sería:
+\begin{quote}
+Si el servicio de pagos responde con alta latencia, el checkout mantiene un porcentaje aceptable de disponibilidad parcial, el circuit breaker se activa y no se produce tormenta de retries.
+\end{quote}
+
+Esta hipótesis es buena porque:
+\begin{itemize}
+\item nombra una perturbación específica;
+\item identifica comportamiento esperado;
+\item puede medirse.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué es blast radius.
+\end{uaexercise}
+
+\begin{uaanswer}
+El blast radius es el alcance potencial del impacto del experimento. Debe controlarse porque un experimento útil es uno que produce aprendizaje sin generar daño desproporcionado. Controlar blast radius significa limitar:
+\begin{itemize}
+\item porcentaje de tráfico afectado;
+\item servicios involucrados;
+\item duración;
+\item capacidad de abortar.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué observabilidad y Chaos Engineering están conectados.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque sin observabilidad no puede saberse si la hipótesis se verificó. Chaos Engineering necesita:
+\begin{itemize}
+\item métricas para steady state;
+\item logs para eventos específicos;
+\item trazas para causalidad distribuida.
+\end{itemize}
+
+Sin esa instrumentación, el experimento introduce perturbación pero no conocimiento confiable.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un experimento para validar graceful degradation.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo en e-commerce:
+\begin{itemize}
+\item perturbar el servicio de recomendaciones;
+\item hipótesis: el catálogo sigue funcionando aunque sin recomendaciones;
+\item métricas: tasa de navegación exitosa, latencia del catálogo, error rate del servicio degradado;
+\item criterio de éxito: el núcleo del negocio sigue disponible y la falla queda contenida en una feature secundaria.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique $D=(P,F,G,S,T)$ a una campaña de validación.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible:
+
+\begin{itemize}
+\item $P$: validar resiliencia operacional bajo perturbación;
+\item $F$: latencia, crash, pérdida, saturación, partición;
+\item $G$: degradación contenida y steady state aceptable;
+\item $S$: experimentos de fault injection con observabilidad y blast radius controlado;
+\item $T$: riesgo experimental, costo operacional y complejidad de instrumentación.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué el objetivo correcto no es “probar que nada falla”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque en sistemas distribuidos la falla parcial es inevitable. El objetivo útil no es negar esa realidad, sino caracterizar:
+\begin{itemize}
+\item qué falla primero;
+\item cómo se propaga;
+\item qué mecanismos la contienen;
+\item qué degradación es aceptable;
+\item qué recuperación ocurre luego.
+\end{itemize}
+
+En otras palabras, el objetivo es producir conocimiento operacional confiable sobre el comportamiento del sistema bajo falla.
+\end{uaanswer}
 
 \end{document}

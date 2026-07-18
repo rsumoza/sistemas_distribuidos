@@ -1,51 +1,100 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{06}
-\UASetClassTitle{Quórums}
-\title{Clase 06 --- Quórums}
+\UASetClassTitle{Sistemas de almacenamiento}
+\UASetDocKind{Guía docente}
+
+\title{Clase 06 --- Guía docente completa}
 \author{\UAProfessor}
-\date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}
-Analizar cómo leer y escribir sobre réplicas usando intersección de quórums y parámetros N, R y W. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+\section{Objetivo profundo}
 
-\section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+El alumno debe comprender:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item cómo se implementa durabilidad real
+\item cómo MVCC permite concurrencia sin locks
+\item cómo LSM transforma la interacción con el disco
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 06 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+---
 
-\section{Errores conceptuales frecuentes}
+\section{Estructura sugerida (90 min)}
+
+\subsection*{Bloque 1 (20 min): WAL}
+
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item mostrar fallo sin WAL
+\item mostrar recovery con WAL
 \end{itemize}
 
-\section{Preguntas disparadoras recomendadas}
+\textbf{Ejercicio en clase:}
+simular crash con log incompleto
+
+---
+
+\subsection*{Bloque 2 (25 min): MVCC}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item explicar versiones
+\item hacer ejemplo con timestamps
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\textbf{Momento clave:}
+\begin{center}
+“los reads no bloquean writes”
+\end{center}
+
+---
+
+\subsection*{Bloque 3 (25 min): LSM}
+
+\begin{itemize}
+\item explicar secuencial vs aleatorio
+\item dibujar flujo completo
+\end{itemize}
+
+---
+
+\subsection*{Bloque 4 (20 min): integración}
+
+\begin{itemize}
+\item unir WAL + MVCC + LSM
+\item discutir trade-offs
+\end{itemize}
+
+---
+
+\section{Errores frecuentes}
+
+\begin{itemize}
+\item pensar que WAL es opcional
+\item ignorar costo de compaction
+\item creer que MVCC no tiene costo
+\end{itemize}
+
+---
+
+\section{Momento crítico}
+
+\begin{center}
+\textbf{“el almacenamiento define la performance real del sistema”}
+\end{center}
+
+---
+
+\section{Conexión con clase 7}
+
+Logs distribuidos:
+
+\begin{itemize}
+\item Kafka
+\item commit log
+\item streaming
+\end{itemize}
+
 \end{document}

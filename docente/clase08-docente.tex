@@ -1,51 +1,180 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{08}
-\UASetClassTitle{Particionado y escalabilidad}
-\title{Clase 08 --- Particionado y escalabilidad}
+\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
+\UASetDocKind{Guía docente}
+
+\title{Clase 08 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Diseñar distribución de datos para escalar sin rebalanceos innecesarios ni hotspots graves. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es mover al estudiante desde modelos abstractos de consistencia hacia decisiones reales de arquitectura. El objetivo no es solo que sepa repetir qué es CAP o PACELC, sino que pueda usar esas ideas para interpretar sistemas concretos.
+
+La afirmación que debe quedar instalada es:
+
+\begin{center}
+\textbf{La consistencia real siempre es una decisión de diseño situada.}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar la clase, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item explicar CAP correctamente, sin slogans;
+\item usar PACELC para discutir operación normal y no solo particiones;
+\item describir Dynamo y Spanner como respuestas distintas a dominios distintos;
+\item justificar una elección de arquitectura según costos de error del negocio.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 08 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): corregir CAP}
+Abrir preguntando:
+\begin{quote}
+¿Qué significa realmente CAP?
+\end{quote}
+
+Es muy probable que aparezca la formulación superficial “elegir dos de tres”. Aprovechar eso para corregirla.
+
+\paragraph{Objetivo didáctico}
+Romper una de las simplificaciones más persistentes del tema.
+
+\subsection*{Bloque 2 (15 min): introducir PACELC}
+Mostrar que CAP no alcanza para pensar la mayoría de los sistemas en funcionamiento normal.
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea que la consistencia fuerte tiene costo incluso cuando la red no está partida.
+
+\subsection*{Bloque 3 (20 min): Dynamo}
+Explicar Dynamo no como “eventual consistency” en abstracto, sino como una arquitectura completa:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item quórums;
+\item versionado;
+\item repair;
+\item hinted handoff;
+\item disponibilidad como prioridad.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Hacer visible que la disponibilidad no sale gratis: se paga con reconciliación.
+
+\subsection*{Bloque 4 (20 min): Spanner}
+Explicar el objetivo de consistencia global y por qué eso exige:
+\begin{itemize}
+\item consenso;
+\item infraestructura temporal;
+\item commit wait.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Mostrar que la consistencia fuerte global es posible, pero no barata.
+
+\subsection*{Bloque 5 (20 min): comparación y diseño}
+Comparar Dynamo y Spanner en dominios concretos:
+\begin{itemize}
+\item red social;
+\item banca;
+\item catálogo global;
+\item inventario distribuido.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el estudiante deje de preguntar “cuál es mejor” y empiece a preguntar “qué error es más costoso aquí”.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. CAP}
+Porque es una referencia central, pero muy mal entendida. Debe corregirse temprano.
+
+\subsection*{2. PACELC}
+Porque agrega la dimensión de latencia y vuelve la discusión aplicable a sistemas reales.
+
+\subsection*{3. Dynamo}
+Porque representa una familia de sistemas que priorizan disponibilidad y reconciliación.
+
+\subsection*{4. Spanner}
+Porque representa una familia de sistemas que priorizan consistencia fuerte global.
+
+\subsection*{5. Comparación}
+Porque el valor de la clase no está en memorizar casos, sino en aprender a distinguir arquitecturas por el problema que resuelven.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué error le duele más al dominio: inconsistencia o indisponibilidad?
+\item ¿Qué costo de latencia es aceptable?
+\item ¿Quién resuelve conflictos: el sistema o la aplicación?
+\item ¿Cuándo una reconciliación posterior es aceptable?
+\item ¿Cuándo una espera extra por commit vale la pena?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item repetir “elegir dos de tres” sin entender el caso de partición;
+\item pensar que PACELC es solo una variante menor de CAP;
+\item tratar Dynamo como “menos correcto” y Spanner como “mejor”, sin contexto;
+\item no distinguir entre consistencia fuerte global y simple durabilidad;
+\item ignorar que la latencia también es una restricción de sistema.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Proponer dos dominios:
+\begin{itemize}
+\item feed global de red social;
+\item sistema de transferencias internacionales.
+\end{itemize}
+
+Pedir al curso que elija entre una arquitectura “tipo Dynamo” y una “tipo Spanner” y que justifique:
+\begin{itemize}
+\item el error más grave;
+\item el costo de la latencia;
+\item si la reconciliación es aceptable o no.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el alumno use CAP/PACELC como herramientas de diseño, no como slogans.
+
+\section{Momento crítico de la clase}
+
+El momento importante aparece cuando el estudiante comprende que:
+
+\begin{center}
+\textbf{la discusión sobre consistencia no es ideológica, sino económica y semántica}
+\end{center}
+
+Es decir: depende de qué error el dominio tolera peor y de qué costo el sistema está dispuesto a pagar.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item explicar CAP correctamente;
+\item justificar PACELC con un ejemplo real;
+\item describir Dynamo y Spanner sin caricaturas;
+\item defender una elección arquitectónica para un dominio concreto.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase prepara naturalmente la discusión sobre servicios y arquitecturas distribuidas más amplias, porque ya dejó claro que:
+\begin{itemize}
+\item no todos los componentes necesitan la misma consistencia;
+\item no todos los dominios toleran los mismos errores;
+\item las decisiones locales de consistencia afectan todo el diseño del sistema.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente: si distintos componentes del sistema pueden necesitar garantías distintas, ¿cómo organizamos una arquitectura distribuida completa sin perder control sobre consistencia, latencia y coordinación?
+\end{uakeybox}
+
 \end{document}

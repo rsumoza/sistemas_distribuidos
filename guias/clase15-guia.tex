@@ -1,24 +1,134 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{15}
-\UASetClassTitle{Proyecto integrador}
-\title{Clase 15 --- Proyecto integrador}
+\UASetClassTitle{Diseño integral de sistemas distribuidos}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 15 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 15.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Proyecto integrador''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Se espera razonamiento de diseño integral. No alcanza con enumerar patrones o tecnologías. Toda respuesta debe justificar:
+\begin{itemize}
+\item problema;
+\item fallas;
+\item garantías;
+\item solución;
+\item trade-offs.
+\end{itemize}
+
+\section{Nivel 1: marco conceptual}
+
+\begin{uaexercise}
+Explique por qué diseñar un sistema distribuido no equivale a listar tecnologías o patrones de moda.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique el sentido del esquema $D=(P,F,G,S,T)$ y por qué ayuda a estructurar una defensa arquitectónica.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una buena propuesta debe hacer explícitas las fallas asumidas y no solo el camino feliz.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una arquitectura técnicamente seria debe reconocer también lo que no resuelve.
+\end{uaexercise}
+
+\section{Nivel 2: trade-offs}
+
+\begin{uaexercise}
+Compare consistencia fuerte y consistencia eventual como decisiones de diseño, no como slogans.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare monolito modular y microservicios en términos de complejidad total del sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare integración por RPC e integración por eventos en términos de acoplamiento, trazabilidad y operación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare transacción fuerte y saga en términos de garantías, costo y semántica visible.
+\end{uaexercise}
+
+\section{Nivel 3: defensa arquitectónica}
+
+\begin{uaexercise}
+Diseñe una estrategia de defensa para responder la objeción: “¿por qué no un monolito?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una estrategia de defensa para responder la objeción: “¿por qué no consistencia fuerte en todo?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una estrategia de defensa para responder la objeción: “¿qué pasa bajo partición?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una estrategia de defensa para responder la objeción: “¿cómo observás y operás este sistema?”.
+\end{uaexercise}
+
+\section{Nivel 4: casos}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para un e-commerce global y justifique sus decisiones principales.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para una plataforma financiera global y justifique sus decisiones principales.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para una plataforma de streaming de eventos y justifique sus decisiones principales.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare por qué esos tres casos no deberían resolverse con exactamente la misma arquitectura.
+\end{uaexercise}
+
+\section{Nivel 5: integración operativa}
+
+\begin{uaexercise}
+Explique cómo deberían aparecer observabilidad y SLOs dentro de una defensa arquitectónica seria.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo deberían aparecer resiliencia e incident management dentro de una defensa seria.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué ownership de datos y bounded contexts no son detalles secundarios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una propuesta distribuida sin modelo operacional está incompleta.
+\end{uaexercise}
+
+\section{Nivel 6: cierre integrador}
+
+\begin{uaexercise}
+Aplique el esquema $D=(P,F,G,S,T)$ a un sistema distribuido de reservas de viaje.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una defensa técnica débil suele prometer simultáneamente propiedades incompatibles.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué hace convincente a una defensa arquitectónica frente a un jurado hostil.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el valor de una arquitectura no está en parecer sofisticada, sino en ser coherente con el dominio y sus costos.
+\end{uaexercise}
 
 \end{document}

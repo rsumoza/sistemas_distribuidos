@@ -1,32 +1,207 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{13}
-\UASetClassTitle{Resiliencia y tolerancia a fallas}
-\title{Clase 13 --- Resiliencia y tolerancia a fallas}
+\UASetClassTitle{Confiabilidad operativa}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 13 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 13.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Resiliencia y tolerancia a fallas''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Resiliencia y tolerancia a fallas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta debe leerse como una introducción al razonamiento operativo basado en objetivos. No se trata solo de memorizar siglas, sino de entender cómo traducir expectativas de servicio en decisiones concretas.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Defina SLI, SLO y SLA.
+\end{uaexercise}
+
+\begin{uaanswer}
+\textbf{SLI} (Service Level Indicator) es una métrica relevante del servicio, observable y medible.  
+\textbf{SLO} (Service Level Objective) es un objetivo cuantitativo sobre un SLI.  
+\textbf{SLA} (Service Level Agreement) es un compromiso formal, habitualmente externo, asociado a niveles de servicio.
+
+Relación:
+\begin{itemize}
+\item SLI = qué mido;
+\item SLO = qué objetivo me propongo;
+\item SLA = qué prometo formalmente.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué un SLI debe elegirse desde la perspectiva del usuario.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque el objetivo de la confiabilidad operativa no es optimizar métricas arbitrarias de infraestructura, sino reflejar si el servicio cumple o no con lo que el usuario necesita. Una métrica irrelevante para la experiencia real puede inducir a optimizar el sistema en la dirección equivocada.
+\end{uaanswer}
+
+\begin{uaexercise}
+Dé ejemplos de buenos y malos SLI.
+\end{uaexercise}
+
+\begin{uaanswer}
+Buenos SLI:
+\begin{itemize}
+\item porcentaje de checkouts exitosos;
+\item latencia p95 de respuesta de API.
+\end{itemize}
+
+Malos SLI:
+\begin{itemize}
+\item uso promedio de CPU sin relación directa al servicio;
+\item cantidad total de logs generados.
+\end{itemize}
+
+La diferencia está en si el indicador representa una propiedad relevante del servicio o solo una señal interna difícil de interpretar.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un SLO razonable para checkout.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo:
+\begin{itemize}
+\item SLI: porcentaje de checkouts completados exitosamente;
+\item SLO: 99.9\% de checkouts exitosos en rolling window de 30 días.
+\end{itemize}
+
+Este objetivo es razonable porque está ligado directamente a una función de negocio crítica y es fácil de interpretar.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué un SLO de 100\% suele ser mala idea.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque equivale a exigir perfección absoluta en un entorno distribuido donde siempre existe:
+\begin{itemize}
+\item falla parcial;
+\item degradación transitoria;
+\item mantenimiento;
+\item incidentes inevitables.
+\end{itemize}
+
+Un SLO de 100\% elimina cualquier margen de operación razonable y empuja a una cultura donde toda pequeña imperfección parece una catástrofe.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina error budget.
+\end{uaexercise}
+
+\begin{uaanswer}
+El error budget es la porción de falla tolerada por un SLO. Si el objetivo no es 100\%, entonces existe una fracción de requests o tiempo en la que el sistema puede incumplir sin violar el objetivo global.
+\end{uaanswer}
+
+\begin{uaexercise}
+Calcule el error budget mensual para 99.9\%.
+\end{uaexercise}
+
+\begin{uaanswer}
+Si el SLO es 99.9\%, entonces el presupuesto de error es 0.1\%.
+
+En términos conceptuales:
+\begin{itemize}
+\item de cada 1000 requests, aproximadamente 1 podría fallar sin violar el objetivo;
+\item en una ventana mensual, 0.1\% del tiempo o requests puede quedar fuera del objetivo.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué hacer si se consume demasiado rápido el error budget.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un equipo podría:
+\begin{itemize}
+\item frenar despliegues riesgosos;
+\item priorizar confiabilidad sobre features nuevas;
+\item investigar causas de degradación;
+\item reforzar mecanismos de resiliencia;
+\item revisar thresholds, observabilidad y capacidad.
+\end{itemize}
+
+La idea es usar el error budget como mecanismo de gobierno técnico, no como indicador decorativo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué promedios de latencia pueden engañar.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los promedios pueden ocultar colas largas. Un sistema puede tener media aceptable pero p95 o p99 muy malos, afectando significativamente a una fracción importante de usuarios. Por eso, para experiencia de servicio, los percentiles suelen ser más informativos.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué significa operar guiado por SLOs.
+\end{uaexercise}
+
+\begin{uaanswer}
+Significa que las decisiones operativas y de priorización se toman con referencia explícita a objetivos de nivel de servicio. Esto cambia la conversación desde “parece andar bien” hacia “estamos cumpliendo o no con el objetivo que acordamos”.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde un problema técnico grave no implique violación del SLO.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un incidente breve en un componente secundario puede sonar técnicamente serio, pero si no afectó de forma relevante el SLI principal dentro de la ventana temporal, podría no consumir de manera significativa el SLO. Esto muestra que severidad técnica e impacto de servicio no siempre coinciden.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo SLOs ayudan entre producto e ingeniería.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque proveen un lenguaje compartido. Producto puede entender impacto en experiencia del usuario; ingeniería puede justificar inversión en confiabilidad o freno de cambios con base en objetivos cuantitativos y no solo en intuiciones.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique $D=(P,F,G,S,T)$ a confiabilidad operativa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible es:
+
+\begin{itemize}
+\item $P$: operar el sistema con criterios explícitos de calidad;
+\item $F$: degradaciones, fallas parciales, ruido de métricas, incidentes reales;
+\item $G$: mantener cumplimiento de nivel de servicio acordado;
+\item $S$: SLI + SLO + error budget + políticas de operación;
+\item $T$: disciplina de medición, priorización más visible y restricciones sobre el ritmo de cambio.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la confiabilidad operativa no es perfección.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque en sistemas distribuidos la falla parcial es inevitable. La confiabilidad madura no intenta negar eso, sino administrarlo explícitamente. El foco no está en exigir ausencia total de error, sino en definir cuánto error es tolerable y cómo reaccionar cuando se supera ese umbral.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué operación guiada por objetivos cambia la cultura del equipo.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque obliga a pasar de intuiciones y discusiones informales a decisiones justificadas por métricas y objetivos explícitos. Eso cambia:
+\begin{itemize}
+\item cómo se discuten incidentes;
+\item cómo se priorizan cambios;
+\item cómo se balancean features vs confiabilidad;
+\item cómo se habla con stakeholders.
+\end{itemize}
+
+La cultura deja de ser reactiva y se vuelve más disciplinada y explícita.
+\end{uaanswer}
 
 \end{document}

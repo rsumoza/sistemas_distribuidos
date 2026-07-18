@@ -1,73 +1,179 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{16}
-\UASetClassTitle{Defensa y cierre}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 16 --- Defensa y cierre}
-\author{\UAProfessor}
-\date{\UADate}
+\UASetClassTitle{Defensa final ante comité}
+\title{\UACourse}
+\subtitle{Clase 16 --- Defensa final de sistema, objeciones y rúbrica}
+
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Defensa y cierre}
+\UASectionSlide{Cierre del curso}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{Del conocimiento a la defensa}
+Durante el curso vimos:
 \begin{itemize}
-\item Sintetizar el pensamiento distribuido y evaluar la madurez conceptual alcanzada en el curso.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item mecanismos
+\item arquitecturas
+\item observabilidad
+\item resiliencia
+\item confiabilidad
+\item incidentes
+\end{itemize}
+
+\pause
+
+\begin{block}{Pregunta final}
+¿Podés defender integralmente un sistema distribuido ante un comité técnico hostil?
+\end{block}
+\end{frame}
+
+\begin{frame}{Defender no es describir}
+Una defensa final no es:
+\begin{itemize}
+\item leer slides
+\item enumerar tecnologías
+\item mostrar un diagrama bonito
+\end{itemize}
+
+\pause
+
+Es:
+\begin{itemize}
+\item formular el problema
+\item justificar decisiones
+\item reconocer límites
+\item responder objeciones
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Estructura de la presentación}
 
-\begin{frame}{Problema central}
-La clase 16 trabaja un tipo específico de dificultad distribuida: Sintetizar el pensamiento distribuido y evaluar la madurez conceptual alcanzada en el curso.
+\begin{frame}{Secuencia recomendada}
+\begin{enumerate}
+\item problema y contexto
+\item requisitos y restricciones
+\item supuestos de falla
+\item arquitectura propuesta
+\item datos, consistencia y comunicación
+\item resiliencia y operación
+\item trade-offs
+\item límites y trabajo futuro
+\end{enumerate}
+\end{frame}
 
+\begin{frame}{Marco del curso}
+\[
+D = (P, F, G, S, T)
+\]
+
+\pause
+
+Toda defensa sólida debería hacer explícitos:
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item problema
+\item fallas
+\item garantías
+\item solución
+\item trade-offs
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\UASectionSlide{Qué mira un comité}
+
+\begin{frame}{Criterios reales}
+Un jurado técnico suele mirar:
 \begin{itemize}
-\item síntesis
-\item defensa
-\item errores comunes
-\item criterio ingenieril
-\item aprendizaje final
+\item claridad conceptual
+\item coherencia interna
+\item realismo de supuestos
+\item calidad de trade-offs
+\item capacidad de responder preguntas
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
-
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{Lo que penaliza}
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item slogans sin justificación
+\item promesas incompatibles
+\item falta de modelo de falla
+\item operación ausente
+\item respuestas evasivas
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\UASectionSlide{Objeciones típicas}
+
+\begin{frame}{Preguntas hostiles frecuentes}
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item ¿por qué esta arquitectura y no otra?
+\item ¿por qué no un monolito?
+\item ¿qué pasa bajo partición?
+\item ¿qué garantía ofrece realmente?
+\item ¿cómo opera esto en producción?
+\item ¿dónde están los límites?
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Cómo responder bien}
+\begin{itemize}
+\item reconocer supuestos
+\item explicitar prioridades
+\item no defender perfección
+\item mostrar consistencia entre dominio y diseño
+\end{itemize}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 16 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\pause
+
+\begin{block}{Clave}
+Una buena respuesta técnica no elimina el trade-off: lo hace visible y lo justifica.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Revisión crítica}
+
+\begin{frame}{Revisión crítica}
+Una defensa madura también puede decir:
+\begin{itemize}
+\item qué parte es frágil
+\item qué parte es más costosa
+\item qué parte requeriría validación experimental
+\item qué parte dejaría como trabajo futuro
+\end{itemize}
+\end{frame}
+
+\begin{frame}{No decir “no sé” mal}
+Decir:
+\begin{quote}
+“Eso requiere una decisión adicional de diseño; bajo estos supuestos elegiría X por estas razones”
+\end{quote}
+
+es mejor que improvisar una respuesta falsa o totalizante.
+\end{frame}
+
+\UASectionSlide{Rúbrica}
+
+\begin{frame}{Rúbrica de evaluación}
+\begin{itemize}
+\item formulación del problema
+\item calidad del diseño
+\item tratamiento de fallas
+\item trade-offs
+\item observabilidad y operación
+\item defensa oral
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cierre del curso}
+\begin{block}{Idea final}
+Saber sistemas distribuidos no es repetir mecanismos: es poder defender una arquitectura coherente bajo preguntas difíciles.
 \end{block}
 \end{frame}
 

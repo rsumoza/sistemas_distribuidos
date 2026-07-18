@@ -1,24 +1,127 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{16}
-\UASetClassTitle{Defensa y cierre}
-\title{Clase 16 --- Defensa y cierre}
+\UASetClassTitle{Defensa final ante comité}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 16 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 16.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Defensa y cierre''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Esta guía está orientada a preparar una defensa oral y escrita ante un comité técnico. No alcanza con proponer un sistema plausible: se espera capacidad de formularlo, defenderlo, revisarlo críticamente y evaluarlo.
+
+\section{Nivel 1: estructura de la defensa}
+
+\begin{uaexercise}
+Explique por qué una defensa final no puede reducirse a describir un diagrama de arquitectura.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué lugar ocupa el problema y el contexto al inicio de una defensa técnica.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una estructura de presentación de 15 minutos para defender un sistema distribuido completo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una buena defensa debe incluir explícitamente supuestos y límites.
+\end{uaexercise}
+
+\section{Nivel 2: marco del curso}
+
+\begin{uaexercise}
+Explique cómo usar el esquema $D=(P,F,G,S,T)$ como columna vertebral de una defensa.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo breve de formulación $D=(P,F,G,S,T)$ para un sistema de reservas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué ocultar los trade-offs debilita una defensa en lugar de fortalecerla.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una arquitectura técnicamente seria debe reconocer qué no resuelve.
+\end{uaexercise}
+
+\section{Nivel 3: objeciones del comité}
+
+\begin{uaexercise}
+Diseñe una respuesta sólida a la objeción: “¿por qué no un monolito?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una respuesta sólida a la objeción: “¿por qué no consistencia fuerte en todo?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una respuesta sólida a la objeción: “¿qué pasa bajo partición?”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una respuesta sólida a la objeción: “¿cómo operás y observás esto?”.
+\end{uaexercise}
+
+\section{Nivel 4: revisión crítica}
+
+\begin{uaexercise}
+Explique por qué una defensa madura debe incluir autocrítica explícita.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya tres ejemplos de limitaciones legítimas que una propuesta distribuida podría reconocer sin debilitarse.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique la diferencia entre debilidad real reconocida y respuesta evasiva.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué decir “eso depende” puede ser una buena respuesta solo si se completa adecuadamente.
+\end{uaexercise}
+
+\section{Nivel 5: rúbrica y evaluación}
+
+\begin{uaexercise}
+Diseñe una rúbrica razonable para evaluar una defensa final de sistema distribuido.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la rúbrica debe incluir tanto calidad de diseño como capacidad de defensa oral.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo distinguir entre una propuesta técnicamente sólida y una propuesta decorativa.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una defensa no debe premiar la complejidad por sí misma.
+\end{uaexercise}
+
+\section{Nivel 6: integración final}
+
+\begin{uaexercise}
+Prepare una mini-defensa escrita para un e-commerce global usando el marco completo del curso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Prepare una mini-defensa escrita para una plataforma financiera usando el marco completo del curso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué hace sobresaliente a una defensa final ante un jurado hostil.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el valor del curso no está en acumular conceptos, sino en poder articularlos en una defensa coherente.
+\end{uaexercise}
 
 \end{document}

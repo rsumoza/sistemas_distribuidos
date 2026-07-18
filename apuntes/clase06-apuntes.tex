@@ -1,41 +1,227 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{06}
-\UASetClassTitle{Quórums}
-\title{Clase 06 --- Quórums}
+\UASetClassTitle{Sistemas de almacenamiento}
+\UASetDocKind{Apuntes}
+
+\title{Clase 06 --- Sistemas de almacenamiento: WAL, MVCC, LSM e índices}
 \author{\UAProfessor}
-\date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 06 desarrolla el tema ``Quórums'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Analizar cómo leer y escribir sobre réplicas usando intersección de quórums y parámetros N, R y W. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+Los sistemas de almacenamiento constituyen la base sobre la cual se implementan las abstracciones de transacciones, consistencia y concurrencia. A diferencia de los modelos lógicos, aquí debemos enfrentar restricciones físicas reales:
 
-\subsection{Preguntas guía}
 \begin{itemize}
-\item ¿Cómo aparece N, R, W en un sistema real? \item ¿Cómo aparece intersección en un sistema real? \item ¿Cómo aparece lecturas y escrituras en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item latencia de disco
+\item costo de fsync
+\item diferencia entre acceso secuencial y aleatorio
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 06 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+\begin{quote}
+El diseño del storage engine define los límites reales del sistema.
+\end{quote}
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+---
 
-\section{Bibliografía guía}
+\section{Write-Ahead Logging (WAL)}
+
+\subsection{Principio fundamental}
+
+Antes de modificar cualquier dato persistente, el sistema debe registrar la operación en un log estable:
+
+\[
+\text{WAL write} \rightarrow \text{Data write}
+\]
+
+\subsection{Propiedad clave}
+
+Esto garantiza:
+
 \begin{itemize}
-\item Kleppmann, cap. 5.
-\item Dynamo paper.
-\item Notas de clase sobre quórums y reconciliación.
+\item \textbf{Atomicidad}: operaciones incompletas pueden revertirse
+\item \textbf{Durabilidad}: operaciones confirmadas pueden recuperarse
 \end{itemize}
 
-\begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
-\end{uakeybox}
+---
+
+\subsection{Modelo de recuperación}
+
+Sea un log:
+
+\[
+L = \{op_1, op_2, ..., op_n\}
+\]
+
+En caso de crash:
+
+\begin{itemize}
+\item \textbf{REDO}: reaplicar operaciones committed
+\item \textbf{UNDO}: revertir operaciones no committed
+\end{itemize}
+
+---
+
+\subsection{Problema sin WAL}
+
+Si se escribe primero el dato:
+
+\begin{itemize}
+\item crash puede dejar estado inconsistente
+\item no hay forma de reconstruir
+\end{itemize}
+
+---
+
+\section{MVCC (Multi-Version Concurrency Control)}
+
+\subsection{Idea central}
+
+En lugar de sobrescribir datos:
+
+\begin{quote}
+cada escritura crea una nueva versión
+\end{quote}
+
+\subsection{Modelo formal}
+
+Cada objeto:
+
+\[
+x = \{(v_1, t_1), (v_2, t_2), ...\}
+\]
+
+Una transacción con timestamp $t$ lee:
+
+\[
+\max \{v_i \mid t_i \le t\}
+\]
+
+---
+
+\subsection{Ventaja principal}
+
+\begin{itemize}
+\item lectores no bloquean escritores
+\item escritores no bloquean lectores
+\end{itemize}
+
+Esto elimina conflictos RW.
+
+---
+
+\subsection{Problemas}
+
+\begin{itemize}
+\item crecimiento de versiones
+\item necesidad de garbage collection
+\end{itemize}
+
+---
+
+\subsection{Garbage Collection}
+
+Una versión puede eliminarse si:
+
+\[
+t_{version} < \min(\text{timestamps activos})
+\]
+
+---
+
+\section{LSM Trees}
+
+\subsection{Motivación}
+
+Discos favorecen escrituras secuenciales:
+
+\[
+\text{secuencial} \gg \text{aleatoria}
+\]
+
+---
+
+\subsection{Arquitectura}
+
+\begin{itemize}
+\item WAL (durabilidad)
+\item Memtable (estructura en memoria)
+\item SSTables (archivos inmutables en disco)
+\end{itemize}
+
+---
+
+\subsection{Flujo de escritura}
+
+\begin{enumerate}
+\item escribir en WAL
+\item insertar en Memtable
+\item flush a SSTable
+\item compaction
+\end{enumerate}
+
+---
+
+\subsection{Compaction}
+
+Proceso de merge:
+
+\begin{itemize}
+\item combina múltiples SSTables
+\item elimina versiones antiguas
+\item reduce fragmentación
+\end{itemize}
+
+---
+
+\subsection{Problemas}
+
+\begin{itemize}
+\item write amplification
+\item read amplification
+\end{itemize}
+
+---
+
+\section{Índices}
+
+\subsection{B-Tree}
+
+\begin{itemize}
+\item estructura balanceada
+\item acceso en $O(\log n)$
+\end{itemize}
+
+---
+
+\subsection{Comparación}
+
+\begin{itemize}
+\item LSM: alto throughput de escritura
+\item B-Tree: baja latencia de lectura
+\end{itemize}
+
+---
+
+\section{Integración}
+
+Un storage engine moderno combina:
+
+\begin{itemize}
+\item WAL → durabilidad
+\item MVCC → concurrencia
+\item LSM/B-Tree → organización física
+\end{itemize}
+
+---
+
+\section{Conclusión}
+
+\begin{quote}
+El almacenamiento no es una implementación: es la materialización del modelo de consistencia.
+\end{quote}
+
 \end{document}

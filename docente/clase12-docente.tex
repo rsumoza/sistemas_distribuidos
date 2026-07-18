@@ -1,51 +1,195 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{12}
-\UASetClassTitle{Observabilidad y debugging}
-\title{Clase 12 --- Observabilidad y debugging}
+\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetDocKind{Guía docente}
+
+\title{Clase 12 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Diseñar observabilidad realista con logs, métricas, trazas y correlación entre componentes. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es transformar la idea de resiliencia desde una propiedad “supuestamente presente” hacia una propiedad experimentalmente validada.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{un sistema resiliente no se presume: se verifica bajo perturbaciones controladas}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item explicar qué diferencia a Chaos Engineering de testing clásico;
+\item formular una hipótesis experimental razonable;
+\item identificar steady state y métricas observables;
+\item diseñar una perturbación controlada con blast radius acotado;
+\item interpretar resultados sin caer en lecturas superficiales.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 12 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): por qué testing clásico no alcanza}
+Arrancar con un contraejemplo:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item sistema pasa todos los tests;
+\item en producción, una latencia alta en una dependencia dispara retries y colapsa el sistema.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Mostrar que la validación distribuida requiere modelos de falla más realistas.
+
+\subsection*{Bloque 2 (20 min): Chaos Engineering}
+Definir la disciplina, insistiendo en:
+\begin{itemize}
+\item hipótesis;
+\item steady state;
+\item perturbación;
+\item medición;
+\item aprendizaje.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Evitar que el estudiante lo entienda como simple vandalismo controlado.
+
+\subsection*{Bloque 3 (20 min): fault injection}
+Presentar tipos de fallas:
+\begin{itemize}
+\item crash;
+\item latencia;
+\item pérdida;
+\item saturación;
+\item partición.
+\end{itemize}
+
+Discutir qué propiedad diferente valida cada una.
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea que no todas las fallas testean lo mismo.
+
+\subsection*{Bloque 4 (15 min): blast radius y seguridad}
+Explicar:
+\begin{itemize}
+\item por qué los experimentos deben ser graduales;
+\item cómo se limita el radio de impacto;
+\item cuándo abortar.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Introducir responsabilidad operacional como parte del diseño experimental.
+
+\subsection*{Bloque 5 (20 min): ejemplo integrado}
+Trabajar un caso concreto:
+\begin{itemize}
+\item Payments lento;
+\item hipótesis sobre breaker y retries;
+\item métricas de steady state;
+\item interpretación de resultados.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Conectar resiliencia, observabilidad y validación empírica en un solo caso.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Testing clásico}
+Porque da el contraste necesario para entender qué agrega Chaos Engineering.
+
+\subsection*{2. Steady state}
+Porque sin steady state el experimento no tiene criterio de éxito o fracaso.
+
+\subsection*{3. Fault injection}
+Porque es el mecanismo que hace visible el comportamiento bajo perturbación.
+
+\subsection*{4. Blast radius}
+Porque el curso debe formar criterio técnico y también responsabilidad de operación.
+
+\subsection*{5. Integración con observabilidad}
+Porque un experimento sin observabilidad produce ruido, no conocimiento.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué hipótesis concreta querés validar?
+\item ¿Qué variable observás para afirmar que el sistema “sigue bien”?
+\item ¿Qué parte del sistema vas a perturbar y por qué?
+\item ¿Qué aprendés si el sistema falla? ¿Y si no falla?
+\item ¿Cómo sabés cuándo abortar el experimento?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que Chaos Engineering es “tirar abajo cosas”;
+\item proponer experimentos sin steady state;
+\item diseñar perturbaciones sin límites de impacto;
+\item olvidar rollback o abort;
+\item no distinguir entre síntoma medido y propiedad validada.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Proponer un sistema de checkout con:
+\begin{itemize}
+\item API;
+\item Auth;
+\item Payments;
+\item Orders.
+\end{itemize}
+
+Pedir al curso que diseñe:
+\begin{itemize}
+\item una hipótesis sobre latencia alta en Payments;
+\item el steady state relevante;
+\item la perturbación;
+\item el blast radius;
+\item los criterios para abortar.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el estudiante vea el experimento como una práctica disciplinada y no como una ocurrencia.
+
+\section{Momento crítico de la clase}
+
+El punto más importante aparece cuando el estudiante entiende que:
+
+\begin{center}
+\textbf{la pregunta útil no es “si el sistema falla”, sino “cómo falla y qué evidencia tengo sobre ese comportamiento”}
+\end{center}
+
+Ese punto debe remarcarse explícitamente.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item formular una hipótesis experimental concreta;
+\item definir steady state medible;
+\item proponer una perturbación controlada;
+\item limitar el blast radius;
+\item interpretar el resultado como conocimiento operacional.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase deja abierta una transición natural hacia:
+\begin{itemize}
+\item confiabilidad;
+\item SLO/SLA/SLI;
+\item error budgets;
+\item gestión de operación basada en objetivos.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente: una vez que podemos observar y experimentar bajo falla, ¿cómo definimos formalmente qué significa que el sistema sea confiable para sus usuarios?
+\end{uakeybox}
+
 \end{document}
