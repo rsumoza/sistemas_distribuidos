@@ -1,32 +1,353 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{14}
-\UASetClassTitle{System Design}
-\title{Clase 14 --- System Design}
+\UASetClassTitle{Incidentes y cultura de confiabilidad}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 14 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 14.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``System Design''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``System Design'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta debe leerse como un modelo de razonamiento operativo y organizacional. El objetivo no es solo clasificar incidentes, sino entender cómo una organización madura responde y aprende de ellos.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Defina incidente desde la perspectiva de confiabilidad operativa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un incidente es un evento que degrada o amenaza propiedades relevantes del servicio, como disponibilidad, latencia, corrección o cumplimiento de SLOs. No todo bug es automáticamente un incidente: la diferencia la marca el impacto real o potencial sobre el servicio y sus usuarios.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué los incidentes deben considerarse eventos esperables.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los sistemas distribuidos operan bajo:
+\begin{itemize}
+\item fallas parciales;
+\item dependencia entre múltiples componentes;
+\item latencias variables;
+\item errores humanos;
+\item cambios continuos;
+\item supuestos que no siempre se sostienen.
+\end{itemize}
+
+En ese contexto, esperar incidentes no es pesimismo; es realismo operacional.
+\end{uaanswer}
+
+\begin{uaexercise}
+Distinga respuesta al incidente y aprendizaje posterior.
+\end{uaexercise}
+
+\begin{uaanswer}
+La respuesta al incidente busca:
+\begin{itemize}
+\item contener daño;
+\item restaurar servicio;
+\item mitigar impacto.
+\end{itemize}
+
+El aprendizaje posterior busca:
+\begin{itemize}
+\item entender causas y factores contribuyentes;
+\item mejorar diseño, observabilidad o procesos;
+\item reducir probabilidad o impacto de repetición.
+\end{itemize}
+
+Confundir ambos momentos lleva a analizar superficialmente durante la urgencia o a mitigar tarde por discutir demasiado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una organización puede tener buenos sistemas técnicos y mala gestión de incidentes.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque la gestión de incidentes no depende solo del software. También requiere:
+\begin{itemize}
+\item roles claros;
+\item comunicación efectiva;
+\item observabilidad útil;
+\item criterios de priorización;
+\item disciplina de postmortems;
+\item cultura de aprendizaje.
+\end{itemize}
+
+Una gran arquitectura puede degradarse mal si la organización responde con confusión o aprende poco.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa las fases principales de la gestión de incidentes.
+\end{uaexercise}
+
+\begin{uaanswer}
+Las fases principales son:
+\begin{enumerate}
+\item detección;
+\item clasificación y severidad;
+\item respuesta inicial;
+\item mitigación;
+\item comunicación;
+\item recuperación;
+\item análisis posterior.
+\end{enumerate}
+
+Cada fase tiene objetivos distintos, y mezclarlas suele degradar la calidad de la respuesta o del aprendizaje.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué criterios deberían usarse para priorizar un incidente.
+\end{uaexercise}
+
+\begin{uaanswer}
+La priorización debería considerar:
+\begin{itemize}
+\item impacto al usuario;
+\item porcentaje de tráfico afectado;
+\item duración;
+\item riesgo de escalamiento;
+\item consumo de error budget;
+\item criticidad del dominio afectado.
+\end{itemize}
+
+No siempre el incidente técnicamente más “interesante” es el más prioritario.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique ventajas de explicitar roles.
+\end{uaexercise}
+
+\begin{uaanswer}
+Explicitar roles evita:
+\begin{itemize}
+\item duplicación de esfuerzos;
+\item silencios en comunicación;
+\item pérdida de timeline;
+\item dispersión en la toma de decisiones.
+\end{itemize}
+
+Además permite que la presión del incidente no degrade completamente la coordinación del equipo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina postmortem.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un postmortem es el análisis estructurado posterior a un incidente, orientado a entender impacto, causas, factores contribuyentes, decisiones tomadas y acciones de mejora. Su propósito principal es producir aprendizaje útil para la organización.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué debe contener un buen postmortem.
+\end{uaexercise}
+
+\begin{uaanswer}
+Al menos:
+\begin{itemize}
+\item resumen del incidente;
+\item impacto;
+\item detección;
+\item timeline;
+\item mitigación aplicada;
+\item análisis causal;
+\item factores contribuyentes;
+\item acciones con owner y plazo.
+\end{itemize}
+
+Sin esta estructura, el documento tiende a volverse anecdótico o superficial.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué el timeline es central.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque obliga a reconstruir secuencialmente:
+\begin{itemize}
+\item cuándo comenzó el problema;
+\item cuándo fue detectado;
+\item qué hipótesis se siguieron;
+\item qué acciones tuvieron efecto;
+\item cuánto tardó cada etapa.
+\end{itemize}
+
+Sin timeline, el análisis queda dominado por memoria selectiva y narrativa retrospectiva poco confiable.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué significa blameless postmortem.
+\end{uaexercise}
+
+\begin{uaanswer}
+Significa que el objetivo del análisis no es castigar individuos como sustituto de comprensión sistémica. Busca entender cómo el sistema técnico y organizacional permitió que el incidente ocurriera y se expandiera.
+
+No implica negar errores humanos, sino evitar que el análisis termine prematuramente en “fue culpa de X”.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué blameless no significa ausencia de responsabilidad.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque la responsabilidad profesional sigue existiendo. Lo que cambia es la forma de tratarla: se busca que la respuesta organizacional produzca aprendizaje y mejora, no miedo y ocultamiento. Blameless elimina la lógica punitiva como eje del análisis, no la exigencia de trabajo serio.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la idea de una única causa raíz puede ser engañosa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los incidentes distribuidos suelen emerger de una cadena de condiciones:
+\begin{itemize}
+\item disparador inmediato;
+\item diseño frágil;
+\item falta de observabilidad;
+\item umbrales mal calibrados;
+\item runbooks incompletos;
+\item coordinación débil.
+\end{itemize}
+
+Reducir todo a una sola causa simplifica demasiado y empobrece la capacidad de aprendizaje.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya una cadena causal para latencia en cascada.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo:
+\begin{enumerate}
+\item la base de datos aumenta latencia;
+\item Orders empieza a acumular requests;
+\item Payments recibe requests más tarde y comienza a timeout;
+\item los clientes reintentan;
+\item aumentan las colas y el uso de conexiones;
+\item la API pública empieza a devolver errores 500;
+\item la alerta visible ocurre en el borde, pero la causa original estaba más abajo.
+\end{enumerate}
+
+Este tipo de cadena muestra por qué la investigación superficial suele equivocarse.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué hace buena a una acción correctiva.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una buena acción correctiva es:
+\begin{itemize}
+\item concreta;
+\item verificable;
+\item con owner;
+\item con fecha;
+\item orientada a reducir repetición o impacto.
+\end{itemize}
+
+No basta con que “suene razonable”; debe ser ejecutable y evaluable.
+\end{uaanswer}
+
+\begin{uaexercise}
+Dé tres ejemplos de malas acciones.
+\end{uaexercise}
+
+\begin{uaanswer}
+Malas acciones típicas:
+\begin{itemize}
+\item “tener más cuidado”;
+\item “vigilar mejor”;
+\item “mejorar comunicación” sin especificar cómo.
+\end{itemize}
+
+Son malas porque no generan cambio verificable ni ownership claro.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo distinguir fix local y aprendizaje organizacional.
+\end{uaexercise}
+
+\begin{uaanswer}
+El fix local corrige el síntoma puntual o la condición inmediata. El aprendizaje organizacional cambia la capacidad futura del sistema o del equipo: mejor observabilidad, mejores runbooks, mejores alertas, mejores prácticas de despliegue, mejor entrenamiento o mejor arquitectura.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué no cerrar seguimiento del postmortem es mala práctica.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque transforma el postmortem en documento decorativo. Si las acciones no se ejecutan, la organización retiene muy poco aprendizaje práctico y el incidente tiende a repetirse bajo otra forma.
+\end{uaanswer}
+
+\begin{uaexercise}
+Relacione incidentes, SLOs y error budgets.
+\end{uaexercise}
+
+\begin{uaanswer}
+Los SLOs y error budgets dan un marco cuantitativo para interpretar incidentes:
+\begin{itemize}
+\item cuánto impactaron;
+\item cuánto budget consumieron;
+\item si obligan a frenar cambios;
+\item si la prioridad operativa debe aumentar.
+\end{itemize}
+
+Sin ese marco, la gravedad del incidente se discute de forma más subjetiva.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique $D=(P,F,G,S,T)$ a gestión de incidentes.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible es:
+
+\begin{itemize}
+\item $P$: responder y aprender de incidentes en sistemas distribuidos;
+\item $F$: fallas parciales, señales ambiguas, presión temporal, coordinación imperfecta;
+\item $G$: restauración razonable y aprendizaje acumulativo;
+\item $S$: incident management + postmortems + ownership + cultura blameless;
+\item $T$: costo organizacional, disciplina operativa y exposición de debilidades.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la cultura de confiabilidad no puede reducirse a herramientas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque herramientas sin prácticas ni cultura adecuada producen:
+\begin{itemize}
+\item postmortems vacíos;
+\item alertas ignoradas;
+\item incidentes ocultos;
+\item fixes superficiales;
+\item ausencia de ownership real.
+\end{itemize}
+
+La cultura define cómo se usan las herramientas y cuánto aprendizaje real se obtiene de ellas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una organización madura se define tanto por cómo aprende de incidentes como por cómo construye software.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque en sistemas complejos el software nunca agota la realidad operativa. La organización que opera el sistema debe poder:
+\begin{itemize}
+\item responder bajo presión;
+\item reconstruir causalidad;
+\item aprender sin ocultar;
+\item transformar incidentes en mejora sistémica.
+\end{itemize}
+
+Esa capacidad es tan importante como la calidad del diseño inicial.
+\end{uaanswer}
 
 \end{document}

@@ -1,30 +1,131 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
+\UASetDocKind{Guía de ejercicios}
+
 \title{Clase 01 --- Pensamiento distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}\label{sec:indicaciones-generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
-Documentar también qué síntomas se observaron, qué causas son compatibles con esos síntomas y qué evidencia permite sostener o descartar cada hipótesis.
 
-\section{Ejercicios}\label{sec:ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 01.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Pensamiento distribuido''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida, indicando qué observaciones se registrarían y cómo se documentaría el análisis.\end{uaexercise}
-\begin{uaexercise}\textbf{9.} Para el caso del pago con timeout, completar una tabla con tres columnas: síntomas relevados, causas posibles y evidencias necesarias para distinguirlas.\end{uaexercise}
-\begin{uaexercise}\textbf{10.} Separar el análisis del caso anterior en tres partes: qué se sabe, qué se infiere y qué todavía no puede afirmarse.\end{uaexercise}
-\begin{uaexercise}\textbf{11.} Proponer una respuesta de diseño para el caso anterior conectando relevamiento, análisis y propuesta. La respuesta debe indicar garantía buscada, solución elegida y trade-off aceptado.\end{uaexercise}
-\begin{uaexercise}\textbf{12.} Describir dos ejemplos concretos de partición de red en sistemas reales. Para cada uno, indicar qué partes quedan aisladas, qué operaciones podrían seguir recibiendo pedidos y qué información falta para decidir con certeza.\end{uaexercise}
-\begin{uaexercise}\textbf{13.} Elegir uno de los ejemplos anteriores y decidir qué sacrificar bajo partición: consistencia fuerte o disponibilidad total. Justificar la decisión en función del dominio, el riesgo y la experiencia de usuario esperada.\end{uaexercise}
+\section{Indicaciones generales}
+
+Responder justificando. Cuando corresponda, usar el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+No alcanza con definir términos: se espera modelado, interpretación y justificación.
+
+\section{Nivel 1: reconocimiento conceptual}
+
+\begin{uaexercise}\textbf{1.}
+Redactar una definición operativa de sistema distribuido que no dependa solo de “hay varias máquinas”.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{2.}
+Explicar con tus palabras por qué una demora suficientemente larga puede parecer una falla.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{3.}
+Describir un ejemplo donde el observador remoto no pueda distinguir entre dos historias internas distintas.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{4.}
+Explicar por qué la red no debe modelarse como un canal instantáneo y perfecto.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{5.}
+Indicar cuál es el error conceptual en la afirmación: “si hubo timeout, el servidor se cayó”.
+\end{uaexercise}
+
+\section{Nivel 2: análisis de ejemplos}
+
+\begin{uaexercise}\textbf{6.}
+Construir dos ejecuciones distintas del ejemplo del pago que sean indistinguibles para el cliente.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{7.}
+Modificar el ejemplo del pago para que, además de no llegar la respuesta, exista retry del cliente. ¿Qué nuevo riesgo aparece?
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{8.}
+Diseñar un ejemplo de sistema de mensajería donde un mensaje pueda aparecer “no entregado” y, sin embargo, haber sido procesado en el servidor.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{9.}
+Describir un caso donde el problema no sea la caída de un nodo, sino la pérdida de conectividad entre nodos correctos.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{10.}
+Explicar por qué una respuesta tardía puede ser más difícil de manejar que una falla explícita.
+\end{uaexercise}
+
+\section{Nivel 3: framework del curso}
+
+\begin{uaexercise}\textbf{11.}
+Aplicar el esquema $D=(P,F,G,S,T)$ a un sistema de compra online.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{12.}
+Aplicar el esquema $D$ a una plataforma de chat.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{13.}
+Aplicar el esquema $D$ a un sistema de autenticación distribuido.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{14.}
+Comparar dos soluciones distintas para el mismo problema y mostrar cómo cambia el trade-off.
+\end{uaexercise}
+
+\section{Nivel 4: razonamiento de diseño}
+
+\begin{uaexercise}\textbf{15.}
+Diseñar una estrategia conceptual para evitar pagos duplicados cuando el cliente reintenta automáticamente.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{16.}
+Explicar qué costo introduce volver idempotente una operación que naturalmente no lo es.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{17.}
+Proponer una garantía razonable para una red social bajo partición y justificarla.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{18.}
+Proponer una garantía razonable para un sistema bancario bajo partición y justificarla.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{19.}
+Construir un ejemplo donde preservar disponibilidad empeore la corrección observable.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{20.}
+Construir un ejemplo donde preservar corrección fuerte reduzca significativamente la disponibilidad o la experiencia de usuario.
+\end{uaexercise}
+
+\section{Nivel 5: integración conceptual}
+
+\begin{uaexercise}\textbf{21.}
+Explicar por qué CAP no debe enseñarse como “elegir dos de tres”.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{22.}
+Relacionar indistinguibilidad, asincronía y CAP en un párrafo coherente.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{23.}
+Explicar qué significa “pensamiento distribuido” al final de esta clase y cómo se diferencia del razonamiento sobre un programa local.
+\end{uaexercise}
+
+\begin{uaexercise}\textbf{24.}
+Indicar cuál creés que es el mayor cambio de paradigma introducido por esta clase y justificarlo.
+\end{uaexercise}
 
 \end{document}

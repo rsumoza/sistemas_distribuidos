@@ -1,41 +1,364 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{15}
-\UASetClassTitle{Proyecto integrador}
-\title{Clase 15 --- Proyecto integrador}
+\UASetClassTitle{Diseño integral de sistemas distribuidos}
+\UASetDocKind{Apuntes}
+
+\title{Clase 15 --- Diseño integral de sistemas distribuidos: defensa arquitectónica, trade-offs, justificación técnica y revisión de casos}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 15 desarrolla el tema ``Proyecto integrador'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Aplicar los conceptos del curso en un proyecto distribuido defendible y observable. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+A lo largo del curso estudiamos mecanismos individuales: RPC, retries, idempotencia, replicación, consistencia, consenso, transacciones, almacenamiento, logs, observabilidad, resiliencia y operación. Sin embargo, un sistema distribuido real no se presenta como una lista de mecanismos, sino como una arquitectura integrada.
 
-\subsection{Preguntas guía}
+Esta clase cambia de foco: pasa de la comprensión de herramientas al problema de \emph{defender una propuesta completa}.
+
+\begin{quote}
+Diseñar un sistema distribuido no es solo elegir componentes; es justificar una estructura de decisiones bajo restricciones, fallas y objetivos.
+\end{quote}
+
+\section{Qué significa defensa arquitectónica}
+
+Una defensa arquitectónica no es un pitch comercial ni una enumeración de tecnologías. Es una argumentación técnica que explica:
+
 \begin{itemize}
-\item ¿Cómo aparece arquitectura en un sistema real? \item ¿Cómo aparece demo en un sistema real? \item ¿Cómo aparece fallas en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item qué problema se quiere resolver;
+\item qué restricciones se asumen;
+\item qué garantías son indispensables;
+\item qué solución se elige;
+\item qué costos se aceptan;
+\item qué límites se reconocen.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 15 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+En otras palabras, una defensa seria debe ser \textbf{coherente}, \textbf{explícita} y \textbf{honesta sobre sus trade-offs}.
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+\section{El marco del curso}
 
-\section{Bibliografía guía}
+Durante la materia se propuso el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+donde:
 \begin{itemize}
-\item DDIA, integración de conceptos.
-\item Kafka docs.
-\item Microservices Patterns.
+\item $P$ = problema;
+\item $F$ = fallas asumidas;
+\item $G$ = garantías requeridas;
+\item $S$ = solución propuesta;
+\item $T$ = trade-offs aceptados.
 \end{itemize}
+
+Este esquema es útil porque obliga a ordenar el pensamiento y evita uno de los errores más frecuentes: empezar por la tecnología antes de formular el problema.
+
+\subsection{Lectura correcta}
+
+\paragraph{Problema ($P$)}
+Debe definirse en términos del dominio:
+\begin{itemize}
+\item qué hace el sistema;
+\item qué usuarios sirve;
+\item qué operaciones son críticas;
+\item qué restricciones de negocio existen.
+\end{itemize}
+
+\paragraph{Fallas ($F$)}
+No debe asumirse “la red funciona” ni “el sistema es local”. Deben explicitarse:
+\begin{itemize}
+\item latencia variable;
+\item pérdida;
+\item fallas parciales;
+\item particiones;
+\item duplicación;
+\item degradación operacional;
+\item errores humanos.
+\end{itemize}
+
+\paragraph{Garantías ($G$)}
+Deben ser visibles y verificables:
+\begin{itemize}
+\item consistencia fuerte o eventual;
+\item durabilidad;
+\item disponibilidad;
+\item semántica de entrega;
+\item SLOs;
+\item auditabilidad;
+\item tolerancia a degradación.
+\end{itemize}
+
+\paragraph{Solución ($S$)}
+La solución no es una lista de herramientas, sino una composición coherente de decisiones sobre:
+\begin{itemize}
+\item arquitectura;
+\item comunicación;
+\item datos;
+\item consistencia;
+\item resiliencia;
+\item observabilidad;
+\item operación.
+\end{itemize}
+
+\paragraph{Trade-offs ($T$)}
+Toda solución seria debe explicitar qué costo acepta:
+\begin{itemize}
+\item latencia;
+\item complejidad;
+\item menor disponibilidad;
+\item reconciliación posterior;
+\item costo operativo;
+\item mayor dificultad de debugging;
+\item infraestructura más costosa.
+\end{itemize}
+
+\section{Qué debe contener una propuesta integral}
+
+Una propuesta madura de sistema distribuido debería cubrir, al menos, estas dimensiones.
+
+\subsection{Modelo de dominio}
+
+\begin{itemize}
+\item qué bounded contexts existen;
+\item qué operaciones son críticas;
+\item qué datos son centrales;
+\item dónde se ubican los invariantes importantes.
+\end{itemize}
+
+\subsection{Modelo de comunicación}
+
+\begin{itemize}
+\item qué se resuelve por RPC;
+\item qué se resuelve por eventos;
+\item dónde se aceptan respuestas asincrónicas;
+\item cómo se propagan timeouts y retries.
+\end{itemize}
+
+\subsection{Modelo de datos}
+
+\begin{itemize}
+\item quién es dueño de qué datos;
+\item qué consistencia requiere cada parte;
+\item cómo se replican y materializan vistas;
+\item cómo se reconcilian conflictos.
+\end{itemize}
+
+\subsection{Modelo de falla}
+
+\begin{itemize}
+\item qué se asume que puede fallar;
+\item cómo se aísla el daño;
+\item qué patrones de resiliencia se usan;
+\item cómo se degrada el sistema.
+\end{itemize}
+
+\subsection{Modelo operacional}
+
+\begin{itemize}
+\item cómo se observa el sistema;
+\item qué SLI/SLO lo gobiernan;
+\item cómo se responde a incidentes;
+\item cómo se valida bajo falla;
+\item qué equipo u ownership sostiene cada parte.
+\end{itemize}
+
+\section{Trade-offs arquitectónicos recurrentes}
+
+\subsection{Consistencia vs latencia}
+
+Consistencia fuerte suele exigir:
+\begin{itemize}
+\item coordinación;
+\item consenso;
+\item commit wait;
+\item menor disponibilidad bajo partición.
+\end{itemize}
+
+Consistencia eventual suele exigir:
+\begin{itemize}
+\item reconciliación;
+\item tolerancia a estados intermedios;
+\item mayor complejidad semántica en la aplicación.
+\end{itemize}
+
+\subsection{Monolito vs microservicios}
+
+Monolito modular:
+\begin{itemize}
+\item menor complejidad distribuida;
+\item transacciones locales simples;
+\item despliegue menos flexible.
+\end{itemize}
+
+Microservicios:
+\begin{itemize}
+\item autonomía y escalado por componente;
+\item más latencia, fallas parciales y costo operacional.
+\end{itemize}
+
+\subsection{RPC vs eventos}
+
+RPC:
+\begin{itemize}
+\item flujo más explícito;
+\item coupling temporal fuerte;
+\item errores sincrónicos más visibles.
+\end{itemize}
+
+Eventos:
+\begin{itemize}
+\item más desacoplamiento temporal;
+\item más dificultad de trazabilidad;
+\item más consistencia eventual.
+\end{itemize}
+
+\subsection{Transacción fuerte vs saga}
+
+Transacción fuerte:
+\begin{itemize}
+\item semántica más simple;
+\item coordinación costosa;
+\item más bloqueo potencial.
+\end{itemize}
+
+Saga:
+\begin{itemize}
+\item más disponibilidad y flexibilidad;
+\item necesidad de compensación;
+\item posibilidad de estados intermedios visibles.
+\end{itemize}
+
+\section{Qué hace convincente una defensa}
+
+Una defensa técnica sólida no se caracteriza por prometer todo. Se caracteriza por:
+
+\begin{itemize}
+\item definir bien el problema;
+\item reconocer restricciones;
+\item justificar por qué ciertas garantías son necesarias y otras no;
+\item explicar por qué ciertas fallas son más costosas que otras;
+\item mostrar cómo el sistema falla de forma contenida;
+\item explicitar qué no resuelve.
+\end{itemize}
+
+\subsection{Lo que un jurado técnico valora}
+
+\begin{itemize}
+\item claridad conceptual;
+\item consistencia interna;
+\item ausencia de slogans vacíos;
+\item razonamiento bajo objeciones;
+\item honestidad sobre límites.
+\end{itemize}
+
+\section{Objeciones típicas y cómo responder}
+
+\subsection{“¿Por qué no un monolito?”}
+
+Buena respuesta:
+\begin{itemize}
+\item explica si el dominio o la organización justifican separación;
+\item reconoce si un monolito modular sería viable;
+\item justifica qué problema real resuelve la distribución.
+\end{itemize}
+
+\subsection{“¿Por qué no consistencia fuerte en todo?”}
+
+Buena respuesta:
+\begin{itemize}
+\item identifica qué partes realmente la necesitan;
+\item explica costo en latencia, coordinación y disponibilidad;
+\item justifica dónde la consistencia eventual es aceptable.
+\end{itemize}
+
+\subsection{“¿Qué pasa bajo partición?”}
+
+Buena respuesta:
+\begin{itemize}
+\item reconoce la partición como escenario real;
+\item explica qué servicios priorizan disponibilidad;
+\item explica cuáles rechazan operaciones;
+\item muestra semántica explícita, no slogans.
+\end{itemize}
+
+\subsection{“¿Cómo observás y operás esto?”}
+
+Buena respuesta:
+\begin{itemize}
+\item habla de logs, métricas, trazas;
+\item SLOs y error budgets;
+\item incident management;
+\item ownership y postmortems.
+\end{itemize}
+
+\section{Revisión de casos}
+
+\subsection{Caso 1: e-commerce global}
+
+Preguntas relevantes:
+\begin{itemize}
+\item ¿checkout requiere consistencia fuerte?;
+\item ¿recomendaciones pueden ser eventuales?;
+\item ¿inventario se coordina con fuerte o con compensaciones?;
+\item ¿qué parte usa eventos y cuál RPC?;
+\item ¿cómo se evita duplicación de pago?
+\end{itemize}
+
+\subsection{Caso 2: plataforma financiera}
+
+Preguntas relevantes:
+\begin{itemize}
+\item ¿qué significa error inaceptable?;
+\item ¿qué auditoría y trazabilidad se exige?;
+\item ¿qué consistencia requiere el ledger?;
+\item ¿qué parte puede cachearse y cuál no?;
+\item ¿qué latencia es aceptable frente a mayor corrección?
+\end{itemize}
+
+\subsection{Caso 3: plataforma de streaming o analytics}
+
+Preguntas relevantes:
+\begin{itemize}
+\item ¿qué semántica de entrega importa?;
+\item ¿qué estado se materializa?;
+\item ¿qué parte necesita batch y cuál tiempo real?;
+\item ¿qué SLOs tienen sentido?;
+\item ¿qué pérdidas o retrasos son tolerables?
+\end{itemize}
+
+\section{Error de diseño frecuente}
+
+El error más frecuente en propuestas de alumnos y equipos jóvenes es presentar una arquitectura que parece maximizar simultáneamente:
+\begin{itemize}
+\item consistencia fuerte;
+\item baja latencia;
+\item alta disponibilidad;
+\item simplicidad operacional;
+\item costo bajo;
+\item independencia total de equipos.
+\end{itemize}
+
+Eso rara vez es serio. Una arquitectura madura sabe qué sacrifica.
+
+\section{Modelo del curso aplicado}
+
+Para cualquier propuesta integral, el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+permite defender la arquitectura como argumento técnico y no como lista de herramientas.
+
+\section{Conclusión}
+
+Diseñar integralmente un sistema distribuido significa articular una respuesta coherente entre dominio, fallas, garantías, arquitectura y operación. La defensa arquitectónica no consiste en impresionar con complejidad, sino en demostrar que las decisiones tomadas son razonables para el problema planteado.
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Una buena arquitectura distribuida no es la más vistosa ni la más moderna. Es la que puede ser defendida con rigor, bajo objeciones serias, sin ocultar sus trade-offs.
 \end{uakeybox}
+
 \end{document}

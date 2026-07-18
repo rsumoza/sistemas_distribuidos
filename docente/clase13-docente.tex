@@ -1,51 +1,179 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{13}
-\UASetClassTitle{Resiliencia y tolerancia a fallas}
-\title{Clase 13 --- Resiliencia y tolerancia a fallas}
+\UASetClassTitle{Confiabilidad operativa}
+\UASetDocKind{Guía docente}
+
+\title{Clase 13 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es que el estudiante comprenda que la confiabilidad operativa no se maneja con intuiciones del tipo “esto anda bien” o “esto anda mal”, sino con objetivos formales, métricas significativas y presupuestos de error que permitan gobernar el sistema.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{confiabilidad operativa = calidad de servicio administrada explícitamente}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item distinguir claramente entre SLI, SLO y SLA;
+\item diseñar indicadores orientados al usuario;
+\item justificar por qué un objetivo debe ser explícito y medible;
+\item calcular e interpretar un error budget;
+\item explicar cómo estos conceptos influyen en operación y priorización.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 13 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): problema de operar sin objetivos}
+Abrir con una pregunta:
+\begin{quote}
+¿Qué significa realmente que el sistema “ande bien”?
+\end{quote}
+
+Buscar respuestas vagas y mostrar su insuficiencia.
+
+\paragraph{Objetivo didáctico}
+Instalar la necesidad de formalizar expectativas de servicio.
+
+\subsection*{Bloque 2 (20 min): SLI, SLO y SLA}
+Definir cada concepto y trabajar ejemplos buenos y malos.
+
+\paragraph{Objetivo didáctico}
+Que el estudiante no vea siglas aisladas, sino una estructura coherente:
+métrica → objetivo → acuerdo.
+
+\subsection*{Bloque 3 (20 min): error budgets}
+Explicar cómo el error budget transforma el objetivo de confiabilidad en una herramienta de decisión.
+
+\paragraph{Objetivo didáctico}
+Mostrar el vínculo entre confiabilidad y velocidad de cambio.
+
+\subsection*{Bloque 4 (15 min): diseño de buenos objetivos}
+Discutir:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item usuario vs infraestructura;
+\item promedios vs percentiles;
+\item ventanas temporales;
+\item objetivos realistas vs imposibles.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el estudiante vea que definir un buen SLO es un problema de diseño, no de burocracia.
+
+\subsection*{Bloque 5 (20 min): operación guiada por objetivos}
+Mostrar cómo cambia la toma de decisiones:
+\begin{itemize}
+\item incidentes;
+\item despliegues;
+\item deuda técnica;
+\item conflicto producto/ingeniería.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Conectar métricas con gobierno real del sistema.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. SLI}
+Porque es la base medible de todo el esquema.
+
+\subsection*{2. SLO}
+Porque convierte expectativas vagas en objetivos explícitos.
+
+\subsection*{3. SLA}
+Porque distingue claramente objetivos internos de compromisos externos.
+
+\subsection*{4. Error budget}
+Porque introduce la lógica económica y operativa de la confiabilidad.
+
+\subsection*{5. Operación guiada por objetivos}
+Porque muestra que estas ideas no son meramente descriptivas: transforman cómo se decide.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué parte del servicio importa realmente al usuario?
+\item ¿Qué métrica se parece a salud del sistema, pero no a salud del servicio?
+\item ¿Qué significa que un objetivo sea demasiado estricto o demasiado laxo?
+\item ¿Qué harías si el error budget se consume demasiado rápido?
+\item ¿Qué conflicto resuelve un SLO entre producto e ingeniería?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item confundir SLI con cualquier métrica disponible;
+\item definir objetivos internos imposibles de sostener;
+\item usar promedios cuando el problema real vive en percentiles;
+\item tratar el error budget como permiso para fallar sin criterio;
+\item no distinguir objetivo técnico de acuerdo contractual.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Tomar tres servicios:
+\begin{itemize}
+\item checkout;
+\item API pública;
+\item pipeline de eventos.
+\end{itemize}
+
+Pedir al curso que proponga para cada uno:
+\begin{itemize}
+\item un SLI relevante;
+\item un SLO razonable;
+\item qué error budget implicaría;
+\item qué decisión tomarían si ese budget se consume demasiado rápido.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el estudiante pase de repetir definiciones a diseñar objetivos concretos y usables.
+
+\section{Momento crítico de la clase}
+
+El momento importante ocurre cuando el estudiante entiende que:
+
+\begin{center}
+\textbf{la confiabilidad operativa no exige 100\% de perfección, sino un nivel de servicio explícito y gobernable}
+\end{center}
+
+Ese punto debe remarcarse, porque corrige una intuición muy frecuente: creer que la única confiabilidad valiosa es la perfección absoluta.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item proponer un SLI relevante;
+\item convertirlo en un SLO razonable;
+\item explicar qué error budget resulta;
+\item usar ese marco para justificar decisiones de operación o despliegue.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase deja abierta una transición natural hacia:
+\begin{itemize}
+\item gestión de incidentes;
+\item postmortems;
+\item aprendizaje organizacional;
+\item cultura operativa.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente: si ya sabemos qué significa “cumplir servicio”, ¿cómo respondemos, aprendemos y mejoramos cuando inevitablemente el sistema no cumple?
+\end{uakeybox}
+
 \end{document}

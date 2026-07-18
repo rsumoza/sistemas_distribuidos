@@ -1,200 +1,174 @@
-% !TeX encoding = UTF-8
-\documentclass{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{07}
-\UASetClassTitle{Consenso y Raft}
+\UASetClassTitle{Logs distribuidos y streaming}
 
 \title{\UACourse}
-\subtitle{Clase 07 — Consenso y Raft}
+\subtitle{Clase 07 --- Commit Log, Kafka, Offsets y Exactly-Once}
 
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Consenso y Raft}
+\UASectionSlide{Motivación}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{Del estado al flujo}
 \begin{itemize}
-\item entender por qué algunos problemas requieren consenso fuerte
-\item distinguir safety y liveness
-\item estudiar la estructura conceptual de Raft
-\item analizar replicación de log y commit por mayoría
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Motivación}
-Hay problemas donde no alcanza con “eventualmente converger”.
-
-Ejemplos:
-\begin{itemize}
-\item elegir un líder
-\item decidir una secuencia única de operaciones
-\item comprometer un log replicado
+\item Antes: estado persistente (clase 6)
+\item Ahora: \textbf{flujo continuo de eventos}
 \end{itemize}
 
-\begin{block}{Pregunta}
-¿Cómo garantizamos una sola historia aceptada por el sistema?
+\pause
+\begin{block}{Problema}
+¿Cómo procesar datos en tiempo real sin perder orden ni consistencia?
 \end{block}
 \end{frame}
 
-\begin{frame}{Qué pide consenso}
-Informalmente:
-\begin{itemize}
-\item los nodos deben acordar un mismo valor o una misma secuencia
-\item no deben aceptar decisiones incompatibles
-\item eventualmente, si las condiciones lo permiten, deben progresar
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Safety vs Liveness}
-\textbf{Safety:}
-\begin{itemize}
-\item nada malo ocurre
-\item por ejemplo: no hay dos líderes válidos que comprometan decisiones incompatibles
-\end{itemize}
-
-\textbf{Liveness:}
-\begin{itemize}
-\item algo bueno eventualmente ocurre
-\item por ejemplo: se elige un líder y el sistema sigue procesando
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Estructura de Raft}
-Roles:
-\begin{itemize}
-\item follower
-\item candidate
-\item leader
-\end{itemize}
-
-Idea central:
+\begin{frame}{Idea central}
 \begin{block}{}
-Raft organiza el consenso alrededor de un líder que serializa las decisiones.
+El sistema es un \textbf{log inmutable de eventos}
 \end{block}
-\end{frame}
 
-\begin{frame}{Elección de líder}
+\pause
 \begin{itemize}
-\item followers esperan heartbeats
-\item si expira el timeout, un follower pasa a candidate
-\item solicita votos
-\item si obtiene mayoría, se convierte en leader
+\item append-only
+\item ordenado
+\item reproducible
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Figura: elección de líder}
-\begin{center}
-\begin{tikzpicture}[node distance=2.2cm,>=Latex,every node/.style={font=\small}]
-\node[draw,rounded corners] (f1) {Follower};
-\node[draw,rounded corners,right=of f1] (c) {Candidate};
-\node[draw,rounded corners,right=of c] (l) {Leader};
+\UASectionSlide{Commit Log}
 
-\draw[->,thick] (f1) -- node[above]{timeout} (c);
-\draw[->,thick] (c) -- node[above]{mayoría} (l);
-\draw[->,thick,bend left=35] (l) to node[below]{heartbeat} (f1);
+\begin{frame}{Definición}
+\begin{block}{}
+Secuencia ordenada e inmutable: $L = (e_0, e_1, ..., e_n)$
+\end{block}
+
+\pause
+\begin{itemize}
+\item cada evento tiene \textbf{offset}
+\item lectura secuencial
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Offsets}
+\begin{itemize}
+\item índice lógico del evento
+\item monotónico por partición
+\item controlado por el consumidor
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Kafka}
+
+\begin{frame}{Arquitectura}
+\begin{itemize}
+\item Topic = categoría lógica
+\item Partition = log ordenado
+\item Broker = nodo de almacenamiento
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Particiones y orden}
+\begin{center}
+\begin{tikzpicture}[node distance=1.5cm]
+\node[draw] (p0) {P0: e0,e1,e2};
+\node[draw,below of=p0] (p1) {P1: e0,e1};
+
+\end{tikzpicture}
+\end{center}
+
+\pause
+\begin{alertblock}{Clave}
+El orden es \textbf{local a la partición}, no global
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Replicación}
+\begin{itemize}
+\item líder (leader)
+\item seguidores (followers)
+\item ISR (in-sync replicas)
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Semánticas de entrega}
+
+\begin{frame}{At-most-once}
+\begin{itemize}
+\item commit de offset antes de procesar
+\item puede perder mensajes
+\item nunca duplica
+\end{itemize}
+\end{frame}
+
+\begin{frame}{At-least-once}
+\begin{itemize}
+\item commit después de procesar
+\item puede duplicar
+\item no pierde mensajes
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Exactly-once}
+\begin{itemize}
+\item no duplicación
+\item no pérdida
+\end{itemize}
+
+\pause
+\begin{alertblock}{Realidad}
+Se logra combinando:
+\begin{itemize}
+\item idempotencia
+\item transacciones
+\item control de offsets
+\end{itemize}
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Streaming}
+
+\begin{frame}{Pipeline}
+\begin{center}
+\begin{tikzpicture}[node distance=2.5cm]
+\node[draw] (p) {Producer};
+\node[draw,right of=p] (k) {Kafka};
+\node[draw,right of=k] (c) {Consumer};
+
+\draw[->] (p) -- (k);
+\draw[->] (k) -- (c);
 \end{tikzpicture}
 \end{center}
 \end{frame}
 
-\begin{frame}{Replicación de log}
-El líder:
+\begin{frame}{Procesamiento stateful}
 \begin{itemize}
-\item recibe comandos del cliente
-\item los agrega a su log
-\item los envía a followers
-\item compromete una entrada cuando una mayoría la confirmó
+\item agregaciones
+\item joins
+\item ventanas (windowing)
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Figura: commit por mayoría}
-\begin{center}
-\begin{tikzpicture}[every node/.style={font=\small}]
-\foreach \y/\name in {0/Líder,-1.1/F1,-2.2/F2,-3.3/F3,-4.4/F4}{
-  \node[anchor=east] at (-0.4,\y) {\name};
-  \draw[thick] (0,\y) -- (6,\y);
-}
-\foreach \x in {0.8,1.8,2.8,3.8,4.8}{
-  \foreach \y in {0,-1.1,-2.2,-3.3,-4.4}{
-    \draw (\x,\y+0.22) rectangle +(0.7,-0.44);
-  }
-}
-\node at (1.15,0) {\tiny 1};
-\node at (2.15,0) {\tiny 2};
-\node at (3.15,0) {\tiny 3};
-
-\node[fill=UAIngAccent!20,draw,minimum width=0.7cm,minimum height=0.44cm] at (4.15,0) {\tiny 4};
-\node[fill=UAIngAccent!20,draw,minimum width=0.7cm,minimum height=0.44cm] at (4.15,-1.1) {\tiny 4};
-\node[fill=UAIngAccent!20,draw,minimum width=0.7cm,minimum height=0.44cm] at (4.15,-2.2) {\tiny 4};
-
-\node at (5.25,0.5) {\small commit por mayoría};
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\begin{frame}{Propiedad clave}
-Una entrada comprometida no debe perderse en líderes posteriores.
-
-Esta idea exige:
+\begin{frame}{Fallas típicas}
 \begin{itemize}
-\item reglas sobre votos
-\item comparación de logs
-\item restricciones sobre qué líder puede ganar
+\item duplicación por reintentos
+\item pérdida por commit prematuro
+\item reorder entre particiones
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo tipo MIT}
-Supongamos:
-\begin{itemize}
-\item un líder replica una entrada a un follower, pero no a mayoría
-\item el líder cae
-\end{itemize}
+\UASectionSlide{Cierre}
 
-Pregunta:
+\begin{frame}{Idea central}
 \begin{block}{}
-¿Puede el nuevo líder ignorar esa entrada?
-\end{block}
-
-Respuesta conceptual:
-\begin{itemize}
-\item si no fue committed, sí
-\item si fue committed por mayoría, no
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Qué simplifica Raft}
-Raft fue diseñado para ser más entendible que Paxos:
-\begin{itemize}
-\item liderazgo fuerte
-\item separación clara entre elección y replicación
-\item log único como objeto central
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Qué no resuelve Raft}
-Raft no “elimina la red”:
-\begin{itemize}
-\item depende de timeouts
-\item puede perder liveness bajo particiones severas
-\item necesita mayoría conectada para progresar
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Errores frecuentes}
-\begin{itemize}
-\item creer que consenso es “solo votar”
-\item confundir replicated state machine con almacenamiento replicado genérico
-\item ignorar la diferencia entre una entrada replicada y una committed
-\item pensar que Raft evita todo downtime
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-Consenso fuerte aparece cuando la inconsistencia ya no es tolerable: el sistema necesita una historia común y una única decisión válida.
+El log es la fuente de verdad; el estado es una vista derivada
 \end{block}
 \end{frame}
 

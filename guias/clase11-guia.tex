@@ -1,24 +1,127 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{11}
-\UASetClassTitle{Arquitecturas distribuidas modernas}
-\title{Clase 11 --- Arquitecturas distribuidas modernas}
+\UASetClassTitle{Resiliencia distribuida}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 11 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 11.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Arquitecturas distribuidas modernas''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Se espera razonamiento de sistemas, no solo definición de patrones. Justificar siempre qué problema resuelve cada mecanismo y qué costo introduce.
+
+\section{Nivel 1: fundamentos}
+
+\begin{uaexercise}
+Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya una cadena causal donde una degradación local termine generando una caída visible en el borde del sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la resiliencia distribuida no consiste en “hacer más retries”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique la diferencia entre tolerar una falla y amplificarla.
+\end{uaexercise}
+
+\section{Nivel 2: retries}
+
+\begin{uaexercise}
+Explique en qué casos retry es razonable y en qué casos es peligroso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una política de retry para una operación idempotente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el exponential backoff es mejor que reintentos inmediatos constantes.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique el rol del jitter en un sistema con miles de clientes concurrentes.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde retries en múltiples capas provoquen una tormenta de requests.
+\end{uaexercise}
+
+\section{Nivel 3: circuit breakers}
+
+\begin{uaexercise}
+Defina circuit breaker y describa sus estados.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique con un ejemplo qué gana el sistema al abrir un breaker.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde un threshold mal calibrado de breaker empeore el comportamiento del sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el estado half-open es importante.
+\end{uaexercise}
+
+\section{Nivel 4: backpressure y bulkheads}
+
+\begin{uaexercise}
+Explique qué problema resuelve backpressure.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un ejemplo donde la ausencia de backpressure haga crecer una cola hasta volver inútil el sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué es bulkhead y cómo se implementa en términos de recursos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde un pool compartido arrastre rutas críticas que no tenían problema.
+\end{uaexercise}
+
+\section{Nivel 5: graceful degradation}
+
+\begin{uaexercise}
+Defina graceful degradation y compárela con caída total.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe tres ejemplos concretos de degradación elegante en una plataforma de e-commerce.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué riesgos aparecen si la degradación no es explícita y semánticamente clara.
+\end{uaexercise}
+
+\section{Nivel 6: integración}
+
+\begin{uaexercise}
+Diseñe una estrategia integrada de resiliencia para una API de checkout.
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplique el modelo $D=(P,F,G,S,T)$ a la resiliencia de un sistema de pagos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué observabilidad y resiliencia están profundamente conectadas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la pregunta correcta no es “cómo evito toda falla”, sino “cómo evito colapso sistémico”.
+\end{uaexercise}
 
 \end{document}

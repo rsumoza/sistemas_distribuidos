@@ -1,43 +1,361 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
+\UASetDocKind{Guía resuelta}
+
 \title{Clase 01 --- Pensamiento distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}\label{sec:indicaciones-generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
-Documentar también qué síntomas se observaron, qué causas son compatibles con esos síntomas y qué evidencia permite sostener o descartar cada hipótesis.
 
-\section{Ejercicios y respuestas orientativas}\label{sec:ejercicios-y-respuestas-orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 01.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Pensamiento distribuido''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida, indicando qué observaciones se registrarían y cómo se documentaría el análisis.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Pensamiento distribuido'', distinguir síntoma de causa, justificar una decisión de diseño razonable y proponer un registro mínimo de observaciones, hipótesis consideradas, evidencia disponible y conclusión adoptada.\end{uaanswer}
-\begin{uaexercise}\textbf{9.} Para el caso del pago con timeout, completar una tabla con tres columnas: síntomas relevados, causas posibles y evidencias necesarias para distinguirlas.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: un síntoma relevante es que el cliente no recibió confirmación antes del timeout. Causas posibles: pedido no recibido, servidor caído, pago procesado con respuesta perdida o respuesta demorada. Evidencias útiles: logs del cliente, logs del servidor, request id, estado de la operación, métricas de latencia, errores de red y trazas de reintentos.\end{uaanswer}
-\begin{uaexercise}\textbf{10.} Separar el análisis del caso anterior en tres partes: qué se sabe, qué se infiere y qué todavía no puede afirmarse.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: se sabe que el cliente observó un timeout. Se puede inferir que hubo demora, pérdida o falla en algún punto del camino, pero no cuál de esas causas ocurrió. No puede afirmarse, sin evidencia adicional, si el pago fue procesado, si el servidor cayó o si la confirmación solo llegó tarde.\end{uaanswer}
-\begin{uaexercise}\textbf{11.} Proponer una respuesta de diseño para el caso anterior conectando relevamiento, análisis y propuesta. La respuesta debe indicar garantía buscada, solución elegida y trade-off aceptado.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: si el relevamiento muestra timeouts y reintentos, y el análisis reconoce que no se puede distinguir demora de falla desde el cliente, una propuesta razonable es usar operaciones idempotentes con request id único. La garantía buscada es evitar débitos duplicados; la solución exige registrar el resultado asociado a cada request id; el trade-off es mayor estado, más validaciones y posible complejidad operativa.\end{uaanswer}
-\begin{uaexercise}\textbf{12.} Describir dos ejemplos concretos de partición de red en sistemas reales. Para cada uno, indicar qué partes quedan aisladas, qué operaciones podrían seguir recibiendo pedidos y qué información falta para decidir con certeza.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: ejemplo 1, una base replicada entre dos regiones donde la región A no puede comunicarse con la región B. Ambas pueden recibir escrituras locales, pero cada una desconoce las escrituras aceptadas por la otra. Ejemplo 2, una app bancaria donde una sucursal o datacenter queda aislado del sistema central. Puede recibir consultas o solicitudes, pero no sabe si el saldo global cambió en otro sitio. En ambos casos falta una visión compartida y reciente del estado global.\end{uaanswer}
-\begin{uaexercise}\textbf{13.} Elegir uno de los ejemplos anteriores y decidir qué sacrificar bajo partición: consistencia fuerte o disponibilidad total. Justificar la decisión en función del dominio, el riesgo y la experiencia de usuario esperada.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: en una transferencia bancaria, una decisión conservadora sería sacrificar disponibilidad total: rechazar o dejar pendiente la operación hasta recuperar coordinación, para preservar consistencia fuerte y evitar saldos incorrectos. En una red social, ante una partición podría aceptarse sacrificar consistencia fuerte y permitir publicaciones locales, asumiendo reconciliación posterior. La decisión debe estar conectada con el costo de aceptar datos inconsistentes frente al costo de negar servicio.\end{uaanswer}
+\section{Criterio de lectura}
+
+Las respuestas de esta guía no deben leerse como “únicas respuestas posibles”, sino como \textbf{modelos de razonamiento}. En esta materia no alcanza con definir términos: hay que identificar el problema, explicitar fallas, elegir garantías y defender trade-offs.
+
+\vspace{0.2cm}
+
+Cuando corresponda, usaremos el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+donde:
+
+\begin{itemize}
+\item $P$ = problema;
+\item $F$ = fallas asumidas;
+\item $G$ = garantía requerida;
+\item $S$ = solución elegida;
+\item $T$ = trade-off aceptado.
+\end{itemize}
+
+\section{Ejercicios y respuestas orientativas}
+
+\begin{uaexercise}\textbf{1.}
+Redactar una definición operativa de sistema distribuido que no dependa solo de “hay varias máquinas”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una definición operativa razonable es: un sistema distribuido es un conjunto de procesos que se ejecutan en máquinas distintas, se comunican por intercambio de mensajes y cooperan para ofrecer una funcionalidad común, sin compartir memoria ni un reloj global confiable.
+
+Lo importante de esta definición no es la multiplicidad de máquinas en sí misma, sino que la coordinación depende de mensajes y que el conocimiento del estado del sistema es parcial. Eso introduce demoras, fallas parciales y dificultad para distinguir entre distintos escenarios internos.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{2.}
+Explicar con tus palabras por qué una demora suficientemente larga puede parecer una falla.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque, desde el punto de vista del observador, ambos fenómenos producen el mismo síntoma: la ausencia de respuesta en el tiempo esperado. Si el sistema no provee una cota confiable de tiempo máximo, entonces una demora arbitrariamente grande y una falla real son indistinguibles observacionalmente.
+
+Este punto es clave porque muestra que el problema no es “qué pasó realmente” sino “qué puede saberse desde el borde del sistema”.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{3.}
+Describir un ejemplo donde el observador remoto no pueda distinguir entre dos historias internas distintas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo clásico: un cliente envía una operación de pago y no recibe respuesta.
+
+Historia A:
+\begin{itemize}
+\item el request nunca llegó al servidor;
+\item el pago no se procesó.
+\end{itemize}
+
+Historia B:
+\begin{itemize}
+\item el request llegó;
+\item el servidor procesó el pago;
+\item la respuesta se perdió en la red.
+\end{itemize}
+
+En ambas historias, el cliente observa exactamente lo mismo: timeout. Por lo tanto, no puede distinguir entre ellas.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{4.}
+Explicar por qué la red no debe modelarse como un canal instantáneo y perfecto.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque esa suposición elimina justamente la fuente principal de dificultad del sistema distribuido. La red real introduce:
+
+\begin{itemize}
+\item demoras variables;
+\item pérdida de mensajes;
+\item reordenamiento;
+\item duplicación;
+\item particiones temporales.
+\end{itemize}
+
+Si se modela la red como perfecta, se obtienen conclusiones falsas sobre detección de fallas, orden de eventos y garantías alcanzables. Una buena parte del curso consiste justamente en razonar sobre lo que ocurre cuando la red deja de ser transparente.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{5.}
+Indicar cuál es el error conceptual en la afirmación: “si hubo timeout, el servidor se cayó”.
+\end{uaexercise}
+
+\begin{uaanswer}
+El error es confundir un \textbf{síntoma observado} con una \textbf{causa interna}. El timeout solo informa que no hubo respuesta visible dentro de un cierto intervalo. No identifica por sí solo la causa.
+
+Podría haber crash, pero también:
+\begin{itemize}
+\item demora extrema;
+\item pérdida del request;
+\item pérdida de la respuesta;
+\item sobrecarga;
+\item ejecución lenta;
+\item partición de red.
+\end{itemize}
+
+Por eso, timeout no equivale a crash.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{6.}
+Construir dos ejecuciones distintas del ejemplo del pago que sean indistinguibles para el cliente.
+\end{uaexercise}
+
+\begin{uaanswer}
+Primera ejecución:
+\begin{enumerate}
+\item el cliente envía la solicitud;
+\item el request se pierde;
+\item el servidor nunca ve la operación;
+\item el cliente agota el timeout.
+\end{enumerate}
+
+Segunda ejecución:
+\begin{enumerate}
+\item el cliente envía la solicitud;
+\item el servidor la recibe y procesa;
+\item la respuesta se pierde;
+\item el cliente agota el timeout.
+\end{enumerate}
+
+En ambos casos, el cliente observa “no recibí respuesta”, pero el resultado real del sistema es distinto.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{7.}
+Modificar el ejemplo del pago para que, además de no llegar la respuesta, exista retry del cliente. ¿Qué nuevo riesgo aparece?
+\end{uaexercise}
+
+\begin{uaanswer}
+El nuevo riesgo es la \textbf{duplicación de efectos}. Si el cliente reintenta porque no observó la respuesta, pero el primer intento sí fue procesado, entonces el segundo intento puede producir un segundo débito.
+
+Este ejercicio muestra que el retry mejora liveness frente a algunas fallas, pero puede empeorar safety si no existe un mecanismo de deduplicación o idempotencia.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{8.}
+Diseñar un ejemplo de sistema de mensajería donde un mensaje pueda aparecer “no entregado” y, sin embargo, haber sido procesado en el servidor.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un usuario envía un mensaje en una aplicación de chat.
+
+\begin{enumerate}
+\item el cliente emite el mensaje;
+\item el backend lo persiste correctamente;
+\item el ack al cliente no vuelve;
+\item el cliente marca el mensaje como “no entregado”.
+\end{enumerate}
+
+Desde el punto de vista del usuario emisor, el mensaje parece no entregado. Desde el punto de vista del servidor, el mensaje ya fue aceptado. Esto muestra nuevamente la brecha entre estado real y estado observable.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{9.}
+Describir un caso donde el problema no sea la caída de un nodo, sino la pérdida de conectividad entre nodos correctos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Dos réplicas siguen funcionando correctamente, pero una partición de red impide que se comuniquen. Ninguna está “caída” en sentido local, pero el sistema global pierde capacidad de coordinación.
+
+Este caso es importante porque muestra que muchas anomalías distribuidas no nacen de que un nodo muera, sino de que nodos correctos dejen de verse entre sí.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{10.}
+Explicar por qué una respuesta tardía puede ser más difícil de manejar que una falla explícita.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una falla explícita permite reaccionar con una semántica clara: abortar, degradar o reintentar sabiendo que la operación no concluyó normalmente. En cambio, una respuesta tardía deja abierta la duda sobre si la operación ocurrió y sobre si un retry generará duplicación.
+
+Por eso, el problema no es solo detectar que algo “anda mal”, sino manejar el hecho de que la historia interna puede seguir evolucionando mientras el cliente ya está tomando decisiones.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{11.}
+Aplicar el esquema $D=(P,F,G,S,T)$ a un sistema de compra online.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta posible es:
+
+\begin{itemize}
+\item $P$: registrar una compra y cobrarla correctamente;
+\item $F$: pérdida de respuesta, retry, demora, partición parcial;
+\item $G$: no duplicar la orden ni cobrar dos veces;
+\item $S$: request ID, persistencia del estado de compra, deduplicación;
+\item $T$: mayor complejidad, más almacenamiento, más latencia en validación.
+\end{itemize}
+
+Lo importante no es la sintaxis de la respuesta, sino que el esquema ordene el razonamiento.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{12.}
+Aplicar el esquema $D$ a una plataforma de chat.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta posible es:
+
+\begin{itemize}
+\item $P$: entrega razonable de mensajes;
+\item $F$: pérdida, delay, duplicación, desconexión del receptor;
+\item $G$: entrega eventual o entrega al menos una vez, según diseño;
+\item $S$: colas, retries, ACKs, almacenamiento temporal;
+\item $T$: posibles duplicados, retrasos, orden no estrictamente global.
+\end{itemize}
+
+Este caso muestra que la garantía requerida suele ser más débil que en un sistema bancario.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{13.}
+Aplicar el esquema $D$ a un sistema de autenticación distribuido.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta plausible es:
+
+\begin{itemize}
+\item $P$: autenticar usuarios correctamente;
+\item $F$: delay, timeout, réplica atrasada, caída parcial;
+\item $G$: no otorgar acceso inválido, aun si eso implica rechazar temporalmente;
+\item $S$: tokens firmados, validación central o cachés con control estricto;
+\item $T$: más coordinación o menor disponibilidad en algunos escenarios.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{14.}
+Comparar dos soluciones distintas para el mismo problema y mostrar cómo cambia el trade-off.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo: pago remoto.
+
+Solución A:
+\begin{itemize}
+\item no hay retries;
+\item menor riesgo de duplicación;
+\item más operaciones perdidas ante fallas transitorias.
+\end{itemize}
+
+Solución B:
+\begin{itemize}
+\item hay retries;
+\item menos pérdida aparente de operaciones;
+\item riesgo de duplicación si no hay idempotencia.
+\end{itemize}
+
+El trade-off cambia entre \emph{completitud aparente} y \emph{riesgo de repetición}.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{15.}
+Diseñar una estrategia conceptual para evitar pagos duplicados cuando el cliente reintenta automáticamente.
+\end{uaexercise}
+
+\begin{uaanswer}
+La estrategia central es separar \textbf{intención lógica} de \textbf{intentos físicos}. Se asigna un identificador único a la intención de pago, y todo retry reutiliza ese identificador. El servidor registra el resultado asociado al identificador y, ante repeticiones, devuelve el resultado previo en vez de ejecutar nuevamente el débito.
+
+La idea importante es que el retry no debe interpretarse como una operación nueva, sino como otra manifestación de la misma intención lógica.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{16.}
+Explicar qué costo introduce volver idempotente una operación que naturalmente no lo es.
+\end{uaexercise}
+
+\begin{uaanswer}
+Volver idempotente una operación que no lo era implica agregar:
+\begin{itemize}
+\item identificadores únicos;
+\item persistencia del resultado;
+\item verificación de duplicados;
+\item más lógica de negocio.
+\end{itemize}
+
+Se gana seguridad frente a retries, pero se paga con más estado, más complejidad y, en general, más costo operacional.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{17.}
+Proponer una garantía razonable para una red social bajo partición y justificarla.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una garantía razonable suele ser disponibilidad alta con consistencia eventual en muchas operaciones de lectura. La justificación es que el costo semántico de ver información levemente desactualizada suele ser menor que el costo de dejar de prestar servicio.
+
+Esto no significa que “todo da igual”, sino que el dominio tolera mejor una cierta desalineación temporal.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{18.}
+Proponer una garantía razonable para un sistema bancario bajo partición y justificarla.
+\end{uaexercise}
+
+\begin{uaanswer}
+En un sistema bancario suele preferirse una garantía más fuerte de corrección observable, incluso si eso obliga a rechazar temporalmente operaciones cuando no puede coordinarse adecuadamente.
+
+La razón es que el costo de una respuesta inconsistente es mucho mayor que el costo de una indisponibilidad temporal.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{19.}
+Construir un ejemplo donde preservar disponibilidad empeore la corrección observable.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un sistema replicado que, bajo partición, sigue respondiendo saldos desde una réplica atrasada. El usuario observa un valor viejo y toma una decisión equivocada. Se mantuvo disponibilidad, pero se degradó la corrección observable.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{20.}
+Construir un ejemplo donde preservar corrección fuerte reduzca significativamente la disponibilidad o la experiencia de usuario.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un sistema de transferencias que, ante duda o imposibilidad de coordinar, rechaza la operación con un mensaje de error temporal. Esto preserva una garantía fuerte de corrección, pero empeora disponibilidad y experiencia del usuario.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{21.}
+Explicar por qué CAP no debe enseñarse como “elegir dos de tres”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque esa formulación sugiere una especie de menú estático o una preferencia de arquitectura, cuando en realidad CAP describe una restricción que aparece cuando hay partición de red. La tensión relevante no es permanente en cualquier condición, sino específicamente cuando la coordinación entre componentes queda interrumpida.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{22.}
+Relacionar indistinguibilidad, asincronía y CAP en un párrafo coherente.
+\end{uaexercise}
+
+\begin{uaanswer}
+En un sistema asíncrono, una demora grande es indistinguible de una falla para el observador remoto. Esa falta de conocimiento perfecto impide decidir siempre correctamente sin costo. Cuando además existe partición, CAP formaliza una consecuencia de esa limitación: no puede preservarse a la vez consistencia fuerte observable y disponibilidad total de las operaciones.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{23.}
+Explicar qué significa “pensamiento distribuido” al final de esta clase y cómo se diferencia del razonamiento sobre un programa local.
+\end{uaexercise}
+
+\begin{uaanswer}
+Pensamiento distribuido significa razonar desde la información parcial, explicitando fallas, garantías y trade-offs. Se diferencia del razonamiento sobre un programa local en que ya no puede asumirse una visión global inmediata del estado ni una relación simple entre síntoma observado y causa interna.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{24.}
+Indicar cuál creés que es el mayor cambio de paradigma introducido por esta clase y justificarlo.
+\end{uaexercise}
+
+\begin{uaanswer}
+La respuesta esperada debe girar en torno a la aceptación de que la observación es incompleta y de que el diseño correcto no consiste en “descubrir siempre qué pasó”, sino en garantizar un comportamiento razonable bajo incertidumbre. Esa ruptura conceptual es el cimiento del resto del curso.
+\end{uaanswer}
 
 \end{document}

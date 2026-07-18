@@ -1,32 +1,322 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{15}
-\UASetClassTitle{Proyecto integrador}
-\title{Clase 15 --- Proyecto integrador}
+\UASetClassTitle{Diseño integral de sistemas distribuidos}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 15 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 15.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Proyecto integrador''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Proyecto integrador'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta debe leerse como una práctica de argumentación técnica. Lo importante no es solo llegar a una arquitectura plausible, sino justificarla bajo objeciones razonables y sin esconder los costos que introduce.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Explique por qué diseñar un sistema distribuido no equivale a listar tecnologías.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque una lista de tecnologías no explica:
+\begin{itemize}
+\item qué problema se resuelve;
+\item qué fallas se asumen;
+\item qué garantías se buscan;
+\item qué trade-offs se aceptan.
+\end{itemize}
+
+Sin esa estructura, la propuesta puede sonar moderna pero seguir siendo conceptualmente vacía.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique el sentido del esquema $D=(P,F,G,S,T)$.
+\end{uaexercise}
+
+\begin{uaanswer}
+El esquema obliga a estructurar el diseño como una respuesta argumentada:
+\begin{itemize}
+\item $P$: define el problema;
+\item $F$: explicita el entorno de falla;
+\item $G$: fija qué garantías importan;
+\item $S$: propone una solución;
+\item $T$: reconoce sus costos.
+\end{itemize}
+
+Es útil porque evita el error de empezar por herramientas antes de formular el problema.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una propuesta debe explicitar fallas asumidas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque un sistema distribuido se comporta distinto según qué fallas se consideran relevantes:
+\begin{itemize}
+\item pérdida de mensajes;
+\item duplicación;
+\item latencia variable;
+\item partición;
+\item fallas parciales;
+\item errores humanos.
+\end{itemize}
+
+Si las fallas no se explicitan, la propuesta queda implícitamente basada en un mundo ideal y su defensa se vuelve débil.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una arquitectura seria debe reconocer lo que no resuelve.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque toda arquitectura distribuye costos y límites. Una propuesta que pretende resolver todo simultáneamente suele ocultar tensiones reales. Reconocer límites fortalece la defensa, porque muestra comprensión del problema en lugar de optimismo superficial.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare consistencia fuerte y eventual como decisiones de diseño.
+\end{uaexercise}
+
+\begin{uaanswer}
+La consistencia fuerte simplifica la semántica visible, pero exige coordinación, latencia y potencialmente menor disponibilidad bajo partición. La consistencia eventual reduce coordinación y favorece disponibilidad y latencia, pero desplaza complejidad hacia reconciliación, estados intermedios y mayor dificultad de razonamiento para la aplicación.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare monolito modular y microservicios.
+\end{uaexercise}
+
+\begin{uaanswer}
+El monolito modular concentra despliegue y simplifica transacciones y debugging, pero ofrece menos independencia operacional. Los microservicios ganan autonomía, despliegue independiente y escalado por componente, pero introducen costo distribuido: latencia, fallas parciales, ownership de datos, observabilidad y operación más complejas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare RPC y eventos.
+\end{uaexercise}
+
+\begin{uaanswer}
+RPC ofrece flujo más explícito y causalidad más directa, pero acopla temporalmente a los componentes. Los eventos desacoplan temporalmente y favorecen extensibilidad y replay, pero introducen mayor dificultad de trazabilidad, orden parcial y consistencia eventual.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare transacción fuerte y saga.
+\end{uaexercise}
+
+\begin{uaanswer}
+La transacción fuerte busca atomicidad global inmediata, con más coordinación y potencial de bloqueo. La saga usa pasos locales y compensaciones, con más disponibilidad y flexibilidad, pero estados intermedios visibles y compensaciones imperfectas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Responda la objeción “¿por qué no un monolito?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+La respuesta correcta no es “porque microservicios escalan mejor” como slogan. Hay que explicar:
+\begin{itemize}
+\item qué bounded contexts justifican separación;
+\item qué equipos necesitan autonomía;
+\item qué componentes requieren escalado distinto;
+\item qué costo distribuido se acepta al separarlos.
+\end{itemize}
+
+Si esas razones no existen, entonces la objeción del monolito modular es válida.
+\end{uaanswer}
+
+\begin{uaexercise}
+Responda “¿por qué no consistencia fuerte en todo?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque consistencia fuerte global tiene costos en latencia, coordinación y disponibilidad. La defensa correcta debe explicar qué partes del dominio la requieren realmente y en cuáles sería innecesariamente cara o semánticamente excesiva.
+\end{uaanswer}
+
+\begin{uaexercise}
+Responda “¿qué pasa bajo partición?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+La respuesta correcta debe explicar:
+\begin{itemize}
+\item qué servicios priorizan disponibilidad;
+\item qué servicios rechazan operaciones para preservar corrección;
+\item qué datos pueden reconciliarse luego;
+\item qué semántica visible tendrá el sistema durante la partición.
+\end{itemize}
+
+Decir simplemente “tenemos replicación” no alcanza.
+\end{uaanswer}
+
+\begin{uaexercise}
+Responda “¿cómo observás y operás esto?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una defensa seria debe mencionar:
+\begin{itemize}
+\item logs estructurados;
+\item métricas y SLOs;
+\item tracing distribuido;
+\item alertas y runbooks;
+\item incident management;
+\item postmortems y ownership.
+\end{itemize}
+
+La operación no es apéndice del diseño: es parte de su viabilidad.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para e-commerce global.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una arquitectura razonable podría combinar:
+\begin{itemize}
+\item monolito modular inicial o microservicios acotados por dominio;
+\item checkout con garantías más fuertes;
+\item recomendaciones y analytics event-driven y eventualmente consistentes;
+\item inventory con coordinación explícita según criticidad;
+\item observabilidad fuerte en checkout y pagos;
+\item sagas para procesos compuestos.
+\end{itemize}
+
+No todo requiere la misma consistencia ni el mismo tipo de integración.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para plataforma financiera.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una plataforma financiera requiere:
+\begin{itemize}
+\item ledger con consistencia fuerte;
+\item auditoría explícita;
+\item operaciones críticas con semántica fuerte e idempotencia;
+\item observabilidad y trazabilidad muy sólidas;
+\item separación cuidadosa entre caminos críticos y no críticos.
+\end{itemize}
+
+El sistema puede seguir usando componentes event-driven, pero el núcleo transaccional no puede tratarse igual que un feed social.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una arquitectura razonable para streaming de eventos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una arquitectura razonable puede apoyarse en:
+\begin{itemize}
+\item commit log distribuido;
+\item procesamiento stateful y stateless;
+\item semántica de entrega explícita;
+\item materialized views;
+\item SLOs centrados en throughput y latencia de procesamiento;
+\item observabilidad fuerte sobre lag, errores y pérdida de frescura.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué esos tres casos no comparten exactamente la misma arquitectura.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque cada dominio tolera distintos errores y exige distintas garantías. E-commerce, finanzas y streaming priorizan de manera diferente:
+\begin{itemize}
+\item consistencia;
+\item latencia;
+\item throughput;
+\item auditabilidad;
+\item disponibilidad;
+\item tolerancia a reconciliación.
+\end{itemize}
+
+Una única receta para todos sería conceptualmente pobre.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo deberían aparecer observabilidad y SLOs en una defensa seria.
+\end{uaexercise}
+
+\begin{uaanswer}
+Deben aparecer como parte del diseño integral: no solo “tenemos dashboards”, sino qué señales importan, qué SLOs gobiernan el sistema, cómo se detectan degradaciones y cómo se toma decisiones operativas con ese marco.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo deberían aparecer resiliencia e incident management.
+\end{uaexercise}
+
+\begin{uaanswer}
+Deben aparecer explícitamente:
+\begin{itemize}
+\item timeouts;
+\item retries bien acotados;
+\item breakers;
+\item aislamiento de recursos;
+\item graceful degradation;
+\item protocolos de incidente y aprendizaje posterior.
+\end{itemize}
+
+Una arquitectura que no considera operación bajo falla está incompleta.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué ownership de datos y bounded contexts no son secundarios.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque determinan fronteras reales del sistema. Sin ownership claro, los servicios se acoplan por base de datos o por contratos implícitos, y la arquitectura pierde coherencia. Los bounded contexts ordenan tanto el dominio como la organización.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique $D=(P,F,G,S,T)$ a reservas de viaje.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible:
+
+\begin{itemize}
+\item $P$: coordinar vuelo, hotel, pago y emisión;
+\item $F$: fallas parciales, latencia, inconsistencia temporal, pasos que fallan luego de otros exitosos;
+\item $G$: completar la reserva con semántica razonable y compensable;
+\item $S$: dominios separados, sagas, eventos, idempotencia, observabilidad fuerte;
+\item $T$: estados intermedios, compensaciones costosas, mayor complejidad operacional.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una defensa débil promete propiedades incompatibles.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque evita enfrentar trade-offs. Quiere mostrar un sistema simultáneamente simple, barato, global, fuertemente consistente, altamente disponible y fácil de operar. Esa promesa suele indicar falta de criterio técnico, no ambición legítima.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué hace convincente una defensa frente a un jurado hostil.
+\end{uaexercise}
+
+\begin{uaanswer}
+La vuelve convincente:
+\begin{itemize}
+\item claridad sobre el problema;
+\item supuestos explícitos;
+\item trade-offs reconocidos;
+\item respuesta seria a objeciones;
+\item coherencia entre arquitectura, operación y dominio.
+\end{itemize}
+
+Un jurado serio valora más la consistencia interna y la honestidad que una acumulación de tecnologías.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué el valor de una arquitectura no está en parecer sofisticada.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque la sofisticación visible no garantiza adecuación al problema. Una arquitectura vale si resuelve razonablemente el dominio con costos explícitos y sostenibles. La elegancia real en sistemas distribuidos está en la coherencia, no en la cantidad de componentes.
+\end{uaanswer}
 
 \end{document}

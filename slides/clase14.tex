@@ -1,73 +1,202 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{14}
-\UASetClassTitle{System Design}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 14 --- System Design}
-\author{\UAProfessor}
-\date{\UADate}
+\UASetClassTitle{Incidentes y cultura de confiabilidad}
+\title{\UACourse}
+\subtitle{Clase 14 --- Incidentes, postmortems, aprendizaje organizacional y cultura de confiabilidad}
+
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{System Design}
+\UASectionSlide{El incidente como hecho normal}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{La intuición equivocada}
+Un incidente suele vivirse como:
 \begin{itemize}
-\item Integrar todo el curso en diseño de sistemas reales con restricciones, fallas y trade-offs explícitos.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item excepción vergonzosa
+\item error puntual
+\item fracaso individual
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Idea correcta}
+En sistemas complejos, los incidentes son eventos esperables y su valor depende de cuánto aprende la organización de ellos.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Qué es un incidente}
+Un incidente es un evento que degrada o amenaza:
+\begin{itemize}
+\item disponibilidad
+\item latencia
+\item corrección
+\item seguridad
+\item cumplimiento de SLOs
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Gestión de incidentes}
 
-\begin{frame}{Problema central}
-La clase 14 trabaja un tipo específico de dificultad distribuida: Integrar todo el curso en diseño de sistemas reales con restricciones, fallas y trade-offs explícitos.
-
+\begin{frame}{Fases}
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item detección
+\item clasificación
+\item respuesta
+\item mitigación
+\item comunicación
+\item recuperación
+\item aprendizaje posterior
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\begin{frame}{Prioridad}
+No toda falla tiene la misma urgencia.
+
+\pause
+
+Se prioriza según:
 \begin{itemize}
-\item requerimientos
-\item componentes
-\item datos
-\item fallas
-\item trade-offs
+\item impacto al usuario
+\item alcance
+\item duración
+\item consumo de error budget
+\item riesgo de escalamiento
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
+\begin{frame}{Incident Command}
+Buenas prácticas:
+\begin{itemize}
+\item alguien coordina
+\item alguien investiga
+\item alguien comunica
+\item alguien registra timeline
+\end{itemize}
+
+\pause
+
+\begin{block}{Clave}
+Durante el incidente, coordinación y claridad importan más que brillantez individual.
+\end{block}
 \end{frame}
 
-\begin{frame}{Preguntas para pensar}
+\UASectionSlide{Postmortems}
+
+\begin{frame}{Postmortem}
+\begin{block}{}
+Documento y proceso de análisis posterior al incidente para entender qué pasó, por qué pasó y cómo reducir repetición.
+\end{block}
+\end{frame}
+
+\begin{frame}{Qué debe incluir}
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item impacto
+\item timeline
+\item detección
+\item causa raíz
+\item factores contribuyentes
+\item mitigación
+\item acciones de mejora
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Blameless}
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item no significa ausencia de responsabilidad
+\item significa evitar castigo como sustituto del análisis
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Clave}
+El objetivo del postmortem no es encontrar culpables, sino aumentar la capacidad de la organización.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Root Cause y factores contribuyentes}
+
+\begin{frame}{Causa raíz}
+Un incidente rara vez tiene una sola causa.
+
+\pause
+
+Suele haber:
+\begin{itemize}
+\item disparador inmediato
+\item condiciones habilitantes
+\item fallas de detección
+\item fallas de mitigación
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Ejemplo}
+\begin{itemize}
+\item DB lenta
+\item retries mal calibrados
+\item breaker ausente
+\item alertas tardías
+\item comunicación confusa
+\end{itemize}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 14 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\pause
+
+\begin{block}{Lección}
+El incidente real es una cadena, no un único bug.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Aprendizaje organizacional}
+
+\begin{frame}{Aprender del incidente}
+Un buen postmortem produce:
+\begin{itemize}
+\item fixes técnicos
+\item mejoras de observabilidad
+\item cambios en runbooks
+\item ajustes en alertas
+\item cambios en procesos
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Anti-patrones}
+\begin{itemize}
+\item cerrar incidente sin aprender
+\item hacer postmortem solo para “cumplir”
+\item listar acciones sin owner ni fecha
+\item reducir todo a error humano
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Cultura de confiabilidad}
+
+\begin{frame}{Qué cultura queremos}
+\begin{itemize}
+\item incidentes visibles, no ocultos
+\item aprendizaje explícito
+\item responsabilidad sin cultura de miedo
+\item mejora continua
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+La confiabilidad no es solo propiedad del sistema; es también propiedad de la organización que lo opera.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea final}
+\begin{block}{}
+Una organización madura no se define por no tener incidentes, sino por responder, aprender y mejorar de manera sistemática cuando los tiene.
 \end{block}
 \end{frame}
 

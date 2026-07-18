@@ -1,41 +1,247 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{11}
-\UASetClassTitle{Arquitecturas distribuidas modernas}
-\title{Clase 11 --- Arquitecturas distribuidas modernas}
+\UASetClassTitle{Resiliencia distribuida}
+\UASetDocKind{Apuntes}
+
+\title{Clase 11 --- Resiliencia distribuida}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 11 desarrolla el tema ``Arquitecturas distribuidas modernas'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Comparar monolitos, microservicios y arquitecturas event-driven como decisiones de diseño. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+En sistemas distribuidos, la falla no es una excepción rara, sino una condición normal del entorno. La cuestión central no es si el sistema fallará, sino \emph{cómo} fallará y \emph{qué tan lejos} se propagará esa falla.
 
-\subsection{Preguntas guía}
+Una dependencia lenta, un broker saturado o una base de datos bajo presión pueden transformar una degradación local en un colapso sistémico. Por eso la resiliencia distribuida no consiste en “agregar reintentos” sin más, sino en diseñar mecanismos que contengan la propagación del daño.
+
+\begin{quote}
+Resiliencia es la capacidad del sistema de sostener comportamiento útil bajo estrés, degradación o falla parcial.
+\end{quote}
+
+\section{Fallos locales y fallos sistémicos}
+
+Una falla local es un problema en un componente específico:
 \begin{itemize}
-\item ¿Cómo aparece monolito en un sistema real? \item ¿Cómo aparece microservicios en un sistema real? \item ¿Cómo aparece event-driven en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item un servicio responde lento;
+\item una cola se llena;
+\item una base de datos supera su capacidad;
+\item un cache deja de responder.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 11 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
-
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
-
-\section{Bibliografía guía}
+El verdadero problema aparece cuando el resto del sistema reacciona mal:
 \begin{itemize}
-\item Kleppmann, cap. 11.
-\item Microservices Patterns.
-\item Martin Fowler, Microservices.
+\item multiplica requests;
+\item acumula trabajo sin límite;
+\item consume recursos compartidos;
+\item propaga latencia a otras capas.
+\end{itemize}
+
+Esto transforma una falla localizada en una falla sistémica.
+
+\section{Retries correctos}
+
+\subsection{Intuición}
+
+Retry es útil cuando la falla es transitoria. Ejemplos:
+\begin{itemize}
+\item una pérdida de paquete;
+\item jitter corto de red;
+\item una condición temporal recuperable.
+\end{itemize}
+
+\subsection{Problema}
+
+Retry es peligroso cuando la causa es:
+\begin{itemize}
+\item saturación;
+\item cola excesiva;
+\item falla persistente;
+\item operación no idempotente.
+\end{itemize}
+
+En esos casos, reintentar agrega más presión sobre el componente que ya está en problemas.
+
+\subsection{Buenas prácticas}
+
+\begin{itemize}
+\item límite estricto de intentos;
+\item exponential backoff;
+\item jitter para evitar sincronización patológica;
+\item aplicar solo en operaciones seguras o idempotentes;
+\item evitar retry en múltiples capas a la vez.
+\end{itemize}
+
+\subsection{Razón profunda}
+
+Un retry no es gratis. Cada retry consume:
+\begin{itemize}
+\item ancho de banda;
+\item conexiones;
+\item CPU;
+\item slots de concurrencia;
+\item tiempo de espera en colas.
+\end{itemize}
+
+\section{Circuit Breakers}
+
+\subsection{Idea}
+
+Un circuit breaker corta temporalmente las llamadas a una dependencia degradada cuando detecta demasiadas fallas o latencias excesivas.
+
+\subsection{Estados}
+
+\paragraph{Closed}
+Las requests fluyen normalmente.
+
+\paragraph{Open}
+Se rechazan llamadas sin intentar ejecutarlas.
+
+\paragraph{Half-open}
+Se deja pasar un pequeño conjunto de requests de prueba para evaluar si la dependencia se recuperó.
+
+\subsection{Ventajas}
+
+\begin{itemize}
+\item evita insistir sobre una dependencia caída o saturada;
+\item protege recursos locales;
+\item reduce tiempo desperdiciado en espera inútil;
+\item da feedback más rápido al sistema llamador.
+\end{itemize}
+
+\subsection{Peligros}
+
+\begin{itemize}
+\item thresholds mal ajustados;
+\item abrir demasiado pronto;
+\item reabrir demasiado tarde;
+\item usarlo sin estrategia de fallback.
+\end{itemize}
+
+\section{Backpressure}
+
+\subsection{Idea}
+
+Cuando el consumidor no puede sostener el ritmo, el productor debe desacelerarse o el sistema debe rechazar trabajo.
+
+\subsection{Sin backpressure}
+
+\begin{itemize}
+\item las colas crecen;
+\item la latencia sube;
+\item aumenta el uso de memoria;
+\item aparecen timeouts;
+\item se disparan retries;
+\item el sistema entra en espiral.
+\end{itemize}
+
+\subsection{Con backpressure}
+
+\begin{itemize}
+\item el ingreso se regula;
+\item se rechaza trabajo antes del colapso;
+\item el sistema protege su estabilidad.
+\end{itemize}
+
+\subsection{Formas de backpressure}
+
+\begin{itemize}
+\item límites de cola;
+\item ventanas de crédito;
+\item control explícito de demanda;
+\item rate limiting;
+\item rechazo temprano.
+\end{itemize}
+
+\section{Bulkheads}
+
+\subsection{Analogía}
+
+En ingeniería naval, un bulkhead separa compartimentos para que una vía de agua no hunda todo el barco. En sistemas distribuidos, el patrón hace lo mismo con recursos.
+
+\subsection{Aplicación}
+
+\begin{itemize}
+\item pools de hilos separados por dependencia;
+\item colas independientes;
+\item límites de concurrencia por tipo de request;
+\item aislamiento por tenant o dominio.
+\end{itemize}
+
+\subsection{Valor}
+
+Si una dependencia consume todos los hilos, conexiones o buffers del sistema, otras rutas críticas quedan bloqueadas. Bulkheads evitan esa contaminación transversal.
+
+\section{Graceful Degradation}
+
+\subsection{Idea}
+
+Cuando el sistema no puede ofrecer la funcionalidad completa, intenta ofrecer una versión degradada pero todavía útil.
+
+\subsection{Ejemplos}
+
+\begin{itemize}
+\item servir catálogo sin recomendaciones;
+\item responder desde cache aun si está desactualizada;
+\item desactivar features no críticas;
+\item aceptar solo lecturas;
+\item rechazar operaciones caras mientras se sostiene el núcleo del servicio.
+\end{itemize}
+
+\subsection{Propósito}
+
+Graceful degradation permite que el sistema falle en forma parcial y controlada, en lugar de caer completamente.
+
+\section{Combinación de patrones}
+
+La resiliencia real no suele depender de un único mecanismo. Una estrategia razonable combina:
+
+\begin{itemize}
+\item timeouts bien elegidos;
+\item retries limitados con backoff;
+\item circuit breakers;
+\item aislamiento de recursos;
+\item control de presión;
+\item degradación funcional;
+\item observabilidad suficiente para decidir.
+\end{itemize}
+
+\section{Error común}
+
+Un error muy habitual es introducir solo retries y timeouts, sin circuit breakers ni backpressure. Eso crea un sistema que parece más robusto, pero en realidad responde al estrés con más carga, más espera y más amplificación de la falla.
+
+\section{Modelo del curso}
+
+Podemos expresar el problema con:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Ejemplo:
+\begin{itemize}
+\item $P$: mantener servicio útil bajo degradación parcial;
+\item $F$: dependencia lenta, timeouts, saturación, colas crecientes;
+\item $G$: contención de la falla y preservación parcial del servicio;
+\item $S$: retries limitados + circuit breaker + bulkheads + backpressure + degradación;
+\item $T$: más complejidad de configuración, tuning y operación.
+\end{itemize}
+
+\section{Conclusión}
+
+La resiliencia distribuida no elimina la falla. La vuelve:
+\begin{itemize}
+\item contenida;
+\item observable;
+\item recuperable;
+\item menos destructiva.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Un sistema resiliente no es el que nunca falla, sino el que impide que una falla local se transforme en colapso sistémico.
 \end{uakeybox}
+
 \end{document}

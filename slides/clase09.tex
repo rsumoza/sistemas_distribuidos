@@ -1,73 +1,233 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{09}
-\UASetClassTitle{Logs y procesamiento distribuido}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 09 --- Logs y procesamiento distribuido}
-\author{\UAProfessor}
-\date{\UADate}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\title{\UACourse}
+\subtitle{Clase 09 --- Monolito, microservicios, event-driven y sagas}
+
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Logs y procesamiento distribuido}
+\UASectionSlide{La pregunta arquitectónica}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{Después de los mecanismos, aparece la arquitectura}
+Hasta ahora vimos:
 \begin{itemize}
-\item Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item RPC, retries, idempotencia
+\item consistencia, replicación, consenso
+\item transacciones distribuidas
+\item almacenamiento y logs
+\end{itemize}
+
+\pause
+
+\begin{block}{Pregunta}
+¿Cómo componemos todo eso en una arquitectura real?
+\end{block}
+\end{frame}
+
+\begin{frame}{Arquitectura no es diagrama}
+Una arquitectura distribuida no es solo:
+\begin{itemize}
+\item cajas y flechas
+\item servicios con nombres bonitos
+\end{itemize}
+
+\pause
+
+Es una decisión sobre:
+\begin{itemize}
+\item acoplamiento
+\item consistencia
+\item despliegue
+\item ownership
+\item modos de falla
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Monolito modular}
 
-\begin{frame}{Problema central}
-La clase 09 trabaja un tipo específico de dificultad distribuida: Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados.
-
+\begin{frame}{Monolito modular}
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item un solo despliegue
+\item módulos internos bien definidos
+\item base de datos compartida
+\end{itemize}
+
+\pause
+
+Ventajas:
+\begin{itemize}
+\item simplicidad
+\item transacciones locales
+\item debugging directo
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\begin{frame}{Límite del monolito}
+Problemas típicos:
 \begin{itemize}
-\item topics
-\item partitions
-\item offsets
-\item consumer groups
-\item semánticas de entrega
+\item acoplamiento creciente
+\item despliegue conjunto
+\item escalado menos flexible
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Cuidado}
+Muchos equipos abandonan demasiado pronto el monolito.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Microservicios}
+
+\begin{frame}{Microservicios}
+\begin{itemize}
+\item servicios autónomos
+\item ownership por dominio
+\item despliegue independiente
+\item datos descentralizados
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
-
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{Ganancias}
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item autonomía organizacional
+\item escalado por componente
+\item evolución independiente
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Costos reales}
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item fallas parciales
+\item latencia de red
+\item consistencia distribuida
+\item observabilidad compleja
+\item transacciones entre servicios
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Idea clave}
+Los microservicios cambian deuda de código por deuda distribuida.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Event-Driven}
+
+\begin{frame}{Arquitectura orientada a eventos}
+\begin{itemize}
+\item servicios no se llaman siempre de forma directa
+\item publican y consumen eventos
+\item desacoplamiento temporal
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Ventajas}
+\begin{itemize}
+\item menor acoplamiento temporal
+\item replay
+\item múltiples consumidores
+\end{itemize}
+\end{frame}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 09 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{frame}{Nuevos problemas}
+\begin{itemize}
+\item trazabilidad
+\item orden parcial
+\item consistencia eventual
+\item duplicación de eventos
+\item debugging más difícil
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Sagas}
+
+\begin{frame}{Por qué aparecen las sagas}
+En microservicios:
+\begin{itemize}
+\item no siempre hay transacción global simple
+\item 2PC es costoso o indeseable
+\end{itemize}
+
+\pause
+
+\begin{block}{Solución frecuente}
+Descomponer en transacciones locales + compensaciones
+\end{block}
+\end{frame}
+
+\begin{frame}{Saga coreografiada}
+\begin{itemize}
+\item cada servicio reacciona a eventos
+\item no hay coordinador central explícito
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Saga orquestada}
+\begin{itemize}
+\item un orquestador coordina pasos
+\item mayor visibilidad del flujo
+\item mayor acoplamiento al orquestador
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Compensación no es rollback}
+\begin{itemize}
+\item rollback revierte un efecto físico en la misma transacción
+\item compensación agrega una acción nueva que intenta neutralizar un efecto previo
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Clave}
+La compensación puede no ser perfecta ni instantánea.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Criterios de diseño}
+
+\begin{frame}{Cuándo NO usar microservicios}
+\begin{itemize}
+\item equipo pequeño
+\item dominio inmaduro
+\item sistema todavía cambiando su modelo
+\item baja presión de escalado independiente
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cuándo sí considerar microservicios}
+\begin{itemize}
+\item dominios bien delimitados
+\item equipos autónomos
+\item necesidades distintas de escalado
+\item despliegues frecuentes e independientes
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Preguntas correctas}
+\begin{itemize}
+\item ¿qué consistencia necesita cada dominio?
+\item ¿qué fallas parciales aparecen?
+\item ¿quién posee los datos?
+\item ¿cómo se observa el sistema?
+\item ¿cómo se compensa si algo sale mal?
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+La arquitectura distribuida correcta no es la más moderna, sino la que hace explícitos sus trade-offs y los alinea con el dominio.
 \end{block}
 \end{frame}
 

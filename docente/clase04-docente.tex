@@ -1,52 +1,101 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{04}
-\UASetClassTitle{Consistencia}
-\title{Clase 04 --- Consistencia}
+\UASetClassTitle{Consenso distribuido}
+\UASetDocKind{Guía docente}
+
+\title{Clase 04 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}
-Que el estudiante entienda consistencia como una especificación observable de lecturas y escrituras, no como una palabra genérica para ``datos correctos''. La clase debe conectar modelos de consistencia con costo de coordinación, latencia y disponibilidad.
+\section{Objetivo profundo}
 
-\section{Resultados de aprendizaje esperados}
+Esta clase busca que el alumno entienda que:
+
 \begin{itemize}
-\item definir corrección en términos de historias observables;
-\item explicar linearizability como comportamiento de objeto único;
-\item explicar eventual consistency como convergencia con lecturas temporalmente obsoletas;
-\item clasificar casos de dominio según el modelo de consistencia requerido;
-\item relacionar consistencia fuerte con decisiones bajo partición.
+\item replicación sin coordinación produce inconsistencias
+\item consenso impone orden global
+\item ese orden tiene costo y límites teóricos
 \end{itemize}
 
-\section{Guion sugerido}
-\begin{enumerate}
-\item Abrir con la pregunta: ``¿qué significa que el sistema sea correcto?''.
-\item Presentar una escritura confirmada seguida de una lectura vieja.
-\item Usar ese caso para distinguir linearizability de modelos más débiles.
-\item Mostrar dominios donde la consistencia eventual es aceptable y dominios donde no.
-\item Cerrar con el trade-off latencia--corrección y la conexión con CAP.
-\end{enumerate}
+\section{Resultado esperado}
 
-\section{Errores conceptuales frecuentes}
+El alumno debe poder:
+
 \begin{itemize}
-\item usar ``consistente'' sin especificar modelo;
-\item creer que eventual consistency significa ausencia de garantías;
-\item olvidar que linearizability respeta tiempo real entre operaciones no solapadas;
-\item analizar consistencia sin mirar el dominio.
+\item definir consenso formalmente
+\item explicar FLP con precisión conceptual
+\item describir Raft y Paxos correctamente
+\item justificar uso de quorums
 \end{itemize}
 
-\section{Preguntas disparadoras}
+\section{Estructura sugerida (90 min)}
+
+\subsection*{Bloque 1 (15 min): problema}
+
+Presentar un sistema replicado que diverge.
+Preguntar:
+\begin{quote}
+¿Cómo logramos que todos acuerden un orden?
+\end{quote}
+
+\subsection*{Bloque 2 (20 min): definición}
+
+Introducir consenso formal:
+Agreement, Validity, Termination.
+
+\subsection*{Bloque 3 (20 min): FLP}
+
+Explicar:
 \begin{itemize}
-\item ¿Qué lectura esperaría un usuario después de una escritura confirmada?
-\item ¿Qué historia observable permite este modelo?
-\item ¿Qué costo tiene coordinar para preservar esa garantía?
-\item ¿Qué daño produce una lectura vieja en este dominio?
+\item estados bivalentes
+\item scheduler adversario
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante deja de decir ``consistencia'' en abstracto y nombra la garantía observable.
-\end{uawarn}
+Objetivo:
+\begin{center}
+“El consenso perfecto no siempre es posible”
+\end{center}
+
+\subsection*{Bloque 4 (20 min): Raft}
+
+Explicar paso a paso:
+\begin{itemize}
+\item elección de líder
+\item replicación
+\item commit
+\end{itemize}
+
+\subsection*{Bloque 5 (15 min): Paxos}
+
+Dar visión conceptual y comparar con Raft.
+
+\section{Momento crítico}
+
+Cuando el alumno entiende:
+
+\begin{center}
+\textbf{“Consenso requiere mayoría, y la mayoría es la base de la seguridad”}
+\end{center}
+
+\section{Errores frecuentes}
+
+\begin{itemize}
+\item creer que consenso siempre termina
+\item no entender quorum
+\item confundir leader con fuente absoluta de verdad
+\end{itemize}
+
+\section{Conexión con siguiente clase}
+
+Transacciones distribuidas:
+\begin{itemize}
+\item 2PC
+\item atomicidad
+\end{itemize}
+
 \end{document}
