@@ -1,51 +1,176 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{15}
-\UASetClassTitle{Proyecto integrador}
-\title{Clase 15 --- Proyecto integrador}
+\UASetClassTitle{Diseño integral de sistemas distribuidos}
+\UASetDocKind{Guía docente}
+
+\title{Clase 15 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Aplicar los conceptos del curso en un proyecto distribuido defendible y observable. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es cerrar el ciclo del curso: pasar desde conocimientos fragmentados sobre mecanismos distribuidos hacia la capacidad de integrarlos en una propuesta coherente y defenderla técnicamente.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{un sistema distribuido bien diseñado no es una colección de patrones, sino una argumentación coherente bajo restricciones reales}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item usar el esquema $D=(P,F,G,S,T)$ como marco de defensa;
+\item argumentar una arquitectura completa sin caer en slogans;
+\item justificar trade-offs frente a objeciones;
+\item comparar casos de dominio sin aplicar una receta única;
+\item reconocer cuándo una propuesta es más marketing que diseño técnico.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 15 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): cambiar el nivel de análisis}
+Abrir con la idea de que el curso ya no está en “qué hace Raft” o “qué es un SLO”, sino en cómo todos esos mecanismos se integran.
+
+\paragraph{Objetivo didáctico}
+Hacer visible el cambio de escala: del mecanismo al sistema completo.
+
+\subsection*{Bloque 2 (20 min): marco de defensa}
+Presentar explícitamente el esquema:
+\[
+D = (P,F,G,S,T)
+\]
+
+y usarlo para ordenar qué debe contener una propuesta seria.
+
+\paragraph{Objetivo didáctico}
+Dar una estructura reusable para diseño y defensa.
+
+\subsection*{Bloque 3 (20 min): trade-offs}
+Trabajar comparaciones:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item consistencia fuerte vs eventual;
+\item monolito vs microservicios;
+\item RPC vs eventos;
+\item transacción fuerte vs saga.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el alumno aprenda a argumentar decisiones, no a repetir preferencias personales.
+
+\subsection*{Bloque 4 (20 min): revisión de casos}
+Tomar tres dominios distintos:
+\begin{itemize}
+\item e-commerce;
+\item finanzas;
+\item streaming.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Mostrar que no hay arquitectura universalmente correcta.
+
+\subsection*{Bloque 5 (15 min): objeciones y defensa}
+Simular preguntas hostiles:
+\begin{itemize}
+\item ¿por qué no un monolito?;
+\item ¿qué pasa bajo partición?;
+\item ¿por qué no consistencia fuerte total?;
+\item ¿cómo operás esto?
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Preparar al estudiante para defensa técnica real, no solo para exposición expositiva.
+
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Marco $D=(P,F,G,S,T)$}
+Porque organiza todo el razonamiento del curso en una forma defendible.
+
+\subsection*{2. Trade-offs}
+Porque la defensa arquitectónica se derrumba si el alumno cree que todo puede maximizarse al mismo tiempo.
+
+\subsection*{3. Casos}
+Porque muestran que la arquitectura correcta depende del dominio y no de una receta genérica.
+
+\subsection*{4. Objeciones}
+Porque obligan a transformar conocimiento en argumentación técnica.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué problema concreto resuelve esta complejidad?
+\item ¿Qué falla es más costosa en este dominio?
+\item ¿Qué parte exige consistencia fuerte y cuál no?
+\item ¿Qué costo operacional trae esta decisión?
+\item ¿Qué parte del sistema no está realmente defendida todavía?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item presentar tecnologías sin problema bien formulado;
+\item esconder trade-offs;
+\item defender microservicios como símbolo de madurez;
+\item suponer consistencia fuerte global sin costo;
+\item no incluir operación, observabilidad o incidentes en la propuesta;
+\item responder objeciones con slogans en vez de supuestos y garantías.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Dividir la clase en grupos y asignarles:
+\begin{itemize}
+\item e-commerce global;
+\item ledger financiero;
+\item pipeline de streaming.
+\end{itemize}
+
+Pedir que preparen una mini-defensa usando:
+\[
+D = (P,F,G,S,T)
+\]
+
+Luego someterlos a dos objeciones hostiles por grupo.
+
+\paragraph{Objetivo}
+Que el alumno practique la transición desde diseño descriptivo hacia defensa argumentada.
+
+\section{Momento crítico de la clase}
+
+El punto más importante aparece cuando el estudiante entiende que:
+
+\begin{center}
+\textbf{la calidad de una arquitectura distribuida se mide por su coherencia defendible bajo objeciones, no por la cantidad de componentes que contiene}
+\end{center}
+
+Ese momento debe remarcarse, porque resume el espíritu del cierre del curso.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item estructurar una propuesta con el marco del curso;
+\item responder objeciones sin improvisación vacía;
+\item reconocer costos explícitos de su diseño;
+\item distinguir entre propuesta sólida y propuesta decorativa.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase prepara perfectamente la clase final, donde el estudiante ya no solo diseña, sino que \emph{defiende} un sistema ante un jurado o comité técnico.
+
+\begin{uakeybox}
+Pregunta puente: si ya podemos integrar y argumentar una arquitectura, ¿cómo se organiza una defensa final convincente ante evaluación crítica y preguntas de comité?
+\end{uakeybox}
+
 \end{document}

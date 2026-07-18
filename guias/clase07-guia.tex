@@ -1,24 +1,51 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
-\UASetClassNumber{07}
-\UASetClassTitle{Consenso y Raft}
-\title{Clase 07 --- Consenso y Raft}
+
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
-\maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 07.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Consenso y Raft''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Nivel 1: fundamentos}
+
+1. Defina commit log y explique por qué es append-only.  
+2. Explique qué representa un offset y por qué es crítico para la recuperación.  
+3. Describa cómo un sistema puede reconstruir estado a partir del log.  
+4. Explique diferencias entre log y base de datos tradicional.
+
+\section{Nivel 2: Kafka}
+
+5. Describa arquitectura completa de Kafka.  
+6. Explique cómo funcionan las particiones.  
+7. ¿Por qué Kafka no garantiza orden global?  
+8. Diseñe un esquema de particionado para balancear carga.
+
+\section{Nivel 3: offsets y fallas}
+
+9. Explique cómo un consumidor maneja offsets.  
+10. Construya escenario donde offset causa pérdida.  
+11. Construya escenario donde offset causa duplicación.  
+12. Explique cómo evitar ambos problemas.
+
+\section{Nivel 4: semánticas}
+
+13. Compare at-most, at-least y exactly-once con ejemplos concretos.  
+14. Diseñe un pipeline at-least-once.  
+15. Diseñe un pipeline exactly-once.  
+16. Explique rol de idempotencia.
+
+\section{Nivel 5: streaming}
+
+17. Diseñe pipeline de procesamiento en tiempo real.  
+18. Modele agregación por ventana.  
+19. Diseñe join entre streams.  
+20. Analice fallas en streaming stateful.
+
+\section{Nivel 6: integración}
+
+21. Relacione logs con almacenamiento (clase 6).  
+22. Explique cómo Kafka implementa persistencia.  
+23. Aplique modelo D al sistema.  
+24. Diseñe sistema completo basado en log.
 
 \end{document}

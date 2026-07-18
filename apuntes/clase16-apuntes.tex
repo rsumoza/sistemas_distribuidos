@@ -1,41 +1,319 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{16}
-\UASetClassTitle{Defensa y cierre}
-\title{Clase 16 --- Defensa y cierre}
+\UASetClassTitle{Defensa final ante comité}
+\UASetDocKind{Apuntes}
+
+\title{Clase 16 --- Defensa final de sistema ante comité: presentación, objeciones, revisión crítica y rúbrica de evaluación}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 16 desarrolla el tema ``Defensa y cierre'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Sintetizar el pensamiento distribuido y evaluar la madurez conceptual alcanzada en el curso. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+El cierre natural de un curso serio de sistemas distribuidos no consiste simplemente en recordar mecanismos, sino en demostrar la capacidad de integrarlos en una propuesta coherente y defenderla frente a objeciones técnicas.
 
-\subsection{Preguntas guía}
+Esta clase toma todo lo visto y lo reordena desde la perspectiva de una \textbf{defensa final ante comité}. Eso implica cambiar nuevamente el nivel de análisis:
+
 \begin{itemize}
-\item ¿Cómo aparece síntesis en un sistema real? \item ¿Cómo aparece defensa en un sistema real? \item ¿Cómo aparece errores comunes en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item ya no se trata solo de saber qué es un algoritmo o patrón;
+\item se trata de justificar por qué una arquitectura concreta es razonable;
+\item se trata de responder críticamente bajo preguntas adversariales;
+\item se trata de reconocer límites, no de ocultarlos.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 16 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+\begin{quote}
+Una buena defensa arquitectónica no intenta parecer perfecta. Intenta ser coherente, explícita y técnicamente honesta.
+\end{quote}
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+\section{Qué significa defender un sistema}
 
-\section{Bibliografía guía}
+Defender un sistema no es describir su diagrama ni enumerar herramientas. Tampoco es un ejercicio de venta.
+
+Una defensa sólida debe responder, de manera integrada, estas preguntas:
+
 \begin{itemize}
-\item Relectura de apuntes del curso.
-\item Defensas de proyectos.
-\item Síntesis de decisiones bajo incertidumbre.
+\item ¿qué problema resuelve el sistema?;
+\item ¿qué restricciones del dominio importan?;
+\item ¿qué fallas se asumen como relevantes?;
+\item ¿qué garantías se consideran indispensables?;
+\item ¿qué arquitectura se propone y por qué?;
+\item ¿qué costo se acepta al tomar esa decisión?;
+\item ¿cómo se opera, observa y mejora el sistema?;
+\item ¿qué límites y riesgos permanecen?
 \end{itemize}
+
+\section{La estructura mínima de una defensa}
+
+Una secuencia razonable para una defensa final es la siguiente.
+
+\subsection{1. Problema y contexto}
+
+Debe quedar claro:
+\begin{itemize}
+\item quién usa el sistema;
+\item qué flujo de negocio resuelve;
+\item qué operaciones son críticas;
+\item qué escala, latencia o distribución geográfica se esperan.
+\end{itemize}
+
+Una arquitectura sin problema explícito tiende a ser decorativa.
+
+\subsection{2. Requisitos y restricciones}
+
+Deben distinguirse:
+\begin{itemize}
+\item requisitos funcionales;
+\item requisitos no funcionales;
+\item restricciones organizacionales o operativas;
+\item restricciones regulatorias o de negocio.
+\end{itemize}
+
+\subsection{3. Modelo de falla}
+
+Una defensa madura no parte del supuesto de red perfecta. Debe decir qué fallas considera:
+
+\begin{itemize}
+\item latencia variable;
+\item timeouts;
+\item pérdida;
+\item duplicación;
+\item partición;
+\item crash de nodos;
+\item degradación de dependencias;
+\item errores humanos y operacionales.
+\end{itemize}
+
+\subsection{4. Garantías}
+
+Aquí deben explicitarse las garantías buscadas:
+\begin{itemize}
+\item consistencia fuerte o eventual;
+\item durabilidad;
+\item semántica de entrega;
+\item auditabilidad;
+\item resiliencia;
+\item SLOs.
+\end{itemize}
+
+\subsection{5. Arquitectura propuesta}
+
+No basta con dibujar cajas. Deben justificarse:
+\begin{itemize}
+\item fronteras del sistema;
+\item bounded contexts;
+\item ownership de datos;
+\item modelo de comunicación;
+\item uso de RPC y/o eventos;
+\item mecanismos de coordinación o compensación;
+\item estrategia de almacenamiento y operación.
+\end{itemize}
+
+\subsection{6. Trade-offs aceptados}
+
+Toda propuesta seria debe decir qué costo paga:
+\begin{itemize}
+\item más latencia;
+\item más complejidad operativa;
+\item menor disponibilidad bajo ciertas fallas;
+\item más reconciliación posterior;
+\item mayor costo de infraestructura.
+\end{itemize}
+
+\subsection{7. Límites y trabajo futuro}
+
+Una defensa fuerte reconoce:
+\begin{itemize}
+\item qué parte sigue siendo frágil;
+\item qué hipótesis todavía deberían validarse;
+\item qué decisiones dependen de pruebas adicionales;
+\item qué parte del diseño está conscientemente postergada.
+\end{itemize}
+
+\section{El marco del curso como columna vertebral}
+
+El curso propuso reiteradamente el marco:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Esta es probablemente la forma más compacta y poderosa de estructurar una defensa final.
+
+\subsection{Problema ($P$)}
+Define el dominio y evita arquitecturas sin anclaje.
+
+\subsection{Fallas ($F$)}
+Evita el diseño idealizado y obliga a pensar en sistemas reales.
+
+\subsection{Garantías ($G$)}
+Obliga a distinguir qué propiedades importan realmente.
+
+\subsection{Solución ($S$)}
+Permite presentar la arquitectura como respuesta al problema, no como moda.
+
+\subsection{Trade-offs ($T$)}
+Introduce honestidad técnica y evita promesas incompatibles.
+
+\section{Qué mira un comité serio}
+
+Un comité técnico no suele premiar la propuesta con más componentes o más buzzwords. Valora especialmente:
+
+\begin{itemize}
+\item claridad conceptual;
+\item consistencia interna;
+\item calidad de las prioridades;
+\item explicitación de supuestos;
+\item capacidad de responder objeciones;
+\item honestidad sobre límites.
+\end{itemize}
+
+En cambio, penaliza:
+\begin{itemize}
+\item slogans;
+\item respuestas totalizantes;
+\item promesas incompatibles;
+\item desconocimiento del modelo de falla;
+\item ausencia de operación o de observabilidad;
+\item improvisación evasiva.
+\end{itemize}
+
+\section{Objeciones típicas}
+
+En una defensa final, algunas objeciones aparecen casi inevitablemente.
+
+\subsection{“¿Por qué no un monolito?”}
+
+Esta pregunta obliga a justificar que la complejidad distribuida resuelve un problema real y no una preferencia ideológica.
+
+Una buena respuesta debe hablar de:
+\begin{itemize}
+\item límites del dominio;
+\item autonomía de equipos;
+\item escalado diferencial;
+\item ownership de datos;
+\item costo aceptado al distribuir.
+\end{itemize}
+
+\subsection{“¿Por qué no consistencia fuerte en todo?”}
+
+Esta objeción obliga a mostrar comprensión del costo de:
+\begin{itemize}
+\item coordinación;
+\item latencia;
+\item disponibilidad bajo partición;
+\item complejidad operacional.
+\end{itemize}
+
+\subsection{“¿Qué pasa bajo partición?”}
+
+Es una pregunta central porque revela si la propuesta existe en el mundo real o solo en el camino feliz.
+
+\subsection{“¿Cómo operás esto?”}
+
+Sin respuesta a observabilidad, SLOs, incidentes, ownership y postmortems, la arquitectura queda incompleta.
+
+\section{Cómo responder bien}
+
+Una buena respuesta ante objeciones técnicas tiene una forma reconocible:
+
+\begin{itemize}
+\item reconoce el supuesto relevante;
+\item explica qué se priorizó;
+\item explicita el costo aceptado;
+\item muestra por qué esa elección tiene sentido para el dominio.
+\end{itemize}
+
+Lo que no debe hacerse:
+\begin{itemize}
+\item negar el trade-off;
+\item responder con slogans;
+\item inventar garantías que el sistema no tiene;
+\item ocultar complejidad operacional;
+\item prometer simultáneamente propiedades incompatibles.
+\end{itemize}
+
+\section{Revisión crítica de la propia propuesta}
+
+Una defensa madura puede y debe incluir autocrítica explícita:
+\begin{itemize}
+\item dónde están los puntos frágiles;
+\item qué parte es más costosa;
+\item qué parte dependería de validación empírica;
+\item qué parte podría rediseñarse si cambiara el dominio.
+\end{itemize}
+
+Esto no debilita la propuesta. La fortalece, porque demuestra criterio técnico y ausencia de ingenuidad.
+
+\section{Rúbrica de evaluación}
+
+Una rúbrica razonable para evaluar una defensa final puede incluir:
+
+\subsection{1. Formulación del problema}
+\begin{itemize}
+\item claridad del contexto;
+\item relevancia del dominio;
+\item precisión de requisitos.
+\end{itemize}
+
+\subsection{2. Modelo de falla}
+\begin{itemize}
+\item explicitación de fallas;
+\item realismo de supuestos;
+\item tratamiento de casos adversos.
+\end{itemize}
+
+\subsection{3. Calidad del diseño}
+\begin{itemize}
+\item coherencia de la arquitectura;
+\item adecuación del modelo de comunicación y datos;
+\item consistencia entre objetivos y mecanismos.
+\end{itemize}
+
+\subsection{4. Trade-offs}
+\begin{itemize}
+\item explicitación de costos;
+\item madurez en la priorización;
+\item honestidad sobre límites.
+\end{itemize}
+
+\subsection{5. Operación}
+\begin{itemize}
+\item observabilidad;
+\item resiliencia;
+\item confiabilidad;
+\item incidentes y aprendizaje.
+\end{itemize}
+
+\subsection{6. Defensa oral}
+\begin{itemize}
+\item claridad expositiva;
+\item calidad de respuestas;
+\item manejo de objeciones;
+\item consistencia argumentativa.
+\end{itemize}
+
+\section{Qué distingue una defensa sobresaliente}
+
+Una defensa sobresaliente no es la que promete más. Es la que logra:
+\begin{itemize}
+\item formular un problema con precisión;
+\item proponer una arquitectura coherente;
+\item alinear mecanismos con garantías;
+\item hacer visibles sus límites;
+\item responder preguntas hostiles sin perder rigor.
+\end{itemize}
+
+\section{Conclusión}
+
+El cierre del curso no está en memorizar patrones, sino en alcanzar la capacidad de integrar, argumentar y defender una arquitectura distribuida completa. Ese es, probablemente, el signo más claro de madurez conceptual en el área.
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Saber sistemas distribuidos significa poder convertir complejidad en una propuesta coherente y defendible bajo preguntas difíciles.
 \end{uakeybox}
+
 \end{document}

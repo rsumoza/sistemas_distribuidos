@@ -1,24 +1,138 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{08}
-\UASetClassTitle{Particionado y escalabilidad}
-\title{Clase 08 --- Particionado y escalabilidad}
+\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 08 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 08.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Particionado y escalabilidad''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Responder justificando siempre desde el punto de vista del sistema. No alcanza con repetir “CAP” o “PACELC” como etiquetas. Se espera análisis de diseño.
+
+\section{Nivel 1: CAP y PACELC}
+
+\begin{uaexercise}
+Explique con precisión qué significa CAP y por qué la interpretación “elegir dos de tres” es incompleta o engañosa.
+\end{uaexercise}
+
+\begin{uaexercise}
+Defina qué significa consistencia en CAP y por qué no debe entenderse como una noción vaga de “datos correctos”.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué significa disponibilidad en CAP y dé un ejemplo de sistema que, ante partición, decida sacrificarla.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo concreto de partición de red y explique qué decisión debe tomar un sistema que prioriza consistencia.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué PACELC es una mejora conceptual respecto de CAP.
+\end{uaexercise}
+
+\begin{uaexercise}
+Dé un ejemplo donde no haya partición, pero igual exista un trade-off entre consistencia y latencia.
+\end{uaexercise}
+
+\section{Nivel 2: Dynamo}
+
+\begin{uaexercise}
+Describa la motivación arquitectónica de Dynamo. ¿Qué tipo de aplicaciones justifican este diseño?
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique el significado de los parámetros $N$, $R$ y $W$.
+\end{uaexercise}
+
+\begin{uaexercise}
+Demuestre informalmente por qué la condición $R+W>N$ garantiza intersección de quórums.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde, aun con $R+W>N$, un cliente pueda observar un estado atrasado.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué problema resuelven los vector clocks en Dynamo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa sloppy quorum y hinted handoff. ¿Qué ganan y qué complican?
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué rol juega anti-entropy en Dynamo.
+\end{uaexercise}
+
+\section{Nivel 3: Spanner}
+
+\begin{uaexercise}
+Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué es TrueTime y por qué devuelve un intervalo en lugar de un instante exacto.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa la idea de commit wait y explique su costo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué significa external consistency y por qué es más fuerte que eventual consistency.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué Spanner sacrifica latencia incluso en ausencia de partición.
+\end{uaexercise}
+
+\section{Nivel 4: comparación y diseño}
+
+\begin{uaexercise}
+Compare Dynamo y Spanner en términos de:
+\begin{itemize}
+\item modelo de consistencia
+\item latencia
+\item particiones
+\item conflictos
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Indique para qué tipo de aplicación elegiría Dynamo y para cuál elegiría Spanner.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una base global para una red social y justifique si la orientaría más cerca de Dynamo o más cerca de Spanner.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una base global para una plataforma financiera y justifique su elección.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo CAP, PACELC y el modelo $D=(P,F,G,S,T)$ se complementan entre sí.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde la disponibilidad extrema resulte peor para el negocio que una indisponibilidad temporal.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde una pequeña inconsistencia temporal sea preferible a una alta latencia global.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la pregunta correcta no es “qué sistema es mejor”, sino “qué error es más costoso en este dominio”.
+\end{uaexercise}
 
 \end{document}

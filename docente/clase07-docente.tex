@@ -1,51 +1,198 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{07}
-\UASetClassTitle{Consenso y Raft}
-\title{Clase 07 --- Consenso y Raft}
+\UASetClassTitle{Logs distribuidos y streaming}
+\UASetDocKind{Guía docente}
+
+\title{Clase 07 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Comprender cuándo se necesita consenso fuerte y cómo Raft organiza liderazgo, log y mayoría. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es que el estudiante cambie de modelo mental: deje de pensar el sistema como un conjunto de servicios que “se llaman entre sí” y empiece a entenderlo como un sistema donde el \textbf{log} organiza la historia del cambio.
+
+La clase debe dejar instalada esta idea:
+
+\begin{center}
+\textbf{El log es la fuente de verdad; el estado es una proyección.}
+\end{center}
+
+Esto es clave porque prepara el terreno para arquitecturas event-driven, sistemas de streaming y análisis de consistencia en plataformas modernas.
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar la clase, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item definir commit log y explicar su rol sistémico;
+\item describir correctamente topics, particiones, brokers y offsets;
+\item explicar por qué el orden es local a la partición;
+\item distinguir at-most-once, at-least-once y exactly-once;
+\item explicar por qué exactly-once no es una “propiedad mágica” del broker;
+\item diseñar un pipeline simple de streaming con criterios explícitos de semántica.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 07 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para una clase de 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): motivación y commit log}
+Arrancar con una pregunta fuerte:
+
+\begin{quote}
+¿Qué pasa si, en vez de pensar en estado, pensamos en historia?
+\end{quote}
+
+Explicar el commit log como secuencia ordenada e inmutable de eventos. Conviene contrastarlo con una base tradicional orientada al estado actual.
+
+\paragraph{Objetivo didáctico}
+Mostrar que el log no es un detalle de implementación, sino una abstracción central.
+
+\subsection*{Bloque 2 (20 min): arquitectura de Kafka}
+Introducir:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item topics;
+\item particiones;
+\item brokers;
+\item producers;
+\item consumers;
+\item consumer groups.
 \end{itemize}
+
+Hacer especial énfasis en:
+\begin{quote}
+el orden es por partición, no global
+\end{quote}
+
+\paragraph{Objetivo didáctico}
+Corregir la intuición espontánea de que “Kafka ordena todo”.
+
+\subsection*{Bloque 3 (20 min): offsets y semánticas de entrega}
+Mostrar que el offset es una decisión de consistencia, no solo un contador.
+
+Construir dos timelines en pizarra:
+\begin{itemize}
+\item commit antes de procesar ⇒ pérdida;
+\item commit después de procesar ⇒ duplicación.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el estudiante vea que las semánticas no son slogans, sino consecuencias directas del lugar donde se confirma progreso.
+
+\subsection*{Bloque 4 (20 min): exactly-once}
+Explicar por qué exactly-once es difícil.
+
+Insistir en que requiere combinación de:
+\begin{itemize}
+\item idempotencia;
+\item coordinación;
+\item persistencia conjunta de offsets y efectos.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Romper la intuición de que “Kafka ya resuelve eso automáticamente”.
+
+\subsection*{Bloque 5 (15 min): streaming stateful}
+Dar ejemplos de:
+\begin{itemize}
+\item agregación por ventana;
+\item joins;
+\item estado derivado del log.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Conectar el log con aplicaciones reales y mostrar que el estado no desaparece: se vuelve una vista mantenida sobre un flujo.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Commit log}
+Debe explicarse porque es la idea estructural de la clase y conecta con recuperación, auditoría y replay.
+
+\subsection*{2. Particiones}
+Debe explicarse porque ahí aparece el verdadero trade-off entre orden y escalabilidad.
+
+\subsection*{3. Offsets}
+Debe explicarse porque es donde se materializa la decisión entre pérdida y duplicación.
+
+\subsection*{4. Exactly-once}
+Debe explicarse porque es uno de los conceptos más malentendidos en la práctica profesional.
+
+\subsection*{5. Streaming stateful}
+Debe explicarse porque muestra que los sistemas modernos no “consumen mensajes” solamente: computan sobre historia.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué gana el sistema al conservar historia en vez de solo estado actual?
+\item ¿Qué se pierde cuando se particiona un topic?
+\item ¿Dónde exactamente aparece la duplicación?
+\item ¿Quién garantiza really exactly-once: el broker, la aplicación o ambos?
+\item ¿Qué pasa con el estado si el consumidor falla en medio de una agregación?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que existe orden global entre particiones;
+\item pensar que el offset “es un detalle técnico menor”;
+\item asumir que at-least-once es siempre suficiente;
+\item creer que exactly-once significa “nunca puede pasar nada raro”;
+\item no distinguir claramente entre persistencia del mensaje y persistencia del efecto.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Simular en pizarra o con alumnos actuando roles:
+
+\begin{itemize}
+\item productor envía mensajes;
+\item consumidor procesa;
+\item se decide cuándo confirmar offset;
+\item ocurre una falla en un punto preciso;
+\item se analiza si hubo pérdida o duplicación.
+\end{itemize}
+
+\paragraph{Objetivo}
+Mostrar que la semántica de entrega no se memoriza: se deduce del protocolo.
+
+\section{Momento crítico de la clase}
+
+El momento clave aparece cuando el estudiante comprende que:
+
+\begin{center}
+\textbf{exactly-once no es una propiedad automática del middleware, sino del diseño completo del sistema}
+\end{center}
+
+Ese punto debe enfatizarse. Si no se consolida, el alumno sale con una idea peligrosa y superficial.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item explicar qué es un log distribuido sin reducirlo a “cola de mensajes”;
+\item justificar por qué el orden es local a la partición;
+\item construir un escenario de pérdida y otro de duplicación;
+\item explicar exactamente qué hace falta para aproximar exactly-once;
+\item diseñar un pipeline pequeño con semántica explícita.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase prepara la discusión sobre consistencia en sistemas reales, porque muestra que:
+
+\begin{itemize}
+\item el orden puede ser local y no global;
+\item la historia puede ser la abstracción central;
+\item la consistencia depende de cómo se derivan y materializan vistas desde el log.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente para la clase siguiente: si el log permite desacoplar y reproducir historia, ¿qué tipo de consistencia real puede ofrecer un sistema distribuido grande bajo particiones, latencia y geo-replicación?
+\end{uakeybox}
+
 \end{document}

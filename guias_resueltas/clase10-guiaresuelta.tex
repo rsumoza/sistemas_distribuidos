@@ -1,32 +1,247 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{10}
-\UASetClassTitle{Transacciones distribuidas}
-\title{Clase 10 --- Transacciones distribuidas}
+\UASetClassTitle{Observabilidad distribuida}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 10 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 10.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Transacciones distribuidas''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Transacciones distribuidas'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta debe leerse como un modelo de razonamiento operativo. El objetivo no es memorizar herramientas, sino aprender a reconstruir causalidad y degradación en un sistema distribuido.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
+\end{uaexercise}
+
+\begin{uaanswer}
+La observabilidad distribuida es la capacidad de inferir el estado interno de un sistema distribuido a partir de sus salidas: logs, métricas y trazas. Se diferencia del monitoreo básico en que no se limita a verificar si algo “está arriba o abajo”, sino que busca hacer inteligible la dinámica interna del sistema, especialmente bajo fallas parciales y ejecuciones complejas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare logs, métricas y trazas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Los logs responden principalmente “qué pasó” en eventos discretos.  
+Las métricas responden “cómo está funcionando el sistema en agregado”.  
+Las trazas responden “cómo recorrió esta request el sistema”.
+
+Ninguna de las tres herramientas reemplaza completamente a las otras:
+\begin{itemize}
+\item métricas muestran patrón agregado;
+\item logs muestran eventos concretos;
+\item trazas reconstruyen causalidad por request.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué logs estructurados son preferibles.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque permiten:
+\begin{itemize}
+\item búsqueda consistente;
+\item filtrado por campos;
+\item agregación automática;
+\item correlación con métricas y trazas.
+\end{itemize}
+
+Un log de texto libre puede ser legible para humanos, pero escala mal para sistemas distribuidos donde se necesitan consultas automáticas por request\_id, servicio, error\_code o latencia.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un esquema mínimo de campos para logs.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un esquema mínimo razonable incluye:
+\begin{itemize}
+\item timestamp;
+\item service\_name;
+\item level;
+\item request\_id;
+\item trace\_id;
+\item endpoint;
+\item status\_code;
+\item latency\_ms;
+\item error\_code;
+\item message.
+\end{itemize}
+
+La lógica es simple: sin contexto, el log local no puede integrarse en una narrativa distribuida.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué problema resuelve un correlation ID.
+\end{uaexercise}
+
+\begin{uaanswer}
+Resuelve el problema de unir eventos dispersos de una misma request. En un sistema distribuido, la ejecución se fragmenta entre servicios. El correlation ID permite reconstruir el recorrido lógico de esa request a través de logs y trazas. Sin él, cada servicio cuenta solo una historia local incompleta.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique las Golden Signals.
+\end{uaexercise}
+
+\begin{uaanswer}
+Las Golden Signals son una guía operativa para mirar:
+\begin{itemize}
+\item latency;
+\item traffic;
+\item errors;
+\item saturation.
+\end{itemize}
+
+Son útiles porque condensan cuatro dimensiones básicas de salud operativa:
+\begin{itemize}
+\item qué tan rápido responde;
+\item cuánto trabajo está entrando;
+\item cuántas solicitudes fallan;
+\item cuán cerca está el sistema del agotamiento de recursos.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué mirar promedios puede ocultar problemas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los promedios suavizan colas largas. Un sistema puede tener latencia media aceptable y, sin embargo, sufrir colas extremas en p95 o p99 que afecten seriamente a una fracción importante de usuarios. En sistemas distribuidos, esas colas largas suelen ser exactamente donde aparecen timeouts y cascadas de retries.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina trace y span.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una trace representa el recorrido completo de una request distribuida. Un span representa una unidad individual de trabajo dentro de esa trace. Por ejemplo:
+\begin{itemize}
+\item trace: checkout completo;
+\item spans: API, autenticación, validación de stock, cobro, persistencia.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué aporta el tracing.
+\end{uaexercise}
+
+\begin{uaanswer}
+El tracing aporta estructura causal. Permite ver:
+\begin{itemize}
+\item qué dependencias se invocaron;
+\item dónde se acumuló la latencia;
+\item qué paso falló;
+\item cuál fue la secuencia exacta de spans.
+\end{itemize}
+
+Esto no se obtiene fácilmente con logs o métricas agregadas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una traza para API, Auth, Orders y Payments.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una traza razonable sería:
+
+\begin{itemize}
+\item span raíz: API /checkout
+\item hijo 1: Auth /validate-token
+\item hijo 2: Orders /create-order
+\item hijo 3: Payments /authorize
+\end{itemize}
+
+Cada span debería registrar:
+\begin{itemize}
+\item tiempo de inicio y fin;
+\item status;
+\item etiquetas relevantes (user\_id, order\_id, payment\_id);
+\item relación padre-hijo.
+\end{itemize}
+
+La ventaja es que puede verse inmediatamente si el cuello de botella estuvo en Auth, Orders o Payments.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un escenario de cascada de fallas iniciada en DB lenta.
+\end{uaexercise}
+
+\begin{uaanswer}
+Escenario:
+
+\begin{enumerate}
+\item la DB aumenta latencia;
+\item el servicio Orders empieza a esperar más;
+\item el servicio API recibe respuestas tardías;
+\item se activan retries en clientes o servicios intermedios;
+\item los retries agregan más carga;
+\item la DB se satura aún más;
+\item aparecen errores 500 o timeouts en el borde.
+\end{enumerate}
+
+El síntoma visible puede ser “la API cae”, pero la causa raíz está en una dependencia más profunda.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una estrategia para diagnosticar 500s en una API distribuida.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una estrategia razonable es:
+
+\begin{enumerate}
+\item observar si la tasa de errores subió súbitamente o gradualmente;
+\item identificar endpoints afectados;
+\item revisar p95/p99 de latencia;
+\item usar trazas para aislar qué dependencia concentra la degradación;
+\item correlacionar logs por request\_id o trace\_id;
+\item verificar si hubo cambios recientes de despliegue o saturación de recursos.
+\end{enumerate}
+
+La clave es no tratar el 500 como explicación, sino como síntoma de una cadena causal.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique $D=(P,F,G,S,T)$ al problema de observabilidad.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible es:
+
+\begin{itemize}
+\item $P$: entender y diagnosticar fallas en un sistema distribuido;
+\item $F$: fallas parciales, latencia variable, retry storms, cascadas;
+\item $G$: reconstrucción de causalidad y localización razonable del problema;
+\item $S$: logs estructurados + métricas + tracing + propagación de contexto;
+\item $T$: sobrecarga, mayor complejidad de instrumentación y costo de almacenamiento/consulta.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la observabilidad debe ser diseño y no parche.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque instrumentar tarde suele implicar:
+\begin{itemize}
+\item logs sin estructura;
+\item falta de trace\_id propagado;
+\item métricas insuficientes;
+\item ausencia de puntos de medición donde realmente importa.
+\end{itemize}
+
+Cuando el sistema ya está en producción, agregar observabilidad de forma improvisada suele ser costoso y parcial. Diseñarla desde el inicio permite que el sistema sea explicable cuando más lo necesita: durante la falla.
+\end{uaanswer}
 
 \end{document}

@@ -1,51 +1,183 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{10}
-\UASetClassTitle{Transacciones distribuidas}
-\title{Clase 10 --- Transacciones distribuidas}
+\UASetClassTitle{Observabilidad distribuida}
+\UASetDocKind{Guía docente}
+
+\title{Clase 10 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Analizar coordinación entre múltiples servicios mediante 2PC, sagas y compensaciones. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es que el estudiante comprenda que el problema de un sistema distribuido no termina cuando el sistema “funciona”. También debe poder \emph{ser entendido} cuando degrada o falla.
+
+La clase debe instalar esta idea:
+
+\begin{center}
+\textbf{la observabilidad distribuida es la condición de posibilidad de la operación seria}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item distinguir logs, métricas y trazas sin confundir sus roles;
+\item justificar por qué el contexto distribuido debe propagarse;
+\item explicar una estrategia razonable de debugging distribuido;
+\item diseñar instrumentación mínima para un sistema real.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 10 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): el problema operacional}
+Abrir con una pregunta:
+\begin{quote}
+¿Cómo depurás una request que pasó por cinco servicios y falló intermitentemente?
+\end{quote}
+
+Esto obliga a reconocer la insuficiencia del debugging local clásico.
+
+\paragraph{Objetivo didáctico}
+Mostrar que el problema ya no es solo programar, sino reconstruir causalidad distribuida.
+
+\subsection*{Bloque 2 (20 min): logs}
+Presentar logs estructurados y comparar con texto libre.
+
+Insistir en:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item request\_id;
+\item trace\_id;
+\item campos estructurados;
+\item contexto mínimo indispensable.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea que “tener logs” no alcanza: tienen que ser diseñados.
+
+\subsection*{Bloque 3 (15 min): métricas}
+Introducir Golden Signals y diferenciar promedio vs percentiles.
+
+\paragraph{Objetivo didáctico}
+Que el alumno entienda por qué una media “aceptable” puede ocultar un sistema roto para una fracción importante de requests.
+
+\subsection*{Bloque 4 (20 min): tracing}
+Explicar trace y span, y mostrar una request distribuida simple.
+
+\paragraph{Objetivo didáctico}
+Que el estudiante comprenda que el tracing organiza causalidad por request, no solo eventos aislados.
+
+\subsection*{Bloque 5 (20 min): debugging distribuido}
+Trabajar una cascada de fallas:
+
+\begin{itemize}
+\item dependencia lenta;
+\item retries;
+\item saturación;
+\item error visible en borde.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Mostrar que la causa raíz rara vez coincide con el lugar donde explota el síntoma visible.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Observabilidad}
+Porque pone el problema en términos de comprensión del sistema, no solo de recolección de señales.
+
+\subsection*{2. Logs}
+Porque son la base de toda narrativa causal y de auditoría local.
+
+\subsection*{3. Métricas}
+Porque permiten detectar degradación agregada y guiar el diagnóstico.
+
+\subsection*{4. Trazas}
+Porque permiten reconstruir recorrido y dependencia de una request individual.
+
+\subsection*{5. Debugging}
+Porque une todos los elementos en una práctica operativa real.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué sabe cada herramienta que las otras no saben?
+\item ¿Qué pasa si una request no lleva trace\_id?
+\item ¿Cómo descubrís la diferencia entre síntoma y causa raíz?
+\item ¿Qué métrica mirarías primero si el sistema “anda lento”?
+\item ¿Cómo cambia el problema en una arquitectura event-driven?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que observabilidad equivale a dashboards;
+\item pensar que logs libres son suficientes;
+\item no distinguir métricas agregadas de trazas individuales;
+\item asumir que el error visible coincide con la causa;
+\item olvidar que los retries también son parte de la dinámica observable.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Tomar un ejemplo de checkout distribuido y simular:
+
+\begin{itemize}
+\item request entra por API;
+\item Auth responde lento;
+\item Payments se reintenta;
+\item aparece timeout en frontend.
+\end{itemize}
+
+Preguntar al curso:
+\begin{itemize}
+\item qué mostrarían las métricas;
+\item qué mostrarían los logs;
+\item qué mostraría la traza;
+\item cuál parece ser la causa raíz.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el estudiante vea cómo cada capa de observabilidad aporta información distinta.
+
+\section{Momento crítico de la clase}
+
+El momento importante ocurre cuando el estudiante entiende que:
+
+\begin{center}
+\textbf{sin contexto propagado, el sistema distribuido pierde su inteligibilidad}
+\end{center}
+
+Ese punto debe remarcarse explícitamente.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item diseñar logs estructurados mínimos para un servicio;
+\item proponer métricas relevantes para una API distribuida;
+\item dibujar una traza simple correctamente;
+\item plantear una estrategia razonable de debugging en producción.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase deja planteada una pregunta natural:
+
+\begin{quote}
+Si ya sabemos observar un sistema distribuido, ¿cómo diseñamos para que resista fallas, se degrade con gracia y no colapse en cascada?
+\end{quote}
+
+Eso abre la puerta a resiliencia, fault tolerance y patrones de estabilidad operacional.
+
+\begin{uakeybox}
+Pregunta puente: observar es necesario, pero no suficiente. ¿Qué patrones hacen que un sistema no solo sea entendible, sino también robusto bajo presión?
+\end{uakeybox}
+
 \end{document}

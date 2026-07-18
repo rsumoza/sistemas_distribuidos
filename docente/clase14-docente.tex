@@ -1,51 +1,175 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{14}
-\UASetClassTitle{System Design}
-\title{Clase 14 --- System Design}
+\UASetClassTitle{Incidentes y cultura de confiabilidad}
+\UASetDocKind{Guía docente}
+
+\title{Clase 14 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Integrar todo el curso en diseño de sistemas reales con restricciones, fallas y trade-offs explícitos. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es que el estudiante comprenda que la confiabilidad no se juega solo en arquitectura, observabilidad o resiliencia, sino también en la capacidad organizacional de responder y aprender de incidentes.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{la confiabilidad madura es una propiedad conjunta del sistema y de la organización que aprende de él}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item definir incidente desde una perspectiva operativa;
+\item describir una gestión razonable de incidentes;
+\item explicar qué es un buen postmortem;
+\item justificar por qué blameless no equivale a “nadie responde por nada”;
+\item distinguir fix local de aprendizaje organizacional.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 14 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): normalizar el incidente}
+Abrir con una pregunta:
+\begin{quote}
+¿Qué revela un incidente: un error aislado o una propiedad del sistema y la organización?
+\end{quote}
+
+La discusión inicial debería llevar a abandonar la idea de que el incidente es solo una vergüenza técnica.
+
+\paragraph{Objetivo didáctico}
+Mover la conversación desde culpa puntual hacia aprendizaje sistémico.
+
+\subsection*{Bloque 2 (20 min): gestión de incidentes}
+Explicar fases:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item detección;
+\item clasificación;
+\item respuesta;
+\item mitigación;
+\item recuperación;
+\item análisis posterior.
 \end{itemize}
+
+Introducir roles de coordinación.
+
+\paragraph{Objetivo didáctico}
+Mostrar que la respuesta al incidente también es una arquitectura organizacional.
+
+\subsection*{Bloque 3 (20 min): postmortems}
+Trabajar qué debe contener un buen postmortem y por qué el timeline es central.
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea el postmortem como mecanismo de aprendizaje, no como burocracia retrospectiva.
+
+\subsection*{Bloque 4 (15 min): blameless y causalidad}
+Explicar por qué “culpa humana” como explicación final empobrece el análisis.
+
+\paragraph{Objetivo didáctico}
+Instalar una visión sistémica de causalidad distribuida y organizacional.
+
+\subsection*{Bloque 5 (20 min): acciones y cultura}
+Discutir qué acciones realmente cambian capacidad futura y cuáles son superficiales.
+
+\paragraph{Objetivo didáctico}
+Conectar postmortems con mejora real de arquitectura, observabilidad, procesos y cultura.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Incidentes}
+Porque es la unidad concreta donde se prueba la madurez operativa del equipo.
+
+\subsection*{2. Gestión de incidentes}
+Porque sin buena gestión, incluso sistemas razonables pueden degradarse muy mal.
+
+\subsection*{3. Postmortems}
+Porque son el principal mecanismo de aprendizaje explícito posterior al incidente.
+
+\subsection*{4. Blameless}
+Porque corrige una desviación cultural muy común y muy destructiva.
+
+\subsection*{5. Aprendizaje organizacional}
+Porque la clase debe mostrar que confiabilidad también es una capacidad colectiva.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué parte del incidente fue técnica y qué parte fue organizacional?
+\item ¿Qué señal faltó para detectar antes?
+\item ¿Qué decisión de mitigación funcionó realmente?
+\item ¿Qué habría cambiado si el equipo hubiera tenido mejor runbook?
+\item ¿Qué parte del incidente podría repetirse mañana si no cambia nada?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que postmortem = encontrar culpable;
+\item pensar que “blameless” significa ausencia de exigencia;
+\item reducir el incidente al bug más visible;
+\item proponer acciones vagas sin owner;
+\item subestimar el valor del timeline.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Proponer un incidente ficticio:
+\begin{itemize}
+\item alta latencia en DB;
+\item retries en cascada;
+\item API cae;
+\item alertas tardías;
+\item mitigación parcial tras 25 minutos.
+\end{itemize}
+
+Pedir al curso que reconstruya:
+\begin{itemize}
+\item impacto;
+\item timeline;
+\item factores contribuyentes;
+\item acciones inmediatas;
+\item acciones de mejora.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el alumno practique el pasaje desde síntoma visible hacia aprendizaje estructurado.
+
+\section{Momento crítico de la clase}
+
+El punto más importante ocurre cuando el estudiante entiende que:
+
+\begin{center}
+\textbf{el valor real del incidente no está solo en restaurar servicio, sino en transformar la experiencia en capacidad organizacional futura}
+\end{center}
+
+Ese punto debe enfatizarse explícitamente.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item explicar qué distingue un buen postmortem de uno superficial;
+\item construir una cadena causal razonable;
+\item proponer acciones correctivas útiles y verificables;
+\item justificar el rol de una cultura blameless madura;
+\item conectar incidentes con confiabilidad y aprendizaje organizacional.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase deja una transición natural hacia el cierre del curso, donde puede discutirse cómo todos los temas se integran en el diseño y defensa de un sistema distribuido completo.
+
+\begin{uakeybox}
+Pregunta puente: si ya entendemos mecanismos, arquitectura, observabilidad, resiliencia, objetivos e incidentes, ¿cómo defendemos integralmente un sistema distribuido ante un jurado técnico o comité de diseño?
+\end{uakeybox}
+
 \end{document}

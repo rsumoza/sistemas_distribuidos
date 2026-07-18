@@ -1,32 +1,549 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{07}
-\UASetClassTitle{Consenso y Raft}
-\title{Clase 07 --- Consenso y Raft}
+\UASetClassTitle{Logs distribuidos y streaming}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 07 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 07.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Consenso y Raft''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Consenso y Raft'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Las respuestas de esta guía no deben leerse como recetas únicas, sino como \textbf{modelos de razonamiento}. En particular, en esta clase interesa que el estudiante aprenda a distinguir entre:
+
+\begin{itemize}
+\item orden local vs orden global;
+\item persistencia vs procesamiento;
+\item semántica del broker vs semántica de la aplicación;
+\item exactamente una vez física vs exactamente una vez lógica.
+\end{itemize}
+
+Cuando corresponda, conviene analizar cada escenario con:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+donde:
+\begin{itemize}
+\item $P$ = problema;
+\item $F$ = fallas asumidas;
+\item $G$ = garantía requerida;
+\item $S$ = solución elegida;
+\item $T$ = trade-off aceptado.
+\end{itemize}
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Defina commit log y explique por qué es append-only.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un commit log es una secuencia ordenada e inmutable de eventos o registros, donde cada nuevo evento se agrega al final. Su propiedad \emph{append-only} significa que el sistema no modifica registros antiguos para reflejar nuevas operaciones, sino que registra nuevos eventos que representan lo ocurrido.
+
+Esta propiedad es fundamental por varias razones:
+
+\begin{itemize}
+\item preserva historia: permite reconstruir cómo se llegó al estado actual;
+\item simplifica recovery: el sistema puede reejecutar eventos;
+\item favorece escritura secuencial: mucho más eficiente en disco que la escritura aleatoria;
+\item evita parte de la complejidad de sincronización asociada a updates in-place.
+\end{itemize}
+
+Desde una perspectiva conceptual, el append-only separa claramente \emph{hecho} de \emph{interpretación}: el log conserva hechos; las vistas derivadas construyen estado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué representa un offset y por qué es crítico para la recuperación.
+\end{uaexercise}
+
+\begin{uaanswer}
+El offset es la posición lógica de un evento dentro de una partición del log. No representa semántica de negocio; representa ubicación ordenada.
+
+Es crítico para la recuperación porque permite al consumidor responder a la pregunta:
+
+\begin{quote}
+¿Hasta qué punto del log procesé correctamente?
+\end{quote}
+
+Si un consumidor falla, puede reiniciarse desde el último offset confirmado. Por eso el offset cumple dos funciones:
+
+\begin{itemize}
+\item marca progreso;
+\item define punto de reanudación.
+\end{itemize}
+
+Sin offsets explícitos, el sistema no puede saber con precisión qué mensajes ya fueron procesados y cuáles deben releerse, lo cual destruye la base de cualquier semántica razonable de entrega.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa cómo un sistema puede reconstruir estado a partir del log.
+\end{uaexercise}
+
+\begin{uaanswer}
+Si el estado del sistema se entiende como una función del log, entonces reconstruir estado consiste en reaplicar, en orden, los eventos almacenados:
+
+\[
+State_n = f(e_0, e_1, \dots, e_n)
+\]
+
+Ejemplo: si el log contiene eventos de cuenta bancaria como:
+
+\begin{itemize}
+\item depósito +100
+\item extracción -30
+\item depósito +20
+\end{itemize}
+
+entonces el saldo final puede reconstruirse aplicando esas operaciones en orden.
+
+En sistemas reales, la reconstrucción total puede ser costosa. Por eso suelen usarse:
+\begin{itemize}
+\item snapshots periódicos;
+\item checkpoints;
+\item materialized views.
+\end{itemize}
+
+Aun así, la idea clave permanece: el log es la historia autoritativa y el estado es una proyección.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique diferencias entre log y base de datos tradicional.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una base de datos tradicional suele exponer el estado actual como abstracción primaria. El log, en cambio, expone la historia de cambios.
+
+En una base clásica:
+\begin{itemize}
+\item se consulta el valor actual;
+\item las actualizaciones suelen sobrescribir estado;
+\item la historia puede quedar implícita o perderse.
+\end{itemize}
+
+En un log:
+\begin{itemize}
+\item se consulta una secuencia de eventos;
+\item las actualizaciones se expresan como nuevos registros;
+\item la historia se preserva explícitamente.
+\end{itemize}
+
+Esto no significa que log y base sean excluyentes. En la práctica, muchos sistemas usan un log como fuente de verdad y bases o vistas materializadas para consultas rápidas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa arquitectura completa de Kafka.
+\end{uaexercise}
+
+\begin{uaanswer}
+Kafka se organiza alrededor de estos conceptos:
+
+\begin{itemize}
+\item \textbf{Topic}: categoría lógica de mensajes.
+\item \textbf{Partition}: sublog ordenado dentro del topic.
+\item \textbf{Broker}: nodo del cluster que almacena particiones.
+\item \textbf{Producer}: proceso que publica mensajes.
+\item \textbf{Consumer}: proceso que los lee.
+\item \textbf{Consumer Group}: conjunto de consumidores que cooperan para repartirse particiones.
+\item \textbf{Leader/Follower}: cada partición tiene una réplica líder y réplicas seguidoras.
+\end{itemize}
+
+La arquitectura permite:
+\begin{itemize}
+\item paralelismo mediante particiones;
+\item tolerancia a fallas mediante replicación;
+\item desacoplamiento entre productores y consumidores.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo funcionan las particiones.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una partición es un log ordenado independiente. Un topic puede dividirse en varias particiones para:
+\begin{itemize}
+\item aumentar throughput;
+\item repartir carga;
+\item permitir procesamiento paralelo.
+\end{itemize}
+
+Cada partición tiene:
+\begin{itemize}
+\item su propia secuencia de offsets;
+\item su propio orden total interno;
+\item su propio líder y seguidores.
+\end{itemize}
+
+La consecuencia más importante es esta:
+
+\begin{uakeybox}
+Kafka garantiza orden dentro de una partición, no entre particiones.
+\end{uakeybox}
+
+Por eso, si el dominio requiere orden estricto para cierta clave, esa clave debe ser enviada consistentemente a la misma partición.
+\end{uaanswer}
+
+\begin{uaexercise}
+¿Por qué Kafka no garantiza orden global?
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque las particiones son logs independientes. Si dos mensajes van a particiones distintas, no existe una única secuencia total compartida por ambas.
+
+Incluso si ambos mensajes se producen “casi al mismo tiempo”, su relación de orden global no está fijada por Kafka. Solo existe:
+\begin{itemize}
+\item orden total dentro de cada partición;
+\item orden parcial a nivel del topic.
+\end{itemize}
+
+Esto es una decisión de diseño: sacrificar orden global para ganar escalabilidad y paralelismo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un esquema de particionado para balancear carga.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una estrategia habitual es particionar por hash de una clave:
+
+\[
+partition = hash(key) \bmod N
+\]
+
+Esto distribuye mensajes entre particiones de manera aproximadamente uniforme si las claves no están sesgadas.
+
+La ventaja es doble:
+\begin{itemize}
+\item balancea carga;
+\item preserva orden por clave.
+\end{itemize}
+
+El riesgo aparece si la clave tiene distribución muy sesgada, porque puede generar \emph{hot partitions}. Por eso, el diseño correcto depende del dominio y del patrón de acceso.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo un consumidor maneja offsets.
+\end{uaexercise}
+
+\begin{uaanswer}
+El consumidor lee mensajes de una partición y mantiene un puntero lógico: el offset consumido/confirmado.
+
+Proceso típico:
+\begin{enumerate}
+\item leer mensaje en offset $k$;
+\item procesarlo;
+\item decidir cuándo confirmar que el progreso llegó hasta $k$ o $k+1$.
+\end{enumerate}
+
+El momento de commit del offset define la semántica de entrega:
+\begin{itemize}
+\item commit antes de procesar $\Rightarrow$ riesgo de pérdida;
+\item commit después de procesar $\Rightarrow$ riesgo de duplicación.
+\end{itemize}
+
+Por eso el offset no es un detalle de implementación: es parte central del contrato semántico del sistema.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya escenario donde offset causa pérdida.
+\end{uaexercise}
+
+\begin{uaanswer}
+Escenario:
+
+\begin{enumerate}
+\item el consumidor lee mensaje $m$ en offset 42;
+\item confirma el offset 43 antes de procesar;
+\item el consumidor falla antes de ejecutar la lógica de negocio;
+\item al reiniciar, comienza desde offset 43.
+\end{enumerate}
+
+Resultado:
+\begin{itemize}
+\item el mensaje $m$ no se procesa nunca;
+\item el sistema cree que ya fue consumido.
+\end{itemize}
+
+Esto es semántica \emph{at-most-once}: no duplica, pero puede perder.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya escenario donde offset causa duplicación.
+\end{uaexercise}
+
+\begin{uaanswer}
+Escenario:
+
+\begin{enumerate}
+\item el consumidor lee mensaje $m$ en offset 42;
+\item procesa la lógica de negocio;
+\item falla antes de confirmar el offset 43;
+\item al reiniciar, vuelve a leer el offset 42.
+\end{enumerate}
+
+Resultado:
+\begin{itemize}
+\item el efecto de negocio puede ejecutarse dos veces;
+\item el mensaje se duplica lógicamente.
+\end{itemize}
+
+Esto corresponde a semántica \emph{at-least-once}: no pierde, pero puede duplicar.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo evitar ambos problemas.
+\end{uaexercise}
+
+\begin{uaanswer}
+No existe una solución trivial que elimine simultáneamente pérdida y duplicación sin costo. Para aproximar \emph{exactly-once} se combinan:
+
+\begin{itemize}
+\item procesamiento idempotente;
+\item commit coordinado entre resultado y offset;
+\item transacciones o mecanismos equivalentes;
+\item deduplicación por clave de operación.
+\end{itemize}
+
+La idea central es convertir múltiples intentos físicos en una sola operación lógica.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare at-most-once, at-least-once y exactly-once con ejemplos concretos.
+\end{uaexercise}
+
+\begin{uaanswer}
+\textbf{At-most-once}:  
+Se confirma progreso antes del procesamiento. Ejemplo: analítica donde perder algunos eventos es tolerable.
+
+\textbf{At-least-once}:  
+Se confirma después del procesamiento. Ejemplo: notificaciones donde es preferible duplicar antes que perder.
+
+\textbf{Exactly-once}:  
+Se asegura que el efecto lógico ocurra una sola vez. Ejemplo: cobro de un pago o actualización crítica de inventario.
+
+El punto importante es que cada semántica responde a un trade-off distinto entre seguridad y completitud.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un pipeline at-least-once.
+\end{uaexercise}
+
+\begin{uaanswer}
+Diseño:
+
+\begin{enumerate}
+\item productor publica evento;
+\item consumidor lee evento;
+\item ejecuta lógica de negocio;
+\item recién después confirma offset.
+\end{enumerate}
+
+Ventaja:
+\begin{itemize}
+\item si falla antes del commit del offset, el mensaje se relee.
+\end{itemize}
+
+Costo:
+\begin{itemize}
+\item la lógica puede ejecutarse múltiples veces.
+\end{itemize}
+
+Por eso, en la práctica, este modelo suele combinarse con operaciones idempotentes.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un pipeline exactly-once.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una estrategia razonable es:
+
+\begin{enumerate}
+\item cada mensaje lleva identificador único;
+\item el consumidor procesa dentro de una transacción local;
+\item en la misma unidad atómica:
+  \begin{itemize}
+  \item registra el identificador como procesado;
+  \item aplica el efecto de negocio;
+  \item persiste el nuevo offset.
+  \end{itemize}
+\end{enumerate}
+
+Si el identificador ya existe, el mensaje se reconoce como duplicado lógico y no se reaplica.
+
+La idea no es que el broker mágicamente haga exactly-once, sino que la aplicación y el sistema de almacenamiento construyan esa semántica.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique rol de idempotencia.
+\end{uaexercise}
+
+\begin{uaanswer}
+La idempotencia permite que múltiples ejecuciones del mismo mensaje tengan el mismo efecto lógico que una sola. Es central cuando se usan retries o at-least-once.
+
+Sin idempotencia:
+\begin{itemize}
+\item duplicación de pagos;
+\item doble envío de email;
+\item doble descuento de stock.
+\end{itemize}
+
+Con idempotencia:
+\begin{itemize}
+\item retries se vuelven seguros o mucho más manejables.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe pipeline de procesamiento en tiempo real.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo: monitoreo de sensores.
+
+\begin{enumerate}
+\item sensores producen eventos;
+\item Kafka los persiste por topic;
+\item consumidor agrega métricas por ventana;
+\item otro consumidor alimenta dashboard;
+\item offsets controlan progreso y replay.
+\end{enumerate}
+
+Este pipeline desacopla producción, almacenamiento y visualización, permitiendo escalar cada parte por separado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Modele agregación por ventana.
+\end{uaexercise}
+
+\begin{uaanswer}
+Supongamos eventos $(key, value, timestamp)$ y una ventana de 1 minuto.
+
+La agregación mantiene estado:
+\[
+Agg(key, window) = \sum value
+\]
+
+Cada nuevo evento actualiza el estado de su ventana correspondiente. Esto es \emph{stateful streaming}: el operador no solo transforma eventos, sino que mantiene memoria del pasado reciente.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe join entre streams.
+\end{uaexercise}
+
+\begin{uaanswer}
+Para hacer join entre dos streams, por ejemplo pedidos y pagos:
+
+\begin{itemize}
+\item cada flujo se indexa por clave (por ejemplo, order\_id);
+\item se mantiene estado temporal de eventos vistos;
+\item cuando llega el matching, se emite la combinación.
+\end{itemize}
+
+El reto es manejar:
+\begin{itemize}
+\item orden de llegada distinto;
+\item eventos tardíos;
+\item expiración del estado.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Analice fallas en streaming stateful.
+\end{uaexercise}
+
+\begin{uaanswer}
+En procesamiento stateful, una falla no solo afecta el mensaje actual, sino también el estado acumulado.
+
+Problemas típicos:
+\begin{itemize}
+\item estado perdido si no fue persistido;
+\item duplicación de actualizaciones al reejecutar;
+\item desincronización entre estado y offset.
+\end{itemize}
+
+Por eso, los sistemas serios de streaming vinculan:
+\begin{itemize}
+\item snapshot del estado;
+\item log de eventos;
+\item posición del offset.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Relacione logs con almacenamiento (clase 6).
+\end{uaexercise}
+
+\begin{uaanswer}
+Clase 6 mostró que el almacenamiento moderno usa logs para garantizar durabilidad y recuperación. Clase 7 lleva esa idea más lejos: el log ya no es solo un detalle interno del storage engine, sino una abstracción de primer nivel para el sistema entero.
+
+En ambos casos, el log organiza el cambio como secuencia ordenada. La diferencia es que:
+\begin{itemize}
+\item en storage, el log soporta recovery;
+\item en streaming, el log es la interfaz de integración entre componentes.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo Kafka implementa persistencia.
+\end{uaexercise}
+
+\begin{uaanswer}
+Kafka persiste mensajes en archivos segmentados sobre disco, organizados como logs append-only por partición. La escritura secuencial aprovecha bien las propiedades físicas del almacenamiento.
+
+La persistencia se combina con replicación:
+\begin{itemize}
+\item el líder acepta escrituras;
+\item seguidores replican;
+\item el ack puede configurarse según cuánta durabilidad se exija.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique modelo D al sistema.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una posible formulación es:
+
+\begin{itemize}
+\item $P$: mover y procesar eventos en tiempo real;
+\item $F$: pérdida de mensajes, duplicación, caídas de consumidores, reorden entre particiones;
+\item $G$: semántica elegida (at-least-once, exactly-once lógico, etc.);
+\item $S$: particiones, offsets, retries, idempotencia, transacciones;
+\item $T$: complejidad, latencia, costo de coordinación.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe sistema completo basado en log.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo: plataforma de pagos.
+
+\begin{enumerate}
+\item el productor registra eventos de pago en un topic;
+\item consumidores especializados validan, autorizan y notifican;
+\item cada consumidor mantiene offsets;
+\item la operación lógica se vuelve idempotente por payment\_id;
+\item las vistas (saldo, dashboard, auditoría) se derivan del log.
+\end{enumerate}
+
+Este diseño desacopla servicios, soporta replay, mejora auditabilidad y permite reconstrucción del estado. El costo es que la complejidad se desplaza hacia:
+\begin{itemize}
+\item semántica de entrega;
+\item manejo de offsets;
+\item consistencia entre estado derivado y log.
+\end{itemize}
+\end{uaanswer}
 
 \end{document}

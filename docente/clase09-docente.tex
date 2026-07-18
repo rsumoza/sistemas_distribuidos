@@ -1,51 +1,175 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{09}
-\UASetClassTitle{Logs y procesamiento distribuido}
-\title{Clase 09 --- Logs y procesamiento distribuido}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\UASetDocKind{Guía docente}
+
+\title{Clase 09 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es evitar una de las patologías más comunes en cursos de sistemas distribuidos: que el estudiante salga creyendo que la “arquitectura moderna” consiste simplemente en cortar un sistema en servicios.
+
+Esta clase debe instalar una idea más madura:
+
+\begin{center}
+\textbf{la arquitectura distribuida es la organización explícita de trade-offs sobre consistencia, coordinación, despliegue y ownership}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item comparar monolito modular y microservicios sin caricaturas;
+\item explicar qué gana y qué pierde una arquitectura event-driven;
+\item distinguir coreografía y orquestación;
+\item diseñar una saga simple con compensaciones razonables;
+\item justificar una frontera de dominio y ownership de datos.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 09 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): abrir con una falsa intuición}
+Abrir preguntando:
+\begin{quote}
+¿La solución natural a todo sistema que crece es “pasarlo a microservicios”?
+\end{quote}
+
+Buscar que aparezcan respuestas rápidas y luego desmontarlas.
+
+\paragraph{Objetivo didáctico}
+Romper la idea de que la arquitectura es una moda.
+
+\subsection*{Bloque 2 (20 min): monolito modular vs microservicios}
+Comparar explícitamente:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item despliegue;
+\item consistencia;
+\item ownership;
+\item debugging;
+\item fallas parciales.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea que el monolito resuelve muchos problemas correctamente y que los microservicios introducen complejidad distribuida real.
+
+\subsection*{Bloque 3 (15 min): arquitectura orientada a eventos}
+Explicar por qué un diseño event-driven desacopla en tiempo, pero complica trazabilidad y consistencia global.
+
+\paragraph{Objetivo didáctico}
+Conectar con la clase de logs y evitar que “evento” se entienda como sinónimo de “simple”.
+
+\subsection*{Bloque 4 (20 min): sagas}
+Trabajar un ejemplo de compra online completo:
+\begin{itemize}
+\item stock;
+\item pago;
+\item despacho;
+\item compensaciones.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Hacer visible que la corrección distribuida de negocio no es igual a rollback técnico.
+
+\subsection*{Bloque 5 (20 min): coreografía, orquestación y ownership}
+Comparar ambos estilos y discutir la propiedad de datos.
+
+\paragraph{Objetivo didáctico}
+Mostrar que la arquitectura no se decide solo por latencia o por preferencia de patrones, sino por gobernanza del sistema.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Monolito modular}
+Porque es el baseline correcto. Sin eso, los microservicios aparecen como progreso inevitable, y eso empobrece el criterio del estudiante.
+
+\subsection*{2. Microservicios}
+Porque son el caso más visible de complejidad distribuida a nivel organizacional y técnico.
+
+\subsection*{3. Event-driven}
+Porque introduce desacoplamiento temporal, pero también nuevas dificultades conceptuales.
+
+\subsection*{4. Sagas}
+Porque son una de las respuestas más usadas cuando la atomicidad global fuerte ya no es razonable.
+
+\subsection*{5. Ownership de datos}
+Porque sin eso la discusión arquitectónica se vuelve puramente cosmética.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué problema real resuelve separar este componente en otro servicio?
+\item ¿Qué nueva falla parcial aparece si lo hacemos?
+\item ¿Qué consistencia necesitamos entre estos bounded contexts?
+\item ¿Qué pasa si un paso del flujo ya produjo efectos visibles y el siguiente falla?
+\item ¿Quién es dueño del dato y quién solo lo consume?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item creer que microservicios siempre escalan mejor en sentido amplio;
+\item pensar que coreografía es “más elegante” por definición;
+\item confundir compensación con rollback;
+\item ignorar observabilidad y debugging como parte del diseño;
+\item separar servicios sin separar ownership real.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Tomar un caso simple, por ejemplo una plataforma de cursos online, y pedir al curso que decida:
+
+\begin{itemize}
+\item qué dejaría en monolito modular;
+\item qué separaría;
+\item si integraría por RPC o eventos;
+\item si una operación compuesta se resolvería con saga;
+\item quién poseería los datos de alumnos, pagos y certificaciones.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el alumno vea que diseñar arquitectura es elegir fronteras y asumir sus consecuencias.
+
+\section{Momento crítico de la clase}
+
+El punto importante aparece cuando el estudiante comprende que:
+
+\begin{center}
+\textbf{una arquitectura distribuida no es mejor por ser más distribuida}
+\end{center}
+
+Ese momento debe subrayarse. Es una corrección muy importante frente al sesgo tecnológico habitual.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item defender un monolito modular sin vergüenza teórica;
+\item justificar cuándo sí valen la pena microservicios;
+\item diseñar una saga con pasos y compensaciones razonables;
+\item explicar quién es dueño de qué dato y por qué.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase prepara el terreno para temas de:
+\begin{itemize}
+\item observabilidad distribuida;
+\item confiabilidad operativa;
+\item debugging y tracing;
+\item resiliencia a nivel sistema completo.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente: una vez que distribuimos componentes, datos y flujos, ¿cómo observamos, diagnosticamos y gobernamos el sistema real en producción?
+\end{uakeybox}
+
 \end{document}

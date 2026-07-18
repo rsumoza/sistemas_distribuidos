@@ -1,41 +1,341 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{14}
-\UASetClassTitle{System Design}
-\title{Clase 14 --- System Design}
+\UASetClassTitle{Incidentes y cultura de confiabilidad}
+\UASetDocKind{Apuntes}
+
+\title{Clase 14 --- Incidentes, postmortems, aprendizaje organizacional y cultura de confiabilidad}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 14 desarrolla el tema ``System Design'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Integrar todo el curso en diseño de sistemas reales con restricciones, fallas y trade-offs explícitos. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+En sistemas distribuidos complejos, los incidentes no son anomalías imposibles ni evidencia automática de incompetencia. Son eventos esperables en un entorno donde interactúan:
 
-\subsection{Preguntas guía}
 \begin{itemize}
-\item ¿Cómo aparece requerimientos en un sistema real? \item ¿Cómo aparece componentes en un sistema real? \item ¿Cómo aparece datos en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item fallas parciales;
+\item latencias variables;
+\item decisiones de diseño imperfectas;
+\item carga imprevisible;
+\item errores humanos;
+\item acoplamientos organizacionales y técnicos.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 14 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
-
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
-
-\section{Bibliografía guía}
+La cuestión clave no es solo prevenir incidentes, sino desarrollar la capacidad de:
 \begin{itemize}
-\item DDIA, visión integrada.
-\item System Design Primer.
-\item Blogs de ingeniería de Uber, Netflix y Mercado Libre.
+\item detectarlos;
+\item responder con claridad;
+\item mitigar daño;
+\item aprender de forma acumulativa.
+\end{itemize}
+
+\begin{quote}
+La confiabilidad madura no consiste en ausencia total de incidentes, sino en aprendizaje operativo sistemático a partir de ellos.
+\end{quote}
+
+\section{Qué es un incidente}
+
+Un incidente es un evento que degrada, o amenaza con degradar, una propiedad relevante del servicio. Esto puede incluir:
+
+\begin{itemize}
+\item caída o indisponibilidad;
+\item aumento severo de latencia;
+\item corrupción o inconsistencia visible;
+\item pérdida de throughput;
+\item impacto sobre SLOs;
+\item exposición de un riesgo de seguridad o integridad.
+\end{itemize}
+
+La gravedad de un incidente no se define solo por su causa técnica, sino por su impacto y por el riesgo que implica para el servicio y los usuarios.
+
+\section{Gestión de incidentes}
+
+\subsection{Fases típicas}
+
+Una gestión madura de incidentes suele incluir:
+
+\begin{enumerate}
+\item detección;
+\item clasificación y severidad;
+\item respuesta inicial;
+\item mitigación;
+\item comunicación;
+\item recuperación;
+\item análisis posterior.
+\end{enumerate}
+
+\subsection{Detección}
+
+La detección puede provenir de:
+\begin{itemize}
+\item alertas automáticas;
+\item dashboards;
+\item anomalías observadas por operadores;
+\item reportes de usuarios;
+\item fallas en procesos downstream.
+\end{itemize}
+
+Un punto importante es que muchos incidentes son detectados tarde no porque sean técnicamente complejos, sino porque el sistema carece de señales adecuadas o porque las señales existen pero no son accionables.
+
+\subsection{Clasificación}
+
+Clasificar un incidente implica estimar:
+\begin{itemize}
+\item impacto;
+\item alcance;
+\item urgencia;
+\item riesgo de escalamiento;
+\item relación con SLOs y error budget.
+\end{itemize}
+
+Esto permite priorizar correctamente y evitar dos errores comunes:
+\begin{itemize}
+\item tratar todo como emergencia máxima;
+\item subestimar incidentes que se amplifican con rapidez.
+\end{itemize}
+
+\section{Roles durante el incidente}
+
+En incidentes de cierta complejidad, es útil diferenciar roles:
+
+\begin{itemize}
+\item \textbf{Incident Commander}: coordina, prioriza y mantiene foco;
+\item \textbf{Investigadores}: siguen hipótesis técnicas;
+\item \textbf{Comunicador}: mantiene informados a stakeholders;
+\item \textbf{Scribe / Timeline Keeper}: registra decisiones y eventos.
+\end{itemize}
+
+\subsection{Razón}
+
+Esto reduce confusión, evita que todos hagan lo mismo y disminuye la probabilidad de que la coordinación falle justo cuando más se necesita.
+
+\section{Respuesta vs aprendizaje}
+
+Durante el incidente, la prioridad es:
+\begin{itemize}
+\item contener daño;
+\item restaurar servicio;
+\item preservar evidencia útil.
+\end{itemize}
+
+No es el momento de discutir exhaustivamente culpa, arquitectura global o responsabilidades de largo plazo. Esas preguntas pertenecen al análisis posterior.
+
+\section{Postmortems}
+
+\subsection{Definición}
+
+Un postmortem es el análisis estructurado posterior a un incidente. Su propósito no es “cerrar un ticket”, sino producir entendimiento organizacional acumulable.
+
+\subsection{Contenido mínimo}
+
+Un buen postmortem debería incluir:
+
+\begin{itemize}
+\item resumen ejecutivo;
+\item impacto observado;
+\item detección;
+\item timeline;
+\item respuesta y mitigación;
+\item análisis causal;
+\item factores contribuyentes;
+\item acciones de mejora;
+\item dueños y fechas de seguimiento.
+\end{itemize}
+
+\subsection{Timeline}
+
+El timeline es especialmente importante porque evita reconstrucciones retrospectivas vagas y obliga a describir:
+\begin{itemize}
+\item qué pasó;
+\item cuándo se detectó;
+\item qué hipótesis se siguieron;
+\item qué decisiones se tomaron;
+\item qué mitigación cambió efectivamente el curso del incidente.
+\end{itemize}
+
+\section{Blameless Postmortem}
+
+\subsection{Qué significa}
+
+Un postmortem \emph{blameless} no significa que “nadie sea responsable” o que “todo da igual”. Significa que el análisis evita convertir el castigo individual en sustituto del entendimiento sistémico.
+
+\subsection{Por qué importa}
+
+Si la organización responde a incidentes buscando culpables como objetivo principal, aparecen efectos dañinos:
+
+\begin{itemize}
+\item ocultamiento de errores;
+\item menor reporte temprano;
+\item explicaciones superficiales;
+\item aprendizaje empobrecido;
+\item miedo a experimentar o escalar problemas.
+\end{itemize}
+
+\subsection{Lectura correcta}
+
+Blameless no elimina responsabilidad profesional. Lo que elimina es la ilusión de que la explicación del incidente se agota en un individuo que “cometió un error”.
+
+\section{Causa raíz y factores contribuyentes}
+
+\subsection{Problema de la causa única}
+
+En sistemas complejos, reducir un incidente a “la causa raíz” puede ser útil como simplificación, pero a menudo es insuficiente o engañoso. Más realista es distinguir:
+
+\begin{itemize}
+\item disparador inmediato;
+\item condiciones habilitantes;
+\item debilidades de diseño;
+\item fallas de observabilidad;
+\item fallas de mitigación;
+\item fallas de coordinación.
+\end{itemize}
+
+\subsection{Ejemplo}
+
+Un incidente visible como “API 500” puede involucrar:
+\begin{itemize}
+\item latencia alta en DB;
+\item retries en cascada;
+\item breaker ausente;
+\item pools compartidos;
+\item alertas tardías;
+\item runbook insuficiente.
+\end{itemize}
+
+La narrativa correcta no es “la base estuvo lenta”, sino la cadena completa que transformó esa lentitud en una degradación sistémica.
+
+\section{Acciones de mejora}
+
+\subsection{Buenas acciones}
+
+Las acciones posteriores al postmortem deben ser:
+\begin{itemize}
+\item concretas;
+\item verificables;
+\item con owner;
+\item con horizonte temporal;
+\item orientadas a reducir repetición o impacto.
+\end{itemize}
+
+\subsection{Tipos}
+
+\begin{itemize}
+\item cambios de código;
+\item mejoras de observabilidad;
+\item ajustes de umbrales;
+\item nuevos tests de falla;
+\item revisiones arquitectónicas;
+\item cambios en runbooks;
+\item entrenamiento del equipo.
+\end{itemize}
+
+\subsection{Malas acciones}
+
+\begin{itemize}
+\item “tener más cuidado”;
+\item “mejorar comunicación” sin mecanismo concreto;
+\item “vigilar más”;
+\item acciones sin responsable.
+\end{itemize}
+
+\section{Aprendizaje organizacional}
+
+\subsection{Qué significa aprender}
+
+Aprender de incidentes no es solo corregir el bug puntual. Es cambiar la capacidad futura de la organización para:
+\begin{itemize}
+\item detectar antes;
+\item responder mejor;
+\item diseñar con más criterio;
+\item reducir superficie de repetición.
+\end{itemize}
+
+\subsection{Señal de madurez}
+
+Una organización madura no se pregunta solo:
+\begin{quote}
+“¿Cómo arreglamos este incidente?”
+\end{quote}
+
+Se pregunta también:
+\begin{quote}
+“¿Qué hizo posible que esto ocurriera, se expandiera y tardara tanto en entenderse?”
+\end{quote}
+
+\section{Cultura de confiabilidad}
+
+La cultura de confiabilidad no es únicamente una colección de herramientas. Incluye:
+
+\begin{itemize}
+\item visibilidad de incidentes;
+\item disciplina de postmortems;
+\item ownership claro;
+\item aprendizaje sin ocultamiento;
+\item equilibrio entre cambio y estabilidad;
+\item valoración explícita de la operación como trabajo técnico serio.
+\end{itemize}
+
+\subsection{Anti-patrones culturales}
+
+\begin{itemize}
+\item tratar incidentes como vergüenza a ocultar;
+\item celebrar solo velocidad de entrega;
+\item ignorar deuda operacional;
+\item escribir postmortems vacíos;
+\item no cerrar el loop de acciones.
+\end{itemize}
+
+\section{Relación con SLOs y error budgets}
+
+Los incidentes se interpretan mejor cuando existen:
+\begin{itemize}
+\item SLI claros;
+\item SLOs explícitos;
+\item error budgets definidos.
+\end{itemize}
+
+Eso permite responder preguntas como:
+\begin{itemize}
+\item ¿qué tan grave fue el impacto?;
+\item ¿consumió cuánto budget?;
+\item ¿qué cambios de ritmo exige?;
+\item ¿qué trade-off entre cambio y estabilidad debemos revisar?
+\end{itemize}
+
+\section{Modelo del curso}
+
+Podemos expresar el problema como:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Por ejemplo:
+\begin{itemize}
+\item $P$: responder y aprender de incidentes en un sistema distribuido;
+\item $F$: fallas parciales, ruido observacional, coordinación imperfecta, decisiones bajo presión;
+\item $G$: recuperación razonable y aprendizaje organizacional efectivo;
+\item $S$: incident management + postmortems + ownership + cultura blameless;
+\item $T$: tiempo, disciplina, exposición de debilidades y costo organizacional de mejorar.
+\end{itemize}
+
+\section{Conclusión}
+
+Los incidentes no son solo eventos técnicos. Son también eventos organizacionales que revelan:
+\begin{itemize}
+\item límites de la arquitectura;
+\item límites de la observabilidad;
+\item límites del proceso operativo;
+\item límites de la cultura.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+La confiabilidad madura no consiste en “tener menos incidentes” por arte de magia, sino en convertir cada incidente en una oportunidad real de aumentar la capacidad del sistema y de la organización.
 \end{uakeybox}
+
 \end{document}

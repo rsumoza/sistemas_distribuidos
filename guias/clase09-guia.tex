@@ -1,24 +1,142 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{09}
-\UASetClassTitle{Logs y procesamiento distribuido}
-\title{Clase 09 --- Logs y procesamiento distribuido}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 09 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 09.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Logs y procesamiento distribuido''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Se espera análisis de arquitectura, no respuestas de una línea. Siempre justificar decisiones en términos de dominio, consistencia, fallas y costo operativo.
+
+\section{Nivel 1: fundamentos}
+
+\begin{uaexercise}
+Defina monolito modular y explique por qué no debe considerarse automáticamente un antipatrón.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué cambia, desde el punto de vista del sistema, cuando se pasa de un monolito modular a una arquitectura de microservicios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare despliegue, consistencia y debugging en monolitos y microservicios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde un sistema pequeño esté peor diseñado como microservicio que como monolito.
+\end{uaexercise}
+
+\section{Nivel 2: event-driven}
+
+\begin{uaexercise}
+Explique qué significa arquitectura orientada a eventos y qué gana respecto de una integración puramente sincrónica.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa dos problemas nuevos que aparecen al pasar a un diseño event-driven.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el orden suele ser parcial y no global en arquitecturas basadas en eventos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un pipeline simple de eventos para el flujo: pedido $\rightarrow$ pago $\rightarrow$ envío.
+\end{uaexercise}
+
+\section{Nivel 3: sagas}
+
+\begin{uaexercise}
+Defina saga y explique por qué aparece en microservicios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare saga y transacción distribuida fuerte.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una compensación no equivale a un rollback.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una saga para una compra online con:
+\begin{itemize}
+\item reserva de stock;
+\item cobro;
+\item despacho.
+\end{itemize}
+Incluya pasos de compensación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde la compensación sea costosa o imperfecta.
+\end{uaexercise}
+
+\section{Nivel 4: coreografía y orquestación}
+
+\begin{uaexercise}
+Explique qué es coreografía y qué es orquestación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un flujo de coreografía para un alta de cliente con validación, scoring y bienvenida.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe el mismo flujo usando orquestación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare ambos enfoques en términos de visibilidad, acoplamiento y debugging.
+\end{uaexercise}
+
+\section{Nivel 5: ownership y datos}
+
+\begin{uaexercise}
+Explique por qué la propiedad de datos es central en microservicios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde dos servicios compartan la misma tabla y muestre por qué eso degrada el diseño.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo cambia el problema de consistencia cuando cada servicio posee sus datos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una separación de bounded contexts para una plataforma de e-commerce.
+\end{uaexercise}
+
+\section{Nivel 6: diseño arquitectónico}
+
+\begin{uaexercise}
+Aplique el modelo $D=(P,F,G,S,T)$ a una arquitectura basada en microservicios para reservas de viaje.
+\end{uaexercise}
+
+\begin{uaexercise}
+Justifique cuándo conviene quedarse en monolito modular y cuándo migrar a microservicios.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde una arquitectura orientada a eventos sea preferible a una basada puramente en RPC.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un caso donde una arquitectura puramente event-driven complique innecesariamente el sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la arquitectura correcta depende tanto del dominio como de la madurez organizacional.
+\end{uaexercise}
 
 \end{document}

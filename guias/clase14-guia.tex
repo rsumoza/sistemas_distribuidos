@@ -1,24 +1,128 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{14}
-\UASetClassTitle{System Design}
-\title{Clase 14 --- System Design}
+\UASetClassTitle{Incidentes y cultura de confiabilidad}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 14 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 14.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``System Design''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones generales}
+
+Se espera razonamiento técnico y organizacional. No alcanza con repetir definiciones: justificar siempre cómo una práctica mejora la capacidad real de operar y aprender.
+
+\section{Nivel 1: fundamentos}
+
+\begin{uaexercise}
+Defina incidente desde la perspectiva de confiabilidad operativa y explique por qué no debe confundirse con cualquier bug menor.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué en sistemas complejos los incidentes deben considerarse eventos esperables y no rarezas imposibles.
+\end{uaexercise}
+
+\begin{uaexercise}
+Distinga claramente entre respuesta al incidente y aprendizaje posterior al incidente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una organización puede tener buenos sistemas técnicos y, aun así, mala gestión de incidentes.
+\end{uaexercise}
+
+\section{Nivel 2: gestión de incidentes}
+
+\begin{uaexercise}
+Describa las fases principales de la gestión de incidentes.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué criterios deberían usarse para priorizar un incidente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué ventajas tiene explicitar roles durante un incidente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde la falta de coordinación empeore significativamente el incidente.
+\end{uaexercise}
+
+\section{Nivel 3: postmortems}
+
+\begin{uaexercise}
+Defina postmortem y explique cuál es su propósito.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué información mínima debe contener un buen postmortem.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué el timeline es una pieza central del postmortem.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde un postmortem superficial impida aprendizaje real.
+\end{uaexercise}
+
+\section{Nivel 4: blameless y causalidad}
+
+\begin{uaexercise}
+Explique qué significa blameless postmortem.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué blameless no significa ausencia de responsabilidad.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la idea de una única causa raíz puede ser engañosa en sistemas distribuidos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya una cadena causal realista para un incidente de latencia en cascada.
+\end{uaexercise}
+
+\section{Nivel 5: acciones y aprendizaje}
+
+\begin{uaexercise}
+Explique qué hace buena a una acción correctiva posterior a un incidente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Dé tres ejemplos de malas acciones de postmortem y justifique por qué lo son.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo distinguir entre fix local y aprendizaje organizacional.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué cerrar un incidente sin cerrar el seguimiento del postmortem es una mala práctica.
+\end{uaexercise}
+
+\section{Nivel 6: integración}
+
+\begin{uaexercise}
+Relacione incidentes, SLOs y error budgets.
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplique el modelo $D=(P,F,G,S,T)$ a la gestión de incidentes en un sistema distribuido.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué la cultura de confiabilidad no puede reducirse a herramientas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué una organización madura se define tanto por cómo aprende de incidentes como por cómo construye software.
+\end{uaexercise}
 
 \end{document}

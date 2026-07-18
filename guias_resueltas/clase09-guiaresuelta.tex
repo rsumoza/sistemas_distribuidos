@@ -1,32 +1,278 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{09}
-\UASetClassTitle{Logs y procesamiento distribuido}
-\title{Clase 09 --- Logs y procesamiento distribuido}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 09 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 09.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Logs y procesamiento distribuido''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Logs y procesamiento distribuido'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta no pretende fijar respuestas únicas, sino mostrar cómo razonar arquitectónicamente. Lo importante no es repetir “microservicios” o “event-driven”, sino justificar:
+\begin{itemize}
+\item qué problema resuelve la elección;
+\item qué fallas introduce;
+\item qué costo organizacional y técnico trae.
+\end{itemize}
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Defina monolito modular y explique por qué no debe considerarse automáticamente un antipatrón.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un monolito modular es una aplicación desplegada como unidad única, pero organizada internamente en módulos con responsabilidades diferenciadas. No es un antipatrón por definición porque puede ofrecer:
+\begin{itemize}
+\item transacciones locales sencillas;
+\item debugging directo;
+\item despliegue simple;
+\item menor complejidad distribuida.
+\end{itemize}
+
+Se vuelve problemático cuando el acoplamiento interno destruye la modularidad, no por el mero hecho de ser monolítico.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué cambia cuando se pasa de un monolito modular a microservicios.
+\end{uaexercise}
+
+\begin{uaanswer}
+Cambia la naturaleza del problema. En un monolito, gran parte de la complejidad es de código y modularidad interna. En microservicios aparecen además:
+\begin{itemize}
+\item fallas parciales;
+\item latencia de red;
+\item consistencia entre servicios;
+\item ownership de datos;
+\item observabilidad distribuida.
+\end{itemize}
+
+La arquitectura deja de ser solo una cuestión de diseño de software y pasa a ser también una cuestión de protocolo y operación.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde un sistema pequeño esté peor como microservicio que como monolito.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un sistema interno de gestión con pocos usuarios, un equipo pequeño y un dominio aún inestable suele estar peor como microservicios porque:
+\begin{itemize}
+\item aumenta la cantidad de despliegues;
+\item obliga a lidiar con consistencia distribuida prematura;
+\item duplica esfuerzo de observabilidad y operación;
+\item complica testing.
+\end{itemize}
+
+En ese escenario, un monolito modular bien estructurado ofrece mayor simplicidad con menor costo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué significa arquitectura orientada a eventos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Significa que los componentes del sistema se integran principalmente publicando y consumiendo eventos, en lugar de depender exclusivamente de llamadas sincrónicas directas. Esto desacopla a productores y consumidores en el tiempo y permite replay, múltiples consumidores y pipelines más flexibles.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa dos problemas nuevos al pasar a event-driven.
+\end{uaexercise}
+
+\begin{uaanswer}
+Dos problemas muy importantes son:
+\begin{itemize}
+\item trazabilidad: el flujo de extremo a extremo se vuelve más difícil de seguir;
+\item consistencia eventual: los distintos servicios pueden ver estados distintos en momentos diferentes.
+\end{itemize}
+
+También aparecen duplicación de eventos, orden parcial y debugging menos intuitivo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué el orden suele ser parcial y no global.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los eventos pueden circular por distintos topics, particiones o canales. Cada canal preserva su propio orden, pero no existe necesariamente un orden total único entre todos los eventos del sistema. Por lo tanto, la arquitectura event-driven trabaja naturalmente con orden parcial.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina saga.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una saga es una secuencia de transacciones locales coordinadas de manera tal que, si una parte posterior falla, se ejecutan compensaciones sobre las partes previas. Es una forma de manejar operaciones de negocio compuestas sin depender de una transacción distribuida fuerte global.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare saga y transacción distribuida fuerte.
+\end{uaexercise}
+
+\begin{uaanswer}
+La transacción distribuida fuerte busca atomicidad global inmediata. La saga acepta descomponer la operación en pasos locales con posibles compensaciones.
+
+Diferencia central:
+\begin{itemize}
+\item transacción fuerte: más corrección fuerte, más coordinación y bloqueo;
+\item saga: más disponibilidad y desacoplamiento, pero más exposición a estados intermedios y compensaciones imperfectas.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué compensación no equivale a rollback.
+\end{uaexercise}
+
+\begin{uaanswer}
+Rollback es una reversión técnica dentro de la misma transacción. Compensación es una nueva acción de negocio que intenta neutralizar un efecto anterior. Puede llegar tarde, puede no restaurar exactamente el mismo estado físico y puede ser observable por usuarios y otros sistemas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una saga para compra online.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una posible saga:
+
+\begin{enumerate}
+\item reservar stock;
+\item autorizar pago;
+\item generar orden;
+\item despachar.
+\end{enumerate}
+
+Compensaciones:
+\begin{itemize}
+\item si falla pago: liberar stock;
+\item si falla orden luego del pago: anular cobro o generar devolución;
+\item si falla despacho: revertir estado de orden y devolver dinero según política.
+\end{itemize}
+
+La clave es que cada paso debe tener explícita su semántica compensatoria.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un caso donde la compensación sea costosa o imperfecta.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo: una reserva aérea o un envío físico ya despachado. La compensación no puede “borrar” el efecto físico como si nunca hubiera ocurrido. Solo puede emitir nuevas acciones, como devolución o cancelación, con costo adicional y posible impacto visible para el cliente.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique coreografía y orquestación.
+\end{uaexercise}
+
+\begin{uaanswer}
+En coreografía, cada servicio reacciona a eventos y el flujo global emerge de esa interacción. En orquestación, un coordinador explícito decide el siguiente paso del proceso y supervisa el flujo completo.
+
+Coreografía:
+\begin{itemize}
+\item más distribuida;
+\item menos centralizada;
+\item más difícil de seguir globalmente.
+\end{itemize}
+
+Orquestación:
+\begin{itemize}
+\item más visible;
+\item más controlada;
+\item más acoplada al orquestador.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la propiedad de datos es central.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque si varios servicios modifican libremente el mismo dato, la frontera entre ellos se vuelve artificial. La separación de ownership obliga a tratar la consistencia entre servicios como un problema explícito y evita dependencias ocultas sobre una base compartida.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde dos servicios compartan tabla y degrade diseño.
+\end{uaexercise}
+
+\begin{uaanswer}
+Si el servicio de pedidos y el de facturación escriben ambos directamente sobre una tabla de órdenes, se pierde encapsulamiento. Cambios de esquema, validaciones o semánticas de negocio quedan acoplados entre servicios, lo que destruye autonomía y vuelve frágil la evolución.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo cambia la consistencia cuando cada servicio posee sus datos.
+\end{uaexercise}
+
+\begin{uaanswer}
+La consistencia deja de resolverse “gratis” vía una única base y pasa a requerir:
+\begin{itemize}
+\item eventos;
+\item RPC;
+\item sagas;
+\item reconciliación;
+\item semánticas explícitas entre bounded contexts.
+\end{itemize}
+
+El costo es mayor complejidad distribuida, pero la ganancia es una frontera de dominio más clara.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique el modelo $D=(P,F,G,S,T)$ a reservas de viaje.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible:
+
+\begin{itemize}
+\item $P$: coordinar vuelo, hotel y pago;
+\item $F$: fallas parciales, respuestas tardías, pasos exitosos seguidos de fallas posteriores;
+\item $G$: flujo de negocio consistente y recuperable;
+\item $S$: saga con compensaciones, algunos pasos síncronos y otros event-driven;
+\item $T$: estados intermedios visibles, complejidad operativa y compensaciones costosas.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Justifique cuándo quedarse en monolito modular y cuándo migrar.
+\end{uaexercise}
+
+\begin{uaanswer}
+Conviene quedarse en monolito modular cuando:
+\begin{itemize}
+\item el dominio aún cambia mucho;
+\item el equipo es pequeño;
+\item se necesita simplicidad operativa;
+\item la presión de escalado independiente es baja.
+\end{itemize}
+
+Conviene considerar microservicios cuando:
+\begin{itemize}
+\item los bounded contexts son claros;
+\item los equipos son autónomos;
+\item las cargas y ciclos de despliegue difieren significativamente;
+\item existe madurez operativa para sostener complejidad distribuida.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la arquitectura correcta depende también de la madurez organizacional.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque una arquitectura distribuida exige no solo decisiones técnicas, sino también:
+\begin{itemize}
+\item ownership claro;
+\item equipos autónomos;
+\item observabilidad;
+\item despliegue automatizado;
+\item disciplina operativa.
+\end{itemize}
+
+Sin esa madurez, la complejidad distribuida supera los beneficios y la arquitectura se vuelve una carga en vez de una solución.
+\end{uaanswer}
 
 \end{document}

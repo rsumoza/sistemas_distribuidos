@@ -1,73 +1,208 @@
 % !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
+
 \UASetClassNumber{12}
-\UASetClassTitle{Observabilidad y debugging}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 12 --- Observabilidad y debugging}
+\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\title{\UACourse}
+\subtitle{Clase 12 --- Chaos Engineering, fault injection y testing distribuido}
+
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Observabilidad y debugging}
+\UASectionSlide{El problema de confiar sin verificar}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{Diseñar no alcanza}
+Ya vimos:
 \begin{itemize}
-\item Diseñar observabilidad realista con logs, métricas, trazas y correlación entre componentes.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item consistencia
+\item resiliencia
+\item observabilidad
+\end{itemize}
+
+\pause
+
+\begin{block}{Pregunta}
+¿Cómo sabemos que el sistema realmente se comporta bien bajo falla?
+\end{block}
+\end{frame}
+
+\begin{frame}{La intuición equivocada}
+Muchos equipos asumen:
+\begin{itemize}
+\item “si el código parece correcto, va a resistir”
+\item “si tenemos retries y breakers, alcanza”
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Problema}
+Los sistemas distribuidos fallan en interacción, no solo en componentes aislados.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Chaos Engineering}
+
+\begin{frame}{Definición}
+\begin{block}{}
+Chaos Engineering = disciplina experimental que estudia cómo responde un sistema ante perturbaciones controladas.
+\end{block}
+\end{frame}
+
+\begin{frame}{Idea central}
+No se trata de romper por romper.
+
+\pause
+
+Se trata de:
+\begin{itemize}
+\item formular hipótesis
+\item introducir una perturbación
+\item observar si el sistema mantiene el comportamiento esperado
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Ciclo experimental}
+\begin{enumerate}
+\item definir steady state
+\item formular hipótesis
+\item inyectar falla
+\item medir impacto
+\item aprender / corregir
+\end{enumerate}
+\end{frame}
 
-\begin{frame}{Problema central}
-La clase 12 trabaja un tipo específico de dificultad distribuida: Diseñar observabilidad realista con logs, métricas, trazas y correlación entre componentes.
+\UASectionSlide{Fault Injection}
 
+\begin{frame}{Tipos de falla inyectable}
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item crash de servicio
+\item latencia artificial
+\item pérdida de paquetes
+\item partición de red
+\item saturación de CPU
+\item errores de dependencia
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\begin{frame}{Qué se busca}
 \begin{itemize}
-\item logs
-\item métricas
-\item trazas
-\item correlation IDs
-\item debugging distribuido
+\item ver si el sistema degrada con gracia
+\item verificar breakers, retries, backpressure
+\item detectar dependencias ocultas
+\item validar hipótesis de operación
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
+\UASectionSlide{Steady State}
 
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{Steady State}
+\begin{block}{}
+Variable o conjunto de variables que representan comportamiento normal aceptable del sistema.
+\end{block}
+
+\pause
+
+Ejemplos:
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item tasa de checkout exitoso
+\item error rate
+\item latencia p95
+\item mensajes procesados por segundo
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Por qué importa}
+Sin steady state:
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item no sabés qué validar
+\item no sabés si el experimento “salió bien”
+\item solo generás ruido
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Testing distribuido}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 12 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{frame}{No todo testing es igual}
+\begin{itemize}
+\item unit tests
+\item integration tests
+\item system tests
+\item failure tests
+\item chaos experiments
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué no alcanza}
+\begin{itemize}
+\item testear funciones aisladas
+\item mocks perfectos
+\item escenarios sin latencia ni pérdida
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Clave}
+Los bugs distribuidos viven en los intersticios: tiempo, orden, concurrencia y fallas parciales.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Riesgo y seguridad}
+
+\begin{frame}{Chaos seguro}
+Buenas prácticas:
+\begin{itemize}
+\item experiments pequeños
+\item blast radius controlado
+\item rollback claro
+\item observabilidad fuerte
+\item horario / entorno adecuados
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Nunca hacer}
+\begin{itemize}
+\item experimentos sin hipótesis
+\item experimentos sin métricas
+\item experimentos en producción sin límites
+\item experimentos sin plan de abortar
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Ejemplo}
+
+\begin{frame}{Ejemplo: checkout}
+Hipótesis:
+\begin{quote}
+Si Payments responde con alta latencia, el sistema mantiene disponibilidad parcial y no colapsa por retries.
+\end{quote}
+
+Perturbación:
+\begin{itemize}
+\item +800 ms en Payments
+\end{itemize}
+
+Validación:
+\begin{itemize}
+\item breaker abre
+\item p95 sube controladamente
+\item checkout no derrumba todo el sitio
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+La resiliencia no debe suponerse: debe validarse experimentalmente.
 \end{block}
 \end{frame}
 

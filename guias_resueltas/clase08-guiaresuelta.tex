@@ -1,32 +1,303 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{08}
-\UASetClassTitle{Particionado y escalabilidad}
-\title{Clase 08 --- Particionado y escalabilidad}
+\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 08 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 08.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Particionado y escalabilidad''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Particionado y escalabilidad'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Las respuestas deben leerse como modelos de razonamiento. El objetivo de esta guía no es solo identificar siglas, sino aprender a justificar elecciones de arquitectura en sistemas reales.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Explique con precisión qué significa CAP y por qué la interpretación “elegir dos de tres” es incompleta o engañosa.
+\end{uaexercise}
+
+\begin{uaanswer}
+CAP no es un menú estático de tres propiedades intercambiables. Es una restricción sobre sistemas replicados \emph{cuando existe partición de red}. La afirmación correcta es que, bajo partición, no es posible mantener simultáneamente consistencia fuerte observable y disponibilidad total.
+
+La formulación “elegir dos de tres” es engañosa porque:
+\begin{itemize}
+\item sugiere una elección permanente e independiente del contexto;
+\item oculta que la tensión relevante aparece específicamente bajo partición;
+\item no distingue entre distintos niveles de consistencia.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué significa disponibilidad en CAP y dé un ejemplo de sistema que, ante partición, decida sacrificarla.
+\end{uaexercise}
+
+\begin{uaanswer}
+Disponibilidad en CAP significa que toda solicitud a un nodo no fallado recibe respuesta. Un sistema que sacrifica disponibilidad bajo partición es uno que rechaza temporalmente operaciones si no puede verificar coherencia global. Un ejemplo típico es una base orientada a transacciones financieras fuertes.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué PACELC es una mejora conceptual respecto de CAP.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque CAP solo analiza el caso de partición, mientras que PACELC agrega la tensión entre consistencia y latencia en operación normal. Esto lo hace más realista para describir sistemas actuales, donde el costo de coordinar globalmente existe incluso sin particiones activas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa la motivación arquitectónica de Dynamo.
+\end{uaexercise}
+
+\begin{uaanswer}
+Dynamo fue diseñado para aplicaciones donde la disponibilidad y la latencia baja eran más importantes que la consistencia fuerte inmediata. Ejemplos típicos:
+\begin{itemize}
+\item carrito de compras;
+\item catálogo distribuido;
+\item perfiles de usuario con reconciliación posterior aceptable.
+\end{itemize}
+
+La idea no es “ignorar consistencia”, sino desplazar parte del costo hacia versionado y reconciliación.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique los parámetros $N$, $R$ y $W$.
+\end{uaexercise}
+
+\begin{uaanswer}
+\begin{itemize}
+\item $N$: número de réplicas de un dato;
+\item $W$: número de réplicas que deben confirmar una escritura;
+\item $R$: número de réplicas consultadas en una lectura.
+\end{itemize}
+
+Estos parámetros permiten ajustar el sistema entre mayor disponibilidad o mayor visibilidad de datos recientes.
+\end{uaanswer}
+
+\begin{uaexercise}
+Demuestre informalmente por qué $R+W>N$ garantiza intersección.
+\end{uaexercise}
+
+\begin{uaanswer}
+Si un quorum de lectura de tamaño $R$ y uno de escritura de tamaño $W$ no se intersectaran, en conjunto cubrirían a lo sumo $N$ nodos distintos. Pero si $R+W>N$, eso es imposible. Por lo tanto, deben compartir al menos una réplica.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde, aun con $R+W>N$, un cliente pueda observar un estado atrasado.
+\end{uaexercise}
+
+\begin{uaanswer}
+Supongamos que la escritura fue aceptada por el quorum, pero una de las réplicas intersectadas aún no aplicó visiblemente la última versión, o la lectura se resuelve usando una política que prioriza disponibilidad local con versiones concurrentes. La intersección aumenta la probabilidad de ver frescura, pero no elimina todos los casos de retraso o conflicto.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué problema resuelven los vector clocks.
+\end{uaexercise}
+
+\begin{uaanswer}
+Permiten distinguir si una versión:
+\begin{itemize}
+\item desciende causalmente de otra;
+\item o si es concurrente.
+\end{itemize}
+
+Esto evita confundir “última en llegar” con “correcta” y permite reconciliar explícitamente versiones concurrentes.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa sloppy quorum y hinted handoff.
+\end{uaexercise}
+
+\begin{uaanswer}
+Sloppy quorum permite escribir temporalmente en nodos alternativos si el nodo propietario no está disponible. Hinted handoff guarda la pista de que esos datos deben reenviarse luego al nodo correcto.
+
+Ganan:
+\begin{itemize}
+\item disponibilidad;
+\item capacidad de seguir operando ante fallas parciales.
+\end{itemize}
+
+Complican:
+\begin{itemize}
+\item la reconciliación;
+\item la trazabilidad del dato;
+\item la consistencia temporal.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué rol juega anti-entropy.
+\end{uaexercise}
+
+\begin{uaanswer}
+Anti-entropy es el proceso mediante el cual las réplicas intercambian información para converger luego de períodos de divergencia. Es fundamental en sistemas AP porque la convergencia no ocurre mágicamente: debe ser activamente restaurada.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
+\end{uaexercise}
+
+\begin{uaanswer}
+Spanner intenta resolver el problema de ofrecer consistencia fuerte global y transacciones distribuidas correctas a escala planetaria. Dynamo, en cambio, no busca imponer orden fuerte global; acepta reconciliación posterior para preservar disponibilidad y latencia.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué es TrueTime y por qué devuelve un intervalo.
+\end{uaexercise}
+
+\begin{uaanswer}
+TrueTime devuelve un intervalo porque reconoce explícitamente que el sistema no conoce la hora exacta, sino una banda de incertidumbre temporal. Esta decisión es conceptualmente fuerte: en lugar de fingir precisión perfecta, modela la imprecisión y la usa para garantizar orden de commit.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa commit wait y explique su costo.
+\end{uaexercise}
+
+\begin{uaanswer}
+Commit wait es la espera adicional que realiza Spanner para asegurarse de que un commit queda correctamente ordenado respecto de otros eventos en presencia de incertidumbre temporal. Su costo principal es la latencia extra, que se paga incluso en funcionamiento normal.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique external consistency.
+\end{uaexercise}
+
+\begin{uaanswer}
+External consistency significa que si una transacción parece terminar antes que otra desde el punto de vista externo, ese orden se preserva en la serialización del sistema. Es una noción más fuerte que eventual consistency porque no solo exige convergencia, sino orden global compatible con la observación temporal.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué Spanner sacrifica latencia incluso sin partición.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque su objetivo no es simplemente “seguir funcionando”, sino garantizar consistencia fuerte global. Para hacerlo, debe coordinar réplicas, usar consenso y respetar incertidumbre temporal con commit wait. Todo eso introduce latencia aunque la red esté funcionando correctamente.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare Dynamo y Spanner.
+\end{uaexercise}
+
+\begin{uaanswer}
+Dynamo:
+\begin{itemize}
+\item consistencia eventual;
+\item latencia baja;
+\item disponibilidad alta;
+\item conflictos visibles y reconciliación posterior.
+\end{itemize}
+
+Spanner:
+\begin{itemize}
+\item consistencia fuerte global;
+\item latencia más alta;
+\item coordinación fuerte;
+\item menos disponibilidad bajo partición.
+\end{itemize}
+
+No compiten por el mismo objetivo. Responden a dominios distintos.
+\end{uaanswer}
+
+\begin{uaexercise}
+Indique para qué tipo de aplicación elegiría Dynamo y para cuál elegiría Spanner.
+\end{uaexercise}
+
+\begin{uaanswer}
+Elegiría Dynamo para aplicaciones donde:
+\begin{itemize}
+\item pequeñas inconsistencias temporales son aceptables;
+\item la disponibilidad continua es prioritaria;
+\item la reconciliación posterior tiene sentido.
+\end{itemize}
+
+Elegiría Spanner para aplicaciones donde:
+\begin{itemize}
+\item el dominio exige transacciones correctas globalmente;
+\item los errores de consistencia son extremadamente costosos;
+\item la latencia extra es aceptable.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una base global para una red social.
+\end{uaexercise}
+
+\begin{uaanswer}
+La orientaría más cerca de Dynamo. En una red social, muchas operaciones toleran consistencia eventual:
+\begin{itemize}
+\item timelines;
+\item likes;
+\item comentarios que pueden aparecer con pequeño retraso.
+\end{itemize}
+
+El costo de una inconsistencia breve suele ser menor que el costo de alta latencia global o indisponibilidad.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una base global para una plataforma financiera.
+\end{uaexercise}
+
+\begin{uaanswer}
+La orientaría más cerca de Spanner. En un sistema financiero, inconsistencias temporales pueden implicar:
+\begin{itemize}
+\item doble gasto;
+\item saldo incorrecto;
+\item orden incorrecto de operaciones.
+\end{itemize}
+
+En ese dominio, la latencia extra suele ser preferible a la ambigüedad semántica.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo CAP, PACELC y el modelo $D=(P,F,G,S,T)$ se complementan.
+\end{uaexercise}
+
+\begin{uaanswer}
+CAP describe el límite bajo partición. PACELC extiende la discusión a operación normal, incorporando latencia. El modelo $D=(P,F,G,S,T)$ permite organizar estas restricciones dentro de un proceso de diseño explícito:
+
+\begin{itemize}
+\item $P$: problema del dominio;
+\item $F$: fallas asumidas;
+\item $G$: garantía requerida;
+\item $S$: solución arquitectónica;
+\item $T$: costo aceptado.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un caso donde la disponibilidad extrema resulte peor para el negocio que una indisponibilidad temporal.
+\end{uaexercise}
+
+\begin{uaanswer}
+Un ejemplo es una operación financiera que se ejecuta con datos inconsistentes durante una partición. Si el sistema responde siempre, pero autoriza operaciones incompatibles con el estado real, el daño puede ser más grave que rechazar temporalmente solicitudes.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un caso donde una pequeña inconsistencia temporal sea preferible a una alta latencia global.
+\end{uaexercise}
+
+\begin{uaanswer}
+En un feed social global, que un like tarde unos segundos en verse es normalmente preferible a forzar coordinación global fuerte que empeore fuertemente la experiencia interactiva de millones de usuarios.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la pregunta correcta no es “qué sistema es mejor”, sino “qué error es más costoso en este dominio”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque todo diseño distribuido tiene costos inevitables. La decisión correcta depende de qué error el dominio tolera peor:
+\begin{itemize}
+\item inconsistencia temporal;
+\item indisponibilidad;
+\item latencia alta;
+\item reconciliación compleja.
+\end{itemize}
+
+No existe sistema universalmente superior. Existen elecciones coherentes con un dominio.
+\end{uaanswer}
 
 \end{document}

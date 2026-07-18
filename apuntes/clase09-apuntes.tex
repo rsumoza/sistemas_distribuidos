@@ -1,41 +1,270 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{09}
-\UASetClassTitle{Logs y procesamiento distribuido}
-\title{Clase 09 --- Logs y procesamiento distribuido}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\UASetDocKind{Apuntes}
+
+\title{Clase 09 --- Monolito, microservicios, event-driven y sagas}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 09 desarrolla el tema ``Logs y procesamiento distribuido'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Modelar sistemas como flujos de eventos sobre logs particionados y consumidores coordinados. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+Luego de estudiar RPC, replicación, consistencia, consenso, transacciones, almacenamiento y logs, aparece una pregunta más amplia: \emph{cómo organizar todo eso en una arquitectura real}. Esta clase busca responder esa pregunta.
 
-\subsection{Preguntas guía}
+La tesis principal es la siguiente:
+
+\begin{quote}
+La arquitectura distribuida no es una cuestión de estilo ni de moda; es una decisión sobre acoplamiento, visibilidad, consistencia, fallas y costo operativo.
+\end{quote}
+
+Por eso, una buena arquitectura no se define por “usar microservicios” o “usar eventos”, sino por hacer explícitas las tensiones que cada elección introduce.
+
+\section{Monolito modular}
+
+\subsection{Definición}
+
+Un monolito modular es una aplicación desplegada como una unidad, pero organizada internamente en módulos con responsabilidades diferenciadas.
+
+\subsection{Ventajas}
+
 \begin{itemize}
-\item ¿Cómo aparece topics en un sistema real? \item ¿Cómo aparece partitions en un sistema real? \item ¿Cómo aparece offsets en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item simplicidad operacional;
+\item despliegue unificado;
+\item transacciones locales sencillas;
+\item debugging relativamente directo;
+\item menor costo de coordinación distribuida.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 09 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+\subsection{Límites}
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
-
-\section{Bibliografía guía}
 \begin{itemize}
-\item Kleppmann, cap. 11.
-\item Kafka documentation.
-\item Confluent design docs introductorios.
+\item acoplamiento creciente si los módulos no se respetan;
+\item dificultad para desplegar partes por separado;
+\item escalado menos granular;
+\item riesgo de que toda la aplicación evolucione como una sola masa.
+\end{itemize}
+
+\subsection{Lectura correcta}
+
+El monolito no es un antipatrón por definición. De hecho, para muchos sistemas y equipos, es la opción correcta durante bastante tiempo. La cuestión no es “si es moderno”, sino si permite evolucionar el dominio sin introducir complejidad distribuida prematura.
+
+\section{Microservicios}
+
+\subsection{Definición}
+
+Una arquitectura de microservicios organiza el sistema como un conjunto de servicios autónomos, con ownership propio sobre una parte del dominio y, en muchos casos, también sobre sus datos.
+
+\subsection{Promesas}
+
+\begin{itemize}
+\item despliegue independiente;
+\item escalado por componente;
+\item autonomía de equipos;
+\item aislamiento de dominios;
+\item evolución desacoplada.
+\end{itemize}
+
+\subsection{Costos reales}
+
+\begin{itemize}
+\item fallas parciales;
+\item latencia de red;
+\item retries, timeouts e idempotencia en todos lados;
+\item datos distribuidos;
+\item dificultad de observabilidad;
+\item necesidad de coordinar semántica entre servicios.
+\end{itemize}
+
+\begin{uawarn}
+Una arquitectura de microservicios cambia parte de la complejidad del código por complejidad de red, operaciones y consistencia.
+\end{uawarn}
+
+\subsection{Conclusión intermedia}
+
+No se debe migrar a microservicios porque “así se hace a escala”, sino cuando el dominio y la organización ya justifican pagar ese costo.
+
+\section{Arquitecturas orientadas a eventos}
+
+\subsection{Idea}
+
+En vez de acoplarse con llamadas sincrónicas, los servicios publican eventos y otros servicios reaccionan a ellos.
+
+\subsection{Ventajas}
+
+\begin{itemize}
+\item desacoplamiento temporal;
+\item posibilidad de replay;
+\item múltiples consumidores sobre la misma historia;
+\item integración más flexible;
+\item mejor soporte para pipelines de procesamiento.
+\end{itemize}
+
+\subsection{Problemas nuevos}
+
+\begin{itemize}
+\item trazabilidad más difícil;
+\item orden generalmente parcial;
+\item duplicación de eventos;
+\item consistencia eventual entre proyecciones;
+\item debugging menos intuitivo.
+\end{itemize}
+
+\subsection{Cambio conceptual}
+
+Cuando el sistema pasa a ser event-driven, el estado deja de ser el único centro del diseño y la historia del cambio gana protagonismo. Esto conecta con la clase anterior sobre logs distribuidos.
+
+\section{Coreografía y orquestación}
+
+\subsection{Coreografía}
+
+Cada servicio responde a eventos relevantes y decide localmente qué hacer después. No hay un coordinador central explícito.
+
+\paragraph{Ventajas}
+\begin{itemize}
+\item menor acoplamiento central;
+\item alta autonomía local.
+\end{itemize}
+
+\paragraph{Problemas}
+\begin{itemize}
+\item flujo global más difícil de entender;
+\item trazabilidad y debugging más complejos;
+\item lógica distribuida implícita en múltiples servicios.
+\end{itemize}
+
+\subsection{Orquestación}
+
+Un componente explícito coordina el flujo, decide el siguiente paso y supervisa el progreso de la operación compuesta.
+
+\paragraph{Ventajas}
+\begin{itemize}
+\item visibilidad del flujo;
+\item mejor control del proceso;
+\item razonamiento más directo sobre el orden de pasos.
+\end{itemize}
+
+\paragraph{Problemas}
+\begin{itemize}
+\item mayor acoplamiento al orquestador;
+\item riesgo de centralización excesiva;
+\item el orquestador mismo se vuelve crítico.
+\end{itemize}
+
+\section{Sagas}
+
+\subsection{Motivación}
+
+En arquitecturas distribuidas con múltiples servicios y datos descentralizados, no siempre es razonable usar transacciones distribuidas fuertes como 2PC. En su lugar aparecen las sagas.
+
+\subsection{Definición}
+
+Una saga es una secuencia de transacciones locales, donde cada paso exitoso puede requerir una compensación si un paso posterior falla.
+
+\subsection{Compensación}
+
+La compensación no equivale a un rollback físico perfecto. Es una nueva acción de negocio que intenta neutralizar el efecto previo.
+
+Ejemplos:
+\begin{itemize}
+\item cancelar una reserva;
+\item emitir una devolución;
+\item revertir un estado visible.
+\end{itemize}
+
+\subsection{Límite importante}
+
+La compensación puede:
+\begin{itemize}
+\item no ser instantánea;
+\item no ser perfecta;
+\item generar nuevos efectos observables.
+\end{itemize}
+
+Por eso, diseñar sagas exige pensar no solo en el camino feliz, sino también en las trayectorias de falla y en su semántica.
+
+\section{Propiedad de datos y límites de dominio}
+
+Una de las decisiones más delicadas en microservicios es quién es dueño de qué dato. Si dos servicios comparten y actualizan libremente el mismo dato, la separación de servicios pierde sentido.
+
+La recomendación general es:
+
+\begin{quote}
+cada servicio debería ser dueño de su modelo y exponer contratos, no tablas ajenas.
+\end{quote}
+
+Esto obliga a tratar la consistencia entre servicios como un problema explícito de integración y no como una ilusión de base de datos compartida.
+
+\section{Criterios para elegir arquitectura}
+
+\subsection{Cuándo evitar microservicios}
+
+\begin{itemize}
+\item equipo pequeño;
+\item dominio todavía inestable;
+\item necesidad fuerte de transacciones locales;
+\item baja presión de despliegue independiente;
+\item poca madurez operativa.
+\end{itemize}
+
+\subsection{Cuándo considerarlos}
+
+\begin{itemize}
+\item bounded contexts relativamente claros;
+\item equipos autónomos;
+\item diferencias grandes en carga o ciclo de cambio;
+\item capacidad de observabilidad y operación distribuida.
+\end{itemize}
+
+\subsection{Pregunta correcta}
+
+La pregunta no es:
+\begin{quote}
+“¿Monolito o microservicios?”
+\end{quote}
+
+La pregunta correcta es:
+\begin{quote}
+“¿Qué complejidad necesito introducir hoy y cuál puedo postergar sin hipotecar el futuro?”
+\end{quote}
+
+\section{Modelo del curso}
+
+Podemos aplicar el esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Por ejemplo, para una arquitectura event-driven de pedidos:
+
+\begin{itemize}
+\item $P$: coordinar pedido, pago y envío;
+\item $F$: fallas parciales, duplicación de eventos, retrasos;
+\item $G$: completar el flujo con consistencia razonable de negocio;
+\item $S$: eventos + saga + compensaciones;
+\item $T$: consistencia eventual, trazabilidad más compleja, debugging más difícil.
+\end{itemize}
+
+\section{Conclusión}
+
+La arquitectura distribuida correcta no es la que maximiza independencia, ni la que reduce al mínimo la latencia, ni la que usa más componentes. Es la que hace explícitos sus trade-offs y los alinea con:
+
+\begin{itemize}
+\item el dominio;
+\item la organización;
+\item el equipo;
+\item la semántica requerida;
+\item los modos de falla aceptables.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Arquitectura distribuida no es “partir el sistema en servicios”. Es decidir, con rigor, dónde poner las fronteras y qué costo semántico y operacional aceptar en cada una.
 \end{uakeybox}
+
 \end{document}

@@ -1,41 +1,246 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{13}
-\UASetClassTitle{Resiliencia y tolerancia a fallas}
-\title{Clase 13 --- Resiliencia y tolerancia a fallas}
+\UASetClassTitle{Confiabilidad operativa}
+\UASetDocKind{Apuntes}
+
+\title{Clase 13 --- Confiabilidad operativa: SLI, SLO, SLA, error budgets y operación guiada por objetivos}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 13 desarrolla el tema ``Resiliencia y tolerancia a fallas'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Diseñar sistemas que fallen bien usando timeouts, retries, circuit breakers y validación bajo caos. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+Una vez que el sistema ya puede observarse, resistir fallas y someterse a experimentación controlada, aparece una pregunta inevitable: ¿cómo decidimos si está funcionando lo suficientemente bien?
 
-\subsection{Preguntas guía}
+Responder “anda bien” o “anda mal” sin criterios explícitos conduce a operación reactiva, discusiones subjetivas y prioridades inconsistentes. Por eso, la confiabilidad operativa moderna se apoya en objetivos formales.
+
+\begin{quote}
+La confiabilidad no se define por perfección absoluta, sino por el cumplimiento de objetivos explícitos relevantes para el usuario.
+\end{quote}
+
+\section{Service Level Indicators (SLI)}
+
+\subsection{Definición}
+
+Un Service Level Indicator (SLI) es una métrica que captura una propiedad relevante del servicio desde la perspectiva del usuario o del comportamiento observable del sistema.
+
+\subsection{Ejemplos}
+
 \begin{itemize}
-\item ¿Cómo aparece timeout en un sistema real? \item ¿Cómo aparece retry en un sistema real? \item ¿Cómo aparece backoff en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item porcentaje de requests exitosas;
+\item latencia p95 o p99;
+\item porcentaje de jobs completados;
+\item retraso máximo tolerado en un pipeline de eventos;
+\item porcentaje de lecturas correctas o dentro de tiempo esperado.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 13 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+\subsection{Qué hace bueno a un SLI}
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+Un buen SLI debe ser:
 
-\section{Bibliografía guía}
 \begin{itemize}
-\item Google SRE Book.
-\item Principles of Chaos Engineering.
-\item Lecturas de resiliencia y anti-patterns.
+\item \textbf{relevante}: reflejar algo que realmente importe a usuarios o al producto;
+\item \textbf{medible}: poder calcularse con datos confiables;
+\item \textbf{estable}: no depender de señales erráticas o mal definidas;
+\item \textbf{accionable}: permitir tomar decisiones operativas o de ingeniería.
 \end{itemize}
+
+\subsection{Ejemplo de mal SLI}
+
+Un indicador como “CPU promedio del cluster” puede ser útil para operación, pero no necesariamente es un buen SLI si no expresa una propiedad observable del servicio para el usuario.
+
+\section{Service Level Objectives (SLO)}
+
+\subsection{Definición}
+
+Un Service Level Objective (SLO) es un objetivo cuantitativo sobre uno o más SLI.
+
+Ejemplos:
+\begin{itemize}
+\item 99.9\% de requests exitosas en 30 días;
+\item p95 de latencia menor a 300 ms;
+\item 99.95\% de jobs procesados en menos de 10 segundos.
+\end{itemize}
+
+\subsection{Propósito}
+
+El SLO convierte una expectativa vaga en un criterio operativo explícito. Esto permite:
+\begin{itemize}
+\item evaluar si el servicio está cumpliendo;
+\item priorizar trabajo de confiabilidad;
+\item decidir si conviene desplegar, frenar o invertir en mejoras;
+\item comunicar con claridad el nivel de servicio esperado.
+\end{itemize}
+
+\subsection{Ventana temporal}
+
+Todo SLO necesita una ventana, por ejemplo:
+\begin{itemize}
+\item 7 días;
+\item 30 días;
+\item trimestre;
+\item rolling window.
+\end{itemize}
+
+La ventana importa porque cambia la interpretación del incumplimiento: una mala hora no significa lo mismo que una degradación sostenida durante semanas.
+
+\section{Service Level Agreements (SLA)}
+
+\subsection{Definición}
+
+Un Service Level Agreement (SLA) es un compromiso formal y externo, a menudo contractual, asociado a uno o más objetivos de nivel de servicio.
+
+\subsection{Relación con SLI y SLO}
+
+\begin{itemize}
+\item \textbf{SLI}: qué se mide;
+\item \textbf{SLO}: qué objetivo se fija;
+\item \textbf{SLA}: qué se promete formalmente a terceros.
+\end{itemize}
+
+\subsection{Importancia práctica}
+
+Un equipo puede operar con SLOs internos más exigentes que el SLA externo, para reservar margen de seguridad.
+
+\section{Error Budgets}
+
+\subsection{Definición}
+
+Si el SLO no exige 100\% de cumplimiento, entonces existe una fracción de falla tolerada. Esa fracción es el \emph{error budget}.
+
+Ejemplo:
+\begin{itemize}
+\item SLO = 99.9\% de disponibilidad mensual;
+\item error budget = 0.1\% del tiempo o requests del período.
+\end{itemize}
+
+\subsection{Interpretación}
+
+El error budget no es permiso para degradar arbitrariamente el sistema, sino una forma de balancear:
+\begin{itemize}
+\item confiabilidad;
+\item ritmo de cambio;
+\item riesgo aceptable;
+\item velocidad de innovación.
+\end{itemize}
+
+\subsection{Uso operativo}
+
+Si el sistema consume demasiado rápido su error budget, el equipo puede decidir:
+\begin{itemize}
+\item frenar despliegues;
+\item priorizar deuda técnica;
+\item investigar degradación;
+\item endurecer validaciones;
+\item reconfigurar alertas o mecanismos de resiliencia.
+\end{itemize}
+
+\section{Operación guiada por objetivos}
+
+\subsection{Sin objetivos explícitos}
+
+Operar sin SLOs conduce a:
+\begin{itemize}
+\item incidentes juzgados subjetivamente;
+\item discusiones ambiguas entre producto e ingeniería;
+\item dificultad para priorizar mantenimiento vs nuevas features;
+\item alertas ruidosas o inconsistentes.
+\end{itemize}
+
+\subsection{Con objetivos explícitos}
+
+Operar con SLOs permite:
+\begin{itemize}
+\item tener un lenguaje compartido;
+\item convertir confiabilidad en una variable administrable;
+\item conectar decisiones técnicas con impacto de producto;
+\item establecer umbrales razonables de degradación.
+\end{itemize}
+
+\section{Diseño de buenos SLOs}
+
+\subsection{Principios}
+
+Un buen SLO debe ser:
+\begin{itemize}
+\item comprensible;
+\item medible;
+\item centrado en la experiencia del usuario;
+\item suficientemente exigente para importar;
+\item suficientemente realista para ser sostenible.
+\end{itemize}
+
+\subsection{Errores frecuentes}
+
+\begin{itemize}
+\item definir SLOs imposibles de medir;
+\item usar promedios cuando los percentiles son lo relevante;
+\item medir infraestructura en vez de servicio;
+\item mezclar muchas propiedades en un único número opaco;
+\item fijar objetivos irrealistas que fuerzan sobreingeniería.
+\end{itemize}
+
+\section{Ejemplos}
+
+\subsection{API pública}
+\begin{itemize}
+\item SLI: porcentaje de requests exitosas;
+\item SLO: 99.95\% en rolling window de 30 días.
+\end{itemize}
+
+\subsection{Servicio de checkout}
+\begin{itemize}
+\item SLI: porcentaje de checkouts completados exitosamente;
+\item SLO: 99.9\% mensual;
+\item error budget: 0.1\%.
+\end{itemize}
+
+\subsection{Pipeline de eventos}
+\begin{itemize}
+\item SLI: porcentaje de eventos procesados en menos de 5 segundos;
+\item SLO: 99.5\% semanal.
+\end{itemize}
+
+\section{Tensiones reales}
+
+Elegir SLOs obliga a enfrentar preguntas difíciles:
+\begin{itemize}
+\item ¿qué tan rápido debe responder el sistema para que siga siendo útil?;
+\item ¿cuánta degradación puede tolerarse?;
+\item ¿qué servicio merece más presupuesto de confiabilidad?;
+\item ¿qué tipo de error es más costoso para el negocio?
+\end{itemize}
+
+Esto conecta la confiabilidad con decisiones de arquitectura, resiliencia y producto.
+
+\section{Modelo del curso}
+
+Podemos expresar este problema como:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Ejemplo:
+\begin{itemize}
+\item $P$: operar un servicio con criterio explícito de calidad;
+\item $F$: fallas parciales, degradaciones, incidentes, ruido observacional;
+\item $G$: cumplimiento de nivel de servicio acordado;
+\item $S$: SLI + SLO + error budgets + políticas operativas;
+\item $T$: disciplina organizacional, costo de medición, decisiones más visibles y trazables.
+\end{itemize}
+
+\section{Conclusión}
+
+La confiabilidad operativa madura no se basa en intuiciones del tipo “esto parece estable”. Se basa en métricas relevantes, objetivos explícitos y presupuestos de error que permitan tomar decisiones consistentes.
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Confiabilidad operativa significa administrar explícitamente cuánto falla el sistema, cuánto puede tolerarse y cuándo el costo del error obliga a cambiar el ritmo de cambio.
 \end{uakeybox}
+
 \end{document}

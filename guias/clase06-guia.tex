@@ -1,24 +1,216 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{06}
-\UASetClassTitle{Quórums}
-\title{Clase 06 --- Quórums}
+\UASetClassTitle{Sistemas de almacenamiento}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 06 --- Guía de ejercicios completa}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 06.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Quórums''.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
+\section{Indicaciones}
+
+Justificar todas las respuestas.  
+Se espera razonamiento técnico (no definiciones superficiales).
+
+---
+
+\section{Nivel 1: WAL y durabilidad}
+
+\begin{uaexercise}
+Explique formalmente por qué la regla WAL garantiza atomicidad en presencia de fallas.
+Modele el estado antes y después de un crash.
+\end{uaexercise}
+
+\begin{uaexercise}
+Considere una secuencia:
+\[
+T: write(x=5), write(y=10), commit
+\]
+y un crash luego de escribir en disco pero antes del commit.
+Describa paso a paso qué hace el recovery.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué problema ocurriría si el sistema escribiera datos antes del log.
+Construya un contraejemplo concreto.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diferencie REDO logging vs UNDO logging con un ejemplo completo de ejecución.
+\end{uaexercise}
+
+---
+
+\section{Nivel 2: MVCC profundo}
+
+\begin{uaexercise}
+Considere tres versiones de un objeto:
+\[
+(x, v_1, t=1), (x, v_2, t=5), (x, v_3, t=10)
+\]
+¿Qué valor devuelve una transacción con timestamp $t=6$? Justifique.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique cómo MVCC permite eliminar bloqueos entre lectores y escritores.
+Modele dos transacciones concurrentes paso a paso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un ejemplo donde MVCC produzca write skew.
+Explique por qué no hay conflicto directo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique el problema de garbage collection en MVCC.
+¿Cuándo es seguro eliminar versiones antiguas?
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un algoritmo simple de garbage collection basado en timestamps activos.
+\end{uaexercise}
+
+---
+
+\section{Nivel 3: LSM Trees}
+
+\begin{uaexercise}
+Describa paso a paso qué ocurre cuando se inserta una clave en un sistema LSM.
+Incluya WAL, Memtable y SSTable.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué LSM evita escrituras aleatorias.
+Relaciónelo con propiedades del disco.
+\end{uaexercise}
+
+\begin{uaexercise}
+Defina write amplification y explique por qué ocurre en LSM.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa un proceso completo de compaction.
+Incluya:
+\begin{itemize}
+\item merge
+\item eliminación de versiones viejas
+\item impacto en rendimiento
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique read amplification en LSM.
+¿Por qué leer puede ser más costoso que escribir?
+\end{uaexercise}
+
+---
+
+\section{Nivel 4: Índices y estructuras}
+
+\begin{uaexercise}
+Explique cómo funciona un B-Tree en inserciones y búsquedas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Compare B-Tree vs LSM para:
+\begin{itemize}
+\item latencia de lectura
+\item latencia de escritura
+\item uso de disco
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un sistema que requiera:
+\begin{itemize}
+\item 90\% lecturas
+\item 10\% escrituras
+\end{itemize}
+¿Qué estructura elegiría y por qué?
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un sistema con:
+\begin{itemize}
+\item ingestión masiva de datos
+\item pocas lecturas
+\end{itemize}
+Justifique su elección.
+\end{uaexercise}
+
+---
+
+\section{Nivel 5: Integración de componentes}
+
+\begin{uaexercise}
+Explique cómo WAL y MVCC interactúan en un sistema real.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa cómo MVCC puede implementarse sobre LSM.
+\end{uaexercise}
+
+\begin{uaexercise}
+Relacione:
+\begin{itemize}
+\item WAL → durabilidad
+\item MVCC → aislamiento
+\item LSM → performance
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Construya un diagrama completo de un storage engine moderno combinando:
+WAL + MVCC + LSM.
+\end{uaexercise}
+
+---
+
+\section{Nivel 6: Diseño avanzado}
+
+\begin{uaexercise}
+Diseñe un motor de almacenamiento para una red social global.
+Considere:
+\begin{itemize}
+\item alto volumen de escrituras
+\item lecturas frecuentes
+\item consistencia eventual
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe un motor para sistema financiero.
+Considere:
+\begin{itemize}
+\item consistencia fuerte
+\item baja tolerancia a errores
+\end{itemize}
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplique el modelo:
+\[
+D = (P, F, G, S, T)
+\]
+al diseño de un storage engine.
+\end{uaexercise}
+
+\begin{uaexercise}
+Identifique los principales trade-offs entre:
+\begin{itemize}
+\item latencia
+\item throughput
+\item consistencia
+\item costo
+\end{itemize}
+\end{uaexercise}
+
+---
 
 \end{document}

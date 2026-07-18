@@ -1,73 +1,235 @@
 % !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
+
 \UASetClassNumber{10}
-\UASetClassTitle{Transacciones distribuidas}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 10 --- Transacciones distribuidas}
+\UASetClassTitle{Observabilidad distribuida}
+\title{\UACourse}
+\subtitle{Clase 10 --- Tracing, métricas, logs y debugging en producción}
+
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Transacciones distribuidas}
+\UASectionSlide{El problema operacional}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{Después de diseñar, hay que operar}
+Ya vimos:
 \begin{itemize}
-\item Analizar coordinación entre múltiples servicios mediante 2PC, sagas y compensaciones.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item RPC, retries, consistencia
+\item transacciones, logs, arquitectura
+\end{itemize}
+
+\pause
+
+\begin{block}{Problema}
+¿Cómo entendemos qué está pasando en un sistema distribuido real cuando algo sale mal?
+\end{block}
+\end{frame}
+
+\begin{frame}{La intuición equivocada}
+En un monolito local, debugging suele significar:
+\begin{itemize}
+\item mirar stack trace
+\item revisar logs
+\item reproducir error
+\end{itemize}
+
+\pause
+
+En un sistema distribuido:
+\begin{itemize}
+\item no hay un único proceso
+\item no hay un único reloj
+\item no hay una única narrativa local
 \end{itemize}
 \end{frame}
 
+\begin{frame}{Observabilidad}
+\begin{block}{Idea}
+Un sistema observable es uno cuyo estado interno puede inferirse a partir de sus salidas.
+\end{block}
 
-\begin{frame}{Problema central}
-La clase 10 trabaja un tipo específico de dificultad distribuida: Analizar coordinación entre múltiples servicios mediante 2PC, sagas y compensaciones.
+\pause
 
+En práctica:
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item logs
+\item métricas
+\item trazas
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\UASectionSlide{Logs}
+
+\begin{frame}{Logs}
+Los logs responden principalmente:
+\begin{quote}
+¿Qué pasó?
+\end{quote}
+
+\pause
+
+Tipos:
 \begin{itemize}
-\item 2PC
-\item bloqueo
-\item sagas
-\item compensaciones
+\item texto plano
+\item estructurados
+\item enriquecidos con contexto
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Logs estructurados}
+Ejemplo:
+\begin{itemize}
+\item timestamp
+\item service\_name
+\item request\_id
+\item user\_id
+\item error\_code
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Clave}
+Un log sin contexto distribuido sirve poco.
+\end{alertblock}
+\end{frame}
+
+\UASectionSlide{Métricas}
+
+\begin{frame}{Métricas}
+Las métricas responden:
+\begin{quote}
+¿Qué tan bien o qué tan mal está funcionando el sistema?
+\end{quote}
+
+\pause
+
+Ejemplos:
+\begin{itemize}
+\item throughput
+\item error rate
+\item latency
+\item saturation
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Golden Signals}
+\begin{itemize}
+\item Latency
+\item Traffic
+\item Errors
+\item Saturation
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Tracing distribuido}
+
+\begin{frame}{Tracing}
+Tracing responde:
+\begin{quote}
+¿Cómo viajó esta request a través del sistema?
+\end{quote}
+\end{frame}
+
+\begin{frame}{Trazas y spans}
+\begin{itemize}
+\item Trace = request completa
+\item Span = operación individual
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo}
+\begin{center}
+\begin{tikzpicture}[node distance=2.8cm]
+\node[draw] (api) {API};
+\node[draw,right of=api] (auth) {Auth};
+\node[draw,right of=auth] (db) {DB};
+
+\draw[->] (api) -- node[above]{span 1} (auth);
+\draw[->] (auth) -- node[above]{span 2} (db);
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+\begin{frame}{Correlation IDs}
+\begin{itemize}
+\item request-id
+\item trace-id
+\item span-id
+\end{itemize}
+
+\pause
+
+\begin{block}{}
+Sin correlación, cada log local queda aislado.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Debugging en producción}
+
+\begin{frame}{Qué vuelve difícil el debugging}
+\begin{itemize}
+\item fallas parciales
+\item timing issues
+\item concurrencia
+\item estado distribuido
 \item consistencia eventual
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
-
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{Estrategia correcta}
+No buscar primero:
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item “la línea exacta”
+\end{itemize}
+
+Buscar primero:
+\begin{itemize}
+\item request afectada
+\item servicio degradado
+\item patrón de fallo
+\item dependencia crítica
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Cascadas de falla}
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item timeout en servicio A
+\item retry en servicio B
+\item saturación en DB
+\item explosión de errores en borde
 \end{itemize}
+
+\pause
+
+\begin{alertblock}{Lección}
+Muchas fallas visibles son síntomas tardíos de otra falla upstream.
+\end{alertblock}
 \end{frame}
 
+\UASectionSlide{Diseño para observabilidad}
+
+\begin{frame}{Observabilidad no es parche}
+Debe diseñarse desde el inicio:
+\begin{itemize}
+\item logs estructurados
+\item métricas por servicio
+\item tracing distribuido
+\item propagación de contexto
+\end{itemize}
+\end{frame}
 
 \begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 10 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{block}{Idea central}
+Si no podés observar el sistema distribuido, no podés operarlo con criterio.
 \end{block}
 \end{frame}
 
