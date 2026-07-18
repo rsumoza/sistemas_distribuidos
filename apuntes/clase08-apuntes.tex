@@ -1,41 +1,321 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{08}
-\UASetClassTitle{Particionado y escalabilidad}
-\title{Clase 08 --- Particionado y escalabilidad}
+\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
+\UASetDocKind{Apuntes}
+
+\title{Clase 08 --- Consistencia real: CAP, PACELC, Dynamo y Spanner}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 08 desarrolla el tema ``Particionado y escalabilidad'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Diseñar distribución de datos para escalar sin rebalanceos innecesarios ni hotspots graves. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+Las clases anteriores introdujeron modelos de consistencia, replicación, consenso y logs. Esta clase da un paso más: estudiar cómo estas ideas se concretan en sistemas reales.
 
-\subsection{Preguntas guía}
+El punto de partida es aceptar que no existe una arquitectura universalmente óptima. Todo sistema grande toma decisiones sobre:
+
 \begin{itemize}
-\item ¿Cómo aparece sharding en un sistema real? \item ¿Cómo aparece hash mod N en un sistema real? \item ¿Cómo aparece consistent hashing en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item consistencia;
+\item disponibilidad;
+\item latencia;
+\item complejidad de reconciliación;
+\item semántica aceptable para la aplicación.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 08 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+Dos referencias paradigmáticas son:
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
-
-\section{Bibliografía guía}
 \begin{itemize}
-\item Kleppmann, cap. 6.
-\item Dynamo paper.
-\item Tanenbaum, particionado y distribución de datos.
+\item \textbf{Dynamo}: prioriza disponibilidad y tolerancia a particiones;
+\item \textbf{Spanner}: prioriza consistencia fuerte global.
+\end{itemize}
+
+\section{CAP}
+
+\subsection{Formulación correcta}
+
+CAP se refiere a sistemas replicados bajo partición. La lectura correcta es:
+
+\begin{quote}
+Si ocurre una partición de red, no es posible ofrecer simultáneamente consistencia fuerte observable y disponibilidad total de las operaciones.
+\end{quote}
+
+\subsection{Consistencia en CAP}
+
+La consistencia de CAP no significa simplemente “datos correctos”, sino una semántica fuerte de visibilidad, usualmente interpretada como linearizabilidad o algo muy cercano a ella.
+
+\subsection{Disponibilidad en CAP}
+
+Disponibilidad significa que toda solicitud a un nodo no fallado recibe respuesta, aun bajo partición.
+
+\subsection{Interpretación correcta}
+
+CAP no clasifica sistemas en una tabla estática. Obliga a explicitar qué ocurre cuando la red se parte.
+
+\begin{uakeybox}
+CAP no es un slogan. Es una restricción operacional bajo partición.
+\end{uakeybox}
+
+\section{PACELC}
+
+\subsection{Motivación}
+
+CAP es insuficiente para describir sistemas reales porque solo habla del caso en que hay partición. Sin embargo, incluso cuando no la hay, existe una tensión fundamental entre consistencia y latencia.
+
+\subsection{Formulación}
+
+\begin{quote}
+If \textbf{P}artition, choose between \textbf{A}vailability and \textbf{C}onsistency; \\
+\textbf{E}lse, choose between \textbf{L}atency and \textbf{C}onsistency.
+\end{quote}
+
+\subsection{Interpretación}
+
+PACELC amplía la discusión:
+
+\begin{itemize}
+\item CAP: ¿qué sacrifico bajo partición?
+\item PACELC: ¿qué sacrifico también en operación normal?
+\end{itemize}
+
+Esto lo vuelve mucho más útil para analizar bases distribuidas modernas.
+
+\section{Dynamo}
+
+\subsection{Objetivo}
+
+Dynamo fue diseñado para aplicaciones de Amazon que necesitaban:
+
+\begin{itemize}
+\item altísima disponibilidad;
+\item tolerancia a particiones;
+\item baja latencia;
+\item escalabilidad horizontal.
+\end{itemize}
+
+\subsection{Estrategia}
+
+Para lograrlo, Dynamo elige:
+
+\begin{itemize}
+\item consistencia eventual;
+\item quórums configurables;
+\item reconciliación posterior;
+\item almacenamiento versionado.
+\end{itemize}
+
+\subsection{Componentes claves}
+
+\paragraph{Consistent Hashing}
+Distribuye claves entre nodos de manera balanceada y facilita escalado.
+
+\paragraph{Replicación con parámetros $N, R, W$}
+\begin{itemize}
+\item $N$: número de réplicas;
+\item $W$: réplicas requeridas para escribir;
+\item $R$: réplicas requeridas para leer.
+\end{itemize}
+
+\paragraph{Intersección}
+Si:
+
+\[
+R + W > N
+\]
+
+entonces lectura y escritura intersectan.
+
+Sin embargo, esto no elimina completamente la posibilidad de:
+\begin{itemize}
+\item versiones atrasadas;
+\item conflictos concurrentes;
+\item necesidad de reconciliación.
+\end{itemize}
+
+\paragraph{Vector Clocks}
+Permiten detectar relaciones de causalidad entre versiones:
+\begin{itemize}
+\item una versión puede descender de otra;
+\item dos versiones pueden ser concurrentes.
+\end{itemize}
+
+\paragraph{Sloppy Quorum}
+Si un nodo no está disponible, se puede escribir en nodos alternativos temporales.
+
+\paragraph{Hinted Handoff}
+Permite reenviar posteriormente los datos al nodo correcto.
+
+\paragraph{Anti-Entropy}
+Sincroniza réplicas con mecanismos de repair / gossip.
+
+\subsection{Trade-off central}
+
+Dynamo consigue altísima disponibilidad a costa de:
+
+\begin{itemize}
+\item exponer conflictos;
+\item delegar parte de la reconciliación;
+\item aceptar inconsistencia temporal.
+\end{itemize}
+
+\subsection{Lectura en CAP/PACELC}
+
+Dynamo es típicamente:
+\begin{itemize}
+\item AP frente a CAP;
+\item PA/EL o, más intuitivamente, un diseño que favorece disponibilidad bajo partición y baja latencia en condiciones normales.
+\end{itemize}
+
+\section{Spanner}
+
+\subsection{Objetivo}
+
+Spanner fue diseñado para ofrecer:
+
+\begin{itemize}
+\item consistencia externa (external consistency);
+\item transacciones globales;
+\item SQL distribuido;
+\item escalabilidad multi-datacenter.
+\end{itemize}
+
+\subsection{Problema}
+
+¿Cómo mantener una ilusión de orden global fuerte en un sistema planetario donde la latencia y la incertidumbre temporal son inevitables?
+
+\subsection{Estrategia}
+
+Spanner combina:
+
+\begin{itemize}
+\item consenso por grupo de réplicas;
+\item particionamiento de datos;
+\item transacciones distribuidas;
+\item \textbf{TrueTime} para razonar explícitamente sobre incertidumbre temporal.
+\end{itemize}
+
+\subsection{TrueTime}
+
+TrueTime no entrega una hora exacta, sino un intervalo:
+
+\[
+TT.now() = [earliest, latest]
+\]
+
+La diferencia entre ambos extremos representa la incertidumbre temporal.
+
+Esto permite que el sistema no finja precisión absoluta. En su lugar, modela la incertidumbre y la usa para garantizar orden de commit.
+
+\subsection{Commit Wait}
+
+Para asegurar external consistency, Spanner espera el tiempo suficiente para que el commit de una transacción quede inequívocamente “en el pasado” respecto de transacciones posteriores.
+
+Este mecanismo tiene un costo inevitable:
+
+\begin{itemize}
+\item más consistencia fuerte global;
+\item más latencia.
+\end{itemize}
+
+\subsection{Trade-off central}
+
+Spanner evita conflictos mediante orden fuerte, pero paga por ello con:
+
+\begin{itemize}
+\item coordinación;
+\item commit wait;
+\item complejidad de infraestructura;
+\item menor disponibilidad bajo partición.
+\end{itemize}
+
+\subsection{Lectura en CAP/PACELC}
+
+Spanner es típicamente:
+\begin{itemize}
+\item CP en CAP;
+\item PC/EC en PACELC: bajo partición prioriza consistencia; en operación normal sigue pagando latencia para mantenerla.
+\end{itemize}
+
+\section{Comparación Dynamo vs Spanner}
+
+\subsection{Dynamo}
+\begin{itemize}
+\item maximiza disponibilidad;
+\item baja latencia;
+\item consistencia eventual;
+\item conflictos visibles;
+\item reconciliación posterior.
+\end{itemize}
+
+\subsection{Spanner}
+\begin{itemize}
+\item consistencia fuerte global;
+\item transacciones distribuidas;
+\item orden temporal controlado;
+\item mayor latencia;
+\item menor disponibilidad bajo partición.
+\end{itemize}
+
+\subsection{Interpretación}
+
+No existe una superioridad universal. Cada uno responde a un dominio distinto.
+
+\paragraph{Dynamo es razonable si:}
+\begin{itemize}
+\item pequeños desalineamientos temporales son aceptables;
+\item la disponibilidad es crítica;
+\item la aplicación tolera reconciliación.
+\end{itemize}
+
+\paragraph{Spanner es razonable si:}
+\begin{itemize}
+\item el dominio exige consistencia fuerte global;
+\item la latencia extra es aceptable;
+\item la semántica del negocio no tolera reconciliaciones posteriores.
+\end{itemize}
+
+\section{Modelo del curso}
+
+Podemos resumir el diseño de consistencia real con:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Ejemplo para Dynamo:
+\begin{itemize}
+\item $P$: disponibilidad global de datos;
+\item $F$: partición, nodos lentos, caídas;
+\item $G$: lectura/escritura eventual y durable;
+\item $S$: quórums flexibles, versionado, repair;
+\item $T$: conflictos e inconsistencia temporal.
+\end{itemize}
+
+Ejemplo para Spanner:
+\begin{itemize}
+\item $P$: transacciones globales correctas;
+\item $F$: particiones, latencia intercontinental;
+\item $G$: external consistency;
+\item $S$: consenso, TrueTime, commit wait;
+\item $T$: latencia y complejidad.
+\end{itemize}
+
+\section{Conclusión}
+
+La consistencia real no se decide en abstracto. Se decide a partir de:
+
+\begin{itemize}
+\item qué errores acepta el dominio;
+\item qué latencia es tolerable;
+\item qué disponibilidad se exige;
+\item quién resuelve la inconsistencia: el sistema o la aplicación.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+CAP y PACELC no son slogans. Dynamo y Spanner muestran que son decisiones de diseño concretas, con costos reales y consecuencias observables.
 \end{uakeybox}
+
 \end{document}

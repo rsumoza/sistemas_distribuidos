@@ -1,41 +1,276 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{12}
-\UASetClassTitle{Observabilidad y debugging}
-\title{Clase 12 --- Observabilidad y debugging}
+\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetDocKind{Apuntes}
+
+\title{Clase 12 --- Chaos Engineering, fault injection y testing distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 12 desarrolla el tema ``Observabilidad y debugging'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Diseñar observabilidad realista con logs, métricas, trazas y correlación entre componentes. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+En sistemas distribuidos, diseñar mecanismos de resiliencia no basta. El verdadero problema es demostrar que esos mecanismos se comportan como se espera bajo condiciones de falla realistas.
 
-\subsection{Preguntas guía}
+Una arquitectura puede parecer correcta en papel y aún así colapsar cuando:
 \begin{itemize}
-\item ¿Cómo aparece logs en un sistema real? \item ¿Cómo aparece métricas en un sistema real? \item ¿Cómo aparece trazas en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item la latencia sube un poco;
+\item una dependencia responde intermitentemente;
+\item una cola se llena;
+\item un retry mal calibrado amplifica la presión;
+\item una partición parcial rompe una hipótesis implícita.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 12 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+Por eso, la validación experimental del comportamiento bajo falla es una disciplina central.
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+\section{Testing distribuido y sus límites}
 
-\section{Bibliografía guía}
+\subsection{Testing clásico}
+
+Unit tests e integration tests tradicionales son necesarios, pero tienen límites evidentes:
 \begin{itemize}
-\item Google SRE Book.
-\item OpenTelemetry docs.
-\item Observabilidad en sistemas distribuidos modernos.
+\item suelen asumir tiempos ideales;
+\item usan mocks demasiado limpios;
+\item rara vez modelan pérdida, reorder o partición;
+\item prueban funciones, no siempre propiedades sistémicas.
+\end{itemize}
+
+\subsection{Problema}
+
+Los errores distribuidos aparecen precisamente en:
+\begin{itemize}
+\item interacciones;
+\item concurrencia;
+\item sincronización temporal;
+\item propagación de falla;
+\item reacciones colectivas del sistema.
+\end{itemize}
+
+\begin{uawarn}
+Un sistema puede pasar todos sus tests clásicos y aun así fallar gravemente ante perturbaciones realistas.
+\end{uawarn}
+
+\section{Chaos Engineering}
+
+\subsection{Definición}
+
+Chaos Engineering es la disciplina experimental que estudia el comportamiento del sistema bajo perturbaciones controladas.
+
+No consiste en “romper cosas” indiscriminadamente, sino en ejecutar experimentos deliberados con hipótesis explícitas.
+
+\subsection{Estructura de un experimento}
+
+Un experimento de chaos razonable tiene:
+
+\begin{enumerate}
+\item una definición de \emph{steady state};
+\item una hipótesis de comportamiento;
+\item una perturbación controlada;
+\item una observación medible del resultado;
+\item una conclusión que permita aprender o corregir.
+\end{enumerate}
+
+\section{Steady State}
+
+\subsection{Definición}
+
+El steady state es un conjunto de señales que representan comportamiento aceptable del sistema.
+
+Ejemplos:
+\begin{itemize}
+\item tasa de requests exitosas;
+\item latencia p95;
+\item throughput sostenido;
+\item longitud de cola;
+\item porcentaje de errores;
+\item tiempo de propagación de eventos.
+\end{itemize}
+
+\subsection{Importancia}
+
+Sin steady state, el experimento no tiene criterio de éxito o fracaso. Solo introduce perturbación, pero no produce conocimiento verificable.
+
+\section{Fault Injection}
+
+\subsection{Idea}
+
+Fault injection consiste en introducir fallas o degradaciones controladas para observar la respuesta del sistema.
+
+\subsection{Tipos frecuentes}
+
+\begin{itemize}
+\item crash de proceso;
+\item reinicio abrupto;
+\item aumento artificial de latencia;
+\item pérdida de paquetes;
+\item throttling de CPU;
+\item saturación de disco;
+\item errores de dependencia;
+\item particiones de red;
+\item colas artificialmente lentas.
+\end{itemize}
+
+\subsection{Objetivo}
+
+El objetivo no es verificar que el sistema “nunca falla”, sino observar:
+\begin{itemize}
+\item si degrada con gracia;
+\item si los mecanismos de resiliencia se activan;
+\item si el daño queda contenido;
+\item si la observabilidad permite entender qué pasó.
+\end{itemize}
+
+\section{Qué propiedades se validan}
+
+Una buena campaña de fault injection puede validar:
+
+\begin{itemize}
+\item timeouts correctamente calibrados;
+\item retries acotados;
+\item circuit breakers efectivos;
+\item backpressure funcional;
+\item bulkheads realmente aislantes;
+\item compensaciones correctas;
+\item recuperación razonable del steady state.
+\end{itemize}
+
+\section{Testing distribuido por capas}
+
+\subsection{Unit tests}
+Validan lógica local. Son insuficientes para propiedades distribuidas.
+
+\subsection{Integration tests}
+Validan integración de pocos componentes. Útiles, pero normalmente demasiado acotados.
+
+\subsection{System tests}
+Validan comportamiento del sistema completo en escenarios nominales.
+
+\subsection{Failure tests}
+Inyectan fallas específicas y verifican respuesta.
+
+\subsection{Chaos experiments}
+Exploran sistemáticamente perturbaciones bajo hipótesis operacionales.
+
+\section{Hipótesis experimentales}
+
+Una hipótesis útil tiene forma concreta, por ejemplo:
+
+\begin{quote}
+Si el servicio de pagos responde con latencia alta, el breaker debe abrir antes de que el checkout completo se vuelva indisponible.
+\end{quote}
+
+Esto es mejor que una formulación vaga como:
+\begin{quote}
+“queremos ver si aguanta.”
+\end{quote}
+
+\section{Blast Radius}
+
+\subsection{Definición}
+
+El blast radius es el alcance potencial del daño que puede causar el experimento.
+
+\subsection{Importancia}
+
+Todo experimento debe controlar explícitamente:
+\begin{itemize}
+\item qué componente se afecta;
+\item qué porcentaje de tráfico;
+\item qué servicios vecinos pueden verse afectados;
+\item cómo abortar rápidamente.
+\end{itemize}
+
+\section{Seguridad operacional}
+
+Chaos Engineering responsable exige:
+
+\begin{itemize}
+\item observabilidad suficiente;
+\item límites claros de abortar;
+\item entorno adecuado;
+\item experimentos pequeños antes que grandes;
+\item objetivos explícitos;
+\item comunicación con los equipos involucrados.
+\end{itemize}
+
+\subsection{Nunca hacer}
+
+\begin{itemize}
+\item experimentos sin hipótesis;
+\item experimentos sin medir steady state;
+\item experiments de alto impacto sin rollback;
+\item perturbaciones masivas en producción sin control fino.
+\end{itemize}
+
+\section{Ejemplo razonado}
+
+Consideremos un sistema de checkout.
+
+Hipótesis:
+\begin{quote}
+Si Payments sufre latencia alta, el sistema de checkout degrada parcialmente pero no colapsa.
+\end{quote}
+
+Perturbación:
+\begin{itemize}
+\item agregar 800 ms de latencia a Payments.
+\end{itemize}
+
+Señales esperadas:
+\begin{itemize}
+\item sube la latencia de checkout;
+\item el breaker de pagos se activa;
+\item se mantiene estabilidad en otras rutas;
+\item no aparece explosión de retries;
+\item el sitio no se cae por completo.
+\end{itemize}
+
+Este experimento no prueba “todo el sistema”, pero sí valida una propiedad operacional concreta.
+
+\section{Relación con observabilidad}
+
+Chaos Engineering depende profundamente de la observabilidad:
+\begin{itemize}
+\item sin métricas no hay steady state;
+\item sin trazas no se entiende la propagación;
+\item sin logs no se reconstruyen eventos específicos.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Observabilidad permite ver la falla. Chaos Engineering permite aprender deliberadamente de ella.
 \end{uakeybox}
+
+\section{Modelo del curso}
+
+Podemos expresar el problema como:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Por ejemplo:
+\begin{itemize}
+\item $P$: validar resiliencia real de un sistema distribuido;
+\item $F$: latencia, crash, pérdida, saturación, partición;
+\item $G$: mantener steady state aceptable o degradación contenida;
+\item $S$: fault injection + experimentación controlada + observabilidad;
+\item $T$: complejidad operativa, riesgo experimental y costo de instrumentación.
+\end{itemize}
+
+\section{Conclusión}
+
+Chaos Engineering y fault injection permiten transformar la resiliencia desde una afirmación teórica hacia una propiedad validada empíricamente.
+
+\begin{quote}
+No alcanza con creer que el sistema resistirá. Hay que demostrar, bajo perturbación realista, qué tan bien falla.
+\end{quote}
+
+\begin{uakeybox}
+La disciplina no consiste en producir caos, sino en producir conocimiento confiable sobre el comportamiento del sistema bajo falla.
+\end{uakeybox}
+
 \end{document}

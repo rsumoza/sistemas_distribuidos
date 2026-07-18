@@ -1,116 +1,292 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{01}
 \UASetClassTitle{Pensamiento distribuido}
+\UASetDocKind{Apuntes}
+
 \title{Clase 01 --- Pensamiento distribuido}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Introducción}\label{sec:introduccion}
-El propósito de esta primera clase es instalar el marco mental del curso.
-Un sistema distribuido no se define solo por tener varias máquinas, sino por el hecho de que dichas máquinas deben cooperar sin memoria compartida, sin reloj global confiable y bajo un canal de comunicación inherentemente incierto.
+\section{Propósito de la clase}
 
-La pregunta fundacional no es ``qué tecnología usar'', sino ``qué podemos garantizar cuando no sabemos exactamente qué está ocurriendo en cada instante del sistema''.
+Esta primera clase instala el marco mental del curso. Su objetivo no es presentar una lista de tecnologías ni una taxonomía superficial, sino cambiar la forma en que el estudiante razona sobre sistemas que operan a través de una red.
 
-Un objetivo central de la clase es aprender a razonar desde síntomas observables hacia posibles causas internas.
-El estudiante debe separar lo que efectivamente relevó del sistema, las hipótesis compatibles con esa evidencia y la conclusión que puede defender.
-Esa separación también debe quedar documentada: observaciones, supuestos, causas posibles, evidencias a favor o en contra y decisión adoptada.
+La idea central es la siguiente:
 
-\section{Definición operativa de sistema distribuido}\label{sec:definicion-operativa-de-sistema-distribuido}
-Una definición útil es la siguiente: un sistema distribuido es un conjunto de procesos o nodos que se ejecutan en máquinas distintas, se comunican por intercambio de mensajes y colaboran para ofrecer una funcionalidad que, desde el punto de vista del usuario, aparece como una sola abstracción.
+\begin{uakeybox}
+En un sistema distribuido, el observador no dispone de una visión global completa, instantánea y confiable del estado del sistema.
+\end{uakeybox}
 
-Esta definición tiene consecuencias inmediatas:
+Esta limitación no es un detalle de implementación ni una rareza de ciertos entornos hostiles. Es una consecuencia estructural de tres hechos básicos:
+
+\begin{itemize}
+\item los componentes se ejecutan en máquinas distintas;
+\item se comunican mediante intercambio de mensajes;
+\item la red introduce demora, pérdida, reordenamiento e incertidumbre.
+\end{itemize}
+
+Por eso, a lo largo de toda la materia, evitaremos pensar como si el sistema fuera un único programa local con un estado perfectamente observable. La meta será desarrollar \emph{pensamiento distribuido}: la capacidad de modelar incertidumbre, explicitar fallas, elegir garantías y defender trade-offs.
+
+\section{Qué vuelve distribuido a un problema}
+
+No todo problema con varias máquinas es, automáticamente, un problema distribuido interesante. Tampoco alcanza con decir que “hay red”, “hay escalabilidad” o “hay muchos usuarios”.
+
+Una formulación operativa útil es la siguiente:
+
+\begin{quote}
+Un problema se vuelve distribuido cuando su corrección depende de coordinar componentes que no comparten memoria, no comparten un reloj global confiable y solo pueden intercambiar información a través de mensajes.
+\end{quote}
+
+Esta definición importa porque desplaza el eje del razonamiento:
+
+\begin{itemize}
+\item ya no alcanza con pensar en términos de estado local;
+\item ya no puede asumirse orden global instantáneo;
+\item ya no puede suponerse que una falta de respuesta identifica una causa única.
+\end{itemize}
+
+\subsection{Consecuencia metodológica}
+
+Cuando un problema es distribuido, la pregunta correcta deja de ser:
+
+\begin{quote}
+“¿Cuál es el estado real exacto del sistema?”
+\end{quote}
+
+y pasa a ser:
+
+\begin{quote}
+“¿Qué puede observar este componente, qué no puede saber, y qué garantía se puede ofrecer bajo esa incertidumbre?”
+\end{quote}
+
+\section{Ejemplo motivador: el pago que no responde}
+
+Consideremos la siguiente situación:
+
 \begin{enumerate}
-\item La comunicación tiene costo y no es instantánea.
-\item El fracaso de un componente no implica el fracaso simultáneo de los demás.
-\item El conocimiento sobre el estado global es parcial, retrasado y potencialmente inconsistente.
+\item un cliente inicia un pago;
+\item el request es enviado al servidor;
+\item el servidor procesa la operación;
+\item la respuesta no vuelve al cliente.
 \end{enumerate}
 
-\section{Ejemplo motivador: pago con timeout}\label{sec:ejemplo-motivador:-pago-con-timeout}
-Supongamos un cliente que envía un pedido de pago a un servidor.
-El servidor procesa el pedido y luego intenta devolver una confirmación.
-El cliente no recibe la respuesta dentro del tiempo esperado y decide reintentar.
-
 \begin{center}
-\begin{tikzpicture}[
-  node distance=4cm,
-  >=Latex,
-  every node/.style={font=\small}
-]
-\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm] (c) {Cliente};
-\node[draw, rounded corners, minimum width=2.8cm, minimum height=1.2cm, right of=c] (s) {Servidor};
-\draw[->, thick]
-  (c.north east) -- (s.north west)
-  node[midway, above=4pt] {pago};
-\draw[->, thick, dashed]
-  (s.south west) -- (c.south east)
-  node[midway, below=6pt] {respuesta perdida / demorada};
+\begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm, right of=c] (s) {Servidor};
+
+\draw[->, thick] (c.north east) -- (s.north west) node[midway, above=4pt] {solicitud de pago};
+\draw[->, thick, dashed] (s.south west) -- (c.south east) node[midway, below=6pt] {respuesta perdida / demorada};
 \end{tikzpicture}
 \end{center}
 
-Desde la perspectiva del cliente, varias historias del sistema son compatibles con el mismo síntoma externo:
+La pregunta intuitiva es inmediata:
+
+\begin{quote}
+¿El pago se realizó o no?
+\end{quote}
+
+La respuesta correcta, desde el punto de vista del cliente, es:
+
+\begin{quote}
+No lo sabemos.
+\end{quote}
+
+Y lo más importante es esto: en general, no podemos saberlo con certeza en ese instante.
+
+\section{Indistinguibilidad}
+
+La noción fundamental que esta clase introduce es la de \textbf{indistinguibilidad observacional}. Distintas historias internas del sistema pueden producir exactamente la misma observación para un actor remoto.
+
+\subsection{Dos historias distintas}
+
+Volvamos al ejemplo del pago. El cliente observa simplemente que no recibió respuesta en el tiempo esperado. Sin embargo, al menos dos historias muy distintas son compatibles con esa observación:
+
+\paragraph{Historia A}
+El servidor nunca recibió el request. No hubo ningún efecto y el cliente terminó en timeout.
+
+\paragraph{Historia B}
+El servidor sí recibió y procesó el request, pero la respuesta se perdió. Hubo efecto, pero el cliente terminó también en timeout.
+
+\subsection{Punto conceptual}
+
+Para el cliente, ambas historias son observacionalmente idénticas. En otras palabras:
+
+\begin{uakeybox}
+La ausencia de respuesta no identifica por sí sola la causa profunda del fenómeno observado.
+\end{uakeybox}
+
+Esto es central, porque obliga a abandonar una intuición local muy arraigada: la idea de que el sistema “debería poder decirnos exactamente qué pasó”.
+
+\subsection{Consecuencia fuerte}
+
+Desde el borde del sistema, lo que se tiene no es conocimiento perfecto, sino evidencia parcial. Diseñar sistemas distribuidos significa aprender a operar bajo esa limitación.
+
+\section{Timeouts no son pruebas}
+
+Un error muy frecuente en estudiantes —y también en desarrolladores inexpertos— es asumir que:
+
+\begin{quote}
+“Si hubo timeout, entonces el servidor falló.”
+\end{quote}
+
+Eso es incorrecto.
+
+Un timeout solo significa que una respuesta no fue observada antes de cierto umbral temporal. Puede deberse a:
+
 \begin{itemize}
-\item El servidor nunca recibió el pedido;
-\item el servidor lo recibió, pero cayó antes de terminar;
-\item el servidor procesó correctamente y la respuesta se perdió;
-\item el servidor sigue vivo y la respuesta solo está demorada.
+\item caída del servidor;
+\item demora grande de red;
+\item pérdida del request;
+\item pérdida de la respuesta;
+\item sobrecarga temporal;
+\item ejecución lenta;
+\item combinación de varios factores.
 \end{itemize}
 
 \begin{uawarn}
-Un timeout es un evento de observación, no una prueba de falla.
+Un timeout es un hecho de observación, no una explicación causal.
 \end{uawarn}
 
-\section{Modelo de sistema: sincronía y asincronía}\label{sec:modelo-de-sistema:-sincronia-y-asincronia}
-En un modelo síncrono se asume la existencia de cotas superiores conocidas para el tiempo de cómputo y para la latencia de la red.
-En un modelo asíncrono no existen cotas superiores fiables o conocidas; en consecuencia, una demora arbitrariamente grande no puede distinguirse de una falla definitiva.
-Este segundo modelo es más severo, pero mucho más cercano al comportamiento real de Internet.
+\section{Modelo síncrono y modelo asíncrono}
 
-\section{Modelo de fallas}\label{sec:modelo-de-fallas}
-El tipo de fallas que aceptamos como plausibles determina el espacio de soluciones correctas.
-\subsection{Crash failures}\label{subsec:crash-failures}
-Un proceso deja de responder por completo.
-\subsection{Omisión}\label{subsec:omision}
-Un mensaje no llega a destino.
-\subsection{Delay}\label{subsec:delay}
-El mensaje llega, pero demasiado tarde para la política de espera del receptor.
-\subsection{Particiones}\label{subsec:particiones}
-La red queda dividida en componentes que no pueden intercambiar mensajes entre sí.
-\subsection{Byzantine}\label{subsec:byzantine}
-Un proceso puede comportarse de manera arbitraria, inconsistente o incluso maliciosa.
+Para razonar con mayor precisión, conviene distinguir dos modelos.
 
-\section{Framework del curso}\label{sec:framework-del-curso}
-A lo largo de toda la materia vamos a estructurar cada decisión de diseño mediante el esquema
-\[
-D = (P,F,G,S,T)
-\]
-donde $P$ representa el problema, $F$ las fallas asumidas, $G$ la garantía requerida, $S$ la solución elegida y $T$ el trade-off aceptado.
+\subsection{Modelo síncrono}
 
-\subsection{Ejemplo con pagos duplicados}\label{subsec:ejemplo-con-pagos-duplicados}
+En un modelo síncrono se asume la existencia de cotas conocidas para:
+
 \begin{itemize}
-\item $P$: evitar débitos duplicados ante reintentos;
-\item $F$: timeout en el cliente y pérdida de respuestas;
-\item $G$: a lo sumo un débito efectivo por operación lógica;
-\item $S$: request id único + almacenamiento de resultados idempotentes;
-\item $T$: mayor costo de estado, validación y complejidad operativa.
+\item tiempo de procesamiento;
+\item tiempo de comunicación;
+\item eventualmente, deriva relativa entre relojes.
 \end{itemize}
 
-\section{CAP: lectura correcta}\label{sec:cap:-lectura-correcta}
-La interpretación relevante para este curso es precisa: cuando existe partición de red, un sistema replicado no puede ofrecer simultáneamente disponibilidad total y consistencia fuerte observable para todas las operaciones.
-Eso obliga a decidir entre rechazar ciertas operaciones para preservar corrección o responder aún con posible desalineación temporal.
+En ese contexto, si una operación excede su cota, puede interpretarse razonablemente como una falla.
 
-\section{Bibliografía guía}\label{sec:bibliografia-guia}
+\subsection{Modelo asíncrono}
+
+En un modelo asíncrono no existen cotas confiables conocidas para la red o el cómputo. Por lo tanto, una demora arbitrariamente larga es indistinguible de una falla real.
+
+Este modelo es más severo, pero conceptualmente mucho más cercano a la realidad de sistemas desplegados sobre redes generales.
+
+\subsection{Importancia para el curso}
+
+El curso se apoya principalmente en la intuición asíncrona: si no se puede distinguir claramente entre demora y falla, entonces las soluciones deben diseñarse de forma robusta a esa ambigüedad.
+
+\section{Qué significa pensar distributivamente}
+
+A partir de lo anterior, podemos definir el núcleo del curso.
+
+\begin{quote}
+Pensar distributivamente es razonar no desde la ilusión de conocimiento global, sino desde la explicitación de lo que cada actor puede observar, de las fallas que se asumen y de las garantías que se desean preservar.
+\end{quote}
+
+Esto significa que toda decisión de diseño debe responder, al menos, a estas preguntas:
+
 \begin{itemize}
-\item Kleppmann, cap.
-1 y comienzo del cap.
-8.
-\item Tanenbaum y Van Steen, fundamentos e introducción.
-\item MIT 6.824, clases introductorias sobre RPC y fallas.
+\item ¿Cuál es el problema real?
+\item ¿Qué fallas estoy modelando?
+\item ¿Qué garantía quiero preservar?
+\item ¿Qué solución elijo?
+\item ¿Qué costo o trade-off acepto?
+\end{itemize}
+
+\section{Framework del curso}
+
+Durante toda la materia vamos a usar el siguiente esquema:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+donde:
+
+\begin{itemize}
+\item $P$ = problema;
+\item $F$ = fallas asumidas;
+\item $G$ = garantía requerida;
+\item $S$ = solución elegida;
+\item $T$ = trade-off aceptado.
+\end{itemize}
+
+Este esquema no es decorativo. Su función pedagógica es ordenar el razonamiento y evitar que el estudiante salte directamente a una tecnología o patrón sin haber modelado el problema.
+
+\subsection{Ejemplo con el pago}
+
+\begin{itemize}
+\item $P$: evitar duplicación de pagos;
+\item $F$: timeout, pérdida de respuesta, retry del cliente;
+\item $G$: a lo sumo un débito efectivo;
+\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $T$: más complejidad, más estado, más lógica de validación.
+\end{itemize}
+
+Lo importante es notar que la solución no aparece en el vacío: surge como respuesta a un problema, a un modelo de fallas y a una garantía requerida.
+
+\section{CAP: interpretación correcta}
+
+La clase cierra conectando estas ideas con CAP, pero de forma correcta.
+
+CAP no debe entenderse como un slogan del tipo “elegir dos de tres”, sino como una restricción que aparece \textbf{bajo partición de red}.
+
+Cuando la red se parte, un sistema replicado no puede ofrecer simultáneamente:
+
+\begin{itemize}
+\item consistencia fuerte observable;
+\item disponibilidad total de las operaciones.
+\end{itemize}
+
+Eso obliga a decidir entre:
+
+\begin{itemize}
+\item rechazar ciertas operaciones para preservar corrección observable;
+\item responder igual para preservar disponibilidad, aceptando posibles inconsistencias.
+\end{itemize}
+
+\subsection{Lectura madura}
+
+CAP no te dice qué arquitectura usar en abstracto. Te obliga a explicitar qué valorás más cuando la coordinación ya no es posible.
+
+\section{Errores conceptuales frecuentes}
+
+Esta primera clase busca corregir desde el inicio algunos errores muy comunes:
+
+\begin{itemize}
+\item creer que timeout implica crash;
+\item creer que el sistema posee un estado global inmediatamente observable;
+\item pensar que toda garantía importante puede obtenerse sin costo;
+\item tratar CAP como slogan, no como restricción;
+\item asumir que “más tecnología” equivale a “mejor diseño”.
+\end{itemize}
+
+\section{Qué debe saber hacer el estudiante al terminar esta clase}
+
+Al finalizar la clase, el estudiante debería poder:
+
+\begin{itemize}
+\item explicar qué vuelve distribuido a un problema;
+\item describir por qué la observación del sistema es incompleta;
+\item construir dos historias indistinguibles para un cliente;
+\item aplicar el esquema $D=(P,F,G,S,T)$ a un caso simple;
+\item explicar CAP como decisión bajo partición.
+\end{itemize}
+
+\section{Guía de profundización bibliográfica}
+
+\begin{itemize}
+\item \textbf{DDIA / Kleppmann}: leer las discusiones introductorias sobre fallas, visibilidad e imposibilidad de obtener una imagen perfecta del sistema. El valor de esta lectura es conceptual, no solo terminológico.
+\item \textbf{Tanenbaum}: usarlo para reforzar definiciones de sistema distribuido, modelos de sistema y vocabulario básico.
+\item \textbf{MIT 6.824}: releer materiales introductorios pensando especialmente en qué sabe cada actor y qué no puede saber.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, razonar desde síntomas hacia causas posibles, documentar el relevamiento y el análisis, relevar, analizar y proponer en forma aislada y conectada, indicar qué garantía busca preservar y qué precio paga por hacerlo.
+Resultado de aprendizaje esperado: al finalizar esta clase, el estudiante debe haber cambiado su modelo mental. Ya no debe razonar como si el sistema fuera una sola máquina local con observación completa.
 \end{uakeybox}
+
 \end{document}

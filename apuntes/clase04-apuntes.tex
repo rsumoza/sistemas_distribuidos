@@ -1,296 +1,386 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{04}
-\UASetClassTitle{Consistencia}
+\UASetClassTitle{Consenso distribuido}
+\UASetDocKind{Apuntes}
 
-\title{Clase 04 --- Consistencia}
+\title{Clase 04 --- Consenso distribuido: fundamentos, imposibilidad y algoritmos}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
+\section{Introducción}
 
-La palabra ``consistencia'' se usa de manera muy amplia en la práctica, pero en sistemas distribuidos no designa una única propiedad simple. Existen múltiples modelos de consistencia, cada uno con distinto significado operacional, distintas garantías observables y distintos costos de implementación.
+En la clase anterior estudiamos replicación y consistencia. Vimos que múltiples réplicas introducen divergencia debido a asincronía, fallas y concurrencia.
 
-El objetivo de esta clase es distinguir cuidadosamente esos modelos y entender que la pregunta correcta no es:
-
-\begin{quote}
-``¿mi sistema es consistente o inconsistente?''
-\end{quote}
-
-sino:
+Esto nos lleva a un problema central:
 
 \begin{quote}
-``¿qué tipo de comportamiento observable prometo a quien interactúa con el sistema, y cuánto cuesta mantener esa promesa?''
+¿Cómo imponemos un orden único de operaciones en un sistema distribuido?
 \end{quote}
+
+La respuesta es el \textbf{consenso distribuido}.
 
 \begin{uakeybox}
-Consistencia es una especificación del comportamiento observable de lecturas y escrituras, no simplemente una propiedad decorativa del almacenamiento.
+Consenso permite que múltiples nodos acuerden un único valor, lo que induce un orden global de operaciones.
 \end{uakeybox}
 
-\section{Qué significa ``corrección''}
+---
 
-Supongamos que múltiples clientes leen y escriben sobre un mismo objeto replicado. La corrección no puede reducirse solo a que ``los datos estén bien'', porque hay una dimensión temporal y observacional:
+\section{Modelo del sistema}
 
-\begin{itemize}
-\item qué escritura debe ver una lectura;
-\item en qué orden deben percibirse operaciones concurrentes;
-\item si dos clientes deben observar la misma historia;
-\item cuándo una actualización se considera visible.
-\end{itemize}
-
-La consistencia formaliza esas expectativas.
-
-\section{Operaciones e historias}
-
-Sea un conjunto de operaciones de lectura y escritura sobre un objeto compartido. Una historia distribuida registra:
+Trabajamos bajo el siguiente modelo:
 
 \begin{itemize}
-\item invocación de cada operación;
-\item respuesta de cada operación;
-\item posible solapamiento entre operaciones;
-\item orden local en cada proceso;
-\item efectos observados.
+\item $n$ procesos (nodos)
+\item comunicación por mensajes
+\item red asíncrona (sin límites de tiempo)
+\item fallas por crash (fail-stop)
 \end{itemize}
 
-Un modelo de consistencia establece qué historias observadas son aceptables y cuáles no.
-
-\section{Linearizability}
-
-La \emph{linearizability} es uno de los modelos más fuertes e intuitivos.
-
-\subsection{Intuición}
-
-Un sistema linearizable se comporta como si todas las operaciones ocurrieran instantáneamente en un punto entre su invocación y su respuesta, respetando el orden temporal real entre operaciones no solapadas.
-
-\subsection{Interpretación práctica}
-
-Si una escritura termina y luego una lectura comienza, la lectura debe ver al menos esa escritura o una posterior.
-
-\subsection{Importancia}
-
-Este modelo aproxima la intuición de ``un solo objeto, una sola historia, inmediatamente visible''.
-
-\subsection{Costo}
-
-Linearizability suele requerir:
+No asumimos:
 
 \begin{itemize}
-\item coordinación;
-\item espera por confirmaciones;
-\item restricciones sobre lecturas y escrituras;
-\item mayor latencia;
-\item menor disponibilidad bajo partición.
+\item relojes sincronizados
+\item tiempos máximos de entrega
 \end{itemize}
 
-\section{Sequential consistency}
+---
 
-La \emph{sequential consistency} también exige que todas las operaciones puedan explicarse mediante un orden secuencial único, pero no obliga a respetar el tiempo real entre operaciones no solapadas.
+\section{Definición formal de consenso}
 
-\subsection{Consecuencia}
+Cada proceso $p_i$ propone un valor $v_i$.
 
-Dos historias pueden ser secuencialmente consistentes aunque una lectura, cronológicamente posterior, no vea una escritura que ya terminó, siempre que exista algún orden global compatible con el orden programático de cada proceso.
+El algoritmo debe garantizar:
 
-\subsection{Diferencia con linearizability}
+\subsection{Agreement}
+\begin{quote}
+Si dos procesos deciden, deciden el mismo valor.
+\end{quote}
 
-Linearizability impone:
-\begin{itemize}
-\item orden secuencial;
-\item y además respeto del tiempo real.
-\end{itemize}
+\subsection{Validity}
+\begin{quote}
+El valor decidido fue propuesto por algún proceso.
+\end{quote}
 
-Sequential consistency impone:
-\begin{itemize}
-\item orden secuencial;
-\item pero no necesariamente respeto del tiempo real.
-\end{itemize}
+\subsection{Termination}
+\begin{quote}
+Todo proceso correcto eventualmente decide.
+\end{quote}
 
-Por eso, linearizability implica sequential consistency, pero no a la inversa.
+---
 
-\section{Eventual consistency}
+\section{Imposibilidad: Teorema FLP}
 
-La \emph{eventual consistency} es mucho más débil. Intuitivamente, afirma que si dejan de ocurrir nuevas escrituras y el sistema sigue intercambiando información, entonces las réplicas eventualmente convergen al mismo estado.
+\subsection{Enunciado}
 
-\subsection{Qué garantiza}
+\begin{quote}
+En un sistema completamente asíncrono con al menos una posible falla, no existe algoritmo determinista que garantice consenso (terminación).
+\end{quote}
 
-\begin{itemize}
-\item convergencia eventual;
-\item no garantiza que una lectura inmediata vea la última escritura;
-\item no garantiza una única historia visible en todo instante.
-\end{itemize}
+---
 
-\subsection{Por qué se usa}
+\subsection{Intuición profunda}
 
-\begin{itemize}
-\item mejora disponibilidad;
-\item reduce coordinación síncrona;
-\item mejora latencia;
-\item encaja en dominios que toleran desalineación temporal.
-\end{itemize}
+El problema no es Agreement ni Validity, sino \textbf{Termination}.
 
-\subsection{Qué exige}
-
-Aunque es débil, no significa ``cualquier cosa vale''. Para que eventual consistency sea útil, el sistema debe definir:
+La red puede:
 
 \begin{itemize}
-\item cómo propaga actualizaciones;
-\item cómo detecta o resuelve conflictos;
-\item cómo garantiza convergencia;
-\item qué comportamiento espera del cliente frente a lecturas potencialmente obsoletas.
+\item retrasar mensajes arbitrariamente
+\item simular fallas (delay vs crash indistinguibles)
 \end{itemize}
 
-\section{Ejemplo comparativo}
+---
 
-Consideremos una variable replicada inicialmente en valor 0.
+\subsection{Estados de ejecución}
 
-\subsection{Escenario 1}
+Definimos:
 
-\begin{enumerate}
-\item Cliente A escribe 1.
-\item El sistema confirma la escritura.
-\item Cliente B lee inmediatamente después y obtiene 0.
-\end{enumerate}
+\begin{itemize}
+\item \textbf{Univalente}: el resultado está determinado (0 o 1)
+\item \textbf{Bivalente}: el resultado aún puede ser 0 o 1
+\end{itemize}
+
+El estado inicial es típicamente bivalente.
+
+---
+
+\subsection{Idea de la prueba}
+
+1. Existe un estado inicial bivalente  
+2. Siempre existe una transición que mantiene bivalencia  
+3. El scheduler puede elegir esas transiciones indefinidamente  
+
+\begin{quote}
+Resultado: ejecución infinita sin decisión
+\end{quote}
+
+---
 
 \subsection{Interpretación}
 
-\begin{itemize}
-\item no es linearizable, porque una lectura posterior a una escritura confirmada no vio su efecto;
-\item puede ser compatible con modelos más débiles;
-\item puede ser aceptable bajo eventual consistency si la convergencia ocurre más adelante.
-\end{itemize}
-
-\subsection{Escenario 2}
-
-\begin{enumerate}
-\item Cliente A escribe 1.
-\item Cliente B escribe 2 concurrentemente desde otra réplica.
-\item Réplicas distintas muestran temporalmente valores distintos.
-\item El sistema más tarde resuelve el conflicto y converge.
-\end{enumerate}
-
-Este escenario puede ser incompatible con modelos fuertes, pero compatible con modelos eventualmente consistentes si el mecanismo de reconciliación está bien definido.
-
-\section{Consistencia y dominio}
-
-No todos los dominios exigen el mismo modelo.
-
-\subsection{Ejemplos que suelen requerir consistencia fuerte}
-
-\begin{itemize}
-\item débito en cuenta bancaria;
-\item control de stock muy escaso;
-\item asignación exclusiva de recursos;
-\item locks distribuidos.
-\end{itemize}
-
-\subsection{Ejemplos que suelen tolerar consistencia más débil}
-
-\begin{itemize}
-\item contador de likes;
-\item feed social;
-\item cachés replicadas;
-\item presencia en línea;
-\item dashboards analíticos no críticos.
-\end{itemize}
-
 \begin{uakeybox}
-La pregunta correcta no es ``qué modelo es mejor'', sino ``qué modelo es suficiente para la semántica del problema''.
+No se puede garantizar consenso perfecto sin introducir supuestos adicionales (timeouts, sincronía parcial, etc.)
 \end{uakeybox}
 
-\section{Consistencia y CAP}
+---
 
-La relación entre consistencia y CAP suele malinterpretarse. Bajo partición de red, un sistema replicado que quiera mantener linearizability o alguna forma fuerte de corrección observable deberá rechazar ciertas operaciones si no puede coordinarse adecuadamente.
+\section{Consenso en la práctica}
 
-Por eso:
+Los sistemas reales evaden FLP mediante:
 
 \begin{itemize}
-\item consistencia fuerte suele empujar al sistema a sacrificar disponibilidad bajo partición;
-\item alta disponibilidad suele empujar a aceptar lecturas o respuestas potencialmente desalineadas.
+\item timeouts
+\item elecciones probabilísticas
+\item sincronía parcial
 \end{itemize}
 
-Esto no implica que CAP sea ``elegir dos de tres'' como slogan, sino que bajo partición aparece una restricción estructural que obliga a decidir.
+Esto permite progreso \emph{en la práctica}, aunque no en el peor caso teórico.
 
-\section{Modelo formal mínimo}
+---
 
-Sea $H$ una historia de operaciones distribuidas. Un modelo de consistencia define un conjunto $\mathcal{C}$ de historias permitidas.
+\section{Raft: consenso práctico}
 
-Entonces:
+Raft es un algoritmo diseñado para ser comprensible y seguro.
+
+---
+
+\subsection{Componentes}
+
+\begin{itemize}
+\item Leader
+\item Followers
+\item Log replicado
+\end{itemize}
+
+---
+
+\subsection{Estructura temporal}
+
+El tiempo se divide en \textbf{términos} (terms).
+
+\begin{itemize}
+\item cada término tiene un líder
+\item los términos son monótonos
+\end{itemize}
+
+---
+
+\subsection{Elección de líder}
+
+\begin{enumerate}
+\item follower expira timeout
+\item se convierte en candidate
+\item solicita votos
+\item si obtiene mayoría → leader
+\end{enumerate}
+
+---
+
+\subsection{Replicación de log}
+
+\begin{enumerate}
+\item cliente envía request al leader
+\item leader agrega entrada a su log
+\item leader replica a followers
+\item cuando mayoría confirma → commit
+\end{enumerate}
+
+---
+
+\section{Invariantes de Raft}
+
+Estos garantizan \textbf{seguridad}.
+
+---
+
+\subsection{Log Matching Property}
+
+\begin{quote}
+Si dos logs tienen una entrada en el mismo índice y término, entonces todos los elementos anteriores son idénticos.
+\end{quote}
+
+\textbf{Razón:}
+\begin{itemize}
+\item el leader solo replica desde prefijos consistentes
+\item followers rechazan inconsistencias
+\end{itemize}
+
+---
+
+\subsection{Leader Completeness}
+
+\begin{quote}
+Si una entrada está comprometida, aparecerá en todos los líderes futuros.
+\end{quote}
+
+\textbf{Idea:}
+\begin{itemize}
+\item commit requiere mayoría
+\item futuros líderes también requieren mayoría
+\item intersección ⇒ preservación
+\end{itemize}
+
+---
+
+\section{Quorums}
+
+Un quorum es un subconjunto de nodos que puede tomar decisiones.
+
+Para consenso:
+
 \[
-H \in \mathcal{C}
+|Q| > \frac{N}{2}
 \]
-si y solo si la historia observada satisface las reglas del modelo.
 
-La fuerza del modelo depende de cuántas historias prohíbe:
+---
+
+\subsection{Propiedad clave}
+
+\[
+Q_1 \cap Q_2 \neq \emptyset
+\]
+
+\textbf{Demostración:}
+
+Supongamos dos quorums disjuntos:
+
+\[
+|Q_1| + |Q_2| \le N
+\]
+
+Pero:
+
+\[
+|Q_1| > N/2, \quad |Q_2| > N/2
+\]
+
+\[
+|Q_1| + |Q_2| > N
+\]
+
+Contradicción.
+
+---
+
+\section{Paxos}
+
+Paxos es el algoritmo clásico de consenso.
+
+---
+
+\subsection{Roles}
 
 \begin{itemize}
-\item linearizability prohíbe muchas más historias que eventual consistency;
-\item eventual consistency acepta muchas historias intermedias, siempre que preserve convergencia final.
+\item Proposer
+\item Acceptor
+\item Learner
 \end{itemize}
 
-\section{Ejemplo trabajado: saldo bancario vs feed social}
+---
 
-\subsection{Saldo bancario}
+\subsection{Fases}
 
-Si un usuario transfiere dinero y luego consulta saldo, leer un valor viejo puede inducir una acción financiera incorrecta. Por eso, la expectativa natural del usuario se alinea con una garantía fuerte.
+\textbf{Phase 1 (Prepare)}
+\begin{itemize}
+\item proposer envía número $n$
+\item acceptors prometen no aceptar menor
+\end{itemize}
 
-\subsection{Feed social}
+\textbf{Phase 2 (Accept)}
+\begin{itemize}
+\item proposer propone valor
+\item acceptors aceptan si cumple promesa
+\end{itemize}
 
-Si un usuario actualiza una foto y otro usuario la ve segundos después, el sistema puede seguir siendo aceptable aunque no haya visibilidad inmediata global. La experiencia se degrada poco y la reducción de coordinación puede valer la pena.
+---
 
-\subsection{Conclusión}
+\section{Propiedad de seguridad de Paxos}
 
-No se trata de que banca ``use bases serias'' y redes sociales ``usen bases malas''. Se trata de que cada dominio paga por el nivel de consistencia que necesita.
+\begin{quote}
+Si un valor es elegido, ningún otro valor distinto puede ser elegido.
+\end{quote}
 
-\section{Qué debe saber hacer el estudiante al terminar esta clase}
+---
 
-El estudiante debería poder:
+\subsection{Prueba (idea)}
 
 \begin{itemize}
-\item distinguir consistencia fuerte, sequential consistency y eventual consistency;
-\item explicar por qué linearizability es más fuerte que sequential consistency;
-\item construir ejemplos donde una lectura viole linearizability;
-\item razonar sobre qué modelo es adecuado según el dominio;
-\item conectar consistencia con disponibilidad, coordinación y latencia.
+\item elección requiere mayoría
+\item nuevas propuestas deben consultar mayoría
+\item intersección ⇒ conocimiento previo
 \end{itemize}
 
-\section{Errores conceptuales frecuentes}
+Por lo tanto:
+
+\begin{quote}
+no puede aparecer un valor distinto
+\end{quote}
+
+---
+
+\section{Consenso y linearizabilidad}
+
+El consenso permite implementar:
 
 \begin{itemize}
-\item usar ``consistente'' como sinónimo de ``correcto'' sin especificar modelo;
-\item creer que eventual consistency equivale a desorden total;
-\item asumir que strong consistency es siempre la mejor opción;
-\item ignorar el costo de coordinación que exige linearizability;
-\item confundir convergencia final con visibilidad inmediata.
+\item orden total de operaciones
+\item máquina de estados replicada
 \end{itemize}
-
-\section{Guía de profundización bibliográfica}
-
-\subsection*{DDIA}
-\begin{itemize}
-\item \textbf{Capítulo 9}: leer para profundizar definiciones de consistency y la discusión sobre linearizability.
-\item Volver también a secciones relevantes del capítulo 5 para vincular consistencia con replicación y lecturas desde réplicas.
-\end{itemize}
-
-\subsection*{Tanenbaum}
-\begin{itemize}
-\item Leer la parte de consistencia y replicación para reforzar la clasificación de modelos y su relación con almacenamiento distribuido.
-\item Conviene usar Tanenbaum para ordenar taxonomías y DDIA para entender implicancias de diseño.
-\end{itemize}
-
-\subsection*{Material complementario}
-\begin{itemize}
-\item Al releer CAP, hacerlo con la siguiente pregunta: \emph{qué garantía observable quiero preservar cuando la red se parte}.
-\item Vincular esta clase con la futura discusión de quórums y consenso.
-\end{itemize}
-
-\section{Resumen final}
 
 \begin{uakeybox}
-Consistencia no es un rótulo binario, sino una familia de contratos sobre qué historia de lecturas y escrituras puede observar un cliente. Elegir un modelo de consistencia es elegir una promesa y aceptar el costo necesario para sostenerla.
+Consenso ⇒ orden total ⇒ linearizabilidad
+\end{uakeybox}
+
+---
+
+\section{Costo del consenso}
+
+\begin{itemize}
+\item múltiples rondas de comunicación
+\item necesidad de mayoría
+\item latencia
+\item menor disponibilidad bajo partición
+\end{itemize}
+
+---
+
+\section{Modelo del curso}
+
+\[
+D = (P, F, G, S, T)
+\]
+
+\begin{itemize}
+\item $P$: estado consistente global
+\item $F$: fallas y asincronía
+\item $G$: consenso (agreement)
+\item $S$: Raft/Paxos
+\item $T$: latencia y disponibilidad
+\end{itemize}
+
+---
+
+\section{Conclusión}
+
+\begin{quote}
+Consenso es el mecanismo que transforma un sistema distribuido en una máquina secuencial lógica.
+\end{quote}
+
+Pero:
+
+\begin{itemize}
+\item no es gratis
+\item no siempre progresa
+\item requiere compromisos explícitos
+\end{itemize}
+
+\begin{uakeybox}
+El consenso no elimina la incertidumbre: la controla.
 \end{uakeybox}
 
 \end{document}

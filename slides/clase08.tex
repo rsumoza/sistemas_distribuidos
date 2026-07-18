@@ -1,214 +1,312 @@
-% !TeX encoding = UTF-8
-\documentclass{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{08}
-\UASetClassTitle{Particionado y escalabilidad}
+\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
 
 \title{\UACourse}
-\subtitle{Clase 08 — Particionado y escalabilidad}
+\subtitle{Clase 08 --- CAP, PACELC, Dynamo y Spanner}
 
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Particionado y escalabilidad}
+\UASectionSlide{Motivación}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{De modelos a sistemas reales}
+Hasta ahora vimos:
 \begin{itemize}
-\item entender por qué escalar implica distribuir datos
-\item comparar hash mod $N$ con consistent hashing
-\item introducir virtual nodes
-\item discutir hotspots y rebalancing
+\item consistencia como contrato
+\item replicación
+\item consenso
+\item logs y streaming
 \end{itemize}
-\end{frame}
 
-\begin{frame}{Motivación}
-Cuando los datos y el tráfico crecen:
-\begin{itemize}
-\item un solo nodo ya no alcanza
-\item hay que distribuir claves y carga
-\end{itemize}
+\pause
 
 \begin{block}{Pregunta}
-¿Cómo asignamos claves a nodos sin rehacer todo cada vez que cambia el clúster?
+¿Cómo se materializan estos trade-offs en sistemas reales a escala global?
 \end{block}
 \end{frame}
 
-\begin{frame}{Particionado}
-Particionar significa dividir el espacio de datos en fragmentos y asignarlos a nodos distintos.
-
-Objetivos:
+\begin{frame}{La intuición equivocada}
+No existe un sistema que maximice simultáneamente:
 \begin{itemize}
-\item distribuir almacenamiento
-\item distribuir throughput
-\item reducir contención
+\item consistencia fuerte
+\item disponibilidad total
+\item baja latencia global
+\item simplicidad
 \end{itemize}
+
+\pause
+
+\begin{alertblock}{Idea}
+Los sistemas reales son decisiones explícitas sobre qué costo aceptar.
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Hash mod N}
-Una idea simple:
-\[
-\text{nodo}(k) = h(k) \bmod N
-\]
+\UASectionSlide{CAP}
 
-Ventaja:
-\begin{itemize}
-\item muy fácil de implementar
-\end{itemize}
+\begin{frame}{CAP correctamente leído}
+CAP no significa “elegir dos de tres” como slogan.
 
-Problema:
-\begin{itemize}
-\item si cambia $N$, casi todas las claves se remapean
-\end{itemize}
-\end{frame}
+\pause
 
-\begin{frame}{Ejemplo de problema}
-Supongamos que pasamos de $N=4$ a $N=5$.
-
-Entonces:
-\[
-h(k) \bmod 4 \neq h(k) \bmod 5
-\]
-para una fracción enorme de claves.
-
-\begin{uawarn}
-Escalar agregando un nodo puede implicar mover casi todo el sistema.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Consistent hashing}
-Idea:
-\begin{itemize}
-\item mapear claves y nodos sobre un anillo
-\item cada clave se asigna al primer nodo que aparece al avanzar en sentido horario
-\end{itemize}
-
-Ventaja:
-\begin{itemize}
-\item al agregar o quitar un nodo, solo se remapea una fracción limitada del espacio
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Figura: consistent hashing}
-\begin{center}
-\begin{tikzpicture}[scale=1.0,every node/.style={font=\small}]
-\draw[thick] (0,0) circle (2.4);
-
-\node[draw,circle,fill=UAIngAccent!20] (A) at (90:2.4) {A};
-\node[draw,circle,fill=UAIngAccent!20] (B) at (210:2.4) {B};
-\node[draw,circle,fill=UAIngAccent!20] (C) at (330:2.4) {C};
-
-\filldraw (40:2.0) circle (2pt) node[right] {$k_1$};
-\filldraw (170:2.0) circle (2pt) node[left] {$k_2$};
-\filldraw (280:2.0) circle (2pt) node[below] {$k_3$};
-
-\node at (0,-3.2) {cada clave va al primer nodo en sentido horario};
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\begin{frame}{Agregar un nodo}
-Si agregamos un nuevo nodo $D$ en el anillo:
-\begin{itemize}
-\item no se remapean todas las claves
-\item solo se reasignan las del segmento que ahora cubre $D$
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Figura: nodo nuevo y rango remapeado}
-\begin{center}
-\begin{tikzpicture}[scale=1.0,every node/.style={font=\small}]
-\draw[thick] (0,0) circle (2.4);
-
-\node[draw,circle,fill=UAIngAccent!20] (A) at (90:2.4) {A};
-\node[draw,circle,fill=UAIngAccent!20] (B) at (210:2.4) {B};
-\node[draw,circle,fill=UAIngAccent!20] (C) at (330:2.4) {C};
-\node[draw,circle,fill=UAIngPrimary!20] (D) at (20:2.4) {D};
-
-\draw[very thick,UAIngPrimary] (20:2.4) arc[start angle=20,end angle=90,radius=2.4];
-
-\node at (0,-3.2) {solo se remapea el rango sombreado/segmento asociado al nuevo nodo};
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\begin{frame}{Virtual nodes}
-Problema:
-\begin{itemize}
-\item pocos nodos físicos pueden producir distribución desigual
-\end{itemize}
-
-Solución:
-\begin{itemize}
-\item representar cada nodo físico por múltiples posiciones virtuales en el anillo
-\item mejora balanceo y flexibilidad de rebalancing
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Hot keys}
-No todo problema de escala se resuelve con hashing.
-
-Puede haber:
-\begin{itemize}
-\item claves extremadamente populares
-\item skew de acceso
-\item desbalance entre particiones
-\end{itemize}
-
-\begin{block}{Conclusión}
-Particionar datos no garantiza particionar carga uniformemente.
-\end{block}
-\end{frame}
-
-\begin{frame}{Ejemplo tipo MIT}
-Supongamos una aplicación social:
-\begin{itemize}
-\item claves distribuidas por consistent hashing
-\item un usuario famoso recibe miles de requests por segundo
-\end{itemize}
-
-Pregunta:
 \begin{block}{}
-¿el anillo resuelve el hotspot?
-\end{block}
-
-No completamente. Hace falta:
+Si hay partición de red, un sistema replicado no puede ofrecer simultáneamente:
 \begin{itemize}
-\item caching
-\item replication específica
-\item fanout/control de lectura
+\item consistencia fuerte observable
+\item disponibilidad total
+\end{itemize}
+\end{block}
+\end{frame}
+
+\begin{frame}{Decisión bajo partición}
+\begin{center}
+\begin{tikzpicture}[scale=1.0,every node/.style={font=\small}]
+\node (C) at (0,0) {Consistencia};
+\node (A) at (3.5,0) {Disponibilidad};
+\node (P) at (1.75,2.5) {Partición};
+
+\draw[thick] (C)--(A)--(P)--(C);
+\end{tikzpicture}
+\end{center}
+
+\pause
+
+Ante partición:
+\begin{itemize}
+\item o rechazás operaciones para preservar corrección;
+\item o respondés igual, aceptando posible inconsistencia.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Comparación rápida}
+\begin{frame}{Qué NO dice CAP}
+CAP no dice:
+\begin{itemize}
+\item qué sistema es “mejor”
+\item que las particiones ocurran siempre
+\item que consistencia y disponibilidad sean propiedades absolutas y aisladas
+\end{itemize}
+
+\pause
+
+CAP sí dice:
+\begin{itemize}
+\item qué no puede garantizarse simultáneamente \emph{bajo partición}.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{PACELC}
+
+\begin{frame}{Limitación de CAP}
+CAP habla cuando hay partición.
+
+\pause
+
+Pero incluso cuando NO hay partición, queda otra tensión:
+\begin{itemize}
+\item consistencia
+\item latencia
+\end{itemize}
+\end{frame}
+
+\begin{frame}{PACELC}
+\begin{block}{}
+If \textbf{P}artition: choose between \textbf{A}vailability and \textbf{C}onsistency.\\
+\medskip
+\textbf{E}lse: choose between \textbf{L}atency and \textbf{C}onsistency.
+\end{block}
+\end{frame}
+
+\begin{frame}{Lectura práctica}
+PACELC mejora CAP porque reconoce que:
+\begin{itemize}
+\item incluso en funcionamiento normal
+\item la consistencia fuerte global
+\item tiene costo en latencia
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Dynamo}
+
+\begin{frame}{Diseño de Dynamo}
+Objetivo:
+\begin{itemize}
+\item alta disponibilidad
+\item tolerancia a particiones
+\item latencia baja
+\end{itemize}
+
+\pause
+
+Elección:
+\begin{itemize}
+\item consistencia eventual
+\item quórums flexibles
+\item reconciliación posterior
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Componentes de Dynamo}
+\begin{itemize}
+\item consistent hashing
+\item particionamiento
+\item quórums $N, R, W$
+\item versionado
+\item sloppy quorum
+\item hinted handoff
+\item anti-entropy
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Quórums}
+\[
+R + W > N
+\]
+
+\pause
+
+\begin{block}{Intuición}
+Si lectura y escritura intersectan, aumenta probabilidad de ver datos recientes.
+\end{block}
+
+\pause
+
+Pero:
+\begin{itemize}
+\item no elimina retrasos
+\item no elimina conflictos
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Vector clocks y conflictos}
+Dynamo expone versiones concurrentes y permite:
+\begin{itemize}
+\item detectar concurrencia
+\item reconciliar después
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{Idea clave}
+La disponibilidad se logra aceptando complejidad de reconciliación.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Dynamo en el espacio CAP/PACELC}
+\begin{itemize}
+\item Bajo partición: favorece A sobre C
+\item Sin partición: favorece L sobre C
+\end{itemize}
+
+\pause
+
+\begin{block}{Clasificación}
+Dynamo es típicamente AP y PA/EL en espíritu PACELC.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Spanner}
+
+\begin{frame}{Diseño de Spanner}
+Objetivo:
+\begin{itemize}
+\item transacciones globales
+\item consistencia externa
+\item SQL distribuido
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Problema de Spanner}
+¿Cómo dar una ilusión de orden global fuerte a escala planetaria?
+
+\pause
+
+Respuesta:
+\begin{itemize}
+\item consenso por shard
+\item particionamiento
+\item relojes acotados (TrueTime)
+\end{itemize}
+\end{frame}
+
+\begin{frame}{TrueTime}
+Spanner no asume reloj perfecto.
+
+\pause
+
+Usa un intervalo:
+\[
+TT.now() = [earliest, latest]
+\]
+
+\pause
+
+Esto permite razonar sobre incertidumbre temporal de forma explícita.
+\end{frame}
+
+\begin{frame}{Commit wait}
+Para asegurar orden externo, Spanner espera hasta que el commit sea seguro respecto de la incertidumbre del reloj.
+
+\pause
+
+\begin{block}{Costo}
+Más consistencia global $\Rightarrow$ más latencia
+\end{block}
+\end{frame}
+
+\begin{frame}{Spanner en CAP/PACELC}
+\begin{itemize}
+\item Bajo partición: preserva C, sacrifica A
+\item Sin partición: sacrifica latencia para preservar C
+\end{itemize}
+
+\pause
+
+\begin{block}{Clasificación}
+Spanner es claramente CP y PC/EC en espíritu PACELC.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Comparación}
+
+\begin{frame}{Dynamo vs Spanner}
 \begin{center}
-\begin{tabular}{l l l}
+\begin{tabular}{lcc}
 \toprule
-Método & Ventaja & Problema \\
+Aspecto & Dynamo & Spanner \\
 \midrule
-Hash mod N & simple & remapea casi todo \\
-Consistent hashing & remapeo limitado & requiere más diseño \\
-Virtual nodes & mejor balance & más complejidad operacional \\
+Modelo & eventual & fuerte / externa \\
+Particiones & alta tolerancia & prioriza consistencia \\
+Latencia & baja & mayor \\
+Conflictos & reconciliación & evita via orden fuerte \\
+Caso típico & carrito, catálogo & banca, SQL global \\
 \bottomrule
 \end{tabular}
 \end{center}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Pregunta de diseño}
+No se trata de “qué sistema gana”, sino de:
 \begin{itemize}
-\item pensar que particionar es solo “repartir datos”
-\item ignorar el costo de rebalancing
-\item suponer distribución uniforme de acceso
-\item olvidar que algunas claves concentran tráfico
+\item qué dominio tenés;
+\item qué errores son aceptables;
+\item qué latencia podés pagar;
+\item qué semántica requiere el negocio.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-Escalar un sistema distribuido exige diseñar cómo evolucionará la distribución de datos cuando cambie el tamaño y la carga del clúster.
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+La consistencia real no es una propiedad abstracta: es una decisión de arquitectura condicionada por particiones, latencia y semántica del dominio.
 \end{block}
 \end{frame}
 

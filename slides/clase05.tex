@@ -1,234 +1,188 @@
-% !TeX encoding = UTF-8
-\documentclass{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{05}
-\UASetClassTitle{Tiempo y causalidad}
+\UASetClassTitle{Transacciones distribuidas}
 
 \title{\UACourse}
-\subtitle{Clase 05 — Tiempo y causalidad}
+\subtitle{Clase 05 --- Serializabilidad, anomalías y 2PC/3PC}
 
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Tiempo y causalidad}
+\UASectionSlide{Motivación}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{De orden global a correctitud}
 \begin{itemize}
-\item entender por qué el tiempo físico no alcanza para ordenar eventos distribuidos
-\item formalizar la noción de causalidad
-\item introducir relojes lógicos de Lamport y vector clocks
-\item distinguir orden total, orden parcial y concurrencia
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Motivación}
-En un sistema distribuido:
-\begin{itemize}
-\item cada nodo observa su reloj local
-\item los relojes pueden derivar
-\item la red introduce demora variable
+\item Consenso ⇒ orden total de operaciones
+\item Falta: \textbf{correctitud lógica de operaciones compuestas}
 \end{itemize}
 
-\begin{block}{Pregunta}
-Si dos eventos ocurrieron en nodos distintos, ¿podemos decir con certeza cuál ocurrió antes?
+\pause
+\begin{block}{Problema}
+¿Cómo ejecutar múltiples operaciones concurrentes sin violar invariantes?
 \end{block}
 \end{frame}
 
-\begin{frame}{Por qué el tiempo físico no alcanza}
-Dos nodos pueden registrar timestamps consistentes localmente y, sin embargo:
+\begin{frame}{Transacción}
+\begin{block}{Definición}
+Unidad lógica de trabajo que debe ejecutarse de forma atómica y aislada.
+\end{block}
+
+\pause
+ACID:
 \begin{itemize}
-\item un mensaje puede llegar mucho después de haberse emitido
-\item una corrección NTP puede modificar el reloj local
-\item la comparación entre timestamps físicos no siempre preserva dependencia causal
+\item Atomicidad: todo o nada
+\item Consistencia: preserva invariantes
+\item Aislamiento: ejecución como si fuera sola
+\item Durabilidad: persistencia tras commit
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Serializabilidad}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+Una ejecución concurrente es correcta si equivale a una ejecución secuencial.
+\end{block}
+\end{frame}
+
+\begin{frame}{Grafo de precedencia}
+\begin{itemize}
+\item nodos: transacciones
+\item aristas: dependencias por conflictos
 \end{itemize}
 
-\begin{uawarn}
-Ordenar por tiempo físico no equivale a ordenar por dependencia causal.
-\end{uawarn}
+\pause
+\begin{alertblock}{Criterio}
+Si el grafo tiene ciclo ⇒ no serializable
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Relación happened-before}
-Definimos la relación causal $a \rightarrow b$:
-\begin{enumerate}
-\item si $a$ y $b$ ocurren en el mismo proceso y $a$ ocurre antes que $b$
-\item si $a$ es el envío de un mensaje y $b$ es la recepción del mismo mensaje
-\item por transitividad
-\end{enumerate}
-
-Si ni $a \rightarrow b$ ni $b \rightarrow a$, entonces los eventos son \textbf{concurrentes}.
-\end{frame}
-
-\begin{frame}{Figura: orden parcial y concurrencia}
+\begin{frame}{Ejemplo de ciclo}
 \begin{center}
-\begin{tikzpicture}[
-  x=1.2cm,y=0.9cm,
-  every node/.style={font=\small},
-  >=Latex
-]
-\draw[thick] (0,0) -- (7,0) node[right]{Proceso $P_1$};
-\draw[thick] (0,-2) -- (7,-2) node[right]{Proceso $P_2$};
+\begin{tikzpicture}[node distance=2.5cm]
+\node (t1) {$T_1$};
+\node (t2) [right of=t1] {$T_2$};
 
-\filldraw (1,0) circle (2pt) node[above] {$a$};
-\filldraw (3,0) circle (2pt) node[above] {$b$};
-\filldraw (5,0) circle (2pt) node[above] {$c$};
-
-\filldraw (2,-2) circle (2pt) node[below] {$d$};
-\filldraw (4,-2) circle (2pt) node[below] {$e$};
-\filldraw (6,-2) circle (2pt) node[below] {$f$};
-
-\draw[->,thick] (3,0) -- (4,-2);
-\draw[->,thick] (2,-2) -- (5,0);
-
-\node at (7.4,-1) {$b \rightarrow e$};
-\node at (7.6,-0.2) {$d \rightarrow c$};
+\draw[->] (t1) to[bend left] node[above]{RW} (t2);
+\draw[->] (t2) to[bend left] node[below]{RW} (t1);
 \end{tikzpicture}
 \end{center}
 
-No todos los eventos son comparables.
+\pause
+Resultado: no existe orden secuencial equivalente
 \end{frame}
 
-\begin{frame}{Relojes de Lamport}
-Cada proceso mantiene un contador lógico $L_i$.
+\UASectionSlide{Anomalías}
 
-Reglas:
+\begin{frame}{Dirty read}
 \begin{itemize}
-\item antes de cada evento local: $L_i \leftarrow L_i + 1$
-\item al enviar un mensaje, se adjunta el valor actual
-\item al recibir un mensaje con timestamp $t$: $L_i \leftarrow \max(L_i,t)+1$
+\item $T_1$ escribe
+\item $T_2$ lee valor no confirmado
+\item $T_1$ aborta
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Non-repeatable read}
+\begin{itemize}
+\item $T_1$ lee valor
+\item $T_2$ lo modifica
+\item $T_1$ vuelve a leer distinto valor
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Phantom}
+\begin{itemize}
+\item $T_1$ lee conjunto
+\item $T_2$ inserta nuevo registro
+\item $T_1$ vuelve a leer ⇒ aparece “fantasma”
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Write skew}
+\begin{itemize}
+\item ambas transacciones leen mismo estado
+\item ambas escriben sin conflicto directo
 \end{itemize}
 
-Propiedad:
-\[
-a \rightarrow b \implies L(a) < L(b)
-\]
+\pause
+\begin{alertblock}{Clave}
+Snapshot Isolation permite esto ⇒ no es serializable
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Límite de Lamport}
-Lamport preserva causalidad, pero no detecta concurrencia.
+\UASectionSlide{Niveles de aislamiento}
 
-Puede ocurrir:
-\[
-L(a) < L(b)
-\]
-sin que exista
-\[
-a \rightarrow b
-\]
+\begin{frame}{SQL estándar}
+\begin{itemize}
+\item Read Uncommitted
+\item Read Committed
+\item Repeatable Read
+\item Serializable
+\end{itemize}
+\end{frame}
 
-\begin{block}{Conclusión}
-Lamport induce un orden compatible con la causalidad, pero no caracteriza completamente la relación causal.
+\begin{frame}{Snapshot Isolation}
+\begin{itemize}
+\item snapshot consistente al inicio
+\item evita dirty read y non-repeatable read
+\item NO evita write skew
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Commit distribuido}
+
+\begin{frame}{Problema}
+\begin{block}{}
+Commit en múltiples nodos debe ser atómico
 \end{block}
 \end{frame}
 
-\begin{frame}{Ejemplo con Lamport}
-\begin{center}
-\begin{tikzpicture}[
-  x=1.2cm,y=0.9cm,
-  every node/.style={font=\small},
-  >=Latex
-]
-\draw[thick] (0,0) -- (7,0) node[right]{P1};
-\draw[thick] (0,-2) -- (7,-2) node[right]{P2};
-
-\filldraw (1,0) circle (2pt) node[above] {$1$};
-\filldraw (3,0) circle (2pt) node[above] {$2$};
-\filldraw (5,0) circle (2pt) node[above] {$5$};
-
-\filldraw (2,-2) circle (2pt) node[below] {$1$};
-\filldraw (4,-2) circle (2pt) node[below] {$3$};
-\filldraw (6,-2) circle (2pt) node[below] {$4$};
-
-\draw[->,thick] (3,0) -- (4,-2);
-\draw[->,thick] (2,-2) -- (5,0);
-\end{tikzpicture}
-\end{center}
-
-Los números respetan la causalidad, pero no indican por sí solos qué pares son concurrentes.
-\end{frame}
-
-\begin{frame}{Vector clocks}
-Cada proceso mantiene un vector $V_i[1..N]$.
-
-Intuición:
+\begin{frame}{2PC}
+\textbf{Fase 1: Prepare}
 \begin{itemize}
-\item cada componente registra lo que el proceso sabe sobre cada proceso
-\item al ocurrir un evento local, incrementa su propia componente
-\item al recibir un mensaje, hace máximo componente a componente
+\item coordinador pregunta “¿puedes committear?”
+\end{itemize}
+
+\textbf{Fase 2: Commit}
+\begin{itemize}
+\item si todos dicen sí ⇒ commit
+\item si alguno dice no ⇒ abort
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Propiedad de vector clocks}
-Para eventos $a,b$:
-\[
-a \rightarrow b \iff V(a) < V(b)
-\]
-donde $V(a) < V(b)$ significa:
+\begin{frame}{Problema de 2PC}
 \begin{itemize}
-\item $V(a)[k] \le V(b)[k]$ para todo $k$
-\item y estrictamente menor en al menos una componente
-\end{itemize}
-
-Si los vectores no son comparables, los eventos son concurrentes.
-\end{frame}
-
-\begin{frame}{Ejemplo: detección de concurrencia}
-\[
-V(a)=(2,1,0), \qquad V(b)=(1,2,0)
-\]
-
-Ninguno domina al otro. 
-Entonces:
-\[
-a \parallel b
-\]
-
-\begin{block}{Valor práctico}
-Vector clocks permiten distinguir entre:
-\begin{itemize}
-\item actualización derivada de otra
-\item actualización concurrente
-\end{itemize}
-\end{block}
-\end{frame}
-
-\begin{frame}{Aplicaciones reales}
-\begin{itemize}
-\item resolución de conflictos en stores eventualmente consistentes
-\item versionado de objetos
-\item depuración de sistemas distribuidos
-\item reconstrucción causal de ejecuciones
+\item coordinador cae
+\item participantes quedan bloqueados
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo tipo MIT}
-Supongamos dos réplicas desconectadas que aceptan escrituras concurrentes sobre el mismo objeto.
-
+\begin{frame}{3PC}
 \begin{itemize}
-\item Con timestamps físicos: una puede sobrescribir arbitrariamente a la otra
-\item con vector clocks: se detecta concurrencia y se fuerza reconciliación
+\item agrega fase intermedia (pre-commit)
+\item reduce bloqueo
 \end{itemize}
 
-\begin{block}{Pregunta}
-¿Qué preferimos en un store distribuido real: simplicidad o preservación de causalidad?
-\end{block}
-\end{frame}
-
-\begin{frame}{Errores frecuentes}
+\pause
+Limitación:
 \begin{itemize}
-\item Creer que sincronizar relojes físicos resuelve el problema de orden
-\item confundir orden total con causalidad
-\item pensar que Lamport detecta concurrencia
-\item olvidar que vector clocks crecen con el número de procesos
+\item requiere sincronía parcial
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-El tiempo distribuido no se razona como reloj universal, sino como dependencia causal entre eventos.
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+Serializabilidad es el estándar de corrección, pero requiere coordinación fuerte.
 \end{block}
 \end{frame}
 

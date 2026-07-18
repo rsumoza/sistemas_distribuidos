@@ -1,41 +1,252 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=apuntes,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{10}
-\UASetClassTitle{Transacciones distribuidas}
-\title{Clase 10 --- Transacciones distribuidas}
+\UASetClassTitle{Observabilidad distribuida}
+\UASetDocKind{Apuntes}
+
+\title{Clase 10 --- Observabilidad distribuida, tracing, métricas, logs y debugging}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Introducción}
-La clase 10 desarrolla el tema ``Transacciones distribuidas'' como una extensión directa del framework del curso. El foco no está puesto solamente en describir una técnica, sino en entender qué problema distribuye, qué hipótesis de falla la vuelven necesaria, qué garantía permite ofrecer y qué costo operativo introduce.
 
-\section{Desarrollo conceptual}
-Analizar coordinación entre múltiples servicios mediante 2PC, sagas y compensaciones. Este tema debe pensarse siempre sobre un caso concreto: una operación, una lectura, una réplica, un log o un servicio remoto que necesita coordinarse con otros elementos del sistema. La clase discute cómo cambia la decisión de diseño cuando cambian las hipótesis de falla o las garantías exigidas por el dominio.
+Una vez que un sistema distribuido está desplegado, el problema central deja de ser solo diseñarlo correctamente y pasa a ser también \emph{entenderlo en producción}. Esto es mucho más difícil que en sistemas locales, porque:
 
-\subsection{Preguntas guía}
 \begin{itemize}
-\item ¿Cómo aparece 2PC en un sistema real? \item ¿Cómo aparece bloqueo en un sistema real? \item ¿Cómo aparece sagas en un sistema real? 
-\item ¿qué síntoma observaría un usuario o un operador?
-\item ¿qué concesión de rendimiento, complejidad o disponibilidad introduce la solución?
+\item la ejecución se distribuye entre múltiples procesos;
+\item las fallas pueden ser parciales;
+\item no hay un reloj global confiable;
+\item la narrativa causal de una request se fragmenta entre servicios.
 \end{itemize}
 
-\section{Conexión con el resto del curso}
-La clase 10 no se estudia aislada: se conecta con RPC, replicación, consistencia, observabilidad o resiliencia según corresponda. El objetivo pedagógico es que el estudiante pueda trasladar el concepto de una situación puntual a una familia completa de problemas distribuidos.
+Por eso, la observabilidad no debe tratarse como un agregado cosmético. Es una capacidad estructural del sistema.
 
-\section{Resultado de aprendizaje esperado}
-Al finalizar la clase, el estudiante debería poder explicar el problema central, formular el modelo de fallas relevante, proponer una solución razonable y justificar el trade-off dominante.
+\section{Observabilidad}
 
-\section{Bibliografía guía}
+Una formulación útil es:
+
+\begin{quote}
+Un sistema es observable si su estado interno puede inferirse razonablemente a partir de sus salidas.
+\end{quote}
+
+En sistemas distribuidos, las salidas principales son:
+
 \begin{itemize}
-\item Kleppmann, cap. 9.
-\item Microservices Patterns.
-\item Tanenbaum, transacciones distribuidas.
+\item logs;
+\item métricas;
+\item trazas distribuidas.
 \end{itemize}
+
+Estas tres dimensiones se complementan. Ninguna por sí sola alcanza.
+
+\section{Logs}
+
+\subsection{Qué responden}
+
+Los logs responden principalmente:
+\begin{quote}
+¿Qué ocurrió?
+\end{quote}
+
+\subsection{Logs tradicionales vs estructurados}
+
+Un log de texto libre puede ser útil para inspección humana rápida, pero escala mal para análisis distribuido. Por eso, en sistemas modernos se prefiere log estructurado con campos como:
+
+\begin{itemize}
+\item timestamp;
+\item service\_name;
+\item request\_id;
+\item trace\_id;
+\item user\_id;
+\item endpoint;
+\item status;
+\item latency;
+\item error\_code.
+\end{itemize}
+
+\subsection{Idea importante}
+
+En sistemas distribuidos, un log aislado casi nunca dice toda la verdad. El valor del log aparece cuando puede correlacionarse con otros eventos de la misma request o del mismo flujo.
+
+\section{Métricas}
+
+\subsection{Qué responden}
+
+Las métricas responden:
+\begin{quote}
+¿Cómo está funcionando el sistema en agregado?
+\end{quote}
+
+\subsection{Ejemplos típicos}
+
+\begin{itemize}
+\item throughput;
+\item tasa de error;
+\item latencia p50/p95/p99;
+\item uso de CPU;
+\item memoria;
+\item saturación de colas;
+\item conexiones activas.
+\end{itemize}
+
+\subsection{Golden Signals}
+
+Una guía clásica de operación distribuida es mirar:
+\begin{itemize}
+\item latency;
+\item traffic;
+\item errors;
+\item saturation.
+\end{itemize}
+
+\subsection{Límite}
+
+Las métricas muestran patrones agregados, pero no explican por sí solas una request individual. Por eso no reemplazan a logs ni trazas.
+
+\section{Tracing distribuido}
+
+\subsection{Qué responde}
+
+El tracing distribuido responde:
+\begin{quote}
+¿Cómo atravesó esta request el sistema?
+\end{quote}
+
+\subsection{Conceptos}
+
+\begin{itemize}
+\item \textbf{Trace}: historia completa de una request distribuida.
+\item \textbf{Span}: unidad individual de trabajo dentro de esa traza.
+\end{itemize}
+
+Una request que pasa por API, Auth, Orders y Payments puede representarse como una traza con múltiples spans enlazados causalmente.
+
+\subsection{Valor}
+
+El tracing permite:
+\begin{itemize}
+\item ver dependencia crítica;
+\item detectar dónde se concentra la latencia;
+\item localizar fallas upstream;
+\item entender el árbol causal de una ejecución.
+\end{itemize}
+
+\section{Propagación de contexto}
+
+\subsection{Correlation IDs}
+
+Para correlacionar logs y spans, el sistema debe propagar contexto explícito:
+
+\begin{itemize}
+\item request\_id;
+\item trace\_id;
+\item span\_id;
+\item eventualmente tenant\_id o user\_id.
+\end{itemize}
+
+\subsection{Punto clave}
+
+Sin propagación de contexto, cada servicio genera una historia local desconectada. El resultado es que el sistema se vuelve opaco justo cuando más necesita ser entendible.
+
+\section{Debugging en producción}
+
+\subsection{Por qué es difícil}
+
+El debugging distribuido es difícil porque los síntomas visibles suelen ser tardíos y desplazados respecto de la causa real.
+
+Ejemplo típico:
+\begin{itemize}
+\item una base de datos empieza a responder lentamente;
+\item los servicios intermedios activan retries;
+\item aumenta la presión sobre la base;
+\item la API frontal empieza a devolver timeout;
+\item el error visible aparece en el borde, pero la causa está en otro sitio.
+\end{itemize}
+
+\subsection{Lección}
+
+La observabilidad debe permitir reconstruir causalidad, no solo enumerar síntomas.
+
+\section{Estrategia de diagnóstico}
+
+Una estrategia razonable para investigar fallas distribuidas es:
+
+\begin{enumerate}
+\item identificar el síntoma observable principal;
+\item encontrar la request o conjunto de requests afectadas;
+\item ubicar el servicio donde comienza la degradación;
+\item revisar dependencias downstream y upstream;
+\item correlacionar métricas, logs y trazas.
+\end{enumerate}
+
+\subsection{Error común}
+
+Un error típico es empezar buscando “la línea exacta de código” antes de reconstruir la topología de la falla. En sistemas distribuidos, el diagnóstico suele requerir primero mapear causalidad y dependencia.
+
+\section{Diseño para observabilidad}
+
+La observabilidad debe ser una propiedad de diseño, no un parche posterior. Eso implica:
+
+\begin{itemize}
+\item logs estructurados desde el inicio;
+\item trazas distribuidas habilitadas;
+\item propagación de contexto entre servicios;
+\item métricas orientadas a capacidad, latencia y errores;
+\item alertas pensadas según objetivos del sistema.
+\end{itemize}
+
+\section{Observabilidad y arquitectura}
+
+Cada estilo arquitectónico cambia el problema observacional:
+
+\subsection{Monolito}
+\begin{itemize}
+\item el tracing es menos crítico;
+\item los logs locales suelen ser más fáciles de correlacionar.
+\end{itemize}
+
+\subsection{Microservicios}
+\begin{itemize}
+\item aumenta la necesidad de tracing;
+\item las dependencias se multiplican;
+\item la causalidad se fragmenta.
+\end{itemize}
+
+\subsection{Event-driven}
+\begin{itemize}
+\item el orden puede ser parcial;
+\item el tracing extremo a extremo es más difícil;
+\item la correlación por event\_id o trace\_id se vuelve crítica.
+\end{itemize}
+
+\section{Modelo del curso}
+
+Podemos formular el problema observacional con:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+Por ejemplo:
+
+\begin{itemize}
+\item $P$: diagnosticar fallas en un sistema distribuido;
+\item $F$: fallas parciales, latencia variable, cascadas de retries;
+\item $G$: capacidad de reconstruir causalidad y localizar degradación;
+\item $S$: logs estructurados + métricas + trazas + propagación de contexto;
+\item $T$: más sobrecarga, más complejidad de instrumentación, más costo operacional.
+\end{itemize}
+
+\section{Conclusión}
+
+No se puede operar seriamente un sistema distribuido si no puede observarse con claridad. Logs, métricas y trazas no son herramientas accesorias, sino mecanismos para recuperar inteligibilidad en un entorno donde la ejecución real está fragmentada.
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar la clase, el estudiante debe ser capaz de explicar qué vuelve difícil este problema distribuido, qué garantía busca preservar y qué precio paga por hacerlo.
+Observabilidad distribuida no es “mirar dashboards”. Es diseñar el sistema para que pueda explicarse a sí mismo cuando falle.
 \end{uakeybox}
+
 \end{document}

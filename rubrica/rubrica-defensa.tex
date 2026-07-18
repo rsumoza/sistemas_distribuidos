@@ -1,0 +1,45 @@
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+\UASetClassNumber{16}
+\UASetClassTitle{Rúbrica de defensa final}
+\UASetDocKind{Rúbrica formal de evaluación}
+\title{Rúbrica formal de evaluación --- Defensa final}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+
+\section{Filosofía de evaluación}
+Se evalúa calidad de decisiones, no cantidad de tecnologías mencionadas.
+
+\section{Dimensiones y ponderación}
+\begin{center}
+\begin{tabular}{p{5.2cm} p{7cm} c}
+\toprule
+Dimensión & Descripción & Peso \\
+\midrule
+Modelado del problema & ¿identifica restricciones y dominio? & 15 \\
+Arquitectura global & ¿la propuesta es coherente y modular? & 15 \\
+Consistencia y replicación & ¿la elección está justificada? & 15 \\
+Manejo de fallas & ¿anticipa particiones, retries y degradación? & 15 \\
+Seguridad & ¿modela amenazas y controles? & 10 \\
+Dinámica real & ¿considera latencia, ancho de banda o costo físico? & 10 \\
+Observabilidad & ¿puede operar y debuggear el sistema? & 10 \\
+Trade-offs & ¿son explícitos, correctos y defendibles? & 10 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Escala cualitativa}
+\begin{itemize}
+\item Insuficiente: describe componentes sin comprender consecuencias.
+\item Aceptable: usa conceptos correctos, pero de forma superficial.
+\item Bueno: justifica decisiones con al menos un trade-off claro.
+\item Excelente: anticipa fallas, límites y objeciones técnicas.
+\item Nivel investigación: propone un insight fuerte o modelado original.
+\end{itemize}
+
+\begin{uakeybox}
+Criterio de oro: el diseño debe poder sobrevivir, con sus supuestos explícitos, a una discusión técnica seria sobre producción real.
+\end{uakeybox}
+\end{document}

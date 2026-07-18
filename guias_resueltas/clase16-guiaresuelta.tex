@@ -1,32 +1,324 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{16}
-\UASetClassTitle{Defensa y cierre}
-\title{Clase 16 --- Defensa y cierre}
+\UASetClassTitle{Defensa final ante comité}
+\UASetDocKind{Guía resuelta}
+
+\title{Clase 16 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
-\section{Indicaciones generales}
-Resolver cada ejercicio explicitando, cuando corresponda, el esquema problema--fallas--garantía--solución--trade-off.
 
-\section{Ejercicios y respuestas orientativas}
-\begin{uaexercise}\textbf{1.} Explicar con tus palabras el problema distribuido central de la clase 16.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{2.} Identificar dos fallas plausibles para el tema ``Defensa y cierre''.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{3.} Explicar qué observación podría hacer un cliente y por qué no alcanza para inferir la causa exacta.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{4.} Aplicar el esquema problema-fallas-garantía-solución-trade-off a un caso simple vinculado al tema.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{5.} Describir un ejemplo donde una solución correcta introduce un costo visible para el usuario u operador.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{6.} Comparar una alternativa más conservadora con una más disponible o más rápida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{7.} Redactar un mini caso realista (4--6 líneas) donde el concepto de la clase sea decisivo.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
-\begin{uaexercise}\textbf{8.} Proponer una forma de validar o auditar la solución elegida.\end{uaexercise}
-\begin{uaanswer}Respuesta orientativa: el estudiante debería conectar el enunciado con el tema ``Defensa y cierre'', distinguir síntoma de causa y justificar una decisión de diseño razonable.\end{uaanswer}
+\section{Criterio de lectura}
+
+Esta guía resuelta debe leerse como entrenamiento para una defensa real. El objetivo no es solo “tener una respuesta”, sino aprender a formular respuestas técnicamente creíbles, estructuradas y honestas frente a objeciones difíciles.
+
+\section{Resoluciones}
+
+\begin{uaexercise}
+Explique por qué una defensa final no puede reducirse a describir un diagrama.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque un diagrama no explica por sí solo:
+\begin{itemize}
+\item qué problema se está resolviendo;
+\item qué fallas se asumieron;
+\item qué garantías se buscan;
+\item por qué esa arquitectura es razonable;
+\item qué trade-offs acepta.
+\end{itemize}
+
+Una defensa seria necesita convertir la arquitectura en argumento técnico, no en ilustración.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué lugar ocupa el problema y el contexto al inicio de una defensa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ocupan el lugar central, porque toda decisión posterior depende de ellos. Sin contexto, cualquier arquitectura puede parecer arbitraria o decorativa. El comité necesita saber qué dominio, qué restricciones y qué criticidades justifican el diseño propuesto.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una estructura de presentación de 15 minutos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una estructura razonable sería:
+\begin{enumerate}
+\item problema y contexto;
+\item requisitos funcionales y no funcionales;
+\item modelo de falla;
+\item arquitectura propuesta;
+\item datos, consistencia y comunicación;
+\item observabilidad y resiliencia;
+\item trade-offs y límites;
+\item cierre con justificación integral.
+\end{enumerate}
+
+Esta secuencia es fuerte porque evita empezar por tecnologías y ordena la propuesta como argumento.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una buena defensa debe incluir supuestos y límites.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque toda arquitectura depende de supuestos. Si no se los explicita, la propuesta parece más fuerte de lo que realmente es. Reconocer límites muestra madurez técnica y permite al comité evaluar la propuesta en sus términos correctos, en lugar de sobreinterpretarla.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo usar $D=(P,F,G,S,T)$ como columna vertebral.
+\end{uaexercise}
+
+\begin{uaanswer}
+El esquema ordena la defensa de forma natural:
+\begin{itemize}
+\item $P$: define el problema y el dominio;
+\item $F$: explicita las fallas que importan;
+\item $G$: fija las garantías exigidas;
+\item $S$: presenta la solución propuesta;
+\item $T$: reconoce costos y trade-offs.
+\end{itemize}
+
+Con este marco, la defensa deja de ser una enumeración y se convierte en un razonamiento estructurado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo de $D=(P,F,G,S,T)$ para reservas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una formulación posible:
+
+\begin{itemize}
+\item $P$: coordinar reserva de vuelo, hotel y pago;
+\item $F$: fallas parciales, latencia, duplicación, pasos que fallan luego de otros exitosos;
+\item $G$: reserva consistente a nivel de negocio y trazabilidad del flujo;
+\item $S$: bounded contexts separados, saga con compensaciones, idempotencia, observabilidad fuerte;
+\item $T$: estados intermedios visibles, compensaciones imperfectas y mayor complejidad operacional.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué ocultar trade-offs debilita una defensa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque una propuesta sin costo explícito parece ingenua. Un comité técnico sabe que no existe arquitectura gratis. Si la propuesta pretende maximizar simultáneamente todas las propiedades valiosas, pierde credibilidad inmediatamente.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una arquitectura seria debe reconocer qué no resuelve.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque esa explicitación muestra criterio. Un sistema serio sabe:
+\begin{itemize}
+\item qué parte deja para evolución posterior;
+\item qué parte depende de validación adicional;
+\item qué parte no cubre bajo ciertos supuestos.
+\end{itemize}
+
+Eso es más fuerte que fingir completitud absoluta.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una respuesta a “¿por qué no un monolito?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una buena respuesta sería:
+\begin{quote}
+Un monolito modular sería una alternativa válida si el dominio, el equipo y el despliegue no exigieran separación fuerte. En nuestro caso, elegimos separar porque existen bounded contexts relativamente claros, distintos ritmos de cambio y distintas necesidades operativas. Aun así, reconocemos que esto introduce costo distribuido y no defendemos la separación como una virtud abstracta, sino como una respuesta a esos requisitos específicos.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una respuesta a “¿por qué no consistencia fuerte en todo?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta sólida sería:
+\begin{quote}
+Porque la consistencia fuerte global tiene costos en coordinación, latencia y disponibilidad. Elegimos reservarla para operaciones donde el dominio no tolera ambigüedad, y aceptar consistencia eventual en partes donde el costo semántico de un pequeño desfase es menor que el costo sistémico de coordinar todo.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una respuesta a “¿qué pasa bajo partición?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta sólida debe decir:
+\begin{quote}
+Bajo partición no pretendemos mantener simultáneamente todas las garantías. Priorizamos disponibilidad en servicios no críticos con reconciliación posterior y priorizamos corrección fuerte en el camino crítico, aunque eso implique rechazar temporalmente ciertas operaciones. Esa decisión se alinea con el costo del error en este dominio.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una respuesta a “¿cómo operás y observás esto?”.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una respuesta seria debería incluir:
+\begin{quote}
+La propuesta incorpora logs estructurados, métricas orientadas a SLI/SLO, tracing distribuido, propagación de contexto, runbooks, incident management y postmortems. La operación no es un apéndice: forma parte de la viabilidad de la arquitectura.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una defensa madura debe incluir autocrítica.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque permite mostrar que el diseño fue evaluado críticamente y no solo presentado desde el camino feliz. La autocrítica fortalece la defensa cuando identifica límites concretos y razonados, no cuando se usa como evasiva.
+\end{uaanswer}
+
+\begin{uaexercise}
+Dé tres ejemplos de limitaciones legítimas.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplos:
+\begin{itemize}
+\item la reconciliación eventual de ciertas vistas puede exponer desfasajes temporales;
+\item ciertas decisiones de timeout y retry requieren validación experimental adicional;
+\item la migración desde monolito a servicios distribuidos incrementaría significativamente el costo operacional.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique la diferencia entre debilidad reconocida y respuesta evasiva.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una debilidad reconocida identifica un límite concreto y su impacto. Una respuesta evasiva usa ambigüedad para evitar responder. La primera fortalece credibilidad; la segunda la destruye.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué “eso depende” solo sirve si se completa.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque “depende” por sí solo no informa nada. Puede ser una buena respuesta solo si se continúa con:
+\begin{itemize}
+\item de qué depende;
+\item qué supuestos cambian;
+\item qué decisión tomaríamos bajo cada caso.
+\end{itemize}
+
+Sin eso, suena a evasión.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una rúbrica razonable para defensa final.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una rúbrica razonable debería incluir:
+\begin{itemize}
+\item formulación del problema;
+\item realismo del modelo de falla;
+\item calidad del diseño;
+\item coherencia de garantías;
+\item explicitación de trade-offs;
+\item integración de operación y observabilidad;
+\item calidad de la defensa oral;
+\item manejo de objeciones.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la rúbrica debe incluir diseño y defensa oral.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque una buena arquitectura mal defendida puede parecer inconsistente, y una defensa brillante sobre una mala arquitectura puede sonar convincente superficialmente. La evaluación debe capturar tanto la calidad del sistema como la capacidad de argumentarlo.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo distinguir propuesta sólida de propuesta decorativa.
+\end{uaexercise}
+
+\begin{uaanswer}
+La propuesta sólida:
+\begin{itemize}
+\item parte del problema;
+\item explicita fallas;
+\item justifica garantías;
+\item reconoce costos;
+\item integra operación.
+\end{itemize}
+
+La decorativa:
+\begin{itemize}
+\item enumera herramientas;
+\item promete todo;
+\item omite límites;
+\item responde con buzzwords en vez de argumentos.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué una defensa no debe premiar complejidad por sí misma.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque en sistemas distribuidos la complejidad es un costo, no una medalla. Una propuesta más compleja solo es mejor si resuelve un problema real que no podía resolverse razonablemente con una opción más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Prepare una mini-defensa escrita para e-commerce global.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una mini-defensa razonable podría decir:
+
+\begin{quote}
+Diseñamos el sistema para soportar catálogo global, checkout crítico y analítica desacoplada. Reservamos consistencia más fuerte para pago y orden, y aceptamos consistencia eventual en recomendaciones y proyecciones. Usamos eventos para desacoplar procesos no críticos y RPC en caminos que requieren respuesta inmediata. Priorizamos alta disponibilidad en la experiencia de navegación, pero no permitimos ambigüedad semántica en cobro. El costo aceptado es mayor complejidad operacional y necesidad de observabilidad fuerte en el camino crítico.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Prepare una mini-defensa escrita para plataforma financiera.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una mini-defensa razonable podría decir:
+
+\begin{quote}
+Diseñamos el núcleo del sistema alrededor de un ledger con consistencia fuerte y trazabilidad completa, porque el dominio no tolera ambigüedad sobre saldos o movimientos. Aceptamos mayor latencia y coordinación en operaciones críticas, y reservamos componentes más relajados para analítica o reporting. La arquitectura prioriza auditabilidad, idempotencia, resiliencia y operación con objetivos explícitos. El costo aceptado es menor flexibilidad en ciertas rutas y mayor complejidad de infraestructura.
+\end{quote}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué hace sobresaliente a una defensa final.
+\end{uaexercise}
+
+\begin{uaanswer}
+La vuelve sobresaliente:
+\begin{itemize}
+\item un problema muy bien formulado;
+\item supuestos realistas;
+\item diseño coherente;
+\item trade-offs bien justificados;
+\item respuestas sólidas ante objeciones;
+\item honestidad técnica;
+\item claridad conceptual.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué el valor del curso no está en acumular conceptos.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque los conceptos aislados no bastan para diseñar sistemas reales. El valor del curso aparece cuando el estudiante puede integrar esos conceptos en una propuesta completa y defenderla con criterio bajo preguntas difíciles. Esa capacidad de articulación es el verdadero cierre formativo.
+\end{uaanswer}
 
 \end{document}

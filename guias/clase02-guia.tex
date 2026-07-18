@@ -1,27 +1,149 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{02}
-\UASetClassTitle{Comunicación y fallas}
-\title{Clase 02 --- Comunicación y fallas}
+\UASetClassTitle{RPC, timeouts, retries e idempotencia}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 02 --- RPC, timeouts, retries e idempotencia}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Indicaciones generales}
-Resolver cada ejercicio distinguiendo observación, causa posible, garantía buscada y trade-off aceptado. Cuando aparezcan timeouts o retries, indicar explícitamente si la operación remota pudo haber ocurrido.
+\section{Indicaciones}
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Una llamada RPC a un servicio de pagos no responde antes del timeout. Enumerar al menos cuatro causas compatibles con esa observación y marcar cuáles implican que el pago pudo haberse ejecutado.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Explicar por qué RPC es una abstracción útil pero peligrosa si se la piensa como una llamada local.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Diseñar una política de timeout para una consulta de saldo y otra para una transferencia. Comparar qué cambia en latencia tolerada, riesgo y experiencia de usuario.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Analizar un retry automático ante timeout en una operación de creación de orden. Indicar qué problema resuelve y qué problema nuevo puede introducir.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Clasificar estas operaciones como idempotentes o no idempotentes y justificar: actualizar email, crear pedido, cancelar reserva, sumar puntos a una cuenta.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Proponer cómo convertir una operación no idempotente en segura ante retries usando un request id o clave de idempotencia.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Comparar at-most-once, at-least-once y exactly-once desde el punto de vista del cliente. Indicar qué garantía ofrece cada una y qué costo introduce.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Dado un sistema que procesa pagos, proponer una decisión de diseño usando el esquema problema--fallas--garantía--solución--trade-off.\end{uaexercise}
-\begin{uaexercise}\textbf{9.} Para una llamada remota que vence por timeout, construir una línea de tiempo con al menos cuatro eventos posibles: decisión del cliente, retransmisión o retry, ejecución del servidor y respuesta tardía. Indicar qué eventos pueden ocurrir después de que el cliente dejó de esperar.\end{uaexercise}
-\begin{uaexercise}\textbf{10.} Elegir una comunicación realista y listar las capas involucradas. Para cada capa, indicar qué respuesta puede tener ante una falla y cómo esa respuesta ayuda o complica el diagnóstico.\end{uaexercise}
+Justificar todas las respuestas.  
+Cuando corresponda, usar:
+
+\[
+D = (P, F, G, S, T)
+\]
+
+\section{Nivel 1: comprensión conceptual}
+
+\begin{uaexercise}
+Definir RPC con precisión. Explicar qué intenta abstraer y por qué esa abstracción es problemática.
+\end{uaexercise}
+
+\begin{uaexercise}
+Listar y explicar al menos 5 diferencias fundamentales entre una llamada local y una llamada remota.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describir todas las etapas de una llamada RPC e identificar en cuáles pueden ocurrir fallas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué la red rompe la transparencia de RPC.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir un ejemplo donde una operación se ejecute pero el cliente no lo sepa.
+\end{uaexercise}
+
+\section{Nivel 2: timeouts}
+
+\begin{uaexercise}
+Definir formalmente qué es un timeout.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué un timeout no implica crash.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar un escenario donde un timeout ocurra pero la operación sea exitosa.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar un escenario donde no haya timeout pero la operación falle.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analizar el trade-off entre:
+\begin{itemize}
+\item timeouts cortos
+\item timeouts largos
+\end{itemize}
+\end{uaexercise}
+
+\section{Nivel 3: retries}
+
+\begin{uaexercise}
+Definir retry y explicar su objetivo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar formalmente por qué retry introduce duplicación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir una línea temporal donde retry produce doble ejecución.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analizar el efecto de múltiples retries sobre el sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Comparar:
+\begin{itemize}
+\item sin retry
+\item con retry
+\end{itemize}
+en términos de liveness y safety.
+\end{uaexercise}
+
+\section{Nivel 4: semánticas}
+
+\begin{uaexercise}
+Definir at-least-once, at-most-once y exactly-once.
+\end{uaexercise}
+
+\begin{uaexercise}
+Dar ejemplos reales de cada semántica.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué exactly-once es difícil en sistemas distribuidos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Relacionar semánticas con retry.
+\end{uaexercise}
+
+\section{Nivel 5: idempotencia}
+
+\begin{uaexercise}
+Definir idempotencia formalmente.
+\end{uaexercise}
+
+\begin{uaexercise}
+Clasificar operaciones en idempotentes y no idempotentes.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar un mecanismo de idempotencia para pagos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar el costo de implementar idempotencia.
+\end{uaexercise}
+
+\section{Nivel 6: integración}
+
+\begin{uaexercise}
+Aplicar $D=(P,F,G,S,T)$ a RPC con retry.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar una API robusta frente a duplicación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar cómo esta clase se conecta con CAP.
+\end{uaexercise}
 
 \end{document}

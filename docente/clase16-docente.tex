@@ -1,51 +1,182 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{16}
-\UASetClassTitle{Defensa y cierre}
-\title{Clase 16 --- Defensa y cierre}
+\UASetClassTitle{Defensa final ante comité}
+\UASetDocKind{Guía docente}
+
+\title{Clase 16 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Sintetizar el pensamiento distribuido y evaluar la madurez conceptual alcanzada en el curso. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es culminar el curso desplazando al estudiante desde el conocimiento fragmentado hacia la capacidad de exposición, defensa y revisión crítica integral de un sistema distribuido.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{la madurez en sistemas distribuidos se evidencia cuando el alumno puede convertir mecanismos en una arquitectura defendible bajo objeciones técnicas reales}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item estructurar una defensa arquitectónica integral;
+\item usar el marco $D=(P,F,G,S,T)$ como guía de argumentación;
+\item responder objeciones hostiles sin caer en slogans;
+\item reconocer límites y trabajo futuro sin debilitar la propuesta;
+\item evaluar técnicamente propuestas de otros con criterio explícito.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 16 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): cambiar de rol}
+Abrir explicando que esta clase no es otra “unidad temática”, sino el momento en que el estudiante deja de ser receptor de contenidos y pasa a ser defensor técnico.
+
+\paragraph{Objetivo didáctico}
+Marcar el cambio de posición epistemológica: ya no “qué aprendimos”, sino “qué podemos defender”.
+
+\subsection*{Bloque 2 (20 min): estructura de la defensa}
+Presentar una secuencia clara de defensa:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item problema;
+\item restricciones;
+\item fallas;
+\item garantías;
+\item arquitectura;
+\item operación;
+\item trade-offs;
+\item límites.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Dar una plantilla conceptual sólida para ordenar exposiciones.
+
+\subsection*{Bloque 3 (20 min): objeciones hostiles}
+Trabajar preguntas típicas de jurado:
+\begin{itemize}
+\item ¿por qué no un monolito?;
+\item ¿por qué no consistencia fuerte en todo?;
+\item ¿qué pasa bajo partición?;
+\item ¿cómo operás esto?;
+\item ¿qué parte no está resuelta?
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Entrenar defensa bajo presión sin perder rigor.
+
+\subsection*{Bloque 4 (15 min): revisión crítica}
+Discutir cómo una buena defensa incluye autocrítica:
+\begin{itemize}
+\item límites;
+\item partes frágiles;
+\item validación pendiente;
+\item trabajo futuro.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Evitar que el alumno piense que defender bien implica fingir perfección.
+
+\subsection*{Bloque 5 (20 min): rúbrica y evaluación}
+Presentar una rúbrica clara y usarla sobre un caso o mini-presentación.
+
+\paragraph{Objetivo didáctico}
+Transformar la defensa en práctica evaluable y no en intuición difusa.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Estructura de defensa}
+Porque muchos alumnos saben contenido pero no saben organizarlo como argumento.
+
+\subsection*{2. Marco $D=(P,F,G,S,T)$}
+Porque resume la lógica del curso y da una columna vertebral reusable.
+
+\subsection*{3. Objeciones}
+Porque obligan a consolidar comprensión real y no recitación.
+
+\subsection*{4. Revisión crítica}
+Porque la honestidad técnica es parte esencial de una buena defensa.
+
+\subsection*{5. Rúbrica}
+Porque hace explícito qué se considera valioso en una propuesta madura.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué problema concreto justifica esta complejidad?
+\item ¿Qué costo estás aceptando y por qué?
+\item ¿Qué parte de tu propuesta es más débil?
+\item ¿Qué respuesta darías si el jurado no acepta tu supuesto principal?
+\item ¿Qué diferencia tu propuesta de una arquitectura “de moda”?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item presentar componentes antes de formular el problema;
+\item responder objeciones con slogans;
+\item ocultar trade-offs;
+\item confundir sofisticación con calidad;
+\item no integrar observabilidad, operación e incidentes;
+\item no reconocer límites o hipótesis.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Dividir la clase en pequeños grupos. Asignar a cada uno un dominio:
+\begin{itemize}
+\item e-commerce global;
+\item ledger financiero;
+\item plataforma de eventos.
+\end{itemize}
+
+Cada grupo prepara una mini-defensa en 5 minutos usando:
+\[
+D = (P,F,G,S,T)
+\]
+
+Luego el resto de la clase actúa como comité hostil con 2 o 3 preguntas fuertes.
+
+\paragraph{Objetivo}
+Practicar simultáneamente formulación, defensa y evaluación.
+
+\section{Momento crítico de la clase}
+
+El punto más importante ocurre cuando el estudiante comprende que:
+
+\begin{center}
+\textbf{la defensa arquitectónica madura no vende una solución perfecta: muestra una solución coherente, limitada y razonada}
+\end{center}
+
+Ese momento debe enfatizarse, porque resume el espíritu del cierre del curso.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item estructurar una defensa sin improvisación caótica;
+\item responder objeciones con claridad;
+\item reconocer límites sin derrumbar su propuesta;
+\item evaluar críticamente otra defensa usando una rúbrica explícita.
+\end{itemize}
+
+\section{Cierre del curso}
+
+Esta clase debe cerrar el curso con una idea fuerte:
+
+\begin{quote}
+Saber sistemas distribuidos no es solo conocer mecanismos, sino poder pensar, diseñar, operar y defender sistemas complejos bajo restricciones reales.
+\end{quote}
+
+\begin{uakeybox}
+El curso termina cuando el estudiante ya no solo puede explicar qué hace un mecanismo, sino cuándo conviene usarlo, qué costo implica y cómo defender esa decisión ante crítica seria.
+\end{uakeybox}
+
 \end{document}

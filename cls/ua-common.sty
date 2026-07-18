@@ -1,0 +1,84 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{ua-common}[2026/04/19 UA course common]
+
+\RequirePackage{xcolor}
+\RequirePackage{graphicx}
+\RequirePackage{tikz}
+\RequirePackage{amsmath,amssymb,booktabs}
+\RequirePackage{hyperref}
+\RequirePackage{microtype}
+\RequirePackage[most]{tcolorbox}
+\RequirePackage{iftex}
+\usetikzlibrary{positioning,arrows.meta,calc,fit}
+
+\definecolor{UAIngPrimary}{HTML}{28285A}
+\definecolor{UAIngAccent}{HTML}{F08A00}
+\definecolor{UAIngMuted}{HTML}{667085}
+\definecolor{UAIngPaper}{HTML}{F7F4EF}
+\definecolor{UAIngRule}{HTML}{D9DFE7}
+
+\ifPDFTeX
+  \RequirePackage[T1]{fontenc}
+  \RequirePackage[utf8]{inputenc}
+  \RequirePackage{lmodern}
+\else
+  \RequirePackage{fontspec}
+  \defaultfontfeatures{Ligatures=TeX}
+  \IfFontExistsTF{Latin Modern Sans}{\setsansfont{Latin Modern Sans}}{\setmainfont{TeX Gyre Heros}}
+\fi
+\renewcommand{\familydefault}{\sfdefault}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=UAIngPrimary,
+  urlcolor=UAIngPrimary,
+  citecolor=UAIngPrimary
+}
+
+\newcommand{\UAUniversity}{Universidad Austral}
+\newcommand{\UAFaculty}{Facultad de Ingeniería}
+\newcommand{\UADepartment}{Departamento de Computación}
+\newcommand{\UACampus}{Pilar}
+\newcommand{\UACareer}{Ingeniería Informática}
+\newcommand{\UACommission}{Comisión A}
+\newcommand{\UAProfessor}{Equipo docente}
+\newcommand{\UASemester}{Primer cuatrimestre 2026}
+\newcommand{\UACourse}{Sistemas Distribuidos}
+\newcommand{\UADate}{19 de abril de 2026}
+\newcommand{\UAClassNumber}{}
+\newcommand{\UAClassTitle}{}
+\newcommand{\UADocKind}{Documento}
+\newcommand{\UALogoPath}{../assets/logo_computacion_austral.png}
+
+\newcommand{\UASetUniversity}[1]{\renewcommand{\UAUniversity}{#1}}
+\newcommand{\UASetFaculty}[1]{\renewcommand{\UAFaculty}{#1}}
+\newcommand{\UASetDepartment}[1]{\renewcommand{\UADepartment}{#1}}
+\newcommand{\UASetCampus}[1]{\renewcommand{\UACampus}{#1}}
+\newcommand{\UASetCareer}[1]{\renewcommand{\UACareer}{#1}}
+\newcommand{\UASetCommission}[1]{\renewcommand{\UACommission}{#1}}
+\newcommand{\UASetProfessor}[1]{\renewcommand{\UAProfessor}{#1}}
+\newcommand{\UASetSemester}[1]{\renewcommand{\UASemester}{#1}}
+\newcommand{\UASetCourse}[1]{\renewcommand{\UACourse}{#1}}
+\newcommand{\UASetDate}[1]{\renewcommand{\UADate}{#1}}
+\newcommand{\UASetClassNumber}[1]{\renewcommand{\UAClassNumber}{#1}}
+\newcommand{\UASetClassTitle}[1]{\renewcommand{\UAClassTitle}{#1}}
+\newcommand{\UASetDocKind}[1]{\renewcommand{\UADocKind}{#1}}
+\newcommand{\UASetLogo}[1]{\renewcommand{\UALogoPath}{#1}}
+
+\newcommand{\UAPrintLogo}[1][1.55cm]{%
+  \IfFileExists{\UALogoPath}{%
+    \includegraphics[height=#1]{\UALogoPath}%
+  }{%
+    \begin{tabular}{c}
+      {\color{UAIngPrimary}\bfseries\footnotesize Universidad}\\[-1pt]
+      {\color{UAIngPrimary}\bfseries\Large AUSTRAL}\\[-1pt]
+      {\color{UAIngPrimary}\bfseries\normalsize Ingeniería}\\[-1pt]
+      {\color{UAIngPrimary}\bfseries\footnotesize Departamento de Computación}
+    \end{tabular}%
+  }%
+}
+
+\newtcolorbox{uakeybox}{enhanced,breakable,colback=UAIngPaper,colframe=UAIngAccent,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{uawarn}{enhanced,breakable,colback=UAIngPaper,colframe=UAIngPrimary,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+\newtcolorbox{uaexercise}{enhanced,breakable,colback=white,colframe=UAIngPrimary,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,title=\textbf{Ejercicio}}
+\newtcolorbox{uaanswer}{enhanced,breakable,colback=UAIngPaper,colframe=UAIngAccent,boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,title=\textbf{Respuesta orientativa}}

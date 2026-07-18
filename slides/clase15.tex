@@ -1,73 +1,201 @@
-% !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-beamer}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{15}
-\UASetClassTitle{Proyecto integrador}
-\title[\UACourse]{\UACourse}
-\subtitle{Clase 15 --- Proyecto integrador}
-\author{\UAProfessor}
-\date{\UADate}
+\UASetClassTitle{Diseño integral de sistemas distribuidos}
+\title{\UACourse}
+\subtitle{Clase 15 --- Defensa arquitectónica, trade-offs y revisión de casos}
+
 \begin{document}
 
-\begin{frame}
+{
+\setbeamertemplate{footline}{}
+\begin{frame}[plain]
 \titlepage
 \end{frame}
+}
 
-\UASectionSlide{Proyecto integrador}
+\UASectionSlide{Del mecanismo al sistema}
 
-\begin{frame}{Objetivos de la clase}
+\begin{frame}{El cambio de nivel}
+Durante el curso vimos:
 \begin{itemize}
-\item Aplicar los conceptos del curso en un proyecto distribuido defendible y observable.
-\item conectar el concepto con decisiones observables de diseño
-\item anticipar cómo reaparece en trabajos prácticos, parciales y sistemas reales
+\item RPC, retries, idempotencia
+\item consistencia, replicación, consenso
+\item transacciones, logs, streaming
+\item observabilidad, resiliencia, incidentes
+\end{itemize}
+
+\pause
+
+\begin{block}{Pregunta}
+¿Cómo integramos todo eso en un sistema coherente y defendible?
+\end{block}
+\end{frame}
+
+\begin{frame}{Diseñar no es listar tecnologías}
+Una propuesta arquitectónica no es:
+\begin{itemize}
+\item un stack de herramientas
+\item un diagrama con cajas
+\item una colección de patrones “modernos”
+\end{itemize}
+
+\pause
+
+Es:
+\begin{itemize}
+\item una respuesta a un problema concreto
+\item bajo fallas concretas
+\item con garantías explícitas
+\item y costos aceptados
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Marco de defensa}
 
-\begin{frame}{Problema central}
-La clase 15 trabaja un tipo específico de dificultad distribuida: Aplicar los conceptos del curso en un proyecto distribuido defendible y observable.
+\begin{frame}{Marco del curso}
+\[
+D = (P, F, G, S, T)
+\]
+
+\pause
 
 \begin{itemize}
-\item ¿qué parte del sistema observamos?
-\item ¿qué hipótesis de falla importan?
-\item ¿qué garantía vale la pena pagar?
+\item $P$: problema
+\item $F$: fallas asumidas
+\item $G$: garantías buscadas
+\item $S$: solución elegida
+\item $T$: trade-offs aceptados
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Temas clave}
+\begin{frame}{Qué debe defenderse}
+Toda propuesta seria debe justificar:
 \begin{itemize}
-\item arquitectura
-\item demo
-\item fallas
-\item observabilidad
-\item defensa
+\item límites del sistema
+\item modelo de datos
+\item consistencia requerida
+\item estrategia de comunicación
+\item estrategia de resiliencia
+\item estrategia operacional
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo guía}
-Se introduce un caso simple que reaparece durante toda la clase para mostrar cómo el concepto modifica decisiones de diseño, latencia, corrección observable y experiencia de usuario.
-\end{frame}
+\UASectionSlide{Trade-offs reales}
 
-\begin{frame}{Preguntas para pensar}
+\begin{frame}{No existe arquitectura gratis}
+Cada decisión gana algo y pierde algo.
+
+\pause
+
+Ejemplos:
 \begin{itemize}
-\item ¿qué afirmaciones puede hacer con certeza un observador remoto?
-\item ¿qué fallas son plausibles en este contexto?
-\item ¿qué garantía sería innegociable y cuál negociable?
+\item consistencia fuerte $\rightarrow$ más coordinación
+\item microservicios $\rightarrow$ más autonomía, más complejidad distribuida
+\item event-driven $\rightarrow$ más desacoplamiento, menos trazabilidad inmediata
+\item resiliencia fuerte $\rightarrow$ más complejidad operativa
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Errores frecuentes}
+\begin{frame}{Error típico}
+\begin{alertblock}{}
+Defender una arquitectura como si maximizara simultáneamente simplicidad, escalabilidad, consistencia, velocidad y costo bajo.
+\end{alertblock}
+
+\pause
+
+Eso no es defensa técnica: es marketing.
+\end{frame}
+
+\UASectionSlide{Estructura de una defensa}
+
+\begin{frame}{Secuencia razonable}
+\begin{enumerate}
+\item problema y contexto
+\item restricciones y supuestos
+\item requisitos no funcionales
+\item diseño propuesto
+\item fallas esperadas
+\item trade-offs aceptados
+\item observabilidad y operación
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Qué valora un jurado técnico}
 \begin{itemize}
-\item confundir síntoma con causa
-\item describir una tecnología sin explicitar la garantía
-\item proponer una solución sin reconocer su costo
+\item claridad
+\item coherencia interna
+\item honestidad sobre límites
+\item capacidad de priorizar
+\item justificación de trade-offs
 \end{itemize}
 \end{frame}
 
+\UASectionSlide{Revisión de casos}
 
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-La clase 15 agrega una nueva capa al pensamiento distribuido: no se trata de memorizar una técnica, sino de reconocer cuándo usarla, qué supone y qué sacrifica.
+\begin{frame}{Caso 1: e-commerce global}
+Preguntas clave:
+\begin{itemize}
+\item ¿qué partes requieren consistencia fuerte?
+\item ¿qué partes toleran eventual consistency?
+\item ¿dónde usar eventos?
+\item ¿cómo resolver checkout?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Caso 2: plataforma financiera}
+Preguntas clave:
+\begin{itemize}
+\item ¿qué operaciones exigen serialización fuerte?
+\item ¿qué errores son inaceptables?
+\item ¿qué latencia puede tolerarse?
+\item ¿qué auditoría se exige?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Caso 3: plataforma de streaming}
+Preguntas clave:
+\begin{itemize}
+\item ¿qué volumen de eventos entra?
+\item ¿qué semántica de entrega importa?
+\item ¿qué parte es batch y qué parte es tiempo real?
+\item ¿qué SLOs tienen sentido?
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Objeciones típicas}
+
+\begin{frame}{Preguntas hostiles esperables}
+\begin{itemize}
+\item ¿por qué no un monolito?
+\item ¿por qué no consistencia fuerte en todo?
+\item ¿qué pasa bajo partición?
+\item ¿cómo observás este flujo?
+\item ¿qué ocurre si falla este servicio crítico?
+\item ¿cómo evitás duplicación?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Buena defensa}
+No responde con slogans.
+
+\pause
+
+Responde con:
+\begin{itemize}
+\item supuestos explícitos
+\item garantías claras
+\item límites reconocidos
+\item elección consciente de costos
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Cierre}
+
+\begin{frame}{Idea central}
+\begin{block}{}
+Diseñar bien un sistema distribuido es poder defender por qué ese sistema, con esos costos y no otros, es razonable para ese dominio.
 \end{block}
 \end{frame}
 

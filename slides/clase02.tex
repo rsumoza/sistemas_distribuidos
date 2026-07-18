@@ -1,183 +1,149 @@
-% !TeX encoding = UTF-8
-\documentclass{../cls/ua-engineering-v6-beamer}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
 
 \UASetClassNumber{02}
-\UASetClassTitle{Comunicación y fallas}
+\UASetClassTitle{RPC, timeouts, retries e idempotencia}
+\UASetDocKind{Guía de ejercicios}
 
-\title{\UACourse}
-\subtitle{Clase 02 — Comunicación y fallas}
+\title{Clase 02 --- RPC, timeouts, retries e idempotencia}
+\author{\UAProfessor}
+\date{\UADate}
 
 \begin{document}
+\maketitle
 
-\begin{frame}
-\titlepage
-\end{frame}
+\section{Indicaciones}
 
-\UASectionSlide{Comunicación en sistemas distribuidos}
+Justificar todas las respuestas.  
+Cuando corresponda, usar:
 
-%------------------------------------------------
+\[
+D = (P, F, G, S, T)
+\]
 
-\begin{frame}{Objetivos de la clase}
+\section{Nivel 1: comprensión conceptual}
+
+\begin{uaexercise}
+Definir RPC con precisión. Explicar qué intenta abstraer y por qué esa abstracción es problemática.
+\end{uaexercise}
+
+\begin{uaexercise}
+Listar y explicar al menos 5 diferencias fundamentales entre una llamada local y una llamada remota.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describir todas las etapas de una llamada RPC e identificar en cuáles pueden ocurrir fallas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué la red rompe la transparencia de RPC.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir un ejemplo donde una operación se ejecute pero el cliente no lo sepa.
+\end{uaexercise}
+
+\section{Nivel 2: timeouts}
+
+\begin{uaexercise}
+Definir formalmente qué es un timeout.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué un timeout no implica crash.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar un escenario donde un timeout ocurra pero la operación sea exitosa.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñar un escenario donde no haya timeout pero la operación falle.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analizar el trade-off entre:
 \begin{itemize}
-\item Entender una comunicación distribuida como una interacción no inmediata.
-\item Razonar qué puede estar ocurriendo mientras el cliente todavía no observa respuesta.
-\item Identificar las capas que intervienen en una llamada remota.
-\item Analizar cómo cada capa puede detectar, ocultar, transformar o amplificar una falla.
-\item Conectar timeout, retry e idempotencia con decisiones de mitigación.
+\item timeouts cortos
+\item timeouts largos
 \end{itemize}
-\end{frame}
+\end{uaexercise}
 
-%------------------------------------------------
+\section{Nivel 3: retries}
 
-\begin{frame}{Problema real}
-En sistemas distribuidos:
+\begin{uaexercise}
+Definir retry y explicar su objetivo.
+\end{uaexercise}
 
+\begin{uaexercise}
+Explicar formalmente por qué retry introduce duplicación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir una línea temporal donde retry produce doble ejecución.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analizar el efecto de múltiples retries sobre el sistema.
+\end{uaexercise}
+
+\begin{uaexercise}
+Comparar:
 \begin{itemize}
-\item todo ocurre mediante mensajes
-\item la red es incierta
-\item no hay garantía de entrega
+\item sin retry
+\item con retry
 \end{itemize}
+en términos de liveness y safety.
+\end{uaexercise}
 
-\begin{block}{Pregunta}
-¿Qué significa “la operación ocurrió”?
-\end{block}
-\end{frame}
+\section{Nivel 4: semánticas}
 
-%------------------------------------------------
+\begin{uaexercise}
+Definir at-least-once, at-most-once y exactly-once.
+\end{uaexercise}
 
-\begin{frame}{Comunicar no es instantáneo}
-Una operación remota atraviesa varias capas, y cada una puede responder distinto ante una falla.
+\begin{uaexercise}
+Dar ejemplos reales de cada semántica.
+\end{uaexercise}
 
-\begin{center}
-\begin{tikzpicture}[
-  node distance=0.8cm,
-  every node/.style={font=\small},
-  box/.style={draw, rounded corners, minimum width=2.7cm, minimum height=0.7cm}
-]
-\node[box] (app) {Aplicación};
-\node[box, below=of app] (rpc) {RPC / cliente HTTP};
-\node[box, below=of rpc] (tcp) {Transporte};
-\node[box, below=of tcp] (net) {Red};
-\node[box, below=of net] (srv) {Servidor};
-\draw[->] (app)--(rpc);
-\draw[->] (rpc)--(tcp);
-\draw[->] (tcp)--(net);
-\draw[->] (net)--(srv);
-\end{tikzpicture}
-\end{center}
+\begin{uaexercise}
+Explicar por qué exactly-once es difícil en sistemas distribuidos.
+\end{uaexercise}
 
-\begin{itemize}
-\item una capa puede reintentar mientras otra ya venció su timeout
-\item una capa puede ocultar pérdida y otra observar demora
-\item el servidor puede ejecutar aunque el cliente ya haya abandonado
-\end{itemize}
-\end{frame}
+\begin{uaexercise}
+Relacionar semánticas con retry.
+\end{uaexercise}
 
-%------------------------------------------------
+\section{Nivel 5: idempotencia}
 
-\begin{frame}{RPC (Remote Procedure Call)}
-Abstracción:
+\begin{uaexercise}
+Definir idempotencia formalmente.
+\end{uaexercise}
 
-\begin{itemize}
-\item llamada local → función
-\item llamada remota → red
-\end{itemize}
+\begin{uaexercise}
+Clasificar operaciones en idempotentes y no idempotentes.
+\end{uaexercise}
 
-\begin{uawarn}
-    RPC intenta ocultar la existencia de la red.
-    En un sistema robusto se gestiona la red, no se oculta. 
-\end{uawarn}
-\end{frame}
+\begin{uaexercise}
+Diseñar un mecanismo de idempotencia para pagos.
+\end{uaexercise}
 
-%------------------------------------------------
+\begin{uaexercise}
+Explicar el costo de implementar idempotencia.
+\end{uaexercise}
 
-\begin{frame}{Problema clave}
-\begin{center}
-\Large
-¿La operación se ejecutó o no?
-\end{center}
+\section{Nivel 6: integración}
 
-\begin{itemize}
-\item request perdido
-\item response perdido
-\item servidor lento
-\item servidor caído
-\end{itemize}
-\end{frame}
+\begin{uaexercise}
+Aplicar $D=(P,F,G,S,T)$ a RPC con retry.
+\end{uaexercise}
 
-%------------------------------------------------
+\begin{uaexercise}
+Diseñar una API robusta frente a duplicación.
+\end{uaexercise}
 
-\begin{frame}{Timeout}
-El cliente decide:
-
-\begin{itemize}
-\item esperar
-\item reintentar
-\end{itemize}
-
-\begin{block}{Clave}
-Timeout ≠ falla
-\end{block}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}{Retry}
-Retry introduce:
-
-\begin{itemize}
-\item duplicación
-\item inconsistencia
-\end{itemize}
-
-Ejemplo:
-\begin{itemize}
-\item pago duplicado
-\end{itemize}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}{Idempotencia}
-Definición:
-
-\begin{block}{}
-Aplicar la operación múltiples veces produce el mismo resultado
-\end{block}
-
-Ejemplo:
-\begin{itemize}
-\item PUT idempotente
-\item POST no necesariamente
-\end{itemize}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}{Semánticas de entrega}
-\begin{itemize}
-\item at-most-once
-\item at-least-once
-\item exactly-once (casi siempre ilusión)
-\end{itemize}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}{Trade-off}
-\begin{itemize}
-\item confiabilidad vs complejidad
-\item latencia vs corrección
-\end{itemize}
-\end{frame}
-
-%------------------------------------------------
-
-\begin{frame}{Cierre}
-\begin{block}{Idea clave}
-Comunicar en sistemas distribuidos es decidir bajo incertidumbre.
-\end{block}
-\end{frame}
+\begin{uaexercise}
+Explicar cómo esta clase se conecta con CAP.
+\end{uaexercise}
 
 \end{document}

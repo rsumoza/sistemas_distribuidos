@@ -1,51 +1,189 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
+\documentclass{../cls/ua-article}
+\input{../config/course-config.tex}
+
 \UASetClassNumber{11}
-\UASetClassTitle{Arquitecturas distribuidas modernas}
-\title{Clase 11 --- Arquitecturas distribuidas modernas}
+\UASetClassTitle{Resiliencia distribuida}
+\UASetDocKind{Guía docente}
+
+\title{Clase 11 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-Comparar monolitos, microservicios y arquitecturas event-driven como decisiones de diseño. El objetivo docente no es solo transmitir terminología, sino cambiar la forma en que el estudiante razona cuando el sistema deja de ser completamente observable.
+
+La meta de esta clase es que el estudiante deje de pensar la resiliencia como una lista de patrones y la entienda como una disciplina de control de propagación de falla.
+
+La idea que debe quedar instalada es:
+
+\begin{center}
+\textbf{una arquitectura resiliente no niega la falla; impide que la falla se propague sin control}
+\end{center}
 
 \section{Resultados de aprendizaje esperados}
-Al finalizar la clase, un estudiante debería poder:
+
+Al finalizar, el estudiante debería poder:
+
 \begin{itemize}
-\item reconocer el tipo de problema distribuido involucrado;
-\item explicitar hipótesis de falla relevantes;
-\item justificar una garantía y no solo nombrarla;
-\item defender una solución junto con su trade-off dominante.
+\item distinguir fallas transitorias de saturación persistente;
+\item justificar cuándo retry ayuda y cuándo destruye;
+\item explicar circuit breakers, backpressure y bulkheads como mecanismos complementarios;
+\item diseñar una estrategia razonable de graceful degradation.
 \end{itemize}
 
-\section{Guion sugerido para un profesor nuevo}
-\begin{enumerate}
-\item Abrir la clase 11 con un caso concreto antes de formalizar definiciones.
-\item Distinguir síntoma observable de causa interna: esta separación debe repetirse explícitamente.
-\item Hacer visible la garantía que importa y no solo la técnica que se está introduciendo.
-\item Mostrar el trade-off en términos de experiencia de usuario, operación o complejidad del sistema.
-\item Cerrar conectando el tema con las siguientes dos clases para consolidar continuidad conceptual.
-\end{enumerate}
+\section{Estructura sugerida para 90 minutos}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): presentar la falla amplificada}
+Abrir con un escenario realista:
 \begin{itemize}
-\item confundir síntoma con causa;
-\item repetir definiciones sin conectarlas con un caso operativo;
-\item proponer una técnica sin explicar por qué esa garantía vale el costo;
-\item olvidar la continuidad con clases anteriores.
+\item DB empieza a responder lento;
+\item API hace retries;
+\item sube la concurrencia;
+\item el borde del sistema colapsa.
 \end{itemize}
+
+\paragraph{Objetivo didáctico}
+Mostrar que el comportamiento incorrecto del sistema ante la falla puede ser peor que la falla original.
+
+\subsection*{Bloque 2 (20 min): retries}
+Explicar retry como herramienta útil pero peligrosa.
+
+Trabajar:
+\begin{itemize}
+\item cuándo sirve;
+\item cuándo no;
+\item why exponential backoff;
+\item why jitter.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Corregir la intuición de que “más retry = más robustez”.
+
+\subsection*{Bloque 3 (20 min): circuit breakers}
+Explicar estados y propósito. Insistir en que el breaker no “cura” la dependencia: protege al sistema llamador y acelera feedback.
+
+\paragraph{Objetivo didáctico}
+Mostrar que el rechazo temprano puede ser una mejora sistémica.
+
+\subsection*{Bloque 4 (15 min): backpressure y bulkheads}
+Trabajar ambos juntos:
+\begin{itemize}
+\item backpressure controla entrada;
+\item bulkheads aíslan recursos.
+\end{itemize}
+
+\paragraph{Objetivo didáctico}
+Que el alumno vea la diferencia entre controlar presión y separar daño.
+
+\subsection*{Bloque 5 (20 min): graceful degradation}
+Discutir ejemplos de degradación aceptable e inaceptable según dominio.
+
+\paragraph{Objetivo didáctico}
+Mostrar que resiliencia no es solo infraestructura, sino también diseño funcional del producto.
+
+\section{Qué explicar y por qué}
+
+\subsection*{1. Retry}
+Porque es el patrón más intuitivo y más frecuentemente mal aplicado.
+
+\subsection*{2. Circuit Breaker}
+Porque introduce explícitamente la idea de dejar de insistir.
+
+\subsection*{3. Backpressure}
+Porque sin control de demanda no hay estabilidad operativa sostenible.
+
+\subsection*{4. Bulkheads}
+Porque la separación de recursos evita contaminación cruzada entre flujos.
+
+\subsection*{5. Graceful Degradation}
+Porque hace visible que resiliencia también es semántica de servicio y no solo mecanismo técnico.
 
 \section{Preguntas disparadoras recomendadas}
+
 \begin{itemize}
-\item ¿qué podés afirmar con certeza desde el borde del sistema?
-\item ¿qué observación te falta para reducir incertidumbre?
-\item ¿qué parte de tu solución mejora corrección y qué parte empeora latencia o complejidad?
+\item ¿Qué pasa si todos reintentan al mismo tiempo?
+\item ¿Qué recurso local se está consumiendo mientras la dependencia tarda?
+\item ¿Qué debería dejar de funcionar primero y qué debería preservarse?
+\item ¿Conviene rechazar rápido o esperar más?
+\item ¿Qué parte del sistema no debería compartir pool con el resto?
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante termina hablando en términos de hipótesis, garantías y trade-offs, no solo de nombres de algoritmos o componentes.
-\end{uawarn}
+\section{Errores frecuentes del alumnado}
+
+\begin{itemize}
+\item pensar que retry siempre ayuda;
+\item usar circuit breaker sin fallback semántico;
+\item hablar de backpressure solo como “colas grandes”;
+\item creer que bulkheads son solo un detalle de infraestructura;
+\item confundir graceful degradation con respuestas incorrectas o engañosas.
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Tomar un flujo de checkout con:
+\begin{itemize}
+\item API;
+\item Auth;
+\item Payments;
+\item Recommendations.
+\end{itemize}
+
+Plantear que Payments empieza a degradarse.
+
+Preguntar al curso:
+\begin{itemize}
+\item dónde poner timeouts;
+\item si conviene retry;
+\item cuándo abrir breaker;
+\item qué recursos aislar;
+\item qué funcionalidad degradar.
+\end{itemize}
+
+\paragraph{Objetivo}
+Que el alumno piense resiliencia como arquitectura de contención y no como una sola librería.
+
+\section{Momento crítico de la clase}
+
+El punto más importante aparece cuando el estudiante comprende que:
+
+\begin{center}
+\textbf{la respuesta correcta a una dependencia degradada no siempre es insistir más, sino insistir menos y aislar mejor}
+\end{center}
+
+Ese punto debe subrayarse, porque rompe una intuición muy frecuente y muy dañina.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item explicar por qué retry puede empeorar saturación;
+\item describir correctamente estados de un breaker;
+\item distinguir backpressure de bulkheads;
+\item proponer una degradación razonable para un dominio concreto;
+\item diseñar una estrategia integrada de resiliencia.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase deja preparada una pregunta natural:
+
+\begin{quote}
+Si ya sabemos diseñar, observar y volver resiliente el sistema, ¿cómo validamos experimentalmente que realmente se comporta bien bajo fallas?
+\end{quote}
+
+Eso conecta naturalmente con:
+\begin{itemize}
+\item chaos engineering;
+\item fault injection;
+\item testing distribuido;
+\item validación experimental de resiliencia.
+\end{itemize}
+
+\begin{uakeybox}
+Pregunta puente: ¿cómo pasamos de confiar en nuestros mecanismos de resiliencia a demostrar empíricamente que funcionan?
+\end{uakeybox}
+
 \end{document}

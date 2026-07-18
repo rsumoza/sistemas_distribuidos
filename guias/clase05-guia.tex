@@ -1,25 +1,47 @@
-% !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
-\input{../config/course-config}
-\UASetClassNumber{05}
-\UASetClassTitle{Tiempo y causalidad}
-\title{Clase 05 --- Tiempo y causalidad}
-\author{\UAProfessor}
-\date{\UADate}
+\documentclass{../cls/ua-article}
+
 \begin{document}
-\maketitle
 
-\section{Indicaciones generales}
-En cada ejercicio separar orden físico, orden lógico y causalidad. Cuando uses relojes de Lamport o vector clocks, indicar qué garantía dan y qué no pueden concluir.
+\section{Nivel 1: fundamentos}
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar por qué dos timestamps físicos de nodos distintos no alcanzan para decidir causalidad entre eventos.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Dado dos procesos con eventos locales y dos mensajes, marcar las relaciones happened-before y señalar qué eventos son concurrentes.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Aplicar las reglas de relojes de Lamport a una secuencia de eventos con envío y recepción de mensajes. Mostrar los contadores resultantes.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Dar un ejemplo donde $L(a) < L(b)$ pero no pueda concluirse que $a \rightarrow b$.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Comparar dos vector clocks e indicar si representan causalidad en algún sentido o concurrencia: $(2,1,0)$ y $(1,2,0)$; $(1,2,0)$ y $(2,3,0)$.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Explicar por qué vector clocks detectan concurrencia y Lamport no.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} En un store eventualmente consistente, dos réplicas aceptan escrituras concurrentes sobre el mismo objeto. Proponer cómo usar vector clocks para decidir si se sobrescribe o se reconcilia.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Identificar el trade-off de usar vector clocks en un sistema con muchos nodos.\end{uaexercise}
+1. Definir formalmente ACID y explicar el rol de cada propiedad.  
+2. Explicar qué significa aislamiento en términos de observabilidad.  
+3. Diferenciar atomicidad de aislamiento con ejemplos concretos.  
+4. Dar un ejemplo donde atomicidad se cumple pero aislamiento falla.  
+
+\section{Nivel 2: serializabilidad}
+
+5. Definir serializabilidad formalmente.  
+6. Construir un grafo de precedencia para dos transacciones con conflictos RW.  
+7. Dar un ejemplo de ejecución no serializable y demostrarlo con el grafo.  
+8. Explicar por qué un ciclo implica imposibilidad de orden secuencial.  
+
+\section{Nivel 3: anomalías}
+
+9. Construir un ejemplo de dirty read.  
+10. Construir un ejemplo de non-repeatable read.  
+11. Construir un ejemplo de phantom read.  
+12. Construir un ejemplo completo de write skew.  
+13. Explicar por qué write skew no genera conflicto directo.  
+
+\section{Nivel 4: aislamiento}
+
+14. Comparar Read Committed vs Repeatable Read.  
+15. Explicar Snapshot Isolation con un ejemplo.  
+16. Mostrar una ejecución válida en SI pero no serializable.  
+
+\section{Nivel 5: commit distribuido}
+
+17. Describir paso a paso 2PC con 3 nodos.  
+18. Construir escenario donde coordinador falla en 2PC.  
+19. Explicar por qué los participantes quedan bloqueados.  
+20. Describir cómo 3PC intenta resolver esto.  
+
+\section{Nivel 6: integración}
+
+21. Relacionar transacciones con consenso.  
+22. Explicar por qué 2PC no resuelve consenso.  
+23. Diseñar sistema que combine consenso + transacciones.  
+24. Aplicar modelo D al problema.
 
 \end{document}
