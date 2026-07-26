@@ -25,7 +25,7 @@
 \UASectionSlide{El problema fundamental}
 
 \begin{frame}{Un problema aparentemente simple}
-Un usuario hace click en \emph{“pagar”}.
+Un usuario hace clic en \emph{“pagar”}.
 
 \begin{itemize}
 \item El cliente envía la solicitud.
@@ -42,7 +42,8 @@ Un usuario hace click en \emph{“pagar”}.
 \pause
 
 \begin{alertblock}{Respuesta correcta}
-No lo sabemos. Y, en general, no podemos saberlo con certeza.
+No lo sabemos.
+Y, en general, no podemos saberlo con certeza.
 \end{alertblock}
 \end{frame}
 
@@ -67,7 +68,7 @@ Lo único observable para el cliente es la falta de confirmación en un cierto i
 \column{0.48\textwidth}
 \textbf{Historia A}
 \begin{itemize}
-\item el servidor nunca recibió la solicitud;
+\item El servidor nunca recibió la solicitud;
 \item no hubo procesamiento;
 \item el cliente observa timeout.
 \end{itemize}
@@ -75,7 +76,7 @@ Lo único observable para el cliente es la falta de confirmación en un cierto i
 \column{0.48\textwidth}
 \textbf{Historia B}
 \begin{itemize}
-\item el servidor sí procesó el pago;
+\item El servidor sí procesó el pago;
 \item la respuesta se perdió;
 \item el cliente observa timeout.
 \end{itemize}
@@ -96,14 +97,15 @@ En sistemas distribuidos, un observador remoto no puede distinguir perfectamente
 \end{block}
 
 \begin{itemize}
-\item una falla real;
+\item Una falla real;
 \item una demora suficientemente larga.
 \end{itemize}
 
 \pause
 
 \begin{uakeybox}
-El problema central no es solo técnico. Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
+El problema central no es solo técnico.
+Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
 \end{uakeybox}
 \end{frame}
 
@@ -111,7 +113,7 @@ El problema central no es solo técnico. Es epistemológico: el sistema no entre
 Si no podés saber con certeza qué pasó, entonces:
 
 \begin{itemize}
-\item no podés basarte en una visión global perfecta;
+\item No podés basarte en una visión global perfecta;
 \item no podés exigir soluciones que dependan de información imposible;
 \item tenés que diseñar bajo incertidumbre.
 \end{itemize}
@@ -129,7 +131,7 @@ El objetivo deja de ser “adivinar el estado real” y pasa a ser “garantizar
 Un sistema distribuido es un conjunto de procesos o nodos que:
 
 \begin{itemize}
-\item se ejecutan en máquinas distintas;
+\item Se ejecutan en máquinas distintas;
 \item se comunican por intercambio de mensajes;
 \item cooperan para ofrecer una abstracción que el usuario percibe como un solo sistema.
 \end{itemize}
@@ -138,7 +140,7 @@ Un sistema distribuido es un conjunto de procesos o nodos que:
 
 Consecuencias:
 \begin{itemize}
-\item la comunicación no es instantánea;
+\item La comunicación no es instantánea;
 \item las fallas son parciales;
 \item el conocimiento del estado global es limitado.
 \end{itemize}
@@ -147,7 +149,7 @@ Consecuencias:
 \begin{frame}{Qué no alcanza con decir}
 No alcanza con afirmar:
 \begin{itemize}
-\item “hay varias máquinas”;
+\item “Hay varias máquinas”;
 \item “hay red”;
 \item “hay paralelismo”.
 \end{itemize}
@@ -164,7 +166,7 @@ El problema se vuelve distribuido cuando la corrección depende de coordinar com
 \begin{frame}{Modelo síncrono y modelo asíncrono}
 \textbf{Modelo síncrono:}
 \begin{itemize}
-\item existen cotas conocidas para red y cómputo;
+\item Existen cotas conocidas para red y cómputo;
 \item una demora fuera de cota puede interpretarse como falla.
 \end{itemize}
 
@@ -172,7 +174,7 @@ El problema se vuelve distribuido cuando la corrección depende de coordinar com
 
 \textbf{Modelo asíncrono:}
 \begin{itemize}
-\item no existen cotas confiables conocidas;
+\item No existen cotas confiables conocidas;
 \item una demora arbitrariamente grande es indistinguible de una falla.
 \end{itemize}
 
@@ -206,7 +208,7 @@ D = (P, F, G, S, T)
 \item $P$: pago remoto con timeout;
 \item $F$: pérdida de respuesta, delay, retry del cliente;
 \item $G$: no más de un débito efectivo;
-\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $S$: request ID único + de-duplicación + persistencia del resultado;
 \item $T$: mayor complejidad y más estado.
 \end{itemize}
 \end{frame}
@@ -219,7 +221,7 @@ Pensar distributivamente no es memorizar algoritmos.
 Es saber:
 
 \begin{itemize}
-\item qué información no tenés;
+\item Qué información no tenés;
 \item qué falla estás modelando;
 \item qué garantía necesitás realmente;
 \item qué costo aceptás pagar por ella.
@@ -236,7 +238,7 @@ CAP no significa “elegir dos de tres” como slogan.
 Significa que, bajo partición de red, un sistema replicado no puede ofrecer simultáneamente:
 
 \begin{itemize}
-\item consistencia fuerte observable;
+\item Consistencia fuerte observable;
 \item disponibilidad total de las operaciones.
 \end{itemize}
 \end{frame}
@@ -245,7 +247,7 @@ Significa que, bajo partición de red, un sistema replicado no puede ofrecer sim
 Ante partición:
 
 \begin{itemize}
-\item o rechazás operaciones para preservar corrección;
+\item O rechazás operaciones para preservar corrección;
 \item o respondés igual para preservar disponibilidad, aceptando posible inconsistencia.
 \end{itemize}
 
@@ -279,7 +281,7 @@ El pensamiento distribuido consiste en decidir correctamente bajo incertidumbre.
 
 No se trata de encontrar una solución perfecta, sino de:
 \begin{itemize}
-\item explicitar supuestos;
+\item Explicitar supuestos;
 \item elegir garantías;
 \item y defender el trade-off que se acepta.
 \end{itemize}
@@ -308,7 +310,7 @@ No se trata de encontrar una solución perfecta, sino de:
 \UASectionSlide{El problema fundamental}
 
 \begin{frame}{Un problema aparentemente simple}
-Un usuario hace click en \emph{“pagar”}.
+Un usuario hace clic en \emph{“pagar”}.
 
 \begin{itemize}
 \item El cliente envía la solicitud.
@@ -325,7 +327,8 @@ Un usuario hace click en \emph{“pagar”}.
 \pause
 
 \begin{alertblock}{Respuesta correcta}
-No lo sabemos. Y, en general, no podemos saberlo con certeza.
+No lo sabemos.
+Y, en general, no podemos saberlo con certeza.
 \end{alertblock}
 \end{frame}
 
@@ -350,7 +353,7 @@ Lo único observable para el cliente es la falta de confirmación en un cierto i
 \column{0.48\textwidth}
 \textbf{Historia A}
 \begin{itemize}
-\item el servidor nunca recibió la solicitud;
+\item El servidor nunca recibió la solicitud;
 \item no hubo procesamiento;
 \item el cliente observa timeout.
 \end{itemize}
@@ -358,7 +361,7 @@ Lo único observable para el cliente es la falta de confirmación en un cierto i
 \column{0.48\textwidth}
 \textbf{Historia B}
 \begin{itemize}
-\item el servidor sí procesó el pago;
+\item El servidor sí procesó el pago;
 \item la respuesta se perdió;
 \item el cliente observa timeout.
 \end{itemize}
@@ -379,14 +382,15 @@ En sistemas distribuidos, un observador remoto no puede distinguir perfectamente
 \end{block}
 
 \begin{itemize}
-\item una falla real;
+\item Una falla real;
 \item una demora suficientemente larga.
 \end{itemize}
 
 \pause
 
 \begin{uakeybox}
-El problema central no es solo técnico. Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
+El problema central no es solo técnico.
+Es epistemológico: el sistema no entrega conocimiento perfecto sobre su propio estado.
 \end{uakeybox}
 \end{frame}
 
@@ -394,7 +398,7 @@ El problema central no es solo técnico. Es epistemológico: el sistema no entre
 Si no podés saber con certeza qué pasó, entonces:
 
 \begin{itemize}
-\item no podés basarte en una visión global perfecta;
+\item No podés basarte en una visión global perfecta;
 \item no podés exigir soluciones que dependan de información imposible;
 \item tenés que diseñar bajo incertidumbre.
 \end{itemize}
@@ -412,7 +416,7 @@ El objetivo deja de ser “adivinar el estado real” y pasa a ser “garantizar
 Un sistema distribuido es un conjunto de procesos o nodos que:
 
 \begin{itemize}
-\item se ejecutan en máquinas distintas;
+\item Se ejecutan en máquinas distintas;
 \item se comunican por intercambio de mensajes;
 \item cooperan para ofrecer una abstracción que el usuario percibe como un solo sistema.
 \end{itemize}
@@ -421,7 +425,7 @@ Un sistema distribuido es un conjunto de procesos o nodos que:
 
 Consecuencias:
 \begin{itemize}
-\item la comunicación no es instantánea;
+\item La comunicación no es instantánea;
 \item las fallas son parciales;
 \item el conocimiento del estado global es limitado.
 \end{itemize}
@@ -430,7 +434,7 @@ Consecuencias:
 \begin{frame}{Qué no alcanza con decir}
 No alcanza con afirmar:
 \begin{itemize}
-\item “hay varias máquinas”;
+\item “Hay varias máquinas”;
 \item “hay red”;
 \item “hay paralelismo”.
 \end{itemize}
@@ -447,7 +451,7 @@ El problema se vuelve distribuido cuando la corrección depende de coordinar com
 \begin{frame}{Modelo síncrono y modelo asíncrono}
 \textbf{Modelo síncrono:}
 \begin{itemize}
-\item existen cotas conocidas para red y cómputo;
+\item Existen cotas conocidas para red y cómputo;
 \item una demora fuera de cota puede interpretarse como falla.
 \end{itemize}
 
@@ -455,7 +459,7 @@ El problema se vuelve distribuido cuando la corrección depende de coordinar com
 
 \textbf{Modelo asíncrono:}
 \begin{itemize}
-\item no existen cotas confiables conocidas;
+\item No existen cotas confiables conocidas;
 \item una demora arbitrariamente grande es indistinguible de una falla.
 \end{itemize}
 
@@ -489,7 +493,7 @@ D = (P, F, G, S, T)
 \item $P$: pago remoto con timeout;
 \item $F$: pérdida de respuesta, delay, retry del cliente;
 \item $G$: no más de un débito efectivo;
-\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $S$: request ID único + de-duplicación + persistencia del resultado;
 \item $T$: mayor complejidad y más estado.
 \end{itemize}
 \end{frame}
@@ -502,7 +506,7 @@ Pensar distributivamente no es memorizar algoritmos.
 Es saber:
 
 \begin{itemize}
-\item qué información no tenés;
+\item Qué información no tenés;
 \item qué falla estás modelando;
 \item qué garantía necesitás realmente;
 \item qué costo aceptás pagar por ella.
@@ -519,7 +523,7 @@ CAP no significa “elegir dos de tres” como slogan.
 Significa que, bajo partición de red, un sistema replicado no puede ofrecer simultáneamente:
 
 \begin{itemize}
-\item consistencia fuerte observable;
+\item Consistencia fuerte observable;
 \item disponibilidad total de las operaciones.
 \end{itemize}
 \end{frame}
@@ -528,7 +532,7 @@ Significa que, bajo partición de red, un sistema replicado no puede ofrecer sim
 Ante partición:
 
 \begin{itemize}
-\item o rechazás operaciones para preservar corrección;
+\item O rechazás operaciones para preservar corrección;
 \item o respondés igual para preservar disponibilidad, aceptando posible inconsistencia.
 \end{itemize}
 
@@ -562,7 +566,7 @@ El pensamiento distribuido consiste en decidir correctamente bajo incertidumbre.
 
 No se trata de encontrar una solución perfecta, sino de:
 \begin{itemize}
-\item explicitar supuestos;
+\item Explicitar supuestos;
 \item elegir garantías;
 \item y defender el trade-off que se acepta.
 \end{itemize}
