@@ -10,6 +10,7 @@
 
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 
 {
@@ -92,12 +93,45 @@ Relación $a \rightarrow b$ si:
 \begin{itemize}
 \item mismo proceso y $a$ ocurre antes que $b$
 \item $a$ envía mensaje que causa $b$
+\item la relación se propaga por transitividad
 \end{itemize}
 
 \pause
 \begin{block}{Consistencia causal}
 Respeta dependencias causales, no impone orden total.
 \end{block}
+\end{frame}
+
+\begin{frame}{Tiempo físico no alcanza}
+Comparar timestamps de nodos distintos puede engañar:
+\begin{itemize}
+\item relojes locales derivan o se corrigen;
+\item la red reordena o demora mensajes;
+\item una hora menor no prueba causalidad.
+\end{itemize}
+
+\pause
+\begin{block}{Pregunta correcta}
+¿Qué evento pudo influir sobre qué otro evento?
+\end{block}
+\end{frame}
+
+\begin{frame}{Relojes de Lamport}
+Cada proceso mantiene un contador lógico:
+\begin{itemize}
+\item incrementa antes de cada evento local;
+\item adjunta el contador al enviar mensajes;
+\item al recibir, usa $\max(local, recibido)+1$.
+\end{itemize}
+
+\pause
+\[
+a \rightarrow b \implies L(a) < L(b)
+\]
+
+\begin{alertblock}{Límite}
+$L(a)<L(b)$ no prueba que $a \rightarrow b$.
+\end{alertblock}
 \end{frame}
 
 \begin{frame}{Eventual consistency}
@@ -166,6 +200,23 @@ Si $R+W>N$, hay intersección de quorums.
 \item merge semántico
 \item versionado (vector clocks)
 \end{itemize}
+\end{frame}
+
+\begin{frame}{Vector clocks}
+Permiten comparar versiones:
+\begin{itemize}
+\item si un vector domina a otro, hay descendencia causal;
+\item si no son comparables, hay concurrencia.
+\end{itemize}
+
+\pause
+\[
+(2,1,0) \parallel (1,2,0)
+\]
+
+\begin{block}{Uso}
+Detectar conflicto y forzar merge en vez de sobrescribir datos.
+\end{block}
 \end{frame}
 
 \begin{frame}{Anti-entropy}

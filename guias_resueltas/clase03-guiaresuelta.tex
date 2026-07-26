@@ -30,10 +30,31 @@ Linearizabilidad exige un orden total consistente con tiempo real. Contraejemplo
 \end{uaanswer}
 
 \begin{uaexercise}
+Explicar por qué dos timestamps físicos de nodos distintos no alcanzan para decidir causalidad entre eventos.
+\end{uaexercise}
+\begin{uaanswer}
+Porque los relojes locales pueden derivar, corregirse o no estar perfectamente sincronizados. Además, una marca física menor no prueba dependencia causal: un evento solo pudo influir sobre otro si hay orden local, mensaje o transitividad que conecte ambos eventos.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplicar las reglas de relojes de Lamport a una secuencia con envío y recepción de mensajes.
+\end{uaexercise}
+\begin{uaanswer}
+En cada evento local se incrementa el contador. En un envío se adjunta el valor actual. En una recepción se asigna $\max(local, recibido)+1$. El resultado debe respetar que si $a \rightarrow b$, entonces $L(a)<L(b)$. Sin embargo, $L(a)<L(b)$ no permite concluir por sí solo que $a$ causó a $b$.
+\end{uaanswer}
+
+\begin{uaexercise}
 Probar informalmente $R+W>N$.
 \end{uaexercise}
 \begin{uaanswer}
 Si elegimos $W$ réplicas para escribir y $R$ para leer, con $R+W>N$, cualquier subconjunto de tamaño $R$ intersecta a cualquier subconjunto de tamaño $W$ (principio de cajas). Por lo tanto, una lectura verá al menos una réplica que participó en la última escritura (en ausencia de retrasos no aplicados).
+\end{uaanswer}
+
+\begin{uaexercise}
+Comparar los vector clocks $(2,1,0)$ y $(1,2,0)$; luego comparar $(1,2,0)$ y $(2,3,0)$.
+\end{uaexercise}
+\begin{uaanswer}
+$(2,1,0)$ y $(1,2,0)$ son concurrentes porque ninguno domina al otro. $(1,2,0) < (2,3,0)$ porque todas las componentes son menores o iguales y al menos una es estrictamente menor; por lo tanto, el primero puede preceder causalmente al segundo.
 \end{uaanswer}
 
 \begin{uaexercise}

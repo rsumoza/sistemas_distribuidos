@@ -19,6 +19,7 @@ Que el estudiante internalice:
 \begin{itemize}
 \item replicar estado introduce divergencia
 \item consistencia es un contrato observable
+\item causalidad lógica no es lo mismo que orden de reloj físico
 \item no existe solución perfecta bajo partición
 \end{itemize}
 
@@ -28,15 +29,18 @@ Que el estudiante internalice:
 Arrancar con dos réplicas que divergen (ejemplo en pizarra). Forzar a los estudiantes a aceptar que no hay “estado único”.
 
 \subsection*{Bloque 2 (20 min): modelos}
-Introducir linearizabilidad (intuición + contraejemplo), luego causalidad (happens-before) y cerrar con eventual.
+Introducir linearizabilidad (intuición + contraejemplo), luego causalidad (happens-before) y cerrar con eventual. Remarcar que un timestamp físico menor no alcanza para inferir causalidad.
 
-\subsection*{Bloque 3 (20 min): arquitecturas}
+\subsection*{Bloque 3 (20 min): orden lógico y versionado}
+Calcular un ejemplo mínimo de reloj de Lamport. Mostrar su límite: preserva causalidad conocida, pero no detecta concurrencia. Introducir vector clocks como metadata para distinguir descendencia causal de escrituras concurrentes.
+
+\subsection*{Bloque 4 (15 min): arquitecturas}
 Leader, multi-leader, leaderless. Hacer énfasis en dónde aparecen conflictos.
 
-\subsection*{Bloque 4 (20 min): quorums y conflictos}
+\subsection*{Bloque 5 (20 min): quorums y conflictos}
 Explicar $N,W,R$ y $R+W>N$. Hacer un ejemplo numérico. Introducir vector clocks a nivel conceptual.
 
-\subsection*{Bloque 5 (15 min): integración}
+\subsection*{Bloque 6 (10 min): integración}
 Aplicar $D=(P,F,G,S,T)$ a dos dominios: banco vs red social.
 
 \section{Momento crítico}
@@ -50,6 +54,8 @@ Cuando el estudiante entiende:
 
 \begin{itemize}
 \item asumir orden global implícito
+\item creer que NTP resuelve orden causal
+\item inferir causalidad solo porque un timestamp Lamport es menor
 \item creer que quorums garantizan frescura absoluta sin considerar retrasos
 \item ignorar resolución de conflictos
 \end{itemize}

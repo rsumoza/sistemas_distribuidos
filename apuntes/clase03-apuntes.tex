@@ -59,9 +59,42 @@ Definimos la relación \emph{happens-before} ($\rightarrow$):
 \begin{itemize}
 \item orden de programa
 \item envío/recepción de mensajes
+\item transitividad entre relaciones conocidas
 \end{itemize}
 
 La consistencia causal exige que si $a \rightarrow b$, entonces todo proceso observa $a$ antes que $b$.
+
+\section{Tiempo físico, orden lógico y causalidad}
+
+En sistemas distribuidos no existe un reloj global perfecto que permita ordenar todos los eventos con certeza. Cada nodo observa su propio reloj local, la red introduce demoras variables y los mensajes pueden llegar tarde, perderse o reordenarse. Por eso, muchas decisiones de diseño deben basarse en causalidad lógica y no solamente en timestamps físicos.
+
+\begin{uakeybox}
+La pregunta importante no siempre es ``qué hora marcaba el reloj'', sino ``qué evento pudo influir sobre qué otro evento''.
+\end{uakeybox}
+
+Comparar timestamps físicos entre nodos distintos puede ser engañoso:
+\begin{itemize}
+\item los relojes locales pueden derivar;
+\item una corrección de sincronización puede mover un reloj hacia adelante o hacia atrás;
+\item un mensaje enviado antes puede llegar después por latencia variable;
+\item dos eventos pueden tener timestamps comparables sin que exista relación causal entre ellos.
+\end{itemize}
+
+\subsection{Relojes de Lamport}
+
+Los relojes de Lamport asignan un contador lógico a cada evento. Cada proceso mantiene un contador $L_i$:
+\begin{itemize}
+\item antes de un evento local, incrementa $L_i$;
+\item al enviar un mensaje, adjunta el valor actual;
+\item al recibir un mensaje con timestamp $t$, actualiza $L_i \leftarrow \max(L_i,t)+1$.
+\end{itemize}
+
+La propiedad central es:
+\[
+a \rightarrow b \implies L(a) < L(b)
+\]
+
+La implicación inversa no vale: si $L(a) < L(b)$, no necesariamente $a \rightarrow b$. Lamport preserva causalidad conocida, pero no detecta concurrencia con precisión.
 
 \subsection{Consistencia eventual}
 
@@ -112,6 +145,15 @@ Vector clocks:
 \item detectan concurrencia
 \item permiten merge explícito
 \end{itemize}
+
+Cada proceso mantiene un vector con una componente por proceso. Para comparar dos vectores $V(a)$ y $V(b)$:
+\begin{itemize}
+\item $V(a) < V(b)$ si todas las componentes de $V(a)$ son menores o iguales que las de $V(b)$ y al menos una es estrictamente menor;
+\item si $V(a) < V(b)$, entonces $a$ precede causalmente a $b$;
+\item si los vectores no son comparables, los eventos son concurrentes.
+\end{itemize}
+
+Por ejemplo, $(2,1,0)$ y $(1,2,0)$ no son comparables; representan escrituras concurrentes. En un store replicado, esto indica que no conviene sobrescribir ciegamente una versión con otra, sino conservar ambas o aplicar reconciliación semántica.
 
 \subsection{Resolución}
 
