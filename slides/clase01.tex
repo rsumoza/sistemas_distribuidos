@@ -10,6 +10,7 @@
 
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 
 % -------------------------------------------------
@@ -241,6 +242,32 @@ Significa que, bajo partición de red, un sistema replicado no puede ofrecer sim
 \item Consistencia fuerte observable;
 \item disponibilidad total de las operaciones.
 \end{itemize}
+\end{frame}
+
+\begin{frame}{CAP: qué significa ``bajo partición''}
+Una partición ocurre cuando dos partes del sistema siguen vivas, pero no pueden comunicarse entre sí de manera confiable.
+
+\begin{columns}[T]
+\column{0.5\textwidth}
+\begin{itemize}
+\item Los nodos no comparten una visión única del estado;
+\item cada lado puede recibir pedidos de clientes;
+\item no hay coordinación inmediata para decidir globalmente.
+\end{itemize}
+
+\column{0.45\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=1.5cm,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=2.1cm] (a) {Réplica A};
+\node[draw, rounded corners, minimum width=2.1cm, right=2.3cm of a] (b) {Réplica B};
+\node[below=0.7cm of a] (ca) {Cliente 1};
+\node[below=0.7cm of b] (cb) {Cliente 2};
+\draw[->] (ca)--(a);
+\draw[->] (cb)--(b);
+\draw[thick,dashed,red] (a)-- node[above] {sin enlace} (b);
+\end{tikzpicture}
+\end{center}
+\end{columns}
 \end{frame}
 
 \begin{frame}{La decisión real bajo partición}

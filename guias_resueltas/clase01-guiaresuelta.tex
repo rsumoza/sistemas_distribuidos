@@ -328,6 +328,22 @@ Un sistema de transferencias que, ante duda o imposibilidad de coordinar, rechaz
 \end{uaanswer}
 
 \begin{uaexercise}\textbf{21.}
+Describir dos ejemplos concretos de partición de red en sistemas reales. Para cada uno, indicar qué partes quedan aisladas, qué operaciones podrían seguir recibiendo pedidos y qué información falta para decidir con certeza.
+\end{uaexercise}
+
+\begin{uaanswer}
+Ejemplo 1: una base replicada entre dos regiones donde la región A no puede comunicarse con la región B. Ambas pueden recibir escrituras locales, pero cada una desconoce las escrituras aceptadas por la otra. Ejemplo 2: una aplicación bancaria donde una sucursal o datacenter queda aislado del sistema central. Puede recibir consultas o solicitudes, pero no sabe si el saldo global cambió en otro sitio. En ambos casos falta una visión compartida y reciente del estado global.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{22.}
+Elegir uno de los ejemplos anteriores y decidir qué sacrificar bajo partición: consistencia fuerte o disponibilidad total. Justificar la decisión en función del dominio, el riesgo y la experiencia de usuario esperada.
+\end{uaexercise}
+
+\begin{uaanswer}
+En una transferencia bancaria, una decisión conservadora sería sacrificar disponibilidad total: rechazar o dejar pendiente la operación hasta recuperar coordinación, para preservar consistencia fuerte y evitar saldos incorrectos. En una red social, ante una partición podría aceptarse sacrificar consistencia fuerte y permitir publicaciones locales, asumiendo reconciliación posterior. La decisión debe estar conectada con el costo de aceptar datos inconsistentes frente al costo de negar servicio.
+\end{uaanswer}
+
+\begin{uaexercise}\textbf{23.}
 Explicar por qué CAP no debe enseñarse como “elegir dos de tres”.
 \end{uaexercise}
 
@@ -335,7 +351,7 @@ Explicar por qué CAP no debe enseñarse como “elegir dos de tres”.
 Porque esa formulación sugiere una especie de menú estático o una preferencia de arquitectura, cuando en realidad CAP describe una restricción que aparece cuando hay partición de red. La tensión relevante no es permanente en cualquier condición, sino específicamente cuando la coordinación entre componentes queda interrumpida.
 \end{uaanswer}
 
-\begin{uaexercise}\textbf{22.}
+\begin{uaexercise}\textbf{24.}
 Relacionar indistinguibilidad, asincronía y CAP en un párrafo coherente.
 \end{uaexercise}
 
@@ -343,7 +359,7 @@ Relacionar indistinguibilidad, asincronía y CAP en un párrafo coherente.
 En un sistema asíncrono, una demora grande es indistinguible de una falla para el observador remoto. Esa falta de conocimiento perfecto impide decidir siempre correctamente sin costo. Cuando además existe partición, CAP formaliza una consecuencia de esa limitación: no puede preservarse a la vez consistencia fuerte observable y disponibilidad total de las operaciones.
 \end{uaanswer}
 
-\begin{uaexercise}\textbf{23.}
+\begin{uaexercise}\textbf{25.}
 Explicar qué significa “pensamiento distribuido” al final de esta clase y cómo se diferencia del razonamiento sobre un programa local.
 \end{uaexercise}
 
@@ -351,7 +367,7 @@ Explicar qué significa “pensamiento distribuido” al final de esta clase y c
 Pensamiento distribuido significa razonar desde la información parcial, explicitando fallas, garantías y trade-offs. Se diferencia del razonamiento sobre un programa local en que ya no puede asumirse una visión global inmediata del estado ni una relación simple entre síntoma observado y causa interna.
 \end{uaanswer}
 
-\begin{uaexercise}\textbf{24.}
+\begin{uaexercise}\textbf{26.}
 Indicar cuál creés que es el mayor cambio de paradigma introducido por esta clase y justificarlo.
 \end{uaexercise}
 
