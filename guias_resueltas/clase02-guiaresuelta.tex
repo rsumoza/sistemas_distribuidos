@@ -26,6 +26,22 @@ El problema es que esta abstracción oculta latencia, fallas y duplicación, lo 
 \end{uaanswer}
 
 \begin{uaexercise}
+Construir una línea de tiempo donde el cliente abandona por timeout pero la operación remota igualmente puede ejecutarse.
+\end{uaexercise}
+
+\begin{uaanswer}
+Una línea posible: $t_0$ el cliente envía request; $t_1$ el transporte retransmite o el cliente RPC reintenta; $t_2$ la aplicación vence su timeout y devuelve error; $t_3$ el servidor ejecuta; $t_4$ la base confirma; $t_5$ la respuesta llega tarde o se pierde. Después de $t_2$ todavía pueden ocurrir retransmisiones, ejecución, confirmación y respuesta tardía.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué separar capas ayuda a diagnosticar una falla de comunicación.
+\end{uaexercise}
+
+\begin{uaanswer}
+Porque cada capa observa una parte distinta del fenómeno y puede tomar acciones independientes. La aplicación puede ver timeout, el cliente HTTP puede haber reintentado, TCP puede haber retransmitido, el balanceador puede haber redirigido, el servidor puede haber ejecutado y la base puede haber confirmado. Separar capas evita atribuir todo a ``la red'' y permite identificar mitigaciones concretas.
+\end{uaanswer}
+
+\begin{uaexercise}
 ¿Por qué retry introduce duplicación?
 \end{uaexercise}
 

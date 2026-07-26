@@ -19,6 +19,8 @@ El objetivo de esta clase es que el estudiante entienda que:
 
 \begin{itemize}
 \item RPC no es transparente
+\item la comunicación distribuida no es inmediata ni atómica
+\item una llamada atraviesa capas que pueden observar y responder distinto ante la falla
 \item timeout introduce incertidumbre inevitable
 \item retry introduce duplicación estructural
 \item idempotencia es la solución clave
@@ -30,6 +32,8 @@ El alumno debe poder explicar:
 
 \begin{itemize}
 \item por qué RPC rompe la analogía con llamadas locales
+\item cómo reconstruir una comunicación remota como línea de tiempo
+\item qué capas intervienen y qué puede hacer cada una ante pérdida, demora o saturación
 \item por qué retry no es opcional
 \item por qué idempotencia es necesaria
 \end{itemize}
@@ -41,6 +45,15 @@ El alumno debe poder explicar:
 \begin{itemize}
 \item presentar RPC
 \item romper la analogía con función local
+\item mostrar que una llamada remota no ocurre como un paso único
+\end{itemize}
+
+\subsection*{Bloque 1b: capas y no-inmediatez (15 min)}
+
+\begin{itemize}
+\item dibujar aplicación, cliente RPC, transporte, red, servidor y almacenamiento
+\item preguntar qué observa cada capa ante pérdida o demora
+\item construir una línea temporal donde el cliente abandona pero el servidor ejecuta
 \end{itemize}
 
 \subsection*{Bloque 2: timeout (15 min)}
@@ -83,6 +96,8 @@ Cuando el alumno entiende:
 
 \begin{itemize}
 \item creer que timeout = falla
+\item pensar que la comunicación remota es instantánea
+\item atribuir el problema a ``la red'' sin separar capas
 \item creer que retry es seguro
 \item ignorar duplicación
 \end{itemize}

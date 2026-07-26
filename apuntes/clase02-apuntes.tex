@@ -52,6 +52,26 @@ Eventos posibles:
 
 Cada etapa puede fallar independientemente.
 
+\section{No-inmediatez y capas de comunicación}
+
+Una comunicación distribuida no debe entenderse como un salto instantáneo entre cliente y servidor. Entre la intención de invocar una operación y la observación de una respuesta hay una trayectoria compuesta por capas: aplicación, librería RPC o cliente HTTP, serialización, transporte, red, balanceadores, servidor, almacenamiento y camino de regreso.
+
+Cada capa puede reaccionar de manera distinta ante una falla:
+\begin{itemize}
+\item la aplicación puede abandonar la espera y mostrar error;
+\item el cliente RPC puede reintentar automáticamente;
+\item TCP puede retransmitir segmentos sin que la aplicación lo observe directamente;
+\item un balanceador puede redirigir a otra instancia;
+\item el servidor puede seguir procesando aunque el cliente ya haya vencido su timeout;
+\item la base de datos puede confirmar o abortar una operación independientemente de que la respuesta vuelva.
+\end{itemize}
+
+Esto introduce una forma práctica de concurrencia: mientras una capa decide que ``ya esperó suficiente'', otra capa puede seguir intentando, entregando, ejecutando o confirmando efectos. Para diagnosticar un problema no alcanza con preguntar ``falló o no falló'': hay que reconstruir qué observó cada capa, qué acción tomó y qué efecto pudo producir.
+
+\begin{uakeybox}
+La no-inmediatez de la comunicación obliga a razonar con líneas de tiempo: lo que el cliente observa, lo que la red transporta, lo que el servidor ejecuta y lo que el almacenamiento confirma pueden no coincidir en el mismo instante.
+\end{uakeybox}
+
 \section{Semánticas}
 
 \subsection{At-least-once}
