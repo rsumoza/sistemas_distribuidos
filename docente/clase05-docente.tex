@@ -1,53 +1,178 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{05}
-\UASetClassTitle{Tiempo y causalidad}
-\title{Clase 05 --- Tiempo y causalidad}
+\UASetClassTitle{Transacciones distribuidas}
+\UASetDocKind{Guía docente}
+
+\title{Clase 05 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Objetivo pedagógico profundo}
-Que el estudiante reemplace la intuición de reloj global por la noción de dependencia causal. El objetivo no es memorizar Lamport y vector clocks, sino saber qué permiten inferir sobre orden, concurrencia y conflictos.
+\section{Objetivo profundo}
+
+El alumno debe comprender:
+
+\begin{itemize}
+\item qué significa corrección en presencia de concurrencia;
+\item por qué serializabilidad es el criterio clásico de referencia;
+\item qué anomalías aparecen cuando el aislamiento es más débil;
+\item cómo se realiza commit distribuido y qué limitaciones introduce.
+\end{itemize}
 
 \section{Resultados de aprendizaje esperados}
+
+Al finalizar la clase, el estudiante debería poder:
+
 \begin{itemize}
-\item explicar por qué el tiempo físico no alcanza para ordenar eventos distribuidos;
-\item aplicar la relación happened-before;
-\item calcular relojes de Lamport en una ejecución simple;
-\item explicar el límite de Lamport para detectar concurrencia;
-\item comparar vector clocks y decidir cuándo dos eventos son concurrentes.
+\item definir transacción y propiedades ACID;
+\item explicar serializabilidad con lenguaje formal básico;
+\item reconocer anomalías como dirty read, non-repeatable read, phantom y write skew;
+\item distinguir Snapshot Isolation de Serializable;
+\item describir 2PC y explicar por qué bloquea.
 \end{itemize}
 
-\section{Guion sugerido}
-\begin{enumerate}
-\item Abrir con dos eventos en nodos distintos y preguntar cuál ocurrió primero.
-\item Mostrar que timestamps físicos no prueban causalidad.
-\item Definir happened-before con orden local, mensajes y transitividad.
-\item Calcular Lamport y discutir su límite.
-\item Introducir vector clocks como mecanismo para detectar concurrencia.
-\item Cerrar con conflictos concurrentes en stores eventualmente consistentes.
-\end{enumerate}
+\section{Estructura sugerida de la clase (90 minutos)}
 
-\section{Errores conceptuales frecuentes}
+\subsection*{Bloque 1 (15 min): motivación}
+
+Abrir con un caso concreto de inconsistencia bajo concurrencia.  
+Ejemplo sugerido: dos operaciones válidas localmente que, ejecutadas en paralelo, violan una restricción global.
+
+Objetivo:
+\begin{quote}
+instalar la idea de que concurrencia sin criterio formal puede romper invariantes aunque cada transacción individual parezca correcta.
+\end{quote}
+
+\subsection*{Bloque 2 (25 min): serializabilidad}
+
+Explicar:
+
 \begin{itemize}
-\item creer que NTP resuelve orden causal;
-\item confundir orden total arbitrario con causalidad;
-\item inferir causalidad solo porque un timestamp Lamport es menor;
-\item olvidar que vector clocks tienen costo de metadata.
+\item definición intuitiva de serializabilidad;
+\item equivalencia con alguna ejecución secuencial;
+\item grafo de precedencia;
+\item criterio de aciclicidad.
 \end{itemize}
 
-\section{Preguntas disparadoras}
+Conviene hacer al menos un ejemplo en pizarra con dos transacciones y conflictos RW / WR.
+
+\subsection*{Bloque 3 (20 min): anomalías}
+
+Trabajar ejemplos concretos de:
+
 \begin{itemize}
-\item ¿Existe un mensaje o camino causal entre estos eventos?
-\item ¿Qué puede concluir Lamport y qué no?
-\item ¿Son comparables estos vectores?
-\item ¿Qué debería hacer una aplicación ante escrituras concurrentes?
+\item dirty read;
+\item non-repeatable read;
+\item phantom;
+\item write skew.
 \end{itemize}
 
-\begin{uawarn}
-Criterio de logro docente: la clase salió bien si el estudiante puede distinguir ``ocurrió antes en el reloj'' de ``causó o precedió lógicamente''.
-\end{uawarn}
+El foco debe estar en que el estudiante vea que no toda concurrencia “aparentemente razonable” preserva correctitud global.
+
+\subsection*{Bloque 4 (15 min): Snapshot Isolation}
+
+Explicar:
+
+\begin{itemize}
+\item snapshot consistente;
+\item qué evita;
+\item qué no evita;
+\item por qué write skew sigue siendo posible.
+\end{itemize}
+
+Este bloque es crítico porque muchos estudiantes tienden a asumir que SI equivale a serializabilidad.
+
+\subsection*{Bloque 5 (15 min): commit distribuido}
+
+Presentar:
+
+\begin{itemize}
+\item problema de commit atómico sobre múltiples nodos;
+\item 2PC;
+\item bloqueo ante caída del coordinador;
+\item mención breve a 3PC y a la relación con consenso.
+\end{itemize}
+
+\section{Conceptos que deben quedar firmes}
+
+Al terminar la clase, deberían quedar especialmente claros:
+
+\begin{itemize}
+\item serializabilidad como criterio de corrección;
+\item diferencia entre atomicidad y aislamiento;
+\item diferencia entre Snapshot Isolation y Serializable;
+\item por qué 2PC no elimina todos los problemas de sistemas distribuidos.
+\end{itemize}
+
+\section{Errores frecuentes de los estudiantes}
+
+\begin{itemize}
+\item creer que “transacción” implica automáticamente serializabilidad;
+\item confundir atomicidad con aislamiento;
+\item pensar que Snapshot Isolation evita cualquier anomalía;
+\item no distinguir conflicto físico de violación semántica global;
+\item creer que 2PC resuelve disponibilidad.
+\end{itemize}
+
+\section{Preguntas disparadoras recomendadas}
+
+\begin{itemize}
+\item ¿Qué significa que una ejecución concurrente sea correcta?
+\item ¿Alcanza con que cada transacción individual sea válida?
+\item ¿Qué diferencia hay entre leer una foto consistente y preservar invariantes globales?
+\item ¿Qué pasa si el coordinador cae después del prepare?
+\end{itemize}
+
+\section{Ejercicio en vivo sugerido}
+
+Hacer en pizarra un caso de write skew:
+
+\begin{itemize}
+\item dos transacciones leen el mismo estado;
+\item cada una modifica un dato distinto;
+\item ambas committean;
+\item la restricción global queda rota.
+\end{itemize}
+
+Luego preguntar explícitamente:
+
+\begin{quote}
+¿Dónde estuvo el conflicto? ¿Por qué el sistema permitió esta ejecución?
+\end{quote}
+
+\section{Momento crítico de la clase}
+
+El punto más importante aparece cuando el alumno entiende:
+
+\begin{center}
+\textbf{Snapshot Isolation no equivale a serializabilidad}
+\end{center}
+
+Ese punto debe remarcarse con fuerza, porque organiza gran parte de la intuición correcta sobre transacciones modernas.
+
+\section{Criterio de éxito docente}
+
+La clase salió bien si el estudiante puede:
+
+\begin{itemize}
+\item construir o reconocer un grafo de precedencia simple;
+\item explicar por qué una ejecución no es serializable;
+\item describir un caso de write skew;
+\item explicar por qué 2PC bloquea;
+\item distinguir garantías locales de correctitud global.
+\end{itemize}
+
+\section{Conexión con la clase siguiente}
+
+Esta clase prepara directamente la discusión sobre almacenamiento, WAL, MVCC e implementación física, porque ahora ya está claro qué propiedades semánticas queremos preservar y por qué su implementación no es trivial.
+
+\begin{uakeybox}
+Pregunta puente: si ya entendemos qué propiedades transaccionales queremos, ¿cómo las implementa realmente un motor de almacenamiento sobre disco, memoria y versiones?
+\end{uakeybox}
+
 \end{document}

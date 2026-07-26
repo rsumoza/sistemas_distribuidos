@@ -1,25 +1,54 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{../cls/ua-engineering-v6-article}
 \input{../config/course-config}
+
 \UASetClassNumber{03}
-\UASetClassTitle{Replicación de estado}
-\title{Clase 03 --- Replicación de estado}
+\UASetClassTitle{Consistencia y replicación}
+\UASetDocKind{Guía de ejercicios}
+
+\title{Clase 03 --- Guía}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
 
-\section{Indicaciones generales}
-En cada ejercicio indicar qué se gana con replicar y qué problema de consistencia, latencia o disponibilidad aparece como costo.
+\section{Indicaciones}
+Justificar. Cuando corresponda usar $D=(P,F,G,S,T)$.
 
-\section{Ejercicios}
-\begin{uaexercise}\textbf{1.} Explicar por qué replicar estado mejora disponibilidad y latencia, pero introduce el problema de inconsistencia entre copias.\end{uaexercise}
-\begin{uaexercise}\textbf{2.} Dibujar un esquema leader-follower con un líder y dos seguidores. Indicar qué nodo recibe escrituras, qué nodos podrían recibir lecturas y dónde aparece atraso de replicación.\end{uaexercise}
-\begin{uaexercise}\textbf{3.} Comparar replicación síncrona y asíncrona para una escritura. Indicar cuál reduce stale reads y cuál mejora latencia de respuesta.\end{uaexercise}
-\begin{uaexercise}\textbf{4.} Un usuario cambia su contraseña y luego intenta iniciar sesión contra una réplica atrasada. Explicar el síntoma, la causa y la garantía que faltó.\end{uaexercise}
-\begin{uaexercise}\textbf{5.} Analizar qué puede pasar si el líder confirma una escritura, cae antes de replicarla y luego se promueve un follower.\end{uaexercise}
-\begin{uaexercise}\textbf{6.} Elegir una política de lectura para un sistema de catálogo y para un sistema bancario: leer del líder o permitir followers. Justificar el trade-off.\end{uaexercise}
-\begin{uaexercise}\textbf{7.} Definir una métrica o señal operativa para detectar stale reads o atraso de réplicas.\end{uaexercise}
-\begin{uaexercise}\textbf{8.} Aplicar problema--fallas--garantía--solución--trade-off a un sistema replicado que debe tolerar caída de un nodo.\end{uaexercise}
+\section{Nivel 1: fundamentos}
+\begin{uaexercise}Definir replicación y explicar sus motivaciones principales.\end{uaexercise}
+\begin{uaexercise}Explicar por qué la divergencia es inevitable en un sistema asíncrono.\end{uaexercise}
+\begin{uaexercise}Construir un ejemplo con dos réplicas que divergen tras escrituras concurrentes.\end{uaexercise}
+\begin{uaexercise}Distinguir estado físico vs estado lógico en un sistema replicado.\end{uaexercise}
+\begin{uaexercise}Explicar por qué “una sola fuente de verdad” es difícil de sostener en presencia de particiones.\end{uaexercise}
+
+\section{Nivel 2: modelos de consistencia}
+\begin{uaexercise}Definir linearizabilidad y dar un ejemplo que la viole.\end{uaexercise}
+\begin{uaexercise}Definir consistencia causal con la relación happens-before.\end{uaexercise}
+\begin{uaexercise}Dar un ejemplo permitido por causal pero no por linearizabilidad.\end{uaexercise}
+\begin{uaexercise}Definir consistencia eventual y sus límites.\end{uaexercise}
+\begin{uaexercise}Comparar los tres modelos en términos de garantías observables.\end{uaexercise}
+
+\section{Nivel 3: arquitecturas}
+\begin{uaexercise}Describir leader-based replication y sus variantes sync/async.\end{uaexercise}
+\begin{uaexercise}Explicar multi-leader y por qué introduce conflictos.\end{uaexercise}
+\begin{uaexercise}Describir leaderless replication y el rol de $N,W,R$.\end{uaexercise}
+\begin{uaexercise}Probar informalmente por qué $R+W>N$ implica intersección.\end{uaexercise}
+\begin{uaexercise}Construir un ejemplo donde $R+W\le N$ rompe lecturas frescas.\end{uaexercise}
+
+\section{Nivel 4: conflictos y convergencia}
+\begin{uaexercise}Definir conflicto concurrente y dar un ejemplo.\end{uaexercise}
+\begin{uaexercise}Explicar LWW y sus riesgos.\end{uaexercise}
+\begin{uaexercise}Explicar vector clocks y cómo detectan concurrencia.\end{uaexercise}
+\begin{uaexercise}Diseñar un merge semántico para un carrito de compras.\end{uaexercise}
+\begin{uaexercise}Describir read-repair y anti-entropy.\end{uaexercise}
+
+\section{Nivel 5: diseño}
+\begin{uaexercise}Aplicar $D$ a un sistema de perfiles de usuario global.\end{uaexercise}
+\begin{uaexercise}Elegir modelo de consistencia para un banco y justificar.\end{uaexercise}
+\begin{uaexercise}Elegir modelo para una red social y justificar.\end{uaexercise}
+\begin{uaexercise}Diseñar un esquema quorum para $N=5$ con objetivos dados.\end{uaexercise}
+\begin{uaexercise}Relacionar esta clase con CAP en presencia de particiones.\end{uaexercise}
 
 \end{document}
