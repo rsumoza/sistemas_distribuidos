@@ -13,9 +13,10 @@
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
+\section{Propósito de la clase}\label{sec:proposito-de-la-clase}
 
-Esta primera clase instala el marco mental del curso. Su objetivo no es presentar una lista de tecnologías ni una taxonomía superficial, sino cambiar la forma en que el estudiante razona sobre sistemas que operan a través de una red.
+Esta primera clase instala el marco mental del curso.
+Su objetivo no es presentar una lista de tecnologías ni una taxonomía superficial, sino cambiar la forma en que el estudiante razona sobre sistemas que operan a través de una red.
 
 La idea central es la siguiente:
 
@@ -23,7 +24,8 @@ La idea central es la siguiente:
 En un sistema distribuido, el observador no dispone de una visión global completa, instantánea y confiable del estado del sistema.
 \end{uakeybox}
 
-Esta limitación no es un detalle de implementación ni una rareza de ciertos entornos hostiles. Es una consecuencia estructural de tres hechos básicos:
+Esta limitación no es un detalle de implementación ni una rareza de ciertos entornos hostiles.
+Es una consecuencia estructural de tres hechos básicos:
 
 \begin{itemize}
 \item los componentes se ejecutan en máquinas distintas;
@@ -31,11 +33,13 @@ Esta limitación no es un detalle de implementación ni una rareza de ciertos en
 \item la red introduce demora, pérdida, reordenamiento e incertidumbre.
 \end{itemize}
 
-Por eso, a lo largo de toda la materia, evitaremos pensar como si el sistema fuera un único programa local con un estado perfectamente observable. La meta será desarrollar \emph{pensamiento distribuido}: la capacidad de modelar incertidumbre, explicitar fallas, elegir garantías y defender trade-offs.
+Por eso, a lo largo de toda la materia, evitaremos pensar como si el sistema fuera un único programa local con un estado perfectamente observable.
+La meta será desarrollar \emph{pensamiento distribuido}: la capacidad de modelar incertidumbre, explicitar fallas, elegir garantías y defender trade-offs.
 
-\section{Qué vuelve distribuido a un problema}
+\section{Qué vuelve distribuido a un problema}\label{sec:que-vuelve-distribuido-a-un-problema}
 
-No todo problema con varias máquinas es, automáticamente, un problema distribuido interesante. Tampoco alcanza con decir que “hay red”, “hay escalabilidad” o “hay muchos usuarios”.
+No todo problema con varias máquinas es, automáticamente, un problema distribuido interesante.
+Tampoco alcanza con decir que “hay red”, “hay escalabilidad” o “hay muchos usuarios”.
 
 Una formulación operativa útil es la siguiente:
 
@@ -51,7 +55,7 @@ Esta definición importa porque desplaza el eje del razonamiento:
 \item ya no puede suponerse que una falta de respuesta identifica una causa única.
 \end{itemize}
 
-\subsection{Consecuencia metodológica}
+\subsection{Consecuencia metodológica}\label{subsec:consecuencia-metodologica}
 
 Cuando un problema es distribuido, la pregunta correcta deja de ser:
 
@@ -65,7 +69,7 @@ y pasa a ser:
 “¿Qué puede observar este componente, qué no puede saber, y qué garantía se puede ofrecer bajo esa incertidumbre?”
 \end{quote}
 
-\section{Ejemplo motivador: el pago que no responde}
+\section{Ejemplo motivador: el pago que no responde}\label{sec:ejemplo-motivador:-el-pago-que-no-responde}
 
 Consideremos la siguiente situación:
 
@@ -100,23 +104,29 @@ No lo sabemos.
 
 Y lo más importante es esto: en general, no podemos saberlo con certeza en ese instante.
 
-\section{Indistinguibilidad}
+\section{Indistinguibilidad}\label{sec:indistinguibilidad}
 
-La noción fundamental que esta clase introduce es la de \textbf{indistinguibilidad observacional}. Distintas historias internas del sistema pueden producir exactamente la misma observación para un actor remoto.
+La noción fundamental que esta clase introduce es la de \textbf{indistinguibilidad observacional}.
+Distintas historias internas del sistema pueden producir exactamente la misma observación para un actor remoto.
 
-\subsection{Dos historias distintas}
+\subsection{Dos historias distintas}\label{subsec:dos-historias-distintas}
 
-Volvamos al ejemplo del pago. El cliente observa simplemente que no recibió respuesta en el tiempo esperado. Sin embargo, al menos dos historias muy distintas son compatibles con esa observación:
+Volvamos al ejemplo del pago.
+El cliente observa simplemente que no recibió respuesta en el tiempo esperado.
+Sin embargo, al menos dos historias muy distintas son compatibles con esa observación:
 
 \paragraph{Historia A}
-El servidor nunca recibió el request. No hubo ningún efecto y el cliente terminó en timeout.
+El servidor nunca recibió el request.
+No hubo ningún efecto y el cliente terminó en timeout.
 
 \paragraph{Historia B}
-El servidor sí recibió y procesó el request, pero la respuesta se perdió. Hubo efecto, pero el cliente terminó también en timeout.
+El servidor sí recibió y procesó el request, pero la respuesta se perdió.
+Hubo efecto, pero el cliente terminó también en timeout.
 
-\subsection{Punto conceptual}
+\subsection{Punto conceptual}\label{subsec:punto-conceptual}
 
-Para el cliente, ambas historias son observacionalmente idénticas. En otras palabras:
+Para el cliente, ambas historias son observacionalmente idénticas.
+En otras palabras:
 
 \begin{uakeybox}
 La ausencia de respuesta no identifica por sí sola la causa profunda del fenómeno observado.
@@ -124,11 +134,12 @@ La ausencia de respuesta no identifica por sí sola la causa profunda del fenóm
 
 Esto es central, porque obliga a abandonar una intuición local muy arraigada: la idea de que el sistema “debería poder decirnos exactamente qué pasó”.
 
-\subsection{Consecuencia fuerte}
+\subsection{Consecuencia fuerte}\label{subsec:consecuencia-fuerte}
 
-Desde el borde del sistema, lo que se tiene no es conocimiento perfecto, sino evidencia parcial. Diseñar sistemas distribuidos significa aprender a operar bajo esa limitación.
+Desde el borde del sistema, lo que se tiene no es conocimiento perfecto, sino evidencia parcial.
+Diseñar sistemas distribuidos significa aprender a operar bajo esa limitación.
 
-\section{Timeouts no son pruebas}
+\section{Timeouts no son pruebas}\label{sec:timeouts-no-son-pruebas}
 
 Un error muy frecuente en estudiantes —y también en desarrolladores inexpertos— es asumir que:
 
@@ -138,7 +149,8 @@ Un error muy frecuente en estudiantes —y también en desarrolladores inexperto
 
 Eso es incorrecto.
 
-Un timeout solo significa que una respuesta no fue observada antes de cierto umbral temporal. Puede deberse a:
+Un timeout solo significa que una respuesta no fue observada antes de cierto umbral temporal.
+Puede deberse a:
 
 \begin{itemize}
 \item caída del servidor;
@@ -154,11 +166,11 @@ Un timeout solo significa que una respuesta no fue observada antes de cierto umb
 Un timeout es un hecho de observación, no una explicación causal.
 \end{uawarn}
 
-\section{Modelo síncrono y modelo asíncrono}
+\section{Modelo síncrono y modelo asíncrono}\label{sec:modelo-sincrono-y-modelo-asincrono}
 
 Para razonar con mayor precisión, conviene distinguir dos modelos.
 
-\subsection{Modelo síncrono}
+\subsection{Modelo síncrono}\label{subsec:modelo-sincrono}
 
 En un modelo síncrono se asume la existencia de cotas conocidas para:
 
@@ -170,17 +182,18 @@ En un modelo síncrono se asume la existencia de cotas conocidas para:
 
 En ese contexto, si una operación excede su cota, puede interpretarse razonablemente como una falla.
 
-\subsection{Modelo asíncrono}
+\subsection{Modelo asíncrono}\label{subsec:modelo-asincrono}
 
-En un modelo asíncrono no existen cotas confiables conocidas para la red o el cómputo. Por lo tanto, una demora arbitrariamente larga es indistinguible de una falla real.
+En un modelo asíncrono no existen cotas confiables conocidas para la red o el cómputo.
+Por lo tanto, una demora arbitrariamente larga es indistinguible de una falla real.
 
 Este modelo es más severo, pero conceptualmente mucho más cercano a la realidad de sistemas desplegados sobre redes generales.
 
-\subsection{Importancia para el curso}
+\subsection{Importancia para el curso}\label{subsec:importancia-para-el-curso}
 
 El curso se apoya principalmente en la intuición asíncrona: si no se puede distinguir claramente entre demora y falla, entonces las soluciones deben diseñarse de forma robusta a esa ambigüedad.
 
-\section{Qué significa pensar distributivamente}
+\section{Qué significa pensar distributivamente}\label{sec:que-significa-pensar-distributivamente}
 
 A partir de lo anterior, podemos definir el núcleo del curso.
 
@@ -198,7 +211,7 @@ Esto significa que toda decisión de diseño debe responder, al menos, a estas p
 \item ¿Qué costo o trade-off acepto?
 \end{itemize}
 
-\section{Framework del curso}
+\section{Framework del curso}\label{sec:framework-del-curso}
 
 Durante toda la materia vamos a usar el siguiente esquema:
 
@@ -216,21 +229,22 @@ donde:
 \item $T$ = trade-off aceptado.
 \end{itemize}
 
-Este esquema no es decorativo. Su función pedagógica es ordenar el razonamiento y evitar que el estudiante salte directamente a una tecnología o patrón sin haber modelado el problema.
+Este esquema no es decorativo.
+Su función pedagógica es ordenar el razonamiento y evitar que el estudiante salte directamente a una tecnología o patrón sin haber modelado el problema.
 
-\subsection{Ejemplo con el pago}
+\subsection{Ejemplo con el pago}\label{subsec:ejemplo-con-el-pago}
 
 \begin{itemize}
 \item $P$: evitar duplicación de pagos;
 \item $F$: timeout, pérdida de respuesta, retry del cliente;
 \item $G$: a lo sumo un débito efectivo;
-\item $S$: request ID único + deduplicación + persistencia del resultado;
+\item $S$: request ID único + de-duplicación + persistencia del resultado;
 \item $T$: más complejidad, más estado, más lógica de validación.
 \end{itemize}
 
 Lo importante es notar que la solución no aparece en el vacío: surge como respuesta a un problema, a un modelo de fallas y a una garantía requerida.
 
-\section{CAP: interpretación correcta}
+\section{CAP: interpretación correcta}\label{sec:cap:-interpretacion-correcta}
 
 La clase cierra conectando estas ideas con CAP, pero de forma correcta.
 
@@ -250,11 +264,12 @@ Eso obliga a decidir entre:
 \item responder igual para preservar disponibilidad, aceptando posibles inconsistencias.
 \end{itemize}
 
-\subsection{Lectura madura}
+\subsection{Lectura madura}\label{subsec:lectura-madura}
 
-CAP no te dice qué arquitectura usar en abstracto. Te obliga a explicitar qué valorás más cuando la coordinación ya no es posible.
+CAP no te dice qué arquitectura usar en abstracto.
+Te obliga a explicitar qué valorás más cuando la coordinación ya no es posible.
 
-\section{Errores conceptuales frecuentes}
+\section{Errores conceptuales frecuentes}\label{sec:errores-conceptuales-frecuentes}
 
 Esta primera clase busca corregir desde el inicio algunos errores muy comunes:
 
@@ -266,7 +281,7 @@ Esta primera clase busca corregir desde el inicio algunos errores muy comunes:
 \item asumir que “más tecnología” equivale a “mejor diseño”.
 \end{itemize}
 
-\section{Qué debe saber hacer el estudiante al terminar esta clase}
+\section{Qué debe saber hacer el estudiante al terminar esta clase}\label{sec:que-debe-saber-hacer-el-estudiante-al-terminar-esta-clase}
 
 Al finalizar la clase, el estudiante debería poder:
 
@@ -278,16 +293,19 @@ Al finalizar la clase, el estudiante debería poder:
 \item explicar CAP como decisión bajo partición.
 \end{itemize}
 
-\section{Guía de profundización bibliográfica}
+\section{Guía de profundización bibliográfica}\label{sec:guia-de-profundizacion-bibliografica}
 
 \begin{itemize}
-\item \textbf{DDIA / Kleppmann}: leer las discusiones introductorias sobre fallas, visibilidad e imposibilidad de obtener una imagen perfecta del sistema. El valor de esta lectura es conceptual, no solo terminológico.
+\item \textbf{DDIA / Kleppmann}: leer las discusiones introductorias sobre fallas, visibilidad e imposibilidad de obtener una imagen perfecta del sistema.
+El valor de esta lectura es conceptual, no solo terminológico.
 \item \textbf{Tanenbaum}: usarlo para reforzar definiciones de sistema distribuido, modelos de sistema y vocabulario básico.
 \item \textbf{MIT 6.824}: releer materiales introductorios pensando especialmente en qué sabe cada actor y qué no puede saber.
 \end{itemize}
 
 \begin{uakeybox}
-Resultado de aprendizaje esperado: al finalizar esta clase, el estudiante debe haber cambiado su modelo mental. Ya no debe razonar como si el sistema fuera una sola máquina local con observación completa.
+Resultado de aprendizaje esperado: al finalizar esta clase, el estudiante debe haber cambiado su modelo mental.
+Ya no debe razonar como si el sistema fuera una sola máquina local con observación completa.
+Debe poder razonar desde síntomas hacia causas posibles, documentar el relevamiento y el análisis, y relevar, analizar y proponer en forma aislada y conectada.
 \end{uakeybox}
 
 \end{document}
