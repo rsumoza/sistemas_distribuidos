@@ -13,9 +13,6 @@
 
 \begin{document}
 
-% -------------------------------------------------
-% Portada sin footline
-% -------------------------------------------------
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -23,7 +20,137 @@
 \end{frame}
 }
 
-\UASectionSlide{El problema fundamental}
+\UASectionSlide{Entrada en calor}
+    
+\begin{frame}{Un problema aparentemente simple}
+    Un usuario hace clic en \emph{“pagar”}.
+
+    \begin{itemize}
+        \item El cliente envía la solicitud.
+        \item El servidor procesa el pago.
+        \item La respuesta no llega.
+    \end{itemize}
+
+    \begin{block}{Para pensar mientras arrancamos}
+        ¿Qué pasó?
+        ¿Qué puedo preguntar?
+        ¿Qué puedo saber?
+    \end{block}
+\end{frame}
+
+\UASectionSlide{Presentación}
+
+\begin{frame}{Contenido}
+    \begin{itemize}
+        \item Presentación de la asignatura.
+        \item Objetivos de la asignatura.
+        \item Contenido de la asignatura.
+        \item Esquema de evaluación.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Presentación}
+    Vamos a hablar de sistemas distribuídos, donde múltiples componentes trabajan en conjunto.
+    
+    Vamos a analizar problemas y posibles soluciones de acuerdo a las restricciones y capacidades deseadas. 
+\end{frame}
+
+\begin{frame}{Objetivos}
+    \textbf{Conocimientos}
+    \begin{itemize}
+        \item Conocer técnicas, algoritmos, diseños e implementaciones de sistemas distribuidos modernos.
+        \item Distinguir características para la toma de decisión en cuanto al dominio.
+    \end{itemize}
+    \textbf{Habilidades}
+    \begin{itemize}
+        \item Relevar contextos de sistemas distribuídos.
+        \item Analizar esos contextos e identificar características.
+        \item Proponer y defender alternativas para resolver esos contextos.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Contenido}
+    \begin{itemize}
+        \item \textbf{Pensamiento distribuido}: fallas parciales, incertidumbre, observación incompleta y trade-offs.
+        \item \textbf{Comunicación}: RPC, timeouts, retries, idempotencia y semánticas de entrega.
+        \item \textbf{Estado replicado}: consistencia, replicación, quorums, conflictos y convergencia.
+        \item \textbf{Coordinación}: consenso, elección de líder, logs replicados y límites de disponibilidad.
+        \item \textbf{Transacciones y almacenamiento}: serializabilidad, aislamiento, commit distribuido, WAL, MVCC e índices.
+        \item \textbf{Arquitecturas distribuidas}: eventos, streaming, sagas, colas, microservicios y resiliencia.
+        \item \textbf{Operación y diseño}: observabilidad, performance, escalabilidad, incidentes y decisiones de arquitectura.
+    \end{itemize}
+\end{frame}
+
+\UASectionSlide{Retomamos}
+
+\begin{frame}{Un problema aparentemente simple}
+    Un usuario hace clic en \emph{“pagar”}.
+
+    \begin{itemize}
+        \item El cliente envía la solicitud.
+        \item El servidor procesa el pago.
+        \item La respuesta no llega.
+    \end{itemize}
+
+    \pause
+
+    \begin{block}{Pregunta}
+        ¿El pago se realizó o no?
+    \end{block}
+
+    \pause
+
+    \begin{alertblock}{Respuesta correcta}
+        No lo sabemos.
+        Y, en general, no podemos saberlo con certeza.
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{Visualización del problema}
+    \begin{center}
+        \begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={font=\small}]
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm] (c) {Cliente};
+\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm, right of=c] (s) {Servidor};
+
+\draw[->, thick] (c.north east) -- (s.north west) node[midway, above=4pt] {solicitud de pago};
+\draw[->, thick, dashed] (s.south west) -- (c.south east) node[midway, below=6pt] {respuesta perdida / demorada};
+        \end{tikzpicture}
+    \end{center}
+
+    \pause
+
+    Lo único observable para el cliente es la falta de confirmación en un cierto intervalo.
+\end{frame}
+
+\begin{frame}{Dos historias, una misma observación}
+    \begin{columns}[T]
+        \column{0.48\textwidth}
+        \textbf{Historia A}
+        \begin{itemize}
+            \item El servidor nunca recibió la solicitud;
+            \item no hubo procesamiento;
+            \item el cliente observa timeout.
+        \end{itemize}
+
+        \column{0.48\textwidth}
+        \textbf{Historia B}
+        \begin{itemize}
+            \item El servidor sí procesó el pago;
+            \item la respuesta se perdió;
+            \item el cliente observa timeout.
+        \end{itemize}
+    \end{columns}
+
+    \pause
+
+    \begin{block}{Idea clave}
+        Para el cliente, ambas historias son indistinguibles.
+    \end{block}
+\end{frame}
+
+\begin{frame}{Observación}
+    ¿Preguntas? 
+\end{frame}
 
 \begin{frame}{Objetivos de la clase}
 \begin{itemize}
@@ -68,71 +195,6 @@
 Primero se separa cada dimensión para no confundir observación, inferencia y decisión. 
 Después se conectan para justificar una propuesta coherente.
 \end{uainfo}
-\end{frame}
-
-\begin{frame}{Un problema aparentemente simple}
-Un usuario hace clic en \emph{“pagar”}.
-
-\begin{itemize}
-\item El cliente envía la solicitud.
-\item El servidor procesa el pago.
-\item La respuesta no llega.
-\end{itemize}
-
-\pause
-
-\begin{block}{Pregunta}
-¿El pago se realizó o no?
-\end{block}
-
-\pause
-
-\begin{alertblock}{Respuesta correcta}
-No lo sabemos.
-Y, en general, no podemos saberlo con certeza.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Visualización del problema}
-\begin{center}
-\begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={font=\small}]
-\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm] (c) {Cliente};
-\node[draw, rounded corners, minimum width=3cm, minimum height=1.1cm, right of=c] (s) {Servidor};
-
-\draw[->, thick] (c.north east) -- (s.north west) node[midway, above=4pt] {solicitud de pago};
-\draw[->, thick, dashed] (s.south west) -- (c.south east) node[midway, below=6pt] {respuesta perdida / demorada};
-\end{tikzpicture}
-\end{center}
-
-\pause
-
-Lo único observable para el cliente es la falta de confirmación en un cierto intervalo.
-\end{frame}
-
-\begin{frame}{Dos historias, una misma observación}
-\begin{columns}[T]
-\column{0.48\textwidth}
-\textbf{Historia A}
-\begin{itemize}
-\item El servidor nunca recibió la solicitud;
-\item no hubo procesamiento;
-\item el cliente observa timeout.
-\end{itemize}
-
-\column{0.48\textwidth}
-\textbf{Historia B}
-\begin{itemize}
-\item El servidor sí procesó el pago;
-\item la respuesta se perdió;
-\item el cliente observa timeout.
-\end{itemize}
-\end{columns}
-
-\pause
-
-\begin{block}{Idea clave}
-Para el cliente, ambas historias son indistinguibles.
-\end{block}
 \end{frame}
 
 \UASectionSlide{La ruptura conceptual}
