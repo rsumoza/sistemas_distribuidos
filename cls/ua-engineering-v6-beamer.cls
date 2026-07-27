@@ -9,7 +9,7 @@
 \ProcessKeyvalOptions*
 
 \LoadClass[aspectratio=169,professionalfonts]{beamer}
-\RequirePackage{../cls/ua-engineering-v6-common}
+\RequirePackage{ua-engineering-v6-common}
 \RequirePackage{pgfpages}
 
 \usetheme{default}

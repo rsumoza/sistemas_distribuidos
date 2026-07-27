@@ -3,6 +3,7 @@ PROJECT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 LATEXMK=latexmk
 LATEXFLAGS=-silent -xelatex -interaction=nonstopmode -halt-on-error
 BUILD_DIR := $(PROJECT_ROOT)build
+export TEXINPUTS := $(PROJECT_ROOT)cls//:$(TEXINPUTS)
 
 SLIDES=$(wildcard slides/*.tex)
 SLIDES_DIR=$(PROJECT_ROOT)slides

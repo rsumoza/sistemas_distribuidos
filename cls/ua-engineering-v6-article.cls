@@ -9,7 +9,7 @@
 \ProcessKeyvalOptions*
 
 \LoadClass[11pt,a4paper]{article}
-\RequirePackage{../cls/ua-engineering-v6-common}
+\RequirePackage{ua-engineering-v6-common}
 \RequirePackage[a4paper,margin=2.4cm,headheight=34pt]{geometry}
 \RequirePackage{fancyhdr}
 \RequirePackage{titlesec}
