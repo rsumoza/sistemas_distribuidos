@@ -23,7 +23,7 @@
 
 \begin{frame}{De orden global a correctitud}
 \begin{itemize}
-\item Consenso ⇒ orden total de operaciones
+\item Consenso $\Rightarrow$ orden total de operaciones
 \item Falta: \textbf{correctitud lógica de operaciones compuestas}
 \end{itemize}
 
@@ -64,7 +64,7 @@ Una ejecución concurrente es correcta si equivale a una ejecución secuencial.
 
 \pause
 \begin{alertblock}{Criterio}
-Si el grafo tiene ciclo ⇒ no serializable
+Si el grafo tiene ciclo $\Rightarrow$ no serializable
 \end{alertblock}
 \end{frame}
 
@@ -105,7 +105,7 @@ Resultado: no existe orden secuencial equivalente
 \begin{itemize}
 \item $T_1$ lee conjunto
 \item $T_2$ inserta nuevo registro
-\item $T_1$ vuelve a leer ⇒ aparece “fantasma”
+\item $T_1$ vuelve a leer $\Rightarrow$ aparece “fantasma”
 \end{itemize}
 \end{frame}
 
@@ -117,7 +117,7 @@ Resultado: no existe orden secuencial equivalente
 
 \pause
 \begin{alertblock}{Clave}
-Snapshot Isolation permite esto ⇒ no es serializable
+Snapshot Isolation permite esto $\Rightarrow$ no es serializable
 \end{alertblock}
 \end{frame}
 
@@ -156,8 +156,8 @@ Commit en múltiples nodos debe ser atómico
 
 \textbf{Fase 2: Commit}
 \begin{itemize}
-\item si todos dicen sí ⇒ commit
-\item si alguno dice no ⇒ abort
+\item si todos dicen sí $\Rightarrow$ commit
+\item si alguno dice no $\Rightarrow$ abort
 \end{itemize}
 \end{frame}
 

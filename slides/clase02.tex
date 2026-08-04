@@ -48,9 +48,9 @@ Una operación remota atraviesa varias capas, y cada una puede responder distint
 
 \begin{center}
 \begin{tikzpicture}[
-  node distance=0.8cm,
+  node distance=0.4cm,
   every node/.style={font=\small},
-  box/.style={draw, rounded corners, minimum width=2.7cm, minimum height=0.7cm}
+  box/.style={draw, rounded corners, minimum width=3.0cm, minimum height=0.5cm}
 ]
 \node[box] (app) {Aplicación};
 \node[box, below=of app] (rpc) {RPC / cliente HTTP};
