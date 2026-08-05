@@ -46,6 +46,20 @@ Clase de 90 minutos.
 
 \section{Estructura sugerida}\label{sec:estructura-sugerida}
 
+\subsection*{Bloque 0 (10 min): presentación de la materia}
+
+Presentar brevemente el recorrido de la asignatura, el plantel docente y el esquema de evaluación.
+
+Usar este bloque para instalar desde el inicio las habilidades esperadas:
+
+\begin{itemize}
+\item relevar contextos de sistemas distribuidos;
+\item analizar síntomas, restricciones y garantías;
+\item proponer y defender alternativas de diseño con trade-offs explícitos.
+\end{itemize}
+
+La presentación administrativa no debe quedar separada del objetivo pedagógico: sirve para mostrar que la materia evalúa razonamiento de ingeniería, no memorización de tecnologías.
+
 \subsection*{Bloque 1 (10--15 min): abrir con un caso, no con una definición}
 
 No empezar diciendo “un sistema distribuido es\ldots”.  
@@ -106,7 +120,8 @@ Este momento es clave porque instala una disciplina intelectual: no empezar por 
 Usar CAP para cerrar la clase de forma fuerte, pero correcta.
 
 No enseñar CAP como trivia.
-Enseñarlo como una forma de verbalizar la restricción que aparece cuando la partición impide coordinación.
+Primero presentar el teorema en pocas palabras: en un sistema replicado, bajo partición, no se pueden garantizar simultáneamente consistencia fuerte, disponibilidad total y tolerancia a particiones.
+Después remarcar la interpretación madura: como las particiones son una falla que el sistema debe tolerar, la decisión real es entre preservar consistencia fuerte o preservar disponibilidad total mientras dura la partición.
 
 \section{Qué explicar y por qué}\label{sec:que-explicar-y-por-que}
 
