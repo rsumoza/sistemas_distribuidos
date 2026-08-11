@@ -11,23 +11,14 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-Esta guía resuelta no pretende fijar respuestas únicas, sino mostrar cómo razonar arquitectónicamente. Lo importante no es repetir “microservicios” o “event-driven”, sino justificar:
-\begin{itemize}
-\item qué problema resuelve la elección;
-\item qué fallas introduce;
-\item qué costo organizacional y técnico trae.
-\end{itemize}
-
-\section{Resoluciones}
-
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
 Defina monolito modular y explique por qué no debe considerarse automáticamente un antipatrón.
 \end{uaexercise}
-
 \begin{uaanswer}
 Un monolito modular es una aplicación desplegada como unidad única, pero organizada internamente en módulos con responsabilidades diferenciadas. No es un antipatrón por definición porque puede ofrecer:
 \begin{itemize}
@@ -41,80 +32,92 @@ Se vuelve problemático cuando el acoplamiento interno destruye la modularidad, 
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué cambia cuando se pasa de un monolito modular a microservicios.
+Explique qué cambia, desde el punto de vista del sistema, cuando se pasa de un monolito modular a una arquitectura de microservicios.
 \end{uaexercise}
-
 \begin{uaanswer}
-Cambia la naturaleza del problema. En un monolito, gran parte de la complejidad es de código y modularidad interna. En microservicios aparecen además:
-\begin{itemize}
-\item fallas parciales;
-\item latencia de red;
-\item consistencia entre servicios;
-\item ownership de datos;
-\item observabilidad distribuida.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La arquitectura deja de ser solo una cuestión de diseño de software y pasa a ser también una cuestión de protocolo y operación.
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde un sistema pequeño esté peor como microservicio que como monolito.
+Compare despliegue, consistencia y debugging en monolitos y microservicios.
 \end{uaexercise}
-
 \begin{uaanswer}
-Un sistema interno de gestión con pocos usuarios, un equipo pequeño y un dominio aún inestable suele estar peor como microservicios porque:
-\begin{itemize}
-\item aumenta la cantidad de despliegues;
-\item obliga a lidiar con consistencia distribuida prematura;
-\item duplica esfuerzo de observabilidad y operación;
-\item complica testing.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-En ese escenario, un monolito modular bien estructurado ofrece mayor simplicidad con menor costo.
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué significa arquitectura orientada a eventos.
+Construya un ejemplo donde un sistema pequeño esté peor diseñado como microservicio que como monolito.
 \end{uaexercise}
-
 \begin{uaanswer}
-Significa que los componentes del sistema se integran principalmente publicando y consumiendo eventos, en lugar de depender exclusivamente de llamadas sincrónicas directas. Esto desacopla a productores y consumidores en el tiempo y permite replay, múltiples consumidores y pipelines más flexibles.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Describa dos problemas nuevos al pasar a event-driven.
+Explique qué significa arquitectura orientada a eventos y qué gana respecto de una integración puramente sincrónica.
 \end{uaexercise}
-
 \begin{uaanswer}
-Dos problemas muy importantes son:
-\begin{itemize}
-\item trazabilidad: el flujo de extremo a extremo se vuelve más difícil de seguir;
-\item consistencia eventual: los distintos servicios pueden ver estados distintos en momentos diferentes.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-También aparecen duplicación de eventos, orden parcial y debugging menos intuitivo.
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué el orden suele ser parcial y no global.
+Describa dos problemas nuevos que aparecen al pasar a un diseño event-driven.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque los eventos pueden circular por distintos topics, particiones o canales. Cada canal preserva su propio orden, pero no existe necesariamente un orden total único entre todos los eventos del sistema. Por lo tanto, la arquitectura event-driven trabaja naturalmente con orden parcial.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina saga.
+Explique por qué el orden suele ser parcial y no global en arquitecturas basadas en eventos.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una saga es una secuencia de transacciones locales coordinadas de manera tal que, si una parte posterior falla, se ejecutan compensaciones sobre las partes previas. Es una forma de manejar operaciones de negocio compuestas sin depender de una transacción distribuida fuerte global.
+La respuesta debe situarse en monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un pipeline simple de eventos para el flujo: pedido $\rightarrow$ pago $\rightarrow$ envío.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina saga y explique por qué aparece en microservicios.
+\end{uaexercise}
+\begin{uaanswer}
+Una saga descompone el flujo en transacciones locales y define una compensación por cada efecto ya visible. La compensación no borra la historia: es una nueva acción de negocio, puede fallar y debe ser idempotente. La solución gana disponibilidad y pierde atomicidad instantánea.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Compare saga y transacción distribuida fuerte.
 \end{uaexercise}
-
 \begin{uaanswer}
 La transacción distribuida fuerte busca atomicidad global inmediata. La saga acepta descomponer la operación en pasos locales con posibles compensaciones.
 
@@ -126,153 +129,113 @@ Diferencia central:
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué compensación no equivale a rollback.
+Explique por qué una compensación no equivale a un rollback.
 \end{uaexercise}
-
 \begin{uaanswer}
-Rollback es una reversión técnica dentro de la misma transacción. Compensación es una nueva acción de negocio que intenta neutralizar un efecto anterior. Puede llegar tarde, puede no restaurar exactamente el mismo estado físico y puede ser observable por usuarios y otros sistemas.
+La respuesta debe situarse en monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una saga para compra online.
-\end{uaexercise}
-
-\begin{uaanswer}
-Una posible saga:
-
-\begin{enumerate}
-\item reservar stock;
-\item autorizar pago;
-\item generar orden;
-\item despachar.
-\end{enumerate}
-
-Compensaciones:
+Diseñe una saga para una compra online con:
 \begin{itemize}
-\item si falla pago: liberar stock;
-\item si falla orden luego del pago: anular cobro o generar devolución;
-\item si falla despacho: revertir estado de orden y devolver dinero según política.
+\item reserva de stock;
+\item cobro;
+\item despacho.
 \end{itemize}
+Incluya pasos de compensación.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La clave es que cada paso debe tener explícita su semántica compensatoria.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Construya un caso donde la compensación sea costosa o imperfecta.
 \end{uaexercise}
-
 \begin{uaanswer}
 Ejemplo: una reserva aérea o un envío físico ya despachado. La compensación no puede “borrar” el efecto físico como si nunca hubiera ocurrido. Solo puede emitir nuevas acciones, como devolución o cancelación, con costo adicional y posible impacto visible para el cliente.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique coreografía y orquestación.
+Explique qué es coreografía y qué es orquestación.
 \end{uaexercise}
-
 \begin{uaanswer}
-En coreografía, cada servicio reacciona a eventos y el flujo global emerge de esa interacción. En orquestación, un coordinador explícito decide el siguiente paso del proceso y supervisa el flujo completo.
+La respuesta debe situarse en monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Coreografía:
-\begin{itemize}
-\item más distribuida;
-\item menos centralizada;
-\item más difícil de seguir globalmente.
-\end{itemize}
-
-Orquestación:
-\begin{itemize}
-\item más visible;
-\item más controlada;
-\item más acoplada al orquestador.
-\end{itemize}
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la propiedad de datos es central.
+Diseñe un flujo de coreografía para un alta de cliente con validación, scoring y bienvenida.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque si varios servicios modifican libremente el mismo dato, la frontera entre ellos se vuelve artificial. La separación de ownership obliga a tratar la consistencia entre servicios como un problema explícito y evita dependencias ocultas sobre una base compartida.
+La respuesta debe situarse en monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde dos servicios compartan tabla y degrade diseño.
+Diseñe el mismo flujo usando orquestación.
 \end{uaexercise}
-
 \begin{uaanswer}
-Si el servicio de pedidos y el de facturación escriben ambos directamente sobre una tabla de órdenes, se pierde encapsulamiento. Cambios de esquema, validaciones o semánticas de negocio quedan acoplados entre servicios, lo que destruye autonomía y vuelve frágil la evolución.
+La respuesta debe situarse en monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique cómo cambia la consistencia cuando cada servicio posee sus datos.
+Compare ambos enfoques en términos de visibilidad, acoplamiento y debugging.
 \end{uaexercise}
-
 \begin{uaanswer}
-La consistencia deja de resolverse “gratis” vía una única base y pasa a requerir:
-\begin{itemize}
-\item eventos;
-\item RPC;
-\item sagas;
-\item reconciliación;
-\item semánticas explícitas entre bounded contexts.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-El costo es mayor complejidad distribuida, pero la ganancia es una frontera de dominio más clara.
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ a reservas de viaje.
+Explique por qué la propiedad de datos es central en microservicios.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una formulación posible:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item $P$: coordinar vuelo, hotel y pago;
-\item $F$: fallas parciales, respuestas tardías, pasos exitosos seguidos de fallas posteriores;
-\item $G$: flujo de negocio consistente y recuperable;
-\item $S$: saga con compensaciones, algunos pasos síncronos y otros event-driven;
-\item $T$: estados intermedios visibles, complejidad operativa y compensaciones costosas.
-\end{itemize}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Justifique cuándo quedarse en monolito modular y cuándo migrar.
+Construya un ejemplo donde dos servicios compartan la misma tabla y muestre por qué eso degrada el diseño.
 \end{uaexercise}
-
 \begin{uaanswer}
-Conviene quedarse en monolito modular cuando:
-\begin{itemize}
-\item el dominio aún cambia mucho;
-\item el equipo es pequeño;
-\item se necesita simplicidad operativa;
-\item la presión de escalado independiente es baja.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Conviene considerar microservicios cuando:
-\begin{itemize}
-\item los bounded contexts son claros;
-\item los equipos son autónomos;
-\item las cargas y ciclos de despliegue difieren significativamente;
-\item existe madurez operativa para sostener complejidad distribuida.
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la arquitectura correcta depende también de la madurez organizacional.
+Explique cómo cambia el problema de consistencia cuando cada servicio posee sus datos.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque una arquitectura distribuida exige no solo decisiones técnicas, sino también:
-\begin{itemize}
-\item ownership claro;
-\item equipos autónomos;
-\item observabilidad;
-\item despliegue automatizado;
-\item disciplina operativa.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Sin esa madurez, la complejidad distribuida supera los beneficios y la arquitectura se vuelve una carga en vez de una solución.
+La evidencia apropiada sería ADRs, mapa de bounded contexts, flujo de saga y ownership de datos. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Se espera razonamiento experimental. No alcanza con enumerar herramientas. Justificar siempre qué hipótesis se valida, qué perturbación se inyecta y cómo se mide el resultado.
-
-\section{Nivel 1: fundamentos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Explique por qué testing clásico no alcanza para validar propiedades distribuidas bajo falla.
 \end{uaexercise}
@@ -35,12 +32,12 @@ Explique qué es un steady state y por qué es indispensable para formular un ex
 Construya un ejemplo de steady state para un sistema de checkout.
 \end{uaexercise}
 
-\section{Nivel 2: fault injection}
-
 \begin{uaexercise}
 Defina fault injection y explique qué tipos de fallas pueden inyectarse de forma controlada.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Diseñe un experimento de latencia artificial sobre una dependencia crítica.
 \end{uaexercise}
@@ -53,8 +50,6 @@ Diseñe un experimento de crash de servicio y explique qué propiedad del sistem
 Explique qué diferencias hay entre inyectar una falla de latencia y una de caída total.
 \end{uaexercise}
 
-\section{Nivel 3: hipótesis y validación}
-
 \begin{uaexercise}
 Formule una hipótesis experimental correcta para un servicio de pagos.
 \end{uaexercise}
@@ -63,6 +58,8 @@ Formule una hipótesis experimental correcta para un servicio de pagos.
 Explique por qué una hipótesis vaga como “queremos ver si aguanta” no es suficiente.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Diseñe un experimento que valide si un circuit breaker abre cuando corresponde.
 \end{uaexercise}
@@ -70,8 +67,6 @@ Diseñe un experimento que valide si un circuit breaker abre cuando corresponde.
 \begin{uaexercise}
 Diseñe un experimento para verificar si retries correctamente acotados no producen tormenta de tráfico.
 \end{uaexercise}
-
-\section{Nivel 4: blast radius y seguridad}
 
 \begin{uaexercise}
 Defina blast radius y explique por qué debe controlarse explícitamente.
@@ -85,11 +80,11 @@ Diseñe una estrategia para limitar el blast radius de un experimento en producc
 Explique qué condiciones mínimas deberían cumplirse antes de correr un experimento de chaos en producción.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Describa un caso donde un experimento sin rollback claro sería irresponsable.
 \end{uaexercise}
-
-\section{Nivel 5: integración con observabilidad}
 
 \begin{uaexercise}
 Explique por qué observabilidad y Chaos Engineering están fuertemente conectados.
@@ -107,22 +102,5 @@ Explique qué rol jugarían las trazas en un experimento de degradación por lat
 Explique por qué un experimento sin instrumentación suficiente produce más ruido que conocimiento.
 \end{uaexercise}
 
-\section{Nivel 6: diseño experimental}
-
-\begin{uaexercise}
-Diseñe un experimento completo para un sistema de checkout con dependencia lenta en pagos.
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe un experimento para validar graceful degradation en un e-commerce.
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ a una campaña de validación bajo falla.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué el objetivo correcto no es “probar que nada falla”, sino caracterizar cómo falla el sistema.
-\end{uaexercise}
 
 \end{document}

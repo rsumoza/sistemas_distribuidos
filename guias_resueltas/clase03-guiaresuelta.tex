@@ -11,22 +11,76 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Respuestas seleccionadas}
+\section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Explicar por qué la divergencia es inevitable.
+Definir replicación y explicar sus motivaciones principales.
 \end{uaexercise}
 \begin{uaanswer}
-En un sistema asíncrono, no hay cotas confiables de entrega. Si dos nodos aceptan escrituras concurrentes o reciben mensajes en distinto orden, sus estados locales difieren. Sin coordinación global (imposible bajo partición), no puede garantizarse sincronización perfecta en todo instante.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Definir linearizabilidad y dar un contraejemplo.
+Explicar por qué la divergencia es inevitable en un sistema asíncrono.
 \end{uaexercise}
 \begin{uaanswer}
-Linearizabilidad exige un orden total consistente con tiempo real. Contraejemplo: dos clientes leen valores distintos donde una lectura posterior observa un valor más viejo que una anterior; no existe un orden total que respete tiempo real y la especificación.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construir un ejemplo con dos réplicas que divergen tras escrituras concurrentes.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Distinguir estado físico vs estado lógico en un sistema replicado.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué “una sola fuente de verdad” es difícil de sostener en presencia de particiones.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Definir linearizabilidad y dar un ejemplo que la viole.
+\end{uaexercise}
+\begin{uaanswer}
+Linearizabilidad exige que cada operación parezca ocurrir en un punto entre invocación y respuesta y que el orden respete tiempo real. Para validar una historia se propone un orden secuencial compatible; si ninguna ubicación de las operaciones satisface ambos requisitos, la historia no es linearizable.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Definir consistencia causal con la relación happens-before.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -37,35 +91,115 @@ Porque los relojes locales pueden derivar, corregirse o no estar perfectamente s
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplicar las reglas de relojes de Lamport a una secuencia con envío y recepción de mensajes.
+Aplicar las reglas de relojes de Lamport a una secuencia simple de eventos con envío y recepción de mensajes.
 \end{uaexercise}
 \begin{uaanswer}
-En cada evento local se incrementa el contador. En un envío se adjunta el valor actual. En una recepción se asigna $\max(local, recibido)+1$. El resultado debe respetar que si $a \rightarrow b$, entonces $L(a)<L(b)$. Sin embargo, $L(a)<L(b)$ no permite concluir por sí solo que $a$ causó a $b$.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Probar informalmente $R+W>N$.
+Dar un ejemplo permitido por causal pero no por linearizabilidad.
 \end{uaexercise}
 \begin{uaanswer}
-Si elegimos $W$ réplicas para escribir y $R$ para leer, con $R+W>N$, cualquier subconjunto de tamaño $R$ intersecta a cualquier subconjunto de tamaño $W$ (principio de cajas). Por lo tanto, una lectura verá al menos una réplica que participó en la última escritura (en ausencia de retrasos no aplicados).
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Comparar los vector clocks $(2,1,0)$ y $(1,2,0)$; luego comparar $(1,2,0)$ y $(2,3,0)$.
+Definir consistencia eventual y sus límites.
 \end{uaexercise}
 \begin{uaanswer}
-$(2,1,0)$ y $(1,2,0)$ son concurrentes porque ninguno domina al otro. $(1,2,0) < (2,3,0)$ porque todas las componentes son menores o iguales y al menos una es estrictamente menor; por lo tanto, el primero puede preceder causalmente al segundo.
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplicar $D$ a un sistema global de perfiles.
+Comparar los tres modelos en términos de garantías observables.
 \end{uaexercise}
 \begin{uaanswer}
-$P$: perfiles replicados globalmente. \\
-$F$: delay, pérdida, partición inter-región. \\
-$G$: lecturas rápidas con consistencia causal/eventual; escrituras con resolución de conflictos. \\
-$S$: multi-leader o leaderless con $N,W,R$ y versionado. \\
-$T$: posibles inconsistencias temporales y merges.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describir leader-based replication y sus variantes sync/async.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar multi-leader y por qué introduce conflictos.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describir leaderless replication y el rol de $N,W,R$.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Probar informalmente por qué $R+W>N$ implica intersección.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construir un ejemplo donde $R+W\le N$ rompe lecturas frescas.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Definir conflicto concurrente y dar un ejemplo.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar LWW y sus riesgos.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en replicación síncrona y asíncrona, stale reads, quórums, causalidad y modelos de consistencia. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo réplica atrasada, escritura concurrente, partición y failover. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar vector clocks y cómo detectan concurrencia.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería historia de lecturas/escrituras, staleness y comparación de quórums. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

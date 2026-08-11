@@ -11,17 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Indicaciones}
+\section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Justificar todas las respuestas.  
-Se espera razonamiento técnico (no definiciones superficiales).
-
----
-
-\section{Nivel 1: WAL y durabilidad}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Explique formalmente por qué la regla WAL garantiza atomicidad en presencia de fallas.
 Modele el estado antes y después de un crash.
@@ -45,10 +39,6 @@ Construya un contraejemplo concreto.
 Diferencie REDO logging vs UNDO logging con un ejemplo completo de ejecución.
 \end{uaexercise}
 
----
-
-\section{Nivel 2: MVCC profundo}
-
 \begin{uaexercise}
 Considere tres versiones de un objeto:
 \[
@@ -57,6 +47,8 @@ Considere tres versiones de un objeto:
 ¿Qué valor devuelve una transacción con timestamp $t=6$? Justifique.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Explique cómo MVCC permite eliminar bloqueos entre lectores y escritores.
 Modele dos transacciones concurrentes paso a paso.
@@ -76,15 +68,13 @@ Explique el problema de garbage collection en MVCC.
 Diseñe un algoritmo simple de garbage collection basado en timestamps activos.
 \end{uaexercise}
 
----
-
-\section{Nivel 3: LSM Trees}
-
 \begin{uaexercise}
 Describa paso a paso qué ocurre cuando se inserta una clave en un sistema LSM.
 Incluya WAL, Memtable y SSTable.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique por qué LSM evita escrituras aleatorias.
 Relaciónelo con propiedades del disco.
@@ -109,14 +99,12 @@ Explique read amplification en LSM.
 ¿Por qué leer puede ser más costoso que escribir?
 \end{uaexercise}
 
----
-
-\section{Nivel 4: Índices y estructuras}
-
 \begin{uaexercise}
 Explique cómo funciona un B-Tree en inserciones y búsquedas.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Compare B-Tree vs LSM para:
 \begin{itemize}
@@ -144,10 +132,6 @@ Diseñe un sistema con:
 Justifique su elección.
 \end{uaexercise}
 
----
-
-\section{Nivel 5: Integración de componentes}
-
 \begin{uaexercise}
 Explique cómo WAL y MVCC interactúan en un sistema real.
 \end{uaexercise}
@@ -156,61 +140,5 @@ Explique cómo WAL y MVCC interactúan en un sistema real.
 Describa cómo MVCC puede implementarse sobre LSM.
 \end{uaexercise}
 
-\begin{uaexercise}
-Relacione:
-\begin{itemize}
-\item WAL → durabilidad
-\item MVCC → aislamiento
-\item LSM → performance
-\end{itemize}
-\end{uaexercise}
-
-\begin{uaexercise}
-Construya un diagrama completo de un storage engine moderno combinando:
-WAL + MVCC + LSM.
-\end{uaexercise}
-
----
-
-\section{Nivel 6: Diseño avanzado}
-
-\begin{uaexercise}
-Diseñe un motor de almacenamiento para una red social global.
-Considere:
-\begin{itemize}
-\item alto volumen de escrituras
-\item lecturas frecuentes
-\item consistencia eventual
-\end{itemize}
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe un motor para sistema financiero.
-Considere:
-\begin{itemize}
-\item consistencia fuerte
-\item baja tolerancia a errores
-\end{itemize}
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo:
-\[
-D = (P, F, G, S, T)
-\]
-al diseño de un storage engine.
-\end{uaexercise}
-
-\begin{uaexercise}
-Identifique los principales trade-offs entre:
-\begin{itemize}
-\item latencia
-\item throughput
-\item consistencia
-\item costo
-\end{itemize}
-\end{uaexercise}
-
----
 
 \end{document}

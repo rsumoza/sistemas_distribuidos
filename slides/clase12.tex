@@ -206,4 +206,42 @@ La resiliencia no debe suponerse: debe validarse experimentalmente.
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Chaos Engineering y validación bajo falla es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Experimento, no espectáculo}
+Un experimento válido conecta hipótesis, perturbación, steady state y criterio de aborto. ``Apagar cosas y mirar'' no produce evidencia reproducible.
+\end{frame}
+\begin{frame}{Escalera de seguridad}
+\begin{enumerate}
+\item test determinista local;
+\item entorno de integración;
+\item porcentaje pequeño de tráfico;
+\item producción con blast radius y abort automático.
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint experimental}
+Escriba antes de ejecutar: qué espera observar, qué resultado refuta la hipótesis y qué mecanismo de resiliencia está realmente evaluando.
+\end{frame}
+
 \end{document}

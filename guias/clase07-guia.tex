@@ -6,46 +6,95 @@
 \date{\UADate}
 \begin{document}
 
-\section{Nivel 1: fundamentos}
+\section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-1. Defina commit log y explique por qué es append-only.  
-2. Explique qué representa un offset y por qué es crítico para la recuperación.  
-3. Describa cómo un sistema puede reconstruir estado a partir del log.  
-4. Explique diferencias entre log y base de datos tradicional.
+\section{Nivel 1: fundamentos y reconocimiento}
+\begin{uaexercise}
+Defina commit log y explique por qué append-only simplifica durabilidad y replay.
+\end{uaexercise}
 
-\section{Nivel 2: Kafka}
+\begin{uaexercise}
+Diferencie topic, partición, registro y offset.
+\end{uaexercise}
 
-5. Describa arquitectura completa de Kafka.  
-6. Explique cómo funcionan las particiones.  
-7. ¿Por qué Kafka no garantiza orden global?  
-8. Diseñe un esquema de particionado para balancear carga.
+\begin{uaexercise}
+Explique por qué Kafka garantiza orden por partición y no orden global.
+\end{uaexercise}
 
-\section{Nivel 3: offsets y fallas}
+\begin{uaexercise}
+Diseñe una clave de particionado para preservar orden por entidad sin crear hotspots.
+\end{uaexercise}
 
-9. Explique cómo un consumidor maneja offsets.  
-10. Construya escenario donde offset causa pérdida.  
-11. Construya escenario donde offset causa duplicación.  
-12. Explique cómo evitar ambos problemas.
+\begin{uaexercise}
+Explique leader, followers e ISR para una partición replicada.
+\end{uaexercise}
 
-\section{Nivel 4: semánticas}
 
-13. Compare at-most, at-least y exactly-once con ejemplos concretos.  
-14. Diseñe un pipeline at-least-once.  
-15. Diseñe un pipeline exactly-once.  
-16. Explique rol de idempotencia.
+\section{Nivel 2: ejecuciones y fallas}
+\begin{uaexercise}
+Analice qué significa un ack de productor y cómo cambia la durabilidad.
+\end{uaexercise}
 
-\section{Nivel 5: streaming}
+\begin{uaexercise}
+Construya una pérdida lógica causada por confirmar el offset antes del efecto.
+\end{uaexercise}
 
-17. Diseñe pipeline de procesamiento en tiempo real.  
-18. Modele agregación por ventana.  
-19. Diseñe join entre streams.  
-20. Analice fallas en streaming stateful.
+\begin{uaexercise}
+Construya una duplicación causada por aplicar el efecto antes de confirmar el offset.
+\end{uaexercise}
 
-\section{Nivel 6: integración}
+\begin{uaexercise}
+Defina at-most-once, at-least-once y efecto lógico único con timelines.
+\end{uaexercise}
 
-21. Relacione logs con almacenamiento (clase 6).  
-22. Explique cómo Kafka implementa persistencia.  
-23. Aplique modelo D al sistema.  
-24. Diseñe sistema completo basado en log.
+\begin{uaexercise}
+Explique por qué exactly-once tiene un alcance y no es una propiedad universal del sistema.
+\end{uaexercise}
+
+
+\section{Nivel 3: diseño y comparación}
+\begin{uaexercise}
+Diseñe un consumidor idempotente con clave de deduplicación.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué ocurre durante un rebalanceo de consumer group.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe recuperación de un procesador stateful usando changelog o checkpoint.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diferencie processing time, ingestion time y event time.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique watermark y su relación con eventos tardíos.
+\end{uaexercise}
+
+
+\section{Nivel 4: integración y defensa}
+\begin{uaexercise}
+Diseñe una ventana tumbling y una sliding para un mismo caso y compare resultados.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analice el join de dos streams cuando los eventos llegan fuera de orden.
+\end{uaexercise}
+
+\begin{uaexercise}
+Defina lag de consumidor y proponga SLI/SLO para frescura.
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplique P-F-G-S-T a un pipeline del Trabajo Final.
+\end{uaexercise}
+
+\begin{uaexercise}
+Defienda ante comité la elección de Kafka frente a RPC directo o una cola simple.
+\end{uaexercise}
+
 
 \end{document}

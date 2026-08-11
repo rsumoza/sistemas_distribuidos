@@ -172,4 +172,79 @@ Esta clase prepara el terreno para temas de:
 Pregunta puente: una vez que distribuimos componentes, datos y flujos, ¿cómo observamos, diagnosticamos y gobernamos el sistema real en producción?
 \end{uakeybox}
 
+
+\section{Plan de conducción ampliado}
+La clase debe alternar explicación, predicción y contraste. Antes de revelar cada mecanismo, pedir al grupo que anticipe qué puede salir mal; después, volver al mismo escenario y preguntar qué propiedad mejora y qué costo aparece. Cada bloque conceptual debe cerrar con una decisión de diseño observable.
+\subsection*{Secuencia recomendada}
+\begin{enumerate}
+\item Recuperar el prerequisito de la clase anterior.
+\item Presentar un caso mínimo que falle y solicitar hipótesis.
+\item Formalizar el concepto central de Arquitecturas distribuidas reales, distinguiendo seguridad, progreso y supuestos.
+\item Resolver un ejemplo completo en pizarra, incluyendo una falla intermedia.
+\item Comparar una alternativa de diseño y explicitar trade-offs.
+\item Cerrar con una pregunta del Trabajo Final y una pregunta de defensa oral.
+\end{enumerate}
+\section{Diagnóstico de comprensión durante la clase}
+No preguntar solamente ``¿se entendió?''. Usar preguntas discriminantes: ``¿qué cambia si el mensaje llega dos veces?'', ``¿qué propiedad sigue siendo cierta si cae un nodo?'', ``¿esto demuestra seguridad o progreso?'', ``¿qué observa un cliente externo?''. Si el estudiante responde solo con nombres de patrones, pedir una ejecución concreta.
+\section{Criterios para corregir ejercicios}
+Una respuesta excelente declara supuestos, construye una secuencia verificable, nombra la garantía con precisión, reconoce un costo y conecta la decisión con el dominio. Penalizar afirmaciones absolutas sin condiciones.
+\section{Vinculación con el Trabajo Final Integrador}
+Reservar entre 5 y 10 minutos para que cada grupo registre una decisión con: problema, alternativa elegida, alternativa descartada y razón. Esto crea trazabilidad entre las clases y las entregas acumulativas.
+\section{Lectura docente previa}
+Revisar la bibliografía indicada en los apuntes y preparar al menos un contraejemplo que no aparezca literalmente en las diapositivas. El objetivo es poder responder preguntas de frontera sin convertir la clase en una lectura del deck.
+
+\section{Arquitectura didáctica v9 para 180 minutos}
+\subsection*{Bloque 1 - desafío inicial (20 min)}
+Presentar una situación donde aparezca falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. Pedir predicciones individuales antes de introducir vocabulario. El objetivo es hacer visibles los supuestos intuitivos y recuperar el prerequisito de la clase anterior.
+
+\subsection*{Bloque 2 - construcción conceptual (35 min)}
+Formalizar monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Separar seguridad, progreso y experiencia del usuario. Explicar no solo \emph{qué} hace cada mecanismo, sino \emph{por qué} existe y qué supuesto permite que funcione.
+
+\subsection*{Bloque 3 - modelo y figura (35 min)}
+Construir en pizarra una línea temporal, grafo, log, máquina de estados o tabla de decisiones. Recorrer una ejecución nominal y una adversarial. La representación debe quedar como referencia para los apuntes y el ejercicio principal.
+
+\subsection*{Pausa (10 min)}
+Recoger una pregunta anónima o un punto de confusión. Elegir una pregunta que permita distinguir síntoma, causa y propiedad.
+
+\subsection*{Bloque 4 - caso trabajado con falla (40 min)}
+Aplicar el mecanismo al caso conductor. Introducir una falla a mitad de ejecución y detenerse en cada transición: quién sabe qué, qué se persiste, qué garantía sigue vigente y qué observa el cliente.
+
+\subsection*{Bloque 5 - taller de decisión (25 min)}
+Los grupos aplican P-F-G-S-T a su Trabajo Final. Deben producir un ADR breve con alternativa elegida, alternativa descartada y evidencia pendiente. La evidencia de esta clase es ADRs, mapa de bounded contexts, flujo de saga y ownership de datos.
+
+\subsection*{Bloque 6 - cierre y exit ticket (15 min)}
+Cada estudiante responde: propiedad principal, supuesto decisivo, costo aceptado y condición bajo la cual cambiaría de diseño. Usar las respuestas para iniciar la clase siguiente.
+
+\section{Qué explicar, por qué y cómo verificarlo}
+\begin{itemize}
+\item Explicar el problema antes del producto, porque reconocer la familia de problema es el resultado cognitivo central.
+\item Explicar el invariante, porque permite evaluar configuraciones y no solo repetir un flujo nominal.
+\item Explicar el límite, porque falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo puede invalidar supuestos o reducir progreso.
+\item Verificar comprensión mediante ADRs, mapa de bounded contexts, flujo de saga y ownership de datos, no mediante una definición aislada.
+\end{itemize}
+
+\section{Preguntas socráticas}
+\begin{itemize}
+\item ¿Qué sabe cada actor en este punto de la ejecución?
+\item ¿Qué propiedad sigue siendo cierta si la respuesta nunca llega?
+\item ¿Qué parte es safety y cuál es liveness?
+\item ¿Qué alternativa más simple resolvería el problema si relajamos una garantía?
+\item ¿Qué observación refutaría nuestra hipótesis de diseño?
+\end{itemize}
+
+\section{Errores previsibles y estrategia de corrección}
+\begin{itemize}
+\item Si el alumno responde con un nombre de tecnología, pedir actores, mensajes y estados.
+\item Si confunde timeout con falla, construir dos ejecuciones indistinguibles.
+\item Si promete todas las garantías, pedir comportamiento bajo partición o saturación.
+\item Si mide solo rendimiento, preguntar cómo evidencia la propiedad semántica.
+\item Si la solución es excesiva, pedir la alternativa mínima y el costo marginal de la garantía fuerte.
+\end{itemize}
+
+\section{Criterios de evaluación formativa}
+Una respuesta excelente declara supuestos, recorre una ejecución, nombra con precisión la garantía, reconoce el costo y propone evidencia reproducible. Una respuesta suficiente identifica el mecanismo y el trade-off principal. Una respuesta insuficiente usa slogans, omite fallas o confunde producto con propiedad.
+
+\section{Preparación docente y bibliografía}
+Lectura previa recomendada: Richardson, Microservices Patterns; Fowler sobre bounded contexts; Nygard, Release It!. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
+
 \end{document}

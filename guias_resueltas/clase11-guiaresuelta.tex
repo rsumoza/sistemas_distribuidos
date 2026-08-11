@@ -11,43 +11,65 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-Las respuestas deben leerse como razonamientos de control de falla. El objetivo no es acumular patrones como catálogo, sino entender qué dinámica interrumpen y qué costo operativo introducen.
+\section{Ejercicios y resoluciones completas}
+\begin{uaexercise}
+Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\section{Resoluciones}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué una dependencia lenta puede ser más peligrosa que una completamente caída.
+Construya una cadena causal donde una degradación local termine generando una caída visible en el borde del sistema.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una dependencia completamente caída produce un fallo explícito y rápido. En cambio, una dependencia lenta consume:
-\begin{itemize}
-\item hilos;
-\item conexiones;
-\item buffers;
-\item slots de concurrencia;
-\item tiempo de espera.
-\end{itemize}
+La respuesta debe situarse en retry budgets, backoff, jitter, circuit breakers, backpressure, bulkheads y graceful degradation. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo dependencia lenta, retry storm, cola sin límite, pool agotado y cascada. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Esa lentitud se propaga en forma de colas, timeouts y retries. Por eso, desde el punto de vista sistémico, una dependencia lenta puede ser más destructiva que una caída total claramente detectada.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Explique por qué la resiliencia distribuida no consiste en “hacer más retries”.
 \end{uaexercise}
-
 \begin{uaanswer}
 Porque el retry solo ayuda si la causa es transitoria. Si la causa es saturación o degradación persistente, reintentar agrega más trabajo sobre el componente degradado y empeora la situación. En esos casos, el retry amplifica la falla en vez de tolerarla.
 \end{uaanswer}
 
 \begin{uaexercise}
+Explique la diferencia entre tolerar una falla y amplificarla.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique en qué casos retry es razonable y en qué casos es peligroso.
+\end{uaexercise}
+\begin{uaanswer}
+Linearizabilidad exige que cada operación parezca ocurrir en un punto entre invocación y respuesta y que el orden respete tiempo real. Para validar una historia se propone un orden secuencial compatible; si ninguna ubicación de las operaciones satisface ambos requisitos, la historia no es linearizable.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
 Diseñe una política de retry para una operación idempotente.
 \end{uaexercise}
-
 \begin{uaanswer}
 Una política razonable incluye:
 \begin{itemize}
@@ -62,17 +84,39 @@ La idempotencia es central porque convierte múltiples intentos físicos en un �
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique el rol del jitter.
+Explique por qué el exponential backoff es mejor que reintentos inmediatos constantes.
 \end{uaexercise}
-
 \begin{uaanswer}
-El jitter introduce aleatoriedad en el tiempo de reintento. Sin jitter, miles de clientes pueden reintentar casi en sincronía, creando picos artificiales y nuevas olas de saturación. El jitter desincroniza esa presión y reduce comportamiento colectivo patológico.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique el rol del jitter en un sistema con miles de clientes concurrentes.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde retries en múltiples capas provoquen una tormenta de requests.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Defina circuit breaker y describa sus estados.
 \end{uaexercise}
-
 \begin{uaanswer}
 Un circuit breaker es un mecanismo que deja de enviar tráfico a una dependencia cuando detecta que hacerlo empeora la situación.
 
@@ -87,9 +131,28 @@ La lógica es evitar insistir ciegamente sobre un componente ya degradado.
 \end{uaanswer}
 
 \begin{uaexercise}
+Explique con un ejemplo qué gana el sistema al abrir un breaker.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en retry budgets, backoff, jitter, circuit breakers, backpressure, bulkheads y graceful degradation. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo dependencia lenta, retry storm, cola sin límite, pool agotado y cascada. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un caso donde un threshold mal calibrado de breaker empeore el comportamiento del sistema.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
 Explique por qué el estado half-open es importante.
 \end{uaexercise}
-
 \begin{uaanswer}
 Porque evita dos extremos incorrectos:
 \begin{itemize}
@@ -103,103 +166,70 @@ Half-open permite probar recuperación con tráfico controlado.
 \begin{uaexercise}
 Explique qué problema resuelve backpressure.
 \end{uaexercise}
-
 \begin{uaanswer}
 Backpressure resuelve el problema de desbalance entre ritmo de producción y capacidad de consumo. Si no se regula la entrada, las colas crecen, aumenta la latencia, se consumen buffers y el sistema puede entrar en espiral de degradación.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué es bulkhead.
+Diseñe un ejemplo donde la ausencia de backpressure haga crecer una cola hasta volver inútil el sistema.
 \end{uaexercise}
-
 \begin{uaanswer}
-Bulkhead es un patrón de aislamiento de recursos. Su propósito es evitar que el agotamiento de una ruta o dependencia consuma todos los recursos compartidos del sistema.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Ejemplos:
-\begin{itemize}
-\item pools separados por dependencia;
-\item límites de concurrencia por endpoint;
-\item colas distintas para trabajo crítico y no crítico.
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina graceful degradation.
+Explique qué es bulkhead y cómo se implementa en términos de recursos.
 \end{uaexercise}
-
 \begin{uaanswer}
-Graceful degradation es la capacidad de ofrecer un servicio degradado pero útil cuando no puede sostenerse la funcionalidad completa. Es preferible a la caída total cuando el dominio tolera pérdida parcial de features mejor que indisponibilidad absoluta.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe tres ejemplos de degradación elegante en e-commerce.
+Construya un caso donde un pool compartido arrastre rutas críticas que no tenían problema.
 \end{uaexercise}
-
 \begin{uaanswer}
-Ejemplos razonables:
-\begin{itemize}
-\item servir catálogo sin recomendaciones personalizadas;
-\item permitir navegación y lectura, pero pausar promociones dinámicas;
-\item usar stock ligeramente atrasado con advertencia en vez de bloquear todo el sitio.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una estrategia integrada de resiliencia para checkout.
+Defina graceful degradation y compárela con caída total.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una estrategia integrada podría incluir:
-\begin{itemize}
-\item timeouts estrictos sobre dependencias externas;
-\item retries limitados y solo sobre operaciones idempotentes;
-\item circuit breaker sobre servicio de pagos;
-\item bulkheads separando checkout de servicios accesorios;
-\item backpressure sobre colas de procesamiento;
-\item degradación que permita guardar carrito aunque falle recomendación o scoring.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-El objetivo no es garantizar éxito total, sino evitar que la degradación de una dependencia destruya toda la experiencia de compra.
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplique $D=(P,F,G,S,T)$ a resiliencia de pagos.
+Diseñe tres ejemplos concretos de degradación elegante en una plataforma de e-commerce.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una formulación razonable es:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item $P$: sostener procesamiento de pagos bajo degradación parcial;
-\item $F$: latencia alta del gateway, timeouts, retries, saturación;
-\item $G$: contención del daño y preservación parcial del servicio;
-\item $S$: retries limitados, circuit breaker, colas controladas, idempotencia y fallback;
-\item $T$: mayor complejidad operativa, tuning fino y posibilidad de rechazos tempranos.
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué observabilidad y resiliencia están profundamente conectadas.
+Explique qué riesgos aparecen si la degradación no es explícita y semánticamente clara.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque no se puede contener correctamente una falla que no se entiende. La observabilidad permite detectar:
-\begin{itemize}
-\item dónde comienza la degradación;
-\item qué dependencia está generando presión;
-\item qué patrón de falla está ocurriendo;
-\item cuándo conviene abrir un breaker o reducir carga.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Sin observabilidad, la resiliencia se reduce a configuraciones ciegas.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué la pregunta correcta no es “cómo evito toda falla”.
-\end{uaexercise}
-
-\begin{uaanswer}
-Porque en sistemas distribuidos la falla parcial es inevitable. La pregunta útil es cómo evitar que una falla local escale hasta transformarse en colapso sistémico. Eso desplaza el foco desde “perfección imposible” hacia “propagación contenida y degradación controlada”.
+La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

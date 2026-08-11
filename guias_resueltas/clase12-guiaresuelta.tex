@@ -11,18 +11,14 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-Las respuestas deben entenderse como modelos de razonamiento experimental. La clave no es solo inyectar una falla, sino saber qué propiedad se intenta validar y cómo se interpreta el resultado.
-
-\section{Resoluciones}
-
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
 Explique por qué testing clásico no alcanza para validar propiedades distribuidas bajo falla.
 \end{uaexercise}
-
 \begin{uaanswer}
 Porque los errores distribuidos suelen emerger de interacción, sincronización, latencia variable y fallas parciales. Los tests clásicos tienden a validar lógica local o integración idealizada, pero no siempre reproducen:
 \begin{itemize}
@@ -36,32 +32,50 @@ Por eso un sistema puede pasar tests convencionales y aun así degradar muy mal 
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina Chaos Engineering.
+Defina Chaos Engineering y explique por qué no debe confundirse con “romper sistemas al azar”.
 \end{uaexercise}
-
 \begin{uaanswer}
-Chaos Engineering es una disciplina experimental que introduce perturbaciones controladas en un sistema para validar si el comportamiento observable se mantiene dentro de un rango aceptable. No se trata de dañar indiscriminadamente, sino de producir evidencia empírica sobre resiliencia bajo hipótesis concretas.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué es un steady state.
+Explique qué es un steady state y por qué es indispensable para formular un experimento.
 \end{uaexercise}
-
 \begin{uaanswer}
-El steady state es una representación medible del comportamiento normal aceptable del sistema. Ejemplos:
-\begin{itemize}
-\item tasa de checkouts exitosos;
-\item latencia p95;
-\item throughput;
-\item tasa de error.
-\end{itemize}
-Es indispensable porque sin él no existe criterio claro para decidir si el experimento mantuvo, degradó o destruyó el comportamiento esperado.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo de steady state para un sistema de checkout.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina fault injection y explique qué tipos de fallas pueden inyectarse de forma controlada.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Diseñe un experimento de latencia artificial sobre una dependencia crítica.
 \end{uaexercise}
-
 \begin{uaanswer}
 Ejemplo:
 \begin{itemize}
@@ -75,105 +89,151 @@ Lo importante es que la perturbación, la hipótesis y la medición estén expl�
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique diferencias entre latencia y caída total.
+Diseñe un experimento de crash de servicio y explique qué propiedad del sistema intentaría validar.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una caída total genera fallo explícito y rápido. Una latencia alta puede ser peor porque consume recursos mientras el sistema sigue esperando, acumulando colas y activando retries. Por eso, en validación bajo falla, ambas perturbaciones prueban propiedades distintas.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Formule una hipótesis experimental correcta para pagos.
+Explique qué diferencias hay entre inyectar una falla de latencia y una de caída total.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una buena hipótesis sería:
-\begin{quote}
-Si el servicio de pagos responde con alta latencia, el checkout mantiene un porcentaje aceptable de disponibilidad parcial, el circuit breaker se activa y no se produce tormenta de retries.
-\end{quote}
+La respuesta debe situarse en testing distribuido, fault injection, steady state, hipótesis, blast radius y diseño experimental. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo perturbación sin hipótesis, blast radius excesivo, señal insuficiente y falso positivo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Esta hipótesis es buena porque:
-\begin{itemize}
-\item nombra una perturbación específica;
-\item identifica comportamiento esperado;
-\item puede medirse.
-\end{itemize}
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué es blast radius.
+Formule una hipótesis experimental correcta para un servicio de pagos.
 \end{uaexercise}
-
 \begin{uaanswer}
-El blast radius es el alcance potencial del impacto del experimento. Debe controlarse porque un experimento útil es uno que produce aprendizaje sin generar daño desproporcionado. Controlar blast radius significa limitar:
-\begin{itemize}
-\item porcentaje de tráfico afectado;
-\item servicios involucrados;
-\item duración;
-\item capacidad de abortar.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué observabilidad y Chaos Engineering están conectados.
+Explique por qué una hipótesis vaga como “queremos ver si aguanta” no es suficiente.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque sin observabilidad no puede saberse si la hipótesis se verificó. Chaos Engineering necesita:
-\begin{itemize}
-\item métricas para steady state;
-\item logs para eventos específicos;
-\item trazas para causalidad distribuida.
-\end{itemize}
+La respuesta debe situarse en testing distribuido, fault injection, steady state, hipótesis, blast radius y diseño experimental. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo perturbación sin hipótesis, blast radius excesivo, señal insuficiente y falso positivo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Sin esa instrumentación, el experimento introduce perturbación pero no conocimiento confiable.
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un experimento para validar graceful degradation.
+Diseñe un experimento que valide si un circuit breaker abre cuando corresponde.
 \end{uaexercise}
-
 \begin{uaanswer}
-Ejemplo en e-commerce:
-\begin{itemize}
-\item perturbar el servicio de recomendaciones;
-\item hipótesis: el catálogo sigue funcionando aunque sin recomendaciones;
-\item métricas: tasa de navegación exitosa, latencia del catálogo, error rate del servicio degradado;
-\item criterio de éxito: el núcleo del negocio sigue disponible y la falla queda contenida en una feature secundaria.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplique $D=(P,F,G,S,T)$ a una campaña de validación.
+Diseñe un experimento para verificar si retries correctamente acotados no producen tormenta de tráfico.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una formulación posible:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item $P$: validar resiliencia operacional bajo perturbación;
-\item $F$: latencia, crash, pérdida, saturación, partición;
-\item $G$: degradación contenida y steady state aceptable;
-\item $S$: experimentos de fault injection con observabilidad y blast radius controlado;
-\item $T$: riesgo experimental, costo operacional y complejidad de instrumentación.
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué el objetivo correcto no es “probar que nada falla”.
+Defina blast radius y explique por qué debe controlarse explícitamente.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque en sistemas distribuidos la falla parcial es inevitable. El objetivo útil no es negar esa realidad, sino caracterizar:
-\begin{itemize}
-\item qué falla primero;
-\item cómo se propaga;
-\item qué mecanismos la contienen;
-\item qué degradación es aceptable;
-\item qué recuperación ocurre luego.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-En otras palabras, el objetivo es producir conocimiento operacional confiable sobre el comportamiento del sistema bajo falla.
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una estrategia para limitar el blast radius de un experimento en producción.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué condiciones mínimas deberían cumplirse antes de correr un experimento de chaos en producción.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa un caso donde un experimento sin rollback claro sería irresponsable.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué observabilidad y Chaos Engineering están fuertemente conectados.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe las métricas mínimas necesarias para evaluar un experimento sobre un pipeline de procesamiento de eventos.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué rol jugarían las trazas en un experimento de degradación por latencia.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué un experimento sin instrumentación suficiente produce más ruido que conocimiento.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

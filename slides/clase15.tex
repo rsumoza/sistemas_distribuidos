@@ -202,4 +202,37 @@ Diseñar bien un sistema distribuido es poder defender por qué ese sistema, con
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Diseño integral de sistemas distribuidos es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{ADR: decisión trazable}
+Cada decisión relevante debe registrar contexto, alternativas, decisión, consecuencias y evidencia pendiente. Esto permite revisar el diseño cuando cambian los supuestos.
+\end{frame}
+\begin{frame}{Architecture review basada en escenarios}
+No preguntar solo ``¿escala?''. Recorrer escenarios: partición, dependencia lenta, duplicación, pérdida de región, pico de carga y operador equivocado.
+\end{frame}
+\begin{frame}{Checkpoint de defensa}
+La arquitectura es defendible si puede explicar por qué la alternativa más simple no alcanza y en qué condición volvería a ser preferible.
+\end{frame}
+
 \end{document}

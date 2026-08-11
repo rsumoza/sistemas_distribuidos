@@ -313,4 +313,40 @@ La consistencia real no es una propiedad abstracta: es una decisión de arquitec
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Consistencia real es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{CAP con dos decisiones explícitas}
+Ante una partición, una operación crítica debe elegir entre:\\[0.2cm]
+\textbf{C}: rechazar o bloquear hasta coordinar.\\
+\textbf{A}: servir y aceptar que dos lados pueden divergir.
+\begin{uakeybox}La clasificación debe hacerse por operación, no por marca de base de datos.\end{uakeybox}
+\end{frame}
+\begin{frame}{Dynamo y Spanner: dos respuestas legítimas}
+Dynamo hace visible la concurrencia y repara después; Spanner paga coordinación e incertidumbre temporal para preservar consistencia externa. Ninguno es universalmente superior.
+\end{frame}
+\begin{frame}{Checkpoint PACELC}
+Para una operación del proyecto, complete: bajo partición elijo A/C porque...; sin partición elijo L/C porque...; la métrica que validará esta decisión es...
+\end{frame}
+
 \end{document}

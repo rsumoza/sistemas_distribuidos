@@ -1,87 +1,57 @@
-.PHONY: all slides apuntes guias guias_resueltas docente clase% clean
+SHELL := /bin/bash
 PROJECT_ROOT := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-LATEXMK=latexmk
-LATEXFLAGS=-silent -xelatex -interaction=nonstopmode -halt-on-error
+LATEXMK := latexmk
+LATEXFLAGS := -xelatex -cd -interaction=nonstopmode -halt-on-error -file-line-error
 BUILD_DIR := $(PROJECT_ROOT)build
 export TEXINPUTS := $(PROJECT_ROOT)cls//:$(TEXINPUTS)
 
-SLIDES=$(wildcard slides/*.tex)
-SLIDES_DIR=$(PROJECT_ROOT)slides
-BUILD_SLIDES_DIR := $(BUILD_DIR)/slides
+SLIDES_DIR := slides
+APUNTES_DIR := apuntes
+GUIAS_DIR := guias
+GUIASR_DIR := guias_resueltas
+DOCENTE_DIR := docente
+SLIDES_SRC := $(wildcard $(SLIDES_DIR)/clase*.tex)
+APUNTES_SRC := $(wildcard $(APUNTES_DIR)/clase*-apuntes.tex)
+GUIAS_SRC := $(wildcard $(GUIAS_DIR)/clase*-guia.tex)
+GUIASR_SRC := $(wildcard $(GUIASR_DIR)/clase*-guiaresuelta.tex)
+DOCENTE_SRC := $(wildcard $(DOCENTE_DIR)/clase*-docente.tex)
+SLIDES_PDF := $(patsubst $(SLIDES_DIR)/%.tex,$(BUILD_DIR)/slides/%.pdf,$(SLIDES_SRC))
+APUNTES_PDF := $(patsubst $(APUNTES_DIR)/%.tex,$(BUILD_DIR)/apuntes/%.pdf,$(APUNTES_SRC))
+GUIAS_PDF := $(patsubst $(GUIAS_DIR)/%.tex,$(BUILD_DIR)/guias/%.pdf,$(GUIAS_SRC))
+GUIASR_PDF := $(patsubst $(GUIASR_DIR)/%.tex,$(BUILD_DIR)/guias_resueltas/%.pdf,$(GUIASR_SRC))
+DOCENTE_PDF := $(patsubst $(DOCENTE_DIR)/%.tex,$(BUILD_DIR)/docente/%.pdf,$(DOCENTE_SRC))
+ALL_PDF := $(SLIDES_PDF) $(APUNTES_PDF) $(GUIAS_PDF) $(GUIASR_PDF) $(DOCENTE_PDF)
+CLASES := 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16
 
-APUNTES=$(wildcard apuntes/*.tex)
-APUNTES_DIR=$(PROJECT_ROOT)apuntes
-BUILD_APUNTES_DIR := $(BUILD_DIR)/apuntes
+.PHONY: all slides apuntes guias guias_resueltas docente validate dirs clean clean-aux distclean help $(addprefix clase,$(CLASES))
+all: validate $(ALL_PDF) ; @$(MAKE) clean-aux ; @echo 'OK: curso completo; build/ conserva solo PDF.'
+slides: validate $(SLIDES_PDF) ; @$(MAKE) clean-aux
+apuntes: validate $(APUNTES_PDF) ; @$(MAKE) clean-aux
+guias: validate $(GUIAS_PDF) ; @$(MAKE) clean-aux
+guias_resueltas: validate $(GUIASR_PDF) ; @$(MAKE) clean-aux
+docente: validate $(DOCENTE_PDF) ; @$(MAKE) clean-aux
+validate: ; @python3 tools/validate_tex.py
+dirs: ; @mkdir -p $(BUILD_DIR)/slides $(BUILD_DIR)/apuntes $(BUILD_DIR)/guias $(BUILD_DIR)/guias_resueltas $(BUILD_DIR)/docente
+$(BUILD_DIR)/slides/%.pdf: $(SLIDES_DIR)/%.tex | dirs ; $(LATEXMK) $(LATEXFLAGS) -outdir=$(BUILD_DIR)/slides $<
+$(BUILD_DIR)/apuntes/%.pdf: $(APUNTES_DIR)/%.tex | dirs ; $(LATEXMK) $(LATEXFLAGS) -outdir=$(BUILD_DIR)/apuntes $<
+$(BUILD_DIR)/guias/%.pdf: $(GUIAS_DIR)/%.tex | dirs ; $(LATEXMK) $(LATEXFLAGS) -outdir=$(BUILD_DIR)/guias $<
+$(BUILD_DIR)/guias_resueltas/%.pdf: $(GUIASR_DIR)/%.tex | dirs ; $(LATEXMK) $(LATEXFLAGS) -outdir=$(BUILD_DIR)/guias_resueltas $<
+$(BUILD_DIR)/docente/%.pdf: $(DOCENTE_DIR)/%.tex | dirs ; $(LATEXMK) $(LATEXFLAGS) -outdir=$(BUILD_DIR)/docente $<
 
-GUIAS=$(wildcard guias/*.tex)
-GUIAS_DIR=$(PROJECT_ROOT)guias
-BUILD_GUIAS_DIR := $(BUILD_DIR)/guias
+define CLASS_TARGET
+clase$(1): validate
+	@$$(MAKE) $$(BUILD_DIR)/slides/clase$(1).pdf $$(BUILD_DIR)/apuntes/clase$(1)-apuntes.pdf $$(BUILD_DIR)/guias/clase$(1)-guia.pdf $$(BUILD_DIR)/guias_resueltas/clase$(1)-guiaresuelta.pdf $$(BUILD_DIR)/docente/clase$(1)-docente.pdf
+	@$$(MAKE) clean-aux
+	@echo 'OK: clase$(1) compilada.'
+endef
+$(foreach c,$(CLASES),$(eval $(call CLASS_TARGET,$(c))))
 
-GUIASR=$(wildcard guias_resueltas/*.tex)
-GUIAS_RESUELTAS_DIR=$(PROJECT_ROOT)guias_resueltas
-BUILD_GUIAS_RESUELTAS_DIR := $(BUILD_DIR)/guias_resueltas
-
-DOCENTE=$(wildcard docente/*.tex)
-DOCENTE_DIR=$(PROJECT_ROOT)docente
-BUILD_DOCENTE_DIR := $(BUILD_DIR)/docente
-
-all: slides apuntes guias guias_resueltas docente
-
-slides:
-	@mkdir -p $(BUILD_SLIDES_DIR)
-	@for f in $(SLIDES); do \
-		echo "Compiling $$f"; \
-		$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_SLIDES_DIR) -cd $$f; \
-	done
-
-apuntes:
-	@mkdir -p $(BUILD_APUNTES_DIR)
-	@for f in $(APUNTES); do \
-		echo "Compiling $$f"; \
-		$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_APUNTES_DIR) -cd $$f; \
-	done
-
-guias:
-	@mkdir -p $(BUILD_GUIAS_DIR)
-	@for f in $(GUIAS); do \
-		echo "Compiling $$f"; \
-		$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_DIR) -cd $$f; \
-	done
-
-guias_resueltas:
-	@mkdir -p $(BUILD_GUIAS_RESUELTAS_DIR)
-	@for f in $(GUIASR); do \
-		echo "Compiling $$f"; \
-		$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_RESUELTAS_DIR) -cd $$f; \
-	done
-
-docente:
-	@mkdir -p $(BUILD_DOCENTE_DIR)
-	@for f in $(DOCENTE); do \
-		echo "Compiling $$f"; \
-		$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_DOCENTE_DIR) -cd $$f; \
-	done
-
-clase%:
-	@echo "Compilando clase $*..."
-	@mkdir -p $(BUILD_SLIDES_DIR) \
-			  $(BUILD_APUNTES_DIR) \
-			  $(BUILD_GUIAS_DIR) \
-			  $(BUILD_GUIAS_RESUELTAS_DIR) \
-			  $(BUILD_DOCENTE_DIR)
-	@rm -f $(BUILD_SLIDES_DIR)/clase$*.* \
-		   $(BUILD_APUNTES_DIR)/clase$*-apuntes.* \
-		   $(BUILD_GUIAS_DIR)/clase$*-guia.* \
-		   $(BUILD_GUIAS_RESUELTAS_DIR)/clase$*-guiaresuelta.* \
-		   $(BUILD_DOCENTE_DIR)/clase$*-docente.*
-	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_SLIDES_DIR) -cd $(SLIDES_DIR)/clase$*.tex;
-	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_APUNTES_DIR) -cd $(APUNTES_DIR)/clase$*-apuntes.tex;
-	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_DIR) -cd $(GUIAS_DIR)/clase$*-guia.tex;
-	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_GUIAS_RESUELTAS_DIR) -cd $(GUIAS_RESUELTAS_DIR)/clase$*-guiaresuelta.tex;
-	@$(LATEXMK) $(LATEXFLAGS) -output-directory=$(BUILD_DOCENTE_DIR) -cd $(DOCENTE_DIR)/clase$*-docente.tex;
-
-
-clean:
-	@find . -type f \( -name "*.aux" -o -name "*.log" -o -name "*.nav" -o -name "*.out" -o -name "*.toc" -o -name "*.snm" -o -name "*.fls" -o -name "*.fdb_latexmk" -o -name "*.vrb" -o -name "*.xdv" \) -delete
-	@rm -rf ./build ./out
-	@echo "Cleaned auxiliary files."
+clean-aux:
+	@if [ -d '$(BUILD_DIR)' ]; then find '$(BUILD_DIR)' -type f ! -name '*.pdf' -delete; fi
+	@find slides apuntes guias guias_resueltas docente -type f \( -name '*.aux' -o -name '*.log' -o -name '*.nav' -o -name '*.out' -o -name '*.toc' -o -name '*.snm' -o -name '*.fls' -o -name '*.fdb_latexmk' -o -name '*.vrb' -o -name '*.xdv' -o -name '*.synctex.gz' \) -delete
+clean: clean-aux ; @echo 'Auxiliares eliminados; PDF preservados.'
+distclean: ; @rm -rf '$(BUILD_DIR)' ; @echo 'Build eliminado.'
+help:
+	@echo 'make all | slides | apuntes | guias | guias_resueltas | docente'
+	@echo 'make clase01 ... make clase16'
+	@echo 'make clean (preserva PDF) | make distclean'

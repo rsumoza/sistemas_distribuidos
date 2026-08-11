@@ -11,47 +11,96 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Indicaciones}
-Justificar. Cuando corresponda usar $D=(P,F,G,S,T)$.
+\section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-\section{Nivel 1: fundamentos}
-\begin{uaexercise}Definir replicación y explicar sus motivaciones principales.\end{uaexercise}
-\begin{uaexercise}Explicar por qué la divergencia es inevitable en un sistema asíncrono.\end{uaexercise}
-\begin{uaexercise}Construir un ejemplo con dos réplicas que divergen tras escrituras concurrentes.\end{uaexercise}
-\begin{uaexercise}Distinguir estado físico vs estado lógico en un sistema replicado.\end{uaexercise}
-\begin{uaexercise}Explicar por qué “una sola fuente de verdad” es difícil de sostener en presencia de particiones.\end{uaexercise}
+\section{Nivel 1: fundamentos y reconocimiento}
+\begin{uaexercise}
+Definir replicación y explicar sus motivaciones principales.
+\end{uaexercise}
 
-\section{Nivel 2: modelos de consistencia}
-\begin{uaexercise}Definir linearizabilidad y dar un ejemplo que la viole.\end{uaexercise}
-\begin{uaexercise}Definir consistencia causal con la relación happens-before.\end{uaexercise}
-\begin{uaexercise}Explicar por qué dos timestamps físicos de nodos distintos no alcanzan para decidir causalidad entre eventos.\end{uaexercise}
-\begin{uaexercise}Aplicar las reglas de relojes de Lamport a una secuencia simple de eventos con envío y recepción de mensajes.\end{uaexercise}
-\begin{uaexercise}Dar un ejemplo permitido por causal pero no por linearizabilidad.\end{uaexercise}
-\begin{uaexercise}Definir consistencia eventual y sus límites.\end{uaexercise}
-\begin{uaexercise}Comparar los tres modelos en términos de garantías observables.\end{uaexercise}
+\begin{uaexercise}
+Explicar por qué la divergencia es inevitable en un sistema asíncrono.
+\end{uaexercise}
 
-\section{Nivel 3: arquitecturas}
-\begin{uaexercise}Describir leader-based replication y sus variantes sync/async.\end{uaexercise}
-\begin{uaexercise}Explicar multi-leader y por qué introduce conflictos.\end{uaexercise}
-\begin{uaexercise}Describir leaderless replication y el rol de $N,W,R$.\end{uaexercise}
-\begin{uaexercise}Probar informalmente por qué $R+W>N$ implica intersección.\end{uaexercise}
-\begin{uaexercise}Construir un ejemplo donde $R+W\le N$ rompe lecturas frescas.\end{uaexercise}
+\begin{uaexercise}
+Construir un ejemplo con dos réplicas que divergen tras escrituras concurrentes.
+\end{uaexercise}
 
-\section{Nivel 4: conflictos y convergencia}
-\begin{uaexercise}Definir conflicto concurrente y dar un ejemplo.\end{uaexercise}
-\begin{uaexercise}Explicar LWW y sus riesgos.\end{uaexercise}
-\begin{uaexercise}Explicar vector clocks y cómo detectan concurrencia.\end{uaexercise}
-\begin{uaexercise}Comparar los vector clocks $(2,1,0)$ y $(1,2,0)$; luego comparar $(1,2,0)$ y $(2,3,0)$.\end{uaexercise}
-\begin{uaexercise}Diseñar un merge semántico para un carrito de compras.\end{uaexercise}
-\begin{uaexercise}Describir read-repair y anti-entropy.\end{uaexercise}
+\begin{uaexercise}
+Distinguir estado físico vs estado lógico en un sistema replicado.
+\end{uaexercise}
 
-\section{Nivel 5: diseño}
-\begin{uaexercise}Aplicar $D$ a un sistema de perfiles de usuario global.\end{uaexercise}
-\begin{uaexercise}Elegir modelo de consistencia para un banco y justificar.\end{uaexercise}
-\begin{uaexercise}Elegir modelo para una red social y justificar.\end{uaexercise}
-\begin{uaexercise}Diseñar un esquema quorum para $N=5$ con objetivos dados.\end{uaexercise}
-\begin{uaexercise}Relacionar esta clase con CAP en presencia de particiones.\end{uaexercise}
+\begin{uaexercise}
+Explicar por qué “una sola fuente de verdad” es difícil de sostener en presencia de particiones.
+\end{uaexercise}
+
+
+\section{Nivel 2: ejecuciones y fallas}
+\begin{uaexercise}
+Definir linearizabilidad y dar un ejemplo que la viole.
+\end{uaexercise}
+
+\begin{uaexercise}
+Definir consistencia causal con la relación happens-before.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar por qué dos timestamps físicos de nodos distintos no alcanzan para decidir causalidad entre eventos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplicar las reglas de relojes de Lamport a una secuencia simple de eventos con envío y recepción de mensajes.
+\end{uaexercise}
+
+\begin{uaexercise}
+Dar un ejemplo permitido por causal pero no por linearizabilidad.
+\end{uaexercise}
+
+
+\section{Nivel 3: diseño y comparación}
+\begin{uaexercise}
+Definir consistencia eventual y sus límites.
+\end{uaexercise}
+
+\begin{uaexercise}
+Comparar los tres modelos en términos de garantías observables.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describir leader-based replication y sus variantes sync/async.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar multi-leader y por qué introduce conflictos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describir leaderless replication y el rol de $N,W,R$.
+\end{uaexercise}
+
+
+\section{Nivel 4: integración y defensa}
+\begin{uaexercise}
+Probar informalmente por qué $R+W>N$ implica intersección.
+\end{uaexercise}
+
+\begin{uaexercise}
+Construir un ejemplo donde $R+W\le N$ rompe lecturas frescas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Definir conflicto concurrente y dar un ejemplo.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar LWW y sus riesgos.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explicar vector clocks y cómo detectan concurrencia.
+\end{uaexercise}
+
 
 \end{document}

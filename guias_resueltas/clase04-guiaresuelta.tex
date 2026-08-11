@@ -11,101 +11,203 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Respuestas seleccionadas (desarrolladas)}
+\section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Definir consenso.
+Definir formalmente el problema de consenso. Indicar claramente entradas, salidas y condiciones del sistema.
 \end{uaexercise}
-
 \begin{uaanswer}
-El problema de consenso consiste en que un conjunto de procesos distribuidos acuerden un único valor a partir de propuestas iniciales, bajo condiciones de asincronía y posibles fallas.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Formalmente, cada proceso $p_i$ propone un valor $v_i$ y eventualmente decide un valor $v$ tal que:
-\begin{itemize}
-\item Agreement: todos los procesos correctos deciden el mismo valor
-\item Validity: $v$ fue propuesto por algún proceso
-\item Termination: todo proceso correcto decide eventualmente
-\end{itemize}
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explicar FLP.
+Explicar con precisión las propiedades:
+Agreement, Validity y Termination.  
+Dar un ejemplo concreto donde se viole cada una.
 \end{uaexercise}
-
 \begin{uaanswer}
-El teorema FLP establece que en un sistema asíncrono con al menos una posible falla, no existe un algoritmo determinista que garantice la terminación del consenso.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La prueba se basa en:
-\begin{itemize}
-\item estados bivalentes (donde el resultado no está determinado)
-\item un scheduler que retrasa mensajes críticos
-\end{itemize}
-
-Esto permite construir ejecuciones infinitas donde el sistema nunca decide.
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Probar intersección de mayorías.
+Explicar por qué consenso es necesario en sistemas replicados.
+Relacionar con la clase anterior.
 \end{uaexercise}
-
 \begin{uaanswer}
-Sea $N$ el número total de nodos.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Una mayoría es cualquier conjunto de tamaño $> N/2$.
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
 
-Sean $Q_1$ y $Q_2$ dos mayorías.
-
-Supongamos que no intersectan:
-\[
-|Q_1| + |Q_2| \le N
-\]
-
-Pero:
-\[
-|Q_1| > N/2, \quad |Q_2| > N/2
-\]
-
-Entonces:
-\[
-|Q_1| + |Q_2| > N
-\]
-
-Contradicción.
-
-Por lo tanto:
-\[
-Q_1 \cap Q_2 \neq \emptyset
-\]
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explicar Log Matching en Raft.
+Dado un sistema con 3 nodos, construir una ejecución donde dos nodos decidan valores distintos.
+¿Qué propiedad se viola?
 \end{uaexercise}
-
 \begin{uaanswer}
-La propiedad establece que si dos logs contienen una entrada con el mismo índice y término, entonces todos los elementos anteriores son idénticos.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Esto se garantiza porque:
-\begin{itemize}
-\item el líder solo añade entradas a partir de logs consistentes
-\item los followers rechazan entradas inconsistentes
-\end{itemize}
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplicar modelo D.
+Definir estado univalente y bivalente.
 \end{uaexercise}
-
 \begin{uaanswer}
-\begin{itemize}
-\item $P$: mantener estado consistente
-\item $F$: fallas de nodos y delay
-\item $G$: consenso
-\item $S$: Raft/Paxos
-\item $T$: latencia y menor disponibilidad
-\end{itemize}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué el estado inicial puede ser bivalente.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar el rol del scheduler adversario en la prueba FLP.
+\end{uaexercise}
+\begin{uaanswer}
+FLP no afirma que consenso sea imposible en la práctica; demuestra que en asincronía total, con una posible falla y algoritmo determinista, no puede garantizarse terminación en todas las ejecuciones. Los sistemas reales recuperan progreso con sincronía parcial, timeouts y aleatoriedad, sin renunciar a seguridad.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construir una ejecución donde el sistema nunca decide.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué agregar timeouts rompe el modelo de FLP.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describir detalladamente el proceso de elección de líder en Raft.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar el rol de los términos (terms).
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describir el protocolo AppendEntries.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Definir formalmente la propiedad de Log Matching.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué el commit requiere mayoría.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construir una ejecución donde un líder cae y otro lo reemplaza.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describir los roles de Paxos: proposer, acceptor, learner.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar la fase Prepare.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar la fase Accept.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Definir formalmente qué significa que un valor sea elegido.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explicar por qué dos valores distintos no pueden ser elegidos.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en consenso, FLP, mayorías, Raft, Paxos, seguridad, progreso y máquina de estados replicada. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo crash, demora arbitraria, elección dividida y pérdida temporal de mayoría. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

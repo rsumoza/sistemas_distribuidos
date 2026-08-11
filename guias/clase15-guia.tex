@@ -11,21 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Se espera razonamiento de diseño integral. No alcanza con enumerar patrones o tecnologías. Toda respuesta debe justificar:
-\begin{itemize}
-\item problema;
-\item fallas;
-\item garantías;
-\item solución;
-\item trade-offs.
-\end{itemize}
-
-\section{Nivel 1: marco conceptual}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Explique por qué diseñar un sistema distribuido no equivale a listar tecnologías o patrones de moda.
 \end{uaexercise}
@@ -42,12 +32,12 @@ Explique por qué una buena propuesta debe hacer explícitas las fallas asumidas
 Explique por qué una arquitectura técnicamente seria debe reconocer también lo que no resuelve.
 \end{uaexercise}
 
-\section{Nivel 2: trade-offs}
-
 \begin{uaexercise}
 Compare consistencia fuerte y consistencia eventual como decisiones de diseño, no como slogans.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Compare monolito modular y microservicios en términos de complejidad total del sistema.
 \end{uaexercise}
@@ -60,8 +50,6 @@ Compare integración por RPC e integración por eventos en términos de acoplami
 Compare transacción fuerte y saga en términos de garantías, costo y semántica visible.
 \end{uaexercise}
 
-\section{Nivel 3: defensa arquitectónica}
-
 \begin{uaexercise}
 Diseñe una estrategia de defensa para responder la objeción: “¿por qué no un monolito?”.
 \end{uaexercise}
@@ -70,6 +58,8 @@ Diseñe una estrategia de defensa para responder la objeción: “¿por qué no 
 Diseñe una estrategia de defensa para responder la objeción: “¿por qué no consistencia fuerte en todo?”.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Diseñe una estrategia de defensa para responder la objeción: “¿qué pasa bajo partición?”.
 \end{uaexercise}
@@ -77,8 +67,6 @@ Diseñe una estrategia de defensa para responder la objeción: “¿qué pasa ba
 \begin{uaexercise}
 Diseñe una estrategia de defensa para responder la objeción: “¿cómo observás y operás este sistema?”.
 \end{uaexercise}
-
-\section{Nivel 4: casos}
 
 \begin{uaexercise}
 Diseñe una arquitectura razonable para un e-commerce global y justifique sus decisiones principales.
@@ -92,11 +80,11 @@ Diseñe una arquitectura razonable para una plataforma financiera global y justi
 Diseñe una arquitectura razonable para una plataforma de streaming de eventos y justifique sus decisiones principales.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Compare por qué esos tres casos no deberían resolverse con exactamente la misma arquitectura.
 \end{uaexercise}
-
-\section{Nivel 5: integración operativa}
 
 \begin{uaexercise}
 Explique cómo deberían aparecer observabilidad y SLOs dentro de una defensa arquitectónica seria.
@@ -114,22 +102,5 @@ Explique por qué ownership de datos y bounded contexts no son detalles secundar
 Explique por qué una propuesta distribuida sin modelo operacional está incompleta.
 \end{uaexercise}
 
-\section{Nivel 6: cierre integrador}
-
-\begin{uaexercise}
-Aplique el esquema $D=(P,F,G,S,T)$ a un sistema distribuido de reservas de viaje.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué una defensa técnica débil suele prometer simultáneamente propiedades incompatibles.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique qué hace convincente a una defensa arquitectónica frente a un jurado hostil.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué el valor de una arquitectura no está en parecer sofisticada, sino en ser coherente con el dominio y sus costos.
-\end{uaexercise}
 
 \end{document}

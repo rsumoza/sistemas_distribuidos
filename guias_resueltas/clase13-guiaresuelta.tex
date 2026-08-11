@@ -11,198 +11,217 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-Esta guía resuelta debe leerse como una introducción al razonamiento operativo basado en objetivos. No se trata solo de memorizar siglas, sino de entender cómo traducir expectativas de servicio en decisiones concretas.
-
-\section{Resoluciones}
-
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Defina SLI, SLO y SLA.
+Defina SLI, SLO y SLA, y explique la diferencia entre los tres conceptos.
 \end{uaexercise}
-
 \begin{uaanswer}
-\textbf{SLI} (Service Level Indicator) es una métrica relevante del servicio, observable y medible.  
-\textbf{SLO} (Service Level Objective) es un objetivo cuantitativo sobre un SLI.  
-\textbf{SLA} (Service Level Agreement) es un compromiso formal, habitualmente externo, asociado a niveles de servicio.
+La respuesta debe situarse en SLI, SLO, SLA, error budgets, burn rates y operación guiada por objetivos. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo SLI mal elegido, ventana incorrecta, budget consumido y alerta ruidosa. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Relación:
-\begin{itemize}
-\item SLI = qué mido;
-\item SLO = qué objetivo me propongo;
-\item SLA = qué prometo formalmente.
-\end{itemize}
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué un SLI debe elegirse desde la perspectiva del usuario.
+Explique por qué un SLI debe elegirse desde la perspectiva del usuario y no solo desde la infraestructura.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque el objetivo de la confiabilidad operativa no es optimizar métricas arbitrarias de infraestructura, sino reflejar si el servicio cumple o no con lo que el usuario necesita. Una métrica irrelevante para la experiencia real puede inducir a optimizar el sistema en la dirección equivocada.
+La respuesta debe situarse en SLI, SLO, SLA, error budgets, burn rates y operación guiada por objetivos. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo SLI mal elegido, ventana incorrecta, budget consumido y alerta ruidosa. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Dé ejemplos de buenos y malos SLI.
+Dé dos ejemplos de buenos SLI y dos ejemplos de malos SLI.
 \end{uaexercise}
-
 \begin{uaanswer}
-Buenos SLI:
-\begin{itemize}
-\item porcentaje de checkouts exitosos;
-\item latencia p95 de respuesta de API.
-\end{itemize}
+La respuesta debe situarse en SLI, SLO, SLA, error budgets, burn rates y operación guiada por objetivos. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo SLI mal elegido, ventana incorrecta, budget consumido y alerta ruidosa. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Malos SLI:
-\begin{itemize}
-\item uso promedio de CPU sin relación directa al servicio;
-\item cantidad total de logs generados.
-\end{itemize}
-
-La diferencia está en si el indicador representa una propiedad relevante del servicio o solo una señal interna difícil de interpretar.
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un SLO razonable para checkout.
+Explique por qué “CPU media del cluster” no siempre es un buen SLI.
 \end{uaexercise}
-
 \begin{uaanswer}
-Ejemplo:
-\begin{itemize}
-\item SLI: porcentaje de checkouts completados exitosamente;
-\item SLO: 99.9\% de checkouts exitosos en rolling window de 30 días.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Este objetivo es razonable porque está ligado directamente a una función de negocio crítica y es fácil de interpretar.
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué un SLO de 100\% suele ser mala idea.
+Diseñe un SLO razonable para una API pública de lectura.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque equivale a exigir perfección absoluta en un entorno distribuido donde siempre existe:
-\begin{itemize}
-\item falla parcial;
-\item degradación transitoria;
-\item mantenimiento;
-\item incidentes inevitables.
-\end{itemize}
+Linearizabilidad exige que cada operación parezca ocurrir en un punto entre invocación y respuesta y que el orden respete tiempo real. Para validar una historia se propone un orden secuencial compatible; si ninguna ubicación de las operaciones satisface ambos requisitos, la historia no es linearizable.
 
-Un SLO de 100\% elimina cualquier margen de operación razonable y empuja a una cultura donde toda pequeña imperfección parece una catástrofe.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina error budget.
+Diseñe un SLO razonable para un sistema de checkout.
 \end{uaexercise}
-
 \begin{uaanswer}
-El error budget es la porción de falla tolerada por un SLO. Si el objetivo no es 100\%, entonces existe una fracción de requests o tiempo en la que el sistema puede incumplir sin violar el objetivo global.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Calcule el error budget mensual para 99.9\%.
+Explique por qué un SLO de 100\% suele ser una mala idea práctica.
 \end{uaexercise}
-
 \begin{uaanswer}
-Si el SLO es 99.9\%, entonces el presupuesto de error es 0.1\%.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-En términos conceptuales:
-\begin{itemize}
-\item de cada 1000 requests, aproximadamente 1 podría fallar sin violar el objetivo;
-\item en una ventana mensual, 0.1\% del tiempo o requests puede quedar fuera del objetivo.
-\end{itemize}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué hacer si se consume demasiado rápido el error budget.
+Explique por qué elegir una ventana temporal adecuada es parte del diseño del SLO.
 \end{uaexercise}
-
 \begin{uaanswer}
-Un equipo podría:
-\begin{itemize}
-\item frenar despliegues riesgosos;
-\item priorizar confiabilidad sobre features nuevas;
-\item investigar causas de degradación;
-\item reforzar mecanismos de resiliencia;
-\item revisar thresholds, observabilidad y capacidad.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La idea es usar el error budget como mecanismo de gobierno técnico, no como indicador decorativo.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué promedios de latencia pueden engañar.
+Defina error budget y explique su significado operativo.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque los promedios pueden ocultar colas largas. Un sistema puede tener media aceptable pero p95 o p99 muy malos, afectando significativamente a una fracción importante de usuarios. Por eso, para experiencia de servicio, los percentiles suelen ser más informativos.
+El error budget es la porción de eventos o tiempo que puede incumplir el SLO en la ventana. Su valor operativo aparece al decidir ritmo de cambio: un burn rate alto obliga a proteger confiabilidad; budget saludable permite asumir riesgo controlado.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué significa operar guiado por SLOs.
+Calcule el error budget mensual para un servicio con SLO de 99.9\%.
 \end{uaexercise}
-
 \begin{uaanswer}
-Significa que las decisiones operativas y de priorización se toman con referencia explícita a objetivos de nivel de servicio. Esto cambia la conversación desde “parece andar bien” hacia “estamos cumpliendo o no con el objetivo que acordamos”.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde un problema técnico grave no implique violación del SLO.
+Explique qué decisiones podría tomar un equipo si está consumiendo demasiado rápido su error budget.
 \end{uaexercise}
-
 \begin{uaanswer}
-Un incidente breve en un componente secundario puede sonar técnicamente serio, pero si no afectó de forma relevante el SLI principal dentro de la ventana temporal, podría no consumir de manera significativa el SLO. Esto muestra que severidad técnica e impacto de servicio no siempre coinciden.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique cómo SLOs ayudan entre producto e ingeniería.
+Explique por qué el error budget conecta confiabilidad con velocidad de cambio.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque proveen un lenguaje compartido. Producto puede entender impacto en experiencia del usuario; ingeniería puede justificar inversión en confiabilidad o freno de cambios con base en objetivos cuantitativos y no solo en intuiciones.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplique $D=(P,F,G,S,T)$ a confiabilidad operativa.
+Explique por qué un SLO basado en promedio de latencia puede ser engañoso.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una formulación posible es:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item $P$: operar el sistema con criterios explícitos de calidad;
-\item $F$: degradaciones, fallas parciales, ruido de métricas, incidentes reales;
-\item $G$: mantener cumplimiento de nivel de servicio acordado;
-\item $S$: SLI + SLO + error budget + políticas de operación;
-\item $T$: disciplina de medición, priorización más visible y restricciones sobre el ritmo de cambio.
-\end{itemize}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la confiabilidad operativa no es perfección.
+Diseñe un SLI/SLO usando p95 o p99 para un servicio de pagos.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque en sistemas distribuidos la falla parcial es inevitable. La confiabilidad madura no intenta negar eso, sino administrarlo explícitamente. El foco no está en exigir ausencia total de error, sino en definir cuánto error es tolerable y cómo reaccionar cuando se supera ese umbral.
+La respuesta debe situarse en SLI, SLO, SLA, error budgets, burn rates y operación guiada por objetivos. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo SLI mal elegido, ventana incorrecta, budget consumido y alerta ruidosa. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué operación guiada por objetivos cambia la cultura del equipo.
+Explique qué problema aparece si el equipo mide algo distinto de lo que el usuario experimenta.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque obliga a pasar de intuiciones y discusiones informales a decisiones justificadas por métricas y objetivos explícitos. Eso cambia:
-\begin{itemize}
-\item cómo se discuten incidentes;
-\item cómo se priorizan cambios;
-\item cómo se balancean features vs confiabilidad;
-\item cómo se habla con stakeholders.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La cultura deja de ser reactiva y se vuelve más disciplinada y explícita.
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una estrategia mínima para medir correctamente un SLI de disponibilidad.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué significa operar un sistema guiado por SLOs.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde un incidente técnico parezca grave, pero no implique violación del SLO.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde un problema “pequeño” técnicamente sí implique un daño real al servicio medido por SLO.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo SLOs ayudan a resolver discusiones entre producto e ingeniería.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería SLI calculado, SLO, budget, burn rate y política de decisión. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

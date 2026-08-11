@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Se espera razonamiento técnico y organizacional. No alcanza con repetir definiciones: justificar siempre cómo una práctica mejora la capacidad real de operar y aprender.
-
-\section{Nivel 1: fundamentos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Defina incidente desde la perspectiva de confiabilidad operativa y explique por qué no debe confundirse con cualquier bug menor.
 \end{uaexercise}
@@ -35,12 +32,12 @@ Distinga claramente entre respuesta al incidente y aprendizaje posterior al inci
 Explique por qué una organización puede tener buenos sistemas técnicos y, aun así, mala gestión de incidentes.
 \end{uaexercise}
 
-\section{Nivel 2: gestión de incidentes}
-
 \begin{uaexercise}
 Describa las fases principales de la gestión de incidentes.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Explique qué criterios deberían usarse para priorizar un incidente.
 \end{uaexercise}
@@ -53,8 +50,6 @@ Explique qué ventajas tiene explicitar roles durante un incidente.
 Construya un ejemplo donde la falta de coordinación empeore significativamente el incidente.
 \end{uaexercise}
 
-\section{Nivel 3: postmortems}
-
 \begin{uaexercise}
 Defina postmortem y explique cuál es su propósito.
 \end{uaexercise}
@@ -63,6 +58,8 @@ Defina postmortem y explique cuál es su propósito.
 Explique qué información mínima debe contener un buen postmortem.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique por qué el timeline es una pieza central del postmortem.
 \end{uaexercise}
@@ -70,8 +67,6 @@ Explique por qué el timeline es una pieza central del postmortem.
 \begin{uaexercise}
 Construya un ejemplo donde un postmortem superficial impida aprendizaje real.
 \end{uaexercise}
-
-\section{Nivel 4: blameless y causalidad}
 
 \begin{uaexercise}
 Explique qué significa blameless postmortem.
@@ -85,11 +80,11 @@ Explique por qué blameless no significa ausencia de responsabilidad.
 Explique por qué la idea de una única causa raíz puede ser engañosa en sistemas distribuidos.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Construya una cadena causal realista para un incidente de latencia en cascada.
 \end{uaexercise}
-
-\section{Nivel 5: acciones y aprendizaje}
 
 \begin{uaexercise}
 Explique qué hace buena a una acción correctiva posterior a un incidente.
@@ -107,22 +102,5 @@ Explique cómo distinguir entre fix local y aprendizaje organizacional.
 Explique por qué cerrar un incidente sin cerrar el seguimiento del postmortem es una mala práctica.
 \end{uaexercise}
 
-\section{Nivel 6: integración}
-
-\begin{uaexercise}
-Relacione incidentes, SLOs y error budgets.
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ a la gestión de incidentes en un sistema distribuido.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la cultura de confiabilidad no puede reducirse a herramientas.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué una organización madura se define tanto por cómo aprende de incidentes como por cómo construye software.
-\end{uaexercise}
 
 \end{document}

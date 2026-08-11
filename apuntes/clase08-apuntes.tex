@@ -319,4 +319,74 @@ La consistencia real no se decide en abstracto. Se decide a partir de:
 CAP y PACELC no son slogans. Dynamo y Spanner muestran que son decisiones de diseño concretas, con costos reales y consecuencias observables.
 \end{uakeybox}
 
+
+\section{Síntesis razonada de la clase}
+Esta unidad debe leerse como parte de una cadena de decisiones de diseño y no como un catálogo de mecanismos. Para estudiar el tema con profundidad conviene reconstruir cuatro preguntas: \emph{qué problema aparece}, \emph{qué garantía se desea}, \emph{qué mecanismo la aproxima} y \emph{qué costo introduce}. En cada ejemplo debe identificarse además el modelo de falla implícito.
+
+\begin{uakeybox}
+Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón: declara sus supuestos, la propiedad que preserva y el escenario en el que deja de ser suficiente.
+\end{uakeybox}
+
+\section{Bibliografía guiada y ruta de profundización}
+Para profundizar esta clase se recomienda: Kleppmann, caps. 5 y 9; DeCandia et al. (Dynamo); Corbett et al. (Spanner); Gilbert y Lynch (CAP).
+
+La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
+
+\section{Conexión con el Trabajo Final Integrador}
+El grupo debe señalar qué parte de su sistema utiliza los conceptos de esta unidad, justificar por qué son necesarios y documentar una alternativa descartada. Cuando el contenido todavía no corresponda a la etapa vigente, debe registrarse como hipótesis o decisión pendiente.
+
+\section{Autoevaluación conceptual}
+\begin{enumerate}
+\item ¿Cuál es el problema distribuido concreto que motiva esta clase?
+\item ¿Qué propiedad de seguridad y qué propiedad de progreso están en juego?
+\item ¿Qué supuesto de red, tiempo o falla resulta decisivo?
+\item ¿Qué trade-off aceptaría en un sistema real y cuál no aceptaría en un dominio crítico?
+\item ¿Cómo observaría experimentalmente que la solución se comporta como espera?
+\end{enumerate}
+
+\section{Profundización autocontenida v9}
+\subsection{Problema, límite e invariante}
+El núcleo de esta clase es CAP, PACELC, quórums, Dynamo, vector clocks, Spanner, TrueTime y consistencia externa. Para estudiarlo de manera autónoma conviene separar tres planos. Primero, el \emph{problema observable}: qué comportamiento incorrecto puede ver un cliente o un operador. Segundo, el \emph{límite del modelo}: qué información, sincronía o coordinación no está disponible. Tercero, el \emph{invariante}: qué propiedad no debe violarse aunque el sistema pierda progreso temporalmente.
+
+El modelo de fallas relevante incluye partición inter-región, réplica atrasada, conflicto concurrente e incertidumbre temporal. Una solución debe describirse como protocolo y no solo como nombre de tecnología: actores, estados, mensajes, condición de éxito, condición de aborto y estado visible después de una interrupción. La evidencia esperada es decisión CAP/PACELC por operación, versiones y latencia inter-región.
+
+\subsection{Método de análisis}
+Ante un caso nuevo, siga esta secuencia:
+\begin{enumerate}
+\item Identifique actores, dato o recurso compartido y frontera de confianza.
+\item Escriba una ejecución nominal y una ejecución adversarial.
+\item Distinga seguridad (lo malo no ocurre) de progreso (algo bueno finalmente ocurre).
+\item Declare qué supuesto permite avanzar: mayoría, deadline, sincronía parcial, operación idempotente, almacenamiento durable u otro.
+\item Compare una alternativa más simple y una más fuerte; registre qué métrica o experimento haría cambiar la decisión.
+\end{enumerate}
+
+\subsection{Caso transferible}
+Considere una plataforma de reservas que recibe operaciones duplicadas, pierde conectividad entre regiones y debe sostener un camino crítico sin ocultar el estado real al usuario. Aplique el mecanismo de esta clase a una única decisión concreta. Una respuesta madura no intenta resolver todo: delimita la operación, formula la garantía y explica la degradación esperada cuando el supuesto central deja de cumplirse.
+
+\subsection{Errores de razonamiento frecuentes}
+\begin{itemize}
+\item confundir una propiedad con el producto que suele implementarla;
+\item describir el camino feliz sin recorrer una falla intermedia;
+\item afirmar ``exactly-once'', ``alta disponibilidad'' o ``consistencia'' sin definir alcance observable;
+\item medir solo throughput aunque la hipótesis trate sobre semántica o recuperación;
+\item presentar la complejidad añadida como beneficio sin compararla con la alternativa más simple.
+\end{itemize}
+
+\section{Lectura guiada}
+Gilbert y Lynch; Abadi sobre PACELC; Dynamo; Spanner.
+
+Durante la lectura, registre: modelo de sistema, propiedad perseguida, contraejemplo que motiva el mecanismo, costo principal y una condición bajo la cual no lo elegiría. Estas cinco anotaciones convierten la bibliografía en una herramienta de diseño y no en una lista para memorizar.
+
+\section{Aplicación al Trabajo Final Integrador}
+El equipo debe producir un ADR breve con la decisión asociada a esta clase. Debe contener: contexto, dos alternativas, supuesto decisivo, garantía elegida, trade-off, evidencia pendiente y fecha de revisión. La evidencia mínima esperada para esta unidad es: decisión CAP/PACELC por operación, versiones y latencia inter-región.
+
+\section{Autoevaluación avanzada}
+\begin{enumerate}
+\item ¿Puedo explicar la clase sin nombrar primero una tecnología?
+\item ¿Puedo construir una ejecución que viole la garantía si el mecanismo se configura mal?
+\item ¿Puedo distinguir seguridad, progreso y experiencia del usuario?
+\item ¿Puedo proponer una medición que valide la propiedad, no solo el rendimiento?
+\item ¿Puedo defender cuándo una solución más simple sería suficiente?
+\end{enumerate}
+
 \end{document}

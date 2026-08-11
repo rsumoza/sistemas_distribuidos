@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Responder justificando siempre desde el punto de vista del sistema. No alcanza con repetir “CAP” o “PACELC” como etiquetas. Se espera análisis de diseño.
-
-\section{Nivel 1: CAP y PACELC}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Explique con precisión qué significa CAP y por qué la interpretación “elegir dos de tres” es incompleta o engañosa.
 \end{uaexercise}
@@ -39,11 +36,11 @@ Construya un ejemplo concreto de partición de red y explique qué decisión deb
 Explique por qué PACELC es una mejora conceptual respecto de CAP.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Dé un ejemplo donde no haya partición, pero igual exista un trade-off entre consistencia y latencia.
 \end{uaexercise}
-
-\section{Nivel 2: Dynamo}
 
 \begin{uaexercise}
 Describa la motivación arquitectónica de Dynamo. ¿Qué tipo de aplicaciones justifican este diseño?
@@ -61,6 +58,8 @@ Demuestre informalmente por qué la condición $R+W>N$ garantiza intersección d
 Construya un ejemplo donde, aun con $R+W>N$, un cliente pueda observar un estado atrasado.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique qué problema resuelven los vector clocks en Dynamo.
 \end{uaexercise}
@@ -73,8 +72,6 @@ Describa sloppy quorum y hinted handoff. ¿Qué ganan y qué complican?
 Explique qué rol juega anti-entropy en Dynamo.
 \end{uaexercise}
 
-\section{Nivel 3: Spanner}
-
 \begin{uaexercise}
 Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
 \end{uaexercise}
@@ -83,6 +80,8 @@ Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
 Explique qué es TrueTime y por qué devuelve un intervalo en lugar de un instante exacto.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Describa la idea de commit wait y explique su costo.
 \end{uaexercise}
@@ -94,8 +93,6 @@ Explique qué significa external consistency y por qué es más fuerte que event
 \begin{uaexercise}
 Explique por qué Spanner sacrifica latencia incluso en ausencia de partición.
 \end{uaexercise}
-
-\section{Nivel 4: comparación y diseño}
 
 \begin{uaexercise}
 Compare Dynamo y Spanner en términos de:
@@ -111,28 +108,5 @@ Compare Dynamo y Spanner en términos de:
 Indique para qué tipo de aplicación elegiría Dynamo y para cuál elegiría Spanner.
 \end{uaexercise}
 
-\begin{uaexercise}
-Diseñe una base global para una red social y justifique si la orientaría más cerca de Dynamo o más cerca de Spanner.
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe una base global para una plataforma financiera y justifique su elección.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique cómo CAP, PACELC y el modelo $D=(P,F,G,S,T)$ se complementan entre sí.
-\end{uaexercise}
-
-\begin{uaexercise}
-Construya un caso donde la disponibilidad extrema resulte peor para el negocio que una indisponibilidad temporal.
-\end{uaexercise}
-
-\begin{uaexercise}
-Construya un caso donde una pequeña inconsistencia temporal sea preferible a una alta latencia global.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la pregunta correcta no es “qué sistema es mejor”, sino “qué error es más costoso en este dominio”.
-\end{uaexercise}
 
 \end{document}

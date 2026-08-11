@@ -11,15 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Indicaciones}
+\section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Justificar todas las respuestas.  
-Se espera modelado formal, no intuiciones vagas.
-
-\section{Nivel 1: fundamentos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Definir formalmente el problema de consenso. Indicar claramente entradas, salidas y condiciones del sistema.
 \end{uaexercise}
@@ -40,12 +36,12 @@ Dado un sistema con 3 nodos, construir una ejecución donde dos nodos decidan va
 ¿Qué propiedad se viola?
 \end{uaexercise}
 
-\section{Nivel 2: FLP}
-
 \begin{uaexercise}
 Definir estado univalente y bivalente.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Explicar por qué el estado inicial puede ser bivalente.
 \end{uaexercise}
@@ -62,12 +58,12 @@ Construir una ejecución donde el sistema nunca decide.
 Explicar por qué agregar timeouts rompe el modelo de FLP.
 \end{uaexercise}
 
-\section{Nivel 3: Raft}
-
 \begin{uaexercise}
 Describir detalladamente el proceso de elección de líder en Raft.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explicar el rol de los términos (terms).
 \end{uaexercise}
@@ -88,8 +84,8 @@ Explicar por qué el commit requiere mayoría.
 Construir una ejecución donde un líder cae y otro lo reemplaza.
 \end{uaexercise}
 
-\section{Nivel 4: Paxos}
 
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Describir los roles de Paxos: proposer, acceptor, learner.
 \end{uaexercise}
@@ -110,37 +106,5 @@ Definir formalmente qué significa que un valor sea elegido.
 Explicar por qué dos valores distintos no pueden ser elegidos.
 \end{uaexercise}
 
-\section{Nivel 5: quorum y pruebas}
-
-\begin{uaexercise}
-Probar que dos mayorías siempre intersectan.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explicar por qué esta propiedad garantiza seguridad.
-\end{uaexercise}
-
-\begin{uaexercise}
-Construir un contraejemplo si no se usa mayoría.
-\end{uaexercise}
-
-\section{Nivel 6: integración}
-
-\begin{uaexercise}
-Aplicar el modelo $D=(P,F,G,S,T)$ al consenso.
-\end{uaexercise}
-
-\begin{uaexercise}
-Comparar Raft y Paxos en términos de:
-\begin{itemize}
-\item complejidad
-\item implementación
-\item garantías
-\end{itemize}
-\end{uaexercise}
-
-\begin{uaexercise}
-Explicar cómo consenso permite implementar linearizabilidad.
-\end{uaexercise}
 
 \end{document}

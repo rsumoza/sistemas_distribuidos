@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Se espera razonamiento de sistemas, no solo definición de patrones. Justificar siempre qué problema resuelve cada mecanismo y qué costo introduce.
-
-\section{Nivel 1: fundamentos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída.
 \end{uaexercise}
@@ -35,12 +32,12 @@ Explique por qué la resiliencia distribuida no consiste en “hacer más retrie
 Explique la diferencia entre tolerar una falla y amplificarla.
 \end{uaexercise}
 
-\section{Nivel 2: retries}
-
 \begin{uaexercise}
 Explique en qué casos retry es razonable y en qué casos es peligroso.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Diseñe una política de retry para una operación idempotente.
 \end{uaexercise}
@@ -57,12 +54,12 @@ Explique el rol del jitter en un sistema con miles de clientes concurrentes.
 Construya un ejemplo donde retries en múltiples capas provoquen una tormenta de requests.
 \end{uaexercise}
 
-\section{Nivel 3: circuit breakers}
-
 \begin{uaexercise}
 Defina circuit breaker y describa sus estados.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique con un ejemplo qué gana el sistema al abrir un breaker.
 \end{uaexercise}
@@ -75,8 +72,6 @@ Construya un caso donde un threshold mal calibrado de breaker empeore el comport
 Explique por qué el estado half-open es importante.
 \end{uaexercise}
 
-\section{Nivel 4: backpressure y bulkheads}
-
 \begin{uaexercise}
 Explique qué problema resuelve backpressure.
 \end{uaexercise}
@@ -85,6 +80,8 @@ Explique qué problema resuelve backpressure.
 Diseñe un ejemplo donde la ausencia de backpressure haga crecer una cola hasta volver inútil el sistema.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Explique qué es bulkhead y cómo se implementa en términos de recursos.
 \end{uaexercise}
@@ -92,8 +89,6 @@ Explique qué es bulkhead y cómo se implementa en términos de recursos.
 \begin{uaexercise}
 Construya un caso donde un pool compartido arrastre rutas críticas que no tenían problema.
 \end{uaexercise}
-
-\section{Nivel 5: graceful degradation}
 
 \begin{uaexercise}
 Defina graceful degradation y compárela con caída total.
@@ -107,22 +102,5 @@ Diseñe tres ejemplos concretos de degradación elegante en una plataforma de e-
 Explique qué riesgos aparecen si la degradación no es explícita y semánticamente clara.
 \end{uaexercise}
 
-\section{Nivel 6: integración}
-
-\begin{uaexercise}
-Diseñe una estrategia integrada de resiliencia para una API de checkout.
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ a la resiliencia de un sistema de pagos.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué observabilidad y resiliencia están profundamente conectadas.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la pregunta correcta no es “cómo evito toda falla”, sino “cómo evito colapso sistémico”.
-\end{uaexercise}
 
 \end{document}

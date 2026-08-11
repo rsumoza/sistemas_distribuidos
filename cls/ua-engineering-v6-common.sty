@@ -1,6 +1,7 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesPackage{ua-engineering-v6-common}[2026/04/19 UA Ingeniería v6 common]
+\ProvidesPackage{ua-engineering-v6-common}[2026/08/02 UA Ingenieria v6.2 common]
 
+% Dependencias compartidas
 \RequirePackage{xcolor}
 \RequirePackage{graphicx}
 \RequirePackage{tikz}
@@ -11,16 +12,25 @@
 \RequirePackage{booktabs}
 \RequirePackage[most]{tcolorbox}
 \RequirePackage{amsmath,amssymb}
-\RequirePackage{tikz}
 \usetikzlibrary{positioning,arrows.meta,calc,shapes.geometric,fit}
 
-\definecolor{UAIngPrimary}{HTML}{28285A}
-\definecolor{UAIngAccent}{HTML}{F08A00}
-\definecolor{UAIngAccentB}{HTML}{FF8300}
+% Paleta institucional de Ingenieria
+\definecolor{UAIngOrange}{HTML}{F08A00}
+\definecolor{UAIngOrangeAlt}{HTML}{FF8300}
+\definecolor{UAIngOrangeSoft}{HTML}{F2A35C}
+\definecolor{UAIngNavy}{HTML}{28285A}
 \definecolor{UAIngPaper}{HTML}{F7F4EF}
 \definecolor{UAIngText}{HTML}{243447}
 \definecolor{UAIngMuted}{HTML}{667085}
+\definecolor{UAIngRule}{HTML}{D9DCE3}
 
+% Alias de compatibilidad con los materiales v6 existentes.
+\colorlet{UAIngPrimary}{UAIngNavy}
+\colorlet{UAIngAccent}{UAIngOrange}
+\colorlet{UAIngAccentB}{UAIngOrangeAlt}
+
+% Tipografia portable. Con XeLaTeX/LuaLaTeX se priorizan las familias
+% institucionales disponibles; pdfLaTeX conserva una alternativa segura.
 \ifPDFTeX
   \RequirePackage[T1]{fontenc}
   \RequirePackage[utf8]{inputenc}
@@ -28,60 +38,41 @@
 \else
   \RequirePackage{fontspec}
   \defaultfontfeatures{Ligatures=TeX}
-  \IfFileExists{../fonts/texgyretermes-regular.otf}{%
-    \setsansfont{texgyretermes}[
-      Path=../fonts/,
-      Extension=.otf,
-      UprightFont=*-regular,
-      BoldFont=*-bold,
-      ItalicFont=*-italic,
-      BoldItalicFont=*-bolditalic
-    ]%
-    \setmainfont{texgyretermes}[
-      Path=../fonts/,
-      Extension=.otf,
-      UprightFont=*-regular,
-      BoldFont=*-bold,
-      ItalicFont=*-italic,
-      BoldItalicFont=*-bolditalic
-    ]%
-    \setmonofont{texgyretermes}[
-      Path=../fonts/,
-      Extension=.otf,
-      UprightFont=*-regular,
-      BoldFont=*-bold,
-      ItalicFont=*-italic,
-      BoldItalicFont=*-bolditalic
-    ]%
-  }{%
-    \IfFontExistsTF{Montserrat}{\setsansfont{Montserrat}}{\setsansfont{Latin Modern Sans}}%
-    \IfFontExistsTF{Open Sans}{\setmainfont{Open Sans}}{\setmainfont{TeX Gyre Termes}}%
-    \IfFontExistsTF{JetBrains Mono}{\setmonofont{JetBrains Mono}}{\setmonofont{DejaVu Sans Mono}}%
-  }
+  % Fuentes TeX Live portables: evita depender de tipografías del sistema.
+  \setsansfont{lmsans10-regular.otf}[
+    BoldFont=lmsans10-bold.otf,
+    ItalicFont=lmsans10-oblique.otf,
+    BoldItalicFont=lmsans10-boldoblique.otf]
+  \setmainfont{lmroman10-regular.otf}[
+    BoldFont=lmroman10-bold.otf,
+    ItalicFont=lmroman10-italic.otf,
+    BoldItalicFont=lmroman10-bolditalic.otf]
+  \setmonofont{lmmono10-regular.otf}[
+    ItalicFont=lmmono10-italic.otf]
 \fi
 \renewcommand{\familydefault}{\sfdefault}
 
 \hypersetup{
   colorlinks=true,
-  linkcolor=UAIngPrimary,
-  urlcolor=UAIngPrimary,
-  citecolor=UAIngPrimary
+  linkcolor=UAIngNavy,
+  urlcolor=UAIngNavy,
+  citecolor=UAIngNavy
 }
 
+% Metadatos institucionales. Cada documento puede redefinirlos.
 \newcommand{\UAUniversity}{Universidad Austral}
 \newcommand{\UAFaculty}{Facultad de Ingeniería}
 \newcommand{\UADepartment}{Departamento de Computación}
 \newcommand{\UACampus}{Pilar}
-\newcommand{\UACareer}{Ingeniería Informática}
-\newcommand{\UACommission}{Comisión A}
-\newcommand{\UAProfessor}{Equipo docente}
-\newcommand{\UASemester}{Primer cuatrimestre 2026}
-\newcommand{\UACourse}{Sistemas Distribuidos}
-\newcommand{\UADate}{19 de abril de 2026}
+\newcommand{\UACareer}{Licenciatura en Ciencia de Datos}
+\newcommand{\UACommission}{Cohorte 2026}
+\newcommand{\UAProfessor}{Prof. Rodolfo Leonardo Sumoza Matos}
+\newcommand{\UASemester}{Segundo cuatrimestre 2026}
+\newcommand{\UACourse}{Investigación Operativa}
+\newcommand{\UADate}{2026}
 \newcommand{\UAClassNumber}{}
 \newcommand{\UAClassTitle}{}
 \newcommand{\UADocKind}{Documento}
-\newcommand{\UALogoPath}{../assets/logo_computacion_austral.png}
 \newcommand{\UABuildNumber}{}
 \newcommand{\UABuildDate}{}
 \newcommand{\UABuildCommit}{}
@@ -99,48 +90,88 @@
 \newcommand{\UASetClassNumber}[1]{\renewcommand{\UAClassNumber}{#1}}
 \newcommand{\UASetClassTitle}[1]{\renewcommand{\UAClassTitle}{#1}}
 \newcommand{\UASetDocKind}[1]{\renewcommand{\UADocKind}{#1}}
-\newcommand{\UASetLogo}[1]{\renewcommand{\UALogoPath}{#1}}
 \newcommand{\UASetBuildNumber}[1]{\renewcommand{\UABuildNumber}{#1}}
 \newcommand{\UASetBuildDate}[1]{\renewcommand{\UABuildDate}{#1}}
 \newcommand{\UASetBuildCommit}[1]{\renewcommand{\UABuildCommit}{#1}}
 
-\InputIfFileExists{../config/build-info.tex}{}{}
-
 \newcommand{\UABuildInfo}{%
-  \ifstrempty{\UABuildNumber}{}{%
+  \ifdefempty{\UABuildNumber}{}{%
     Build \UABuildNumber%
-    \ifstrempty{\UABuildDate}{}{ --- \UABuildDate}%
-    \ifstrempty{\UABuildCommit}{}{ --- \UABuildCommit}%
+    \ifdefempty{\UABuildDate}{}{ -- \UABuildDate}%
+    \ifdefempty{\UABuildCommit}{}{ -- \UABuildCommit}%
   }%
 }
 
-\newcommand{\UAPrintLogo}[1][1.5cm]{%
-  \IfFileExists{\UALogoPath}{\includegraphics[height=#1]{\UALogoPath}}{%
-    {\color{UAIngPrimary}\bfseries \UAUniversity\ \UAFaculty\ \UADepartment}%
-  }%
+% Logo entregado por la Facultad. La busqueda prioriza el directorio del .tex,
+% lo que hace autocontenidos los paquetes semanales, y conserva alternativas
+% para el paquete docente completo.
+\newcommand{\UALogoPath}{logo_ingenieria_austral.png}
+\newcommand{\UAResolvedLogo}{}
+\newcommand{\UASetLogo}[1]{\renewcommand{\UALogoPath}{#1}\renewcommand{\UAResolvedLogo}{}}
+
+\makeatletter
+\newcommand{\UA@TryLogo}[1]{%
+  \ifdefempty{\UAResolvedLogo}{%
+    \IfFileExists{#1}{\renewcommand{\UAResolvedLogo}{#1}}{}%
+  }{}%
 }
+\newcommand{\UAResolveLogo}{%
+  \renewcommand{\UAResolvedLogo}{}%
+  \UA@TryLogo{\UALogoPath}%
+  \UA@TryLogo{assets/logo_ingenieria_austral.png}%
+  \UA@TryLogo{../assets/logo_ingenieria_austral.png}%
+  \UA@TryLogo{../../assets/logo_ingenieria_austral.png}%
+  \UA@TryLogo{../../../assets/logo_ingenieria_austral.png}%
+  \UA@TryLogo{../../../02_Fuentes_y_herramientas/assets/logo_ingenieria_austral.png}%
+}
+\newcommand{\UA@LogoFallback}{%
+  \begingroup
+  \setlength{\fboxsep}{0.28em}%
+  \fcolorbox{UAIngOrange}{white}{%
+    \scriptsize\bfseries\color{UAIngNavy}%
+    UNIVERSIDAD AUSTRAL\hspace{0.45em}%
+    {\color{UAIngOrange}|}\hspace{0.45em}INGENIERÍA}%
+  \endgroup
+}
+\AtBeginDocument{\UAResolveLogo}
+
+% Compatibilidad: UAPrintLogo recibe altura. UAPrintLogoWide recibe ancho.
+\newcommand{\UAPrintLogo}[1][1.0cm]{%
+  \ifdefempty{\UAResolvedLogo}{\UAResolveLogo}{}%
+  \ifdefempty{\UAResolvedLogo}{\UA@LogoFallback}{%
+    \includegraphics[height=#1,keepaspectratio]{\UAResolvedLogo}}%
+}
+\newcommand{\UAPrintLogoWide}[1][4.5cm]{%
+  \ifdefempty{\UAResolvedLogo}{\UAResolveLogo}{}%
+  \ifdefempty{\UAResolvedLogo}{\UA@LogoFallback}{%
+    \includegraphics[width=#1,keepaspectratio]{\UAResolvedLogo}}%
+}
+\makeatother
 
 \newcommand{\UAHeaderMeta}{%
   \UAUniversity\\
   \UAFaculty\\
   \UADepartment\\
   \UACourse\\
-  \UACareer\ --- \UACommission\\
-  \UACampus\ --- \UASemester
+  \UACareer\ -- \UACommission\\
+  \UACampus\ -- \UASemester
 }
 
+% Componentes comunes
 \newtcolorbox{uakeybox}{
-  enhanced,breakable,colback=UAIngPaper,colframe=UAIngAccent,
-  boxrule=0.8pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+  enhanced,breakable,colback=UAIngPaper,colframe=UAIngOrange,
+  boxrule=0.9pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
 \newtcolorbox{uainfo}{
-  enhanced,breakable,colback=white,colframe=UAIngPrimary,
-  boxrule=0.7pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+  enhanced,breakable,colback=white,colframe=UAIngNavy,
+  boxrule=0.7pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
 \newtcolorbox{uawarn}{
-  enhanced,breakable,colback=UAIngPaper,colframe=UAIngAccentB,
-  boxrule=0.7pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
+  enhanced,breakable,colback=UAIngPaper,colframe=UAIngOrangeAlt,
+  boxrule=0.8pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm}
 \newtcolorbox{uaexercise}{
-  enhanced,breakable,colback=white,colframe=UAIngPrimary,
-  boxrule=0.7pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,title=\textbf{Ejercicio}}
+  enhanced,breakable,colback=white,colframe=UAIngNavy,
+  boxrule=0.7pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm,
+  title=\textbf{Ejercicio},colbacktitle=UAIngNavy,coltitle=white}
 \newtcolorbox{uaanswer}{
-  enhanced,breakable,colback=UAIngPaper,colframe=UAIngAccent,
-  boxrule=0.7pt,arc=2mm,left=3mm,right=3mm,top=2mm,bottom=2mm,title=\textbf{Respuesta orientativa}}
+  enhanced,breakable,colback=UAIngPaper,colframe=UAIngOrange,
+  boxrule=0.8pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm,
+  title=\textbf{Respuesta orientativa},colbacktitle=UAIngOrange,coltitle=white}

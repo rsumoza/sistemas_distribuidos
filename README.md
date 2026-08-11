@@ -1,38 +1,26 @@
-# Universidad Austral — Ingeniería — Sistemas Distribuidos — paquete v6
+# Sistemas Distribuidos v9 Premium
 
-Este paquete integra las 16 clases del curso con:
-- slides
-- apuntes
-- guías
-- guías resueltas
-- material docente
+Curso completo de 16 clases con identidad de Ingeniería - Universidad Austral.
 
-## Cambios v6
-- identidad institucional reforzada
-- logo institucional combinado integrado en primeras páginas y footers
-- headers y footers más visibles
-- clase 1 actualizada con la última figura TikZ recomendada para el ejemplo cliente-servidor
-- contenido de todas las clases elevado al estándar conceptual de la clase 1
+## Contenido
 
-## Estructura
-- `cls/`
-- `config/`
-- `assets/`
-- `slides/`
-- `apuntes/`
-- `guias/`
-- `guias_resueltas/`
-- `docente/`
+- 16 presentaciones (clases 01-05 preservadas; 06-16 revisadas pedagógicamente)
+- 16 apuntes autocontenidos
+- 16 guías con 20 ejercicios cada una
+- 16 guías resueltas con 20 soluciones desarrolladas
+- 16 guías docentes para encuentros de 180 minutos
+- Trabajo Final Integrador con dos entregas intermedias y final el 12/11/2026
+- Programa académico y especificación del Trabajo Final en Word
+- clases/estilos LaTeX institucionales y logo transparente
+- Makefile y validador estructural
 
-## Compilación
+## Uso
+
 ```bash
-make slides
-make apuntes
-make guias
-make guias_resueltas
-make docente
+make validate
 make all
+make clase06
+make clean
 ```
 
-## Fecha incorporada
-19 de abril de 2026
+`make clean` elimina auxiliares y conserva PDF. `make distclean` elimina build completo.

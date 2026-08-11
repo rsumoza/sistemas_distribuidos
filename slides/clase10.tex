@@ -233,4 +233,37 @@ Si no podés observar el sistema distribuido, no podés operarlo con criterio.
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Observabilidad distribuida es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Telemetría no es observabilidad}
+Recolectar muchos datos no garantiza poder responder preguntas nuevas. La observabilidad exige contexto, correlación y señales que permitan inferir causalidad.
+\end{frame}
+\begin{frame}{Incidente guiado por evidencia}
+Métrica: sube p99. Traza: Payments concentra 80\% del tiempo. Logs correlacionados: timeouts hacia un proveedor. La combinación reduce el espacio de hipótesis.
+\end{frame}
+\begin{frame}{Checkpoint}
+Diseñe una pregunta operativa que el sistema deba responder y recién después elija logs, métricas y spans necesarios. Instrumentar sin pregunta genera costo y ruido.
+\end{frame}
+
 \end{document}

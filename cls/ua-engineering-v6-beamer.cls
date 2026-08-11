@@ -1,5 +1,5 @@
 \NeedsTeXFormat{LaTeX2e}
-\ProvidesClass{ua-engineering-v6-beamer}[2026/04/19 UA Ingeniería v6 beamer]
+\ProvidesClass{ua-engineering-v6-beamer}[2026/08/02 UA Ingenieria v6.2 beamer]
 
 \RequirePackage{kvoptions}
 \SetupKeyvalOptions{family=UABEA,prefix=UABEA@}
@@ -9,80 +9,108 @@
 \ProcessKeyvalOptions*
 
 \LoadClass[aspectratio=169,professionalfonts]{beamer}
-\RequirePackage{ua-engineering-v6-common}
+
+\IfFileExists{ua-engineering-v6-common.sty}
+  {\RequirePackage{ua-engineering-v6-common}}
+  {\IfFileExists{../cls/ua-engineering-v6-common.sty}
+     {\RequirePackage{../cls/ua-engineering-v6-common}}
+     {\IfFileExists{../../../02_Fuentes_y_herramientas/cls/ua-engineering-v6-common.sty}
+        {\RequirePackage{../../../02_Fuentes_y_herramientas/cls/ua-engineering-v6-common}}
+        {\ClassError{ua-engineering-v6-beamer}
+          {No se encontro ua-engineering-v6-common.sty}
+          {Copie la clase, el estilo y el logo junto al archivo .tex.}}}}
 \RequirePackage{pgfpages}
 
 \usetheme{default}
 \setbeamertemplate{navigation symbols}{}
-\ifstrequal{\UABEA@notes}{show}{\setbeameroption{show notes}}{}
-\ifstrequal{\UABEA@notes}{second}{\setbeameroption{show notes on second screen=right}}{}
+\setbeamersize{text margin left=0.66cm,text margin right=0.66cm}
+
+\ifdefstring{\UABEA@notes}{show}{\setbeameroption{show notes}}{}
+\ifdefstring{\UABEA@notes}{second}{\setbeameroption{show notes on second screen=right}}{}
 
 \setbeamercolor{normal text}{fg=UAIngText,bg=white}
-\setbeamercolor{structure}{fg=UAIngPrimary}
+\setbeamercolor{structure}{fg=UAIngNavy}
 \setbeamercolor{title}{fg=white}
 \setbeamercolor{subtitle}{fg=white}
-\setbeamercolor{frametitle}{fg=UAIngPrimary,bg=white}
-\setbeamercolor{block title}{fg=white,bg=UAIngPrimary}
+\setbeamercolor{frametitle}{fg=UAIngNavy,bg=white}
+\setbeamercolor{block title}{fg=white,bg=UAIngNavy}
 \setbeamercolor{block body}{fg=UAIngText,bg=UAIngPaper}
-\setbeamercolor{footline}{fg=white,bg=UAIngPrimary}
+\setbeamercolor{alerted text}{fg=UAIngOrange}
+\setbeamercolor{footline}{fg=UAIngMuted,bg=white}
 
 \setbeamerfont{title}{series=\bfseries,size=\LARGE}
 \setbeamerfont{subtitle}{size=\large}
 \setbeamerfont{frametitle}{series=\bfseries,size=\Large}
+\setbeamerfont{footline}{size=\scriptsize}
+
+\setbeamertemplate{itemize item}{\color{UAIngOrange}\raisebox{0.15ex}{\small$\blacktriangleright$}}
+\setbeamertemplate{itemize subitem}{\color{UAIngNavy}\raisebox{0.15ex}{\scriptsize$\blacktriangleright$}}
+\setbeamertemplate{enumerate item}{\color{UAIngOrange}\insertenumlabel.}
+\setbeamertemplate{caption label separator}{: }
 
 \setbeamertemplate{title page}{
 \begin{tikzpicture}[remember picture,overlay]
-\fill[UAIngPrimary] (current page.south west) rectangle (current page.north east);
-\node[anchor=north, yshift=-0.9cm] at (current page.north) {\UAPrintLogo[2.0cm]};
-\node[anchor=center, text width=0.80\paperwidth, align=center] at ([yshift=-0.3cm]current page.center) {
-{\color{white}\bfseries\LARGE \inserttitle}\\[0.45cm]
-{\color{white}\Large \insertsubtitle}\\[0.55cm]
-{\color{white}\normalsize \UAUniversity\ --- \UAFaculty}\\[0.12cm]
-{\color{white}\normalsize \UADepartment}\\[0.12cm]
-{\color{white}\normalsize \UACareer\ --- \UACommission\ --- \UACampus}\\[0.12cm]
-{\color{white}\normalsize \UAProfessor\ --- \UADate}
-\ifstrempty{\UABuildNumber}{}{\\[0.35cm]{\color{white}\scriptsize \UABuildInfo}}
-};
+  \fill[UAIngOrange] (current page.south west) rectangle (current page.north east);
+  \fill[UAIngNavy] (current page.south west) rectangle ([yshift=0.18cm]current page.south east);
+  \node[anchor=north west,inner sep=0pt] at
+    ([xshift=0.82cm,yshift=-0.45cm]current page.north west)
+    {\UAPrintLogoWide[4.35cm]};
+  \node[anchor=west,text width=0.83\paperwidth,align=left,inner sep=0pt] at
+    ([xshift=0.88cm,yshift=0.05cm]current page.west) {%
+      {\color{white}\bfseries\LARGE\inserttitle}\par\vspace{0.30cm}
+      {\color{white}\Large\insertsubtitle}%
+    };
+  \node[anchor=south west,text width=0.83\paperwidth,align=left,inner sep=0pt] at
+    ([xshift=0.88cm,yshift=0.62cm]current page.south west) {%
+      {\color{white}\small\bfseries \UADepartment}\par\vspace{0.07cm}
+      {\color{white}\small \UACareer\ -- \UACommission\ -- \UACampus}\par\vspace{0.05cm}
+      {\color{white}\small \UAProfessor\ -- \UADate}%
+    };
 \end{tikzpicture}
 }
 
 \setbeamertemplate{frametitle}{%
-  \vspace{0.10cm}
-  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.35cm,rightskip=0.35cm,sep=0.12cm]{frametitle}
-  \usebeamerfont{frametitle}\insertframetitle
-  \par\vspace{0.04cm}{\color{UAIngAccent}\rule{\paperwidth-0.7cm}{0.8pt}}
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,leftskip=0.66cm,rightskip=0.66cm,sep=0.16cm]{frametitle}
+    \usebeamerfont{frametitle}\insertframetitle
+    \par\vspace{0.05cm}{\color{UAIngOrange}\rule{\dimexpr\paperwidth-1.66cm\relax}{0.9pt}}
   \end{beamercolorbox}
 }
 
-\setbeamertemplate{footline}{
-\leavevmode
-\hbox{
-  % Logo izquierda
-  \begin{beamercolorbox}[wd=.15\paperwidth,ht=2.8ex,dp=1.2ex,leftskip=0.2cm]{footline}
-    \UAPrintLogo[0.6cm]
-  \end{beamercolorbox}
-
-  % Curso centro
-  \begin{beamercolorbox}[wd=.65\paperwidth,ht=2.8ex,dp=1.2ex,center]{footline}
-    \small \UACourse\ — Clase \UAClassNumber
-  \end{beamercolorbox}
-
-  % Slide number derecha
-  \begin{beamercolorbox}[wd=.20\paperwidth,ht=2.8ex,dp=1.2ex,rightskip=0.3cm]{footline}
-    \small \insertframenumber/\inserttotalframenumber
-  \end{beamercolorbox}
-}
+\setbeamertemplate{footline}{%
+  \leavevmode
+  \vbox{%
+    \hbox{\color{UAIngOrange}\rule{\paperwidth}{0.75pt}}%
+    \hbox{%
+      \begin{beamercolorbox}[wd=.20\paperwidth,ht=3.5ex,dp=1.35ex,leftskip=0.30cm]{footline}
+        \UAPrintLogo[0.58cm]
+      \end{beamercolorbox}%
+      \begin{beamercolorbox}[wd=.66\paperwidth,ht=3.5ex,dp=1.35ex,center]{footline}
+        \usebeamerfont{footline}\color{UAIngMuted}\UACourse%
+        \ifstrempty{\UAClassNumber}{}{\ -- Clase \UAClassNumber}%
+      \end{beamercolorbox}%
+      \begin{beamercolorbox}[wd=.14\paperwidth,ht=3.5ex,dp=1.35ex,rightskip=0.34cm]{footline}
+        \hfill\usebeamerfont{footline}\color{UAIngNavy}\bfseries
+        \insertframenumber/\inserttotalframenumber
+      \end{beamercolorbox}%
+    }%
+  }
 }
 
 \newcommand{\UASectionSlide}[1]{%
 \begin{frame}[plain]
 \begin{tikzpicture}[remember picture,overlay]
-\fill[UAIngPrimary] (current page.north west) rectangle (current page.south east);
-\fill[UAIngAccent] (current page.south west) rectangle ([yshift=0.20cm]current page.south east);
-\node[anchor=north east,inner sep=10pt] at (current page.north east) {\UAPrintLogo[2.35cm]};
+  \fill[UAIngOrange] (current page.south west) rectangle (current page.north east);
+  \fill[UAIngNavy] (current page.south west) rectangle ([yshift=0.18cm]current page.south east);
+  \node[anchor=north east,inner sep=0pt] at
+    ([xshift=-0.70cm,yshift=-0.45cm]current page.north east)
+    {\UAPrintLogoWide[3.55cm]};
+  \node[anchor=west,text width=0.80\paperwidth,align=left,inner sep=0pt] at
+    ([xshift=0.90cm,yshift=-0.20cm]current page.west)
+    {{\color{white}\bfseries\fontsize{28}{33}\selectfont #1}};
+  \node[anchor=south west,inner sep=0pt] at
+    ([xshift=0.90cm,yshift=0.50cm]current page.south west)
+    {{\color{white}\small\bfseries \UACourse}};
 \end{tikzpicture}
-\vfill
-{\color{white}\bfseries\fontsize{28}{32}\selectfont #1\par}
-\vfill
 \end{frame}
 }

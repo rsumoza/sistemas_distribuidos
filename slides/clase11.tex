@@ -215,4 +215,37 @@ La resiliencia distribuida es control de propagación de falla, no negación de 
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Resiliencia distribuida es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Retry budget}
+Un request con tres capas y dos retries por capa puede multiplicarse hasta $3^3=27$ intentos. Limitar retries localmente no alcanza si el presupuesto no es extremo a extremo.
+\end{frame}
+\begin{frame}{Backpressure vs load shedding}
+Backpressure desacelera al productor; load shedding rechaza trabajo que ya no puede procesarse dentro del deadline. Ambos protegen estabilidad, pero ofrecen semánticas distintas al cliente.
+\end{frame}
+\begin{frame}{Checkpoint de resiliencia}
+Para el camino crítico, declare timeout total, presupuesto de retries, límite de concurrencia, fallback, señal de breaker y degradación aceptable.
+\end{frame}
+
 \end{document}

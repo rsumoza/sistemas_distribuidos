@@ -234,4 +234,37 @@ La arquitectura distribuida correcta no es la más moderna, sino la que hace exp
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Arquitecturas distribuidas reales es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{El anti-patrón del monolito distribuido}
+Separar despliegues sin separar ownership ni contratos produce lo peor de ambos mundos: latencia y fallas de red, pero acoplamiento de datos y releases.
+\end{frame}
+\begin{frame}{Fitness functions arquitectónicas}
+Una arquitectura debe evaluarse con propiedades verificables: tiempo de despliegue, blast radius, autonomía de datos, latencia del camino crítico y capacidad de recuperación.
+\end{frame}
+\begin{frame}{Decisión de frontera}
+Antes de crear un servicio, documente: bounded context, owner, dato propio, contrato, falla independiente y razón por la que un módulo interno no alcanza.
+\end{frame}
+
 \end{document}

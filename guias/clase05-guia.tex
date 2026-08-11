@@ -6,46 +6,95 @@
 \date{\UADate}
 \begin{document}
 
-\section{Nivel 1: fundamentos}
+\section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-1. Definir formalmente ACID y explicar el rol de cada propiedad.  
-2. Explicar qué significa aislamiento en términos de observabilidad.  
-3. Diferenciar atomicidad de aislamiento con ejemplos concretos.  
-4. Dar un ejemplo donde atomicidad se cumple pero aislamiento falla.  
+\section{Nivel 1: fundamentos y reconocimiento}
+\begin{uaexercise}
+Defina atomicidad, consistencia, aislamiento y durabilidad, y explique por qué cada propiedad responde a un problema distinto.
+\end{uaexercise}
 
-\section{Nivel 2: serializabilidad}
+\begin{uaexercise}
+Diferencie atomicidad de aislamiento mediante una ejecución donde una se preserve y la otra no.
+\end{uaexercise}
 
-5. Definir serializabilidad formalmente.  
-6. Construir un grafo de precedencia para dos transacciones con conflictos RW.  
-7. Dar un ejemplo de ejecución no serializable y demostrarlo con el grafo.  
-8. Explicar por qué un ciclo implica imposibilidad de orden secuencial.  
+\begin{uaexercise}
+Dado un schedule con dos transacciones, identifique conflictos RW, WR y WW.
+\end{uaexercise}
 
-\section{Nivel 3: anomalías}
+\begin{uaexercise}
+Construya el grafo de precedencia de un schedule y determine si es conflict-serializable.
+\end{uaexercise}
 
-9. Construir un ejemplo de dirty read.  
-10. Construir un ejemplo de non-repeatable read.  
-11. Construir un ejemplo de phantom read.  
-12. Construir un ejemplo completo de write skew.  
-13. Explicar por qué write skew no genera conflicto directo.  
+\begin{uaexercise}
+Demuestre informalmente por qué un ciclo en el grafo impide un orden serial equivalente.
+\end{uaexercise}
 
-\section{Nivel 4: aislamiento}
 
-14. Comparar Read Committed vs Repeatable Read.  
-15. Explicar Snapshot Isolation con un ejemplo.  
-16. Mostrar una ejecución válida en SI pero no serializable.  
+\section{Nivel 2: ejecuciones y fallas}
+\begin{uaexercise}
+Construya un dirty read y explique el estado observable después de un abort.
+\end{uaexercise}
 
-\section{Nivel 5: commit distribuido}
+\begin{uaexercise}
+Construya una non-repeatable read e indique qué nivel de aislamiento la permite.
+\end{uaexercise}
 
-17. Describir paso a paso 2PC con 3 nodos.  
-18. Construir escenario donde coordinador falla en 2PC.  
-19. Explicar por qué los participantes quedan bloqueados.  
-20. Describir cómo 3PC intenta resolver esto.  
+\begin{uaexercise}
+Construya un phantom read con una consulta por predicado.
+\end{uaexercise}
 
-\section{Nivel 6: integración}
+\begin{uaexercise}
+Desarrolle el caso de write skew de dos médicos y formule el invariante violado.
+\end{uaexercise}
 
-21. Relacionar transacciones con consenso.  
-22. Explicar por qué 2PC no resuelve consenso.  
-23. Diseñar sistema que combine consenso + transacciones.  
-24. Aplicar modelo D al problema.
+\begin{uaexercise}
+Explique por qué Snapshot Isolation evita conflictos WW pero puede permitir write skew.
+\end{uaexercise}
+
+
+\section{Nivel 3: diseño y comparación}
+\begin{uaexercise}
+Compare Read Committed, Repeatable Read, Snapshot Isolation y Serializable usando anomalías permitidas.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una prueba que diferencie Snapshot Isolation de serializabilidad real.
+\end{uaexercise}
+
+\begin{uaexercise}
+Describa el protocolo 2PC con coordinador y tres participantes, incluyendo registros durables.
+\end{uaexercise}
+
+\begin{uaexercise}
+Analice una caída del coordinador antes de prepare, durante prepare y después de recibir todos los votos YES.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué un participante prepared no puede decidir unilateralmente sin riesgo para atomicidad.
+\end{uaexercise}
+
+
+\section{Nivel 4: integración y defensa}
+\begin{uaexercise}
+Compare 2PC con consenso: problema que resuelve cada uno, seguridad y progreso.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique qué supuesto adicional necesita 3PC y por qué no elimina las particiones reales.
+\end{uaexercise}
+
+\begin{uaexercise}
+Diseñe una saga para reserva, pago y emisión; incluya compensaciones e idempotencia.
+\end{uaexercise}
+
+\begin{uaexercise}
+Aplique P-F-G-S-T a una transacción distribuida de su Trabajo Final.
+\end{uaexercise}
+
+\begin{uaexercise}
+Defienda ante comité cuándo elegiría transacción fuerte, 2PC o saga para una operación crítica.
+\end{uaexercise}
+
 
 \end{document}

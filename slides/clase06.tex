@@ -158,4 +158,46 @@ El almacenamiento no es implementación: es diseño del sistema
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Sistemas de almacenamiento es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Decidir un motor de almacenamiento}
+\begin{frame}{Caso conductor: telemetría de alta escritura}
+Un sistema recibe millones de eventos diarios y debe conservarlos, consultar rangos temporales y recuperarse después de un crash.
+\begin{block}{Decisión}
+¿B-tree o LSM? La respuesta depende de la mezcla de lecturas, escrituras, amplificación y objetivos de recovery.
+\end{block}
+\end{frame}
+\begin{frame}{Amplificaciones: la factura escondida}
+\begin{itemize}
+\item write amplification: bytes físicos por byte lógico escrito;
+\item read amplification: estructuras consultadas por lectura;
+\item space amplification: espacio físico respecto del estado lógico.
+\end{itemize}
+\begin{uakeybox}Optimizar una dimensión desplaza costo hacia otra. La compaction no es mantenimiento gratuito: es trabajo diferido.</\end{uakeybox}
+\end{frame}
+\begin{frame}{Checkpoint de diseño}
+Para el Trabajo Final, documente: carga esperada, objetivo de recovery, patrón de consulta, política de compaction y evidencia que permitiría revisar la elección.
+\end{frame}
+
 \end{document}

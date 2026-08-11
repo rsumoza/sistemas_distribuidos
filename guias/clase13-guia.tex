@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Justificar siempre desde el punto de vista del servicio y del usuario. No alcanza con dar definiciones: se espera razonar por qué un indicador, objetivo o acuerdo es bueno o malo.
-
-\section{Nivel 1: conceptos básicos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Defina SLI, SLO y SLA, y explique la diferencia entre los tres conceptos.
 \end{uaexercise}
@@ -35,12 +32,12 @@ Dé dos ejemplos de buenos SLI y dos ejemplos de malos SLI.
 Explique por qué “CPU media del cluster” no siempre es un buen SLI.
 \end{uaexercise}
 
-\section{Nivel 2: diseño de objetivos}
-
 \begin{uaexercise}
 Diseñe un SLO razonable para una API pública de lectura.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Diseñe un SLO razonable para un sistema de checkout.
 \end{uaexercise}
@@ -53,8 +50,6 @@ Explique por qué un SLO de 100\% suele ser una mala idea práctica.
 Explique por qué elegir una ventana temporal adecuada es parte del diseño del SLO.
 \end{uaexercise}
 
-\section{Nivel 3: error budgets}
-
 \begin{uaexercise}
 Defina error budget y explique su significado operativo.
 \end{uaexercise}
@@ -63,6 +58,8 @@ Defina error budget y explique su significado operativo.
 Calcule el error budget mensual para un servicio con SLO de 99.9\%.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique qué decisiones podría tomar un equipo si está consumiendo demasiado rápido su error budget.
 \end{uaexercise}
@@ -70,8 +67,6 @@ Explique qué decisiones podría tomar un equipo si está consumiendo demasiado 
 \begin{uaexercise}
 Explique por qué el error budget conecta confiabilidad con velocidad de cambio.
 \end{uaexercise}
-
-\section{Nivel 4: métricas y medición}
 
 \begin{uaexercise}
 Explique por qué un SLO basado en promedio de latencia puede ser engañoso.
@@ -85,11 +80,11 @@ Diseñe un SLI/SLO usando p95 o p99 para un servicio de pagos.
 Explique qué problema aparece si el equipo mide algo distinto de lo que el usuario experimenta.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Diseñe una estrategia mínima para medir correctamente un SLI de disponibilidad.
 \end{uaexercise}
-
-\section{Nivel 5: operación guiada por objetivos}
 
 \begin{uaexercise}
 Explique qué significa operar un sistema guiado por SLOs.
@@ -107,22 +102,5 @@ Construya un ejemplo donde un problema “pequeño” técnicamente sí implique
 Explique cómo SLOs ayudan a resolver discusiones entre producto e ingeniería.
 \end{uaexercise}
 
-\section{Nivel 6: integración}
-
-\begin{uaexercise}
-Diseñe un esquema completo de SLI, SLO y error budget para una plataforma de streaming de eventos.
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ a la confiabilidad operativa de un sistema distribuido.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la confiabilidad operativa no debe confundirse con perfección absoluta.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la operación guiada por objetivos cambia la cultura técnica de un equipo.
-\end{uaexercise}
 
 \end{document}

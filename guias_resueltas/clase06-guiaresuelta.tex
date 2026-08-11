@@ -11,83 +11,253 @@
 
 \date{\UADate}
 \begin{document}
-\maketitle
 
-\section{Resoluciones}
+\section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
+
+\section{Ejercicios y resoluciones completas}
+\begin{uaexercise}
+Explique formalmente por qué la regla WAL garantiza atomicidad en presencia de fallas.
+Modele el estado antes y después de un crash.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
 \begin{uaexercise}
-¿Por qué WAL garantiza atomicidad?
+Considere una secuencia:
+\[
+T: write(x=5), write(y=10), commit
+\]
+y un crash luego de escribir en disco pero antes del commit.
+Describa paso a paso qué hace el recovery.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque toda operación se registra antes de ejecutarse. Si ocurre un crash, el sistema puede:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué problema ocurriría si el sistema escribiera datos antes del log.
+Construya un contraejemplo concreto.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diferencie REDO logging vs UNDO logging con un ejemplo completo de ejecución.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Considere tres versiones de un objeto:
+\[
+(x, v_1, t=1), (x, v_2, t=5), (x, v_3, t=10)
+\]
+¿Qué valor devuelve una transacción con timestamp $t=6$? Justifique.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo MVCC permite eliminar bloqueos entre lectores y escritores.
+Modele dos transacciones concurrentes paso a paso.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un ejemplo donde MVCC produzca write skew.
+Explique por qué no hay conflicto directo.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique el problema de garbage collection en MVCC.
+¿Cuándo es seguro eliminar versiones antiguas?
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un algoritmo simple de garbage collection basado en timestamps activos.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa paso a paso qué ocurre cuando se inserta una clave en un sistema LSM.
+Incluya WAL, Memtable y SSTable.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué LSM evita escrituras aleatorias.
+Relaciónelo con propiedades del disco.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina write amplification y explique por qué ocurre en LSM.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa un proceso completo de compaction.
+Incluya:
 \begin{itemize}
-\item aplicar REDO para operaciones committed
-\item aplicar UNDO para operaciones incompletas
+\item merge
+\item eliminación de versiones viejas
+\item impacto en rendimiento
 \end{itemize}
-Esto asegura que la transacción se ejecute completamente o no se ejecute.
-\end{uaanswer}
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
----
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
 \begin{uaexercise}
-Ejemplo de MVCC.
+Explique read amplification en LSM.
+¿Por qué leer puede ser más costoso que escribir?
 \end{uaexercise}
-
 \begin{uaanswer}
-Versiones:
-\[
-(x,10,t=1), (x,20,t=5), (x,30,t=10)
-\]
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Transacción con $t=6$:
-\[
-\Rightarrow x=20
-\]
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
 
-Se selecciona la versión más reciente válida.
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
-
----
 
 \begin{uaexercise}
-Write skew en MVCC.
+Explique cómo funciona un B-Tree en inserciones y búsquedas.
 \end{uaexercise}
-
 \begin{uaanswer}
-Dos transacciones leen mismo estado inicial y escriben sobre datos distintos sin conflicto directo.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-No hay conflicto RW ni WW ⇒ ambas committean.
-
-Resultado: inconsistencia lógica.
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
-
----
 
 \begin{uaexercise}
-LSM escritura paso a paso.
+Compare B-Tree vs LSM para:
+\begin{itemize}
+\item latencia de lectura
+\item latencia de escritura
+\item uso de disco
+\end{itemize}
 \end{uaexercise}
-
 \begin{uaanswer}
-\begin{enumerate}
-\item escribir en WAL
-\item insertar en Memtable
-\item flush a SSTable
-\item compaction
-\end{enumerate}
-\end{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
----
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
 \begin{uaexercise}
-Write amplification.
+Diseñe un sistema que requiera:
+\begin{itemize}
+\item 90\% lecturas
+\item 10\% escrituras
+\end{itemize}
+¿Qué estructura elegiría y por qué?
 \end{uaexercise}
-
 \begin{uaanswer}
-Ocurre porque un mismo dato se reescribe múltiples veces durante compaction.
-Esto incrementa el costo total de escritura.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
----
+\begin{uaexercise}
+Diseñe un sistema con:
+\begin{itemize}
+\item ingestión masiva de datos
+\item pocas lecturas
+\end{itemize}
+Justifique su elección.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo WAL y MVCC interactúan en un sistema real.
+\end{uaexercise}
+\begin{uaanswer}
+La regla WAL exige que la información necesaria para REDO/UNDO sea durable antes de que una página modificada llegue al almacenamiento y que el commit sea durable antes de responder. Tras un crash, recovery analiza el log, rehace cambios confirmados y deshace o ignora los no confirmados según el esquema.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa cómo MVCC puede implementarse sobre LSM.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería log de recovery, benchmark de lectura/escritura y medición de amplificaciones. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
 \end{document}

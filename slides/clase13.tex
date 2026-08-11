@@ -197,4 +197,37 @@ La confiabilidad operativa no se gestiona con intuiciones, sino con objetivos ex
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Confiabilidad operativa es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Burn rate}
+No alcanza con saber cuánto budget queda: importa a qué velocidad se consume. Un burn rate alto exige reacción antes de agotar la ventana completa.
+\end{frame}
+\begin{frame}{Dos ventanas, una señal accionable}
+Alertar con una ventana corta detecta incidentes rápidos; una ventana larga evita ruido. Combinar ambas reduce falsos positivos sin ignorar degradación sostenida.
+\end{frame}
+\begin{frame}{Checkpoint de servicio}
+Defina un SLI desde la experiencia del usuario, su población válida, ventana, objetivo y política concreta cuando el budget se consume.
+\end{frame}
+
 \end{document}

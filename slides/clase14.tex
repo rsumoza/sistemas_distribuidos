@@ -203,4 +203,37 @@ Una organización madura no se define por no tener incidentes, sino por responde
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Incidentes y cultura de confiabilidad es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{No hay una sola causa raíz}
+El disparador inicia el incidente; factores contribuyentes explican por qué se propagó, tardó en detectarse o fue difícil de mitigar.
+\end{frame}
+\begin{frame}{Acción verificable}
+``Tener más cuidado'' no cambia el sistema. Una acción útil tiene owner, fecha, evidencia de cierre y relación explícita con un factor contribuyente.
+\end{frame}
+\begin{frame}{Checkpoint cultural}
+Pregunte: ¿qué información y presiones hicieron razonable la decisión de la persona en ese momento? La respuesta revela mejoras sistémicas posibles.
+\end{frame}
+
 \end{document}

@@ -11,14 +11,11 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-Justificar siempre. En esta clase no alcanza con decir “usar logs” o “mirar trazas”: se espera explicar qué problema resuelve cada herramienta y qué límites tiene.
-
-\section{Nivel 1: fundamentos}
-
+\section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
 Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
 \end{uaexercise}
@@ -35,12 +32,12 @@ Compare logs, métricas y trazas en términos de qué pregunta responde cada uno
 Construya un ejemplo donde las métricas muestren degradación, pero no permitan identificar por sí solas la causa.
 \end{uaexercise}
 
-\section{Nivel 2: logs}
-
 \begin{uaexercise}
 Explique por qué los logs estructurados son preferibles a los logs de texto libre en sistemas distribuidos.
 \end{uaexercise}
 
+
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Diseñe un esquema mínimo de campos para logs en un servicio HTTP distribuido.
 \end{uaexercise}
@@ -53,8 +50,6 @@ Explique qué problema resuelve un correlation ID.
 Construya un ejemplo donde logs sin request\_id o trace\_id dificulten severamente el debugging.
 \end{uaexercise}
 
-\section{Nivel 3: métricas}
-
 \begin{uaexercise}
 Explique qué son las Golden Signals y por qué son útiles.
 \end{uaexercise}
@@ -63,6 +58,8 @@ Explique qué son las Golden Signals y por qué son útiles.
 Diseñe un conjunto mínimo de métricas para una API distribuida de pagos.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique por qué mirar promedios de latencia puede ocultar problemas serios.
 \end{uaexercise}
@@ -70,8 +67,6 @@ Explique por qué mirar promedios de latencia puede ocultar problemas serios.
 \begin{uaexercise}
 Describa una situación donde la latencia p99 sea más importante que la media.
 \end{uaexercise}
-
-\section{Nivel 4: tracing}
 
 \begin{uaexercise}
 Defina trace y span.
@@ -85,11 +80,11 @@ Explique qué información aporta una traza que no aportan logs agregados.
 Diseñe una traza para una request que pasa por API, Auth, Orders y Payments.
 \end{uaexercise}
 
+
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Explique por qué la propagación de contexto es indispensable en tracing distribuido.
 \end{uaexercise}
-
-\section{Nivel 5: debugging en producción}
 
 \begin{uaexercise}
 Construya un escenario de cascada de fallas iniciada en una base de datos lenta.
@@ -107,22 +102,5 @@ Diseñe una estrategia paso a paso para diagnosticar un aumento repentino de err
 Explique por qué “buscar la línea exacta que falló” no suele ser el primer paso correcto en debugging distribuido.
 \end{uaexercise}
 
-\section{Nivel 6: diseño para observabilidad}
-
-\begin{uaexercise}
-Diseñe una política mínima de observabilidad para un sistema de microservicios.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique cómo cambia el problema de observabilidad en un sistema event-driven respecto de uno puramente sincrónico.
-\end{uaexercise}
-
-\begin{uaexercise}
-Aplique el modelo $D=(P,F,G,S,T)$ al problema de observabilidad distribuida.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la observabilidad debe tratarse como una propiedad de diseño y no como un agregado posterior.
-\end{uaexercise}
 
 \end{document}

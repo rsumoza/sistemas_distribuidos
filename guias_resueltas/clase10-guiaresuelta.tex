@@ -11,119 +11,136 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-Esta guía resuelta debe leerse como un modelo de razonamiento operativo. El objetivo no es memorizar herramientas, sino aprender a reconstruir causalidad y degradación en un sistema distribuido.
-
-\section{Resoluciones}
-
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
 Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
 \end{uaexercise}
-
 \begin{uaanswer}
 La observabilidad distribuida es la capacidad de inferir el estado interno de un sistema distribuido a partir de sus salidas: logs, métricas y trazas. Se diferencia del monitoreo básico en que no se limita a verificar si algo “está arriba o abajo”, sino que busca hacer inteligible la dinámica interna del sistema, especialmente bajo fallas parciales y ejecuciones complejas.
 \end{uaanswer}
 
 \begin{uaexercise}
-Compare logs, métricas y trazas.
+Explique por qué un sistema distribuido necesita algo más que logs locales para ser entendible en producción.
 \end{uaexercise}
-
 \begin{uaanswer}
-Los logs responden principalmente “qué pasó” en eventos discretos.  
-Las métricas responden “cómo está funcionando el sistema en agregado”.  
-Las trazas responden “cómo recorrió esta request el sistema”.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Ninguna de las tres herramientas reemplaza completamente a las otras:
-\begin{itemize}
-\item métricas muestran patrón agregado;
-\item logs muestran eventos concretos;
-\item trazas reconstruyen causalidad por request.
-\end{itemize}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué logs estructurados son preferibles.
+Compare logs, métricas y trazas en términos de qué pregunta responde cada uno.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque permiten:
-\begin{itemize}
-\item búsqueda consistente;
-\item filtrado por campos;
-\item agregación automática;
-\item correlación con métricas y trazas.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Un log de texto libre puede ser legible para humanos, pero escala mal para sistemas distribuidos donde se necesitan consultas automáticas por request\_id, servicio, error\_code o latencia.
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un esquema mínimo de campos para logs.
+Construya un ejemplo donde las métricas muestren degradación, pero no permitan identificar por sí solas la causa.
 \end{uaexercise}
-
 \begin{uaanswer}
-Un esquema mínimo razonable incluye:
-\begin{itemize}
-\item timestamp;
-\item service\_name;
-\item level;
-\item request\_id;
-\item trace\_id;
-\item endpoint;
-\item status\_code;
-\item latency\_ms;
-\item error\_code;
-\item message.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-La lógica es simple: sin contexto, el log local no puede integrarse en una narrativa distribuida.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué los logs estructurados son preferibles a los logs de texto libre en sistemas distribuidos.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un esquema mínimo de campos para logs en un servicio HTTP distribuido.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Explique qué problema resuelve un correlation ID.
 \end{uaexercise}
-
 \begin{uaanswer}
 Resuelve el problema de unir eventos dispersos de una misma request. En un sistema distribuido, la ejecución se fragmenta entre servicios. El correlation ID permite reconstruir el recorrido lógico de esa request a través de logs y trazas. Sin él, cada servicio cuenta solo una historia local incompleta.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique las Golden Signals.
+Construya un ejemplo donde logs sin request\_id o trace\_id dificulten severamente el debugging.
 \end{uaexercise}
-
 \begin{uaanswer}
-Las Golden Signals son una guía operativa para mirar:
-\begin{itemize}
-\item latency;
-\item traffic;
-\item errors;
-\item saturation.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Son útiles porque condensan cuatro dimensiones básicas de salud operativa:
-\begin{itemize}
-\item qué tan rápido responde;
-\item cuánto trabajo está entrando;
-\item cuántas solicitudes fallan;
-\item cuán cerca está el sistema del agotamiento de recursos.
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué mirar promedios puede ocultar problemas.
+Explique qué son las Golden Signals y por qué son útiles.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque los promedios suavizan colas largas. Un sistema puede tener latencia media aceptable y, sin embargo, sufrir colas extremas en p95 o p99 que afecten seriamente a una fracción importante de usuarios. En sistemas distribuidos, esas colas largas suelen ser exactamente donde aparecen timeouts y cascadas de retries.
+La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un conjunto mínimo de métricas para una API distribuida de pagos.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué mirar promedios de latencia puede ocultar problemas serios.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa una situación donde la latencia p99 sea más importante que la media.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
 Defina trace y span.
 \end{uaexercise}
-
 \begin{uaanswer}
 Una trace representa el recorrido completo de una request distribuida. Un span representa una unidad individual de trabajo dentro de esa trace. Por ejemplo:
 \begin{itemize}
@@ -133,115 +150,78 @@ Una trace representa el recorrido completo de una request distribuida. Un span r
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué aporta el tracing.
+Explique qué información aporta una traza que no aportan logs agregados.
 \end{uaexercise}
-
 \begin{uaanswer}
-El tracing aporta estructura causal. Permite ver:
-\begin{itemize}
-\item qué dependencias se invocaron;
-\item dónde se acumuló la latencia;
-\item qué paso falló;
-\item cuál fue la secuencia exacta de spans.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Esto no se obtiene fácilmente con logs o métricas agregadas.
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una traza para API, Auth, Orders y Payments.
+Diseñe una traza para una request que pasa por API, Auth, Orders y Payments.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una traza razonable sería:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item span raíz: API /checkout
-\item hijo 1: Auth /validate-token
-\item hijo 2: Orders /create-order
-\item hijo 3: Payments /authorize
-\end{itemize}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
 
-Cada span debería registrar:
-\begin{itemize}
-\item tiempo de inicio y fin;
-\item status;
-\item etiquetas relevantes (user\_id, order\_id, payment\_id);
-\item relación padre-hijo.
-\end{itemize}
-
-La ventaja es que puede verse inmediatamente si el cuello de botella estuvo en Auth, Orders o Payments.
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas iniciada en DB lenta.
+Explique por qué la propagación de contexto es indispensable en tracing distribuido.
 \end{uaexercise}
-
 \begin{uaanswer}
-Escenario:
+La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-\begin{enumerate}
-\item la DB aumenta latencia;
-\item el servicio Orders empieza a esperar más;
-\item el servicio API recibe respuestas tardías;
-\item se activan retries en clientes o servicios intermedios;
-\item los retries agregan más carga;
-\item la DB se satura aún más;
-\item aparecen errores 500 o timeouts en el borde.
-\end{enumerate}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
 
-El síntoma visible puede ser “la API cae”, pero la causa raíz está en una dependencia más profunda.
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una estrategia para diagnosticar 500s en una API distribuida.
+Construya un escenario de cascada de fallas iniciada en una base de datos lenta.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una estrategia razonable es:
+La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-\begin{enumerate}
-\item observar si la tasa de errores subió súbitamente o gradualmente;
-\item identificar endpoints afectados;
-\item revisar p95/p99 de latencia;
-\item usar trazas para aislar qué dependencia concentra la degradación;
-\item correlacionar logs por request\_id o trace\_id;
-\item verificar si hubo cambios recientes de despliegue o saturación de recursos.
-\end{enumerate}
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
 
-La clave es no tratar el 500 como explicación, sino como síntoma de una cadena causal.
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Aplique $D=(P,F,G,S,T)$ al problema de observabilidad.
+Explique por qué el síntoma visible puede no coincidir con la causa raíz en un sistema distribuido.
 \end{uaexercise}
-
 \begin{uaanswer}
-Una formulación posible es:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item $P$: entender y diagnosticar fallas en un sistema distribuido;
-\item $F$: fallas parciales, latencia variable, retry storms, cascadas;
-\item $G$: reconstrucción de causalidad y localización razonable del problema;
-\item $S$: logs estructurados + métricas + tracing + propagación de contexto;
-\item $T$: sobrecarga, mayor complejidad de instrumentación y costo de almacenamiento/consulta.
-\end{itemize}
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la observabilidad debe ser diseño y no parche.
+Diseñe una estrategia paso a paso para diagnosticar un aumento repentino de errores 500 en una API distribuida.
 \end{uaexercise}
-
 \begin{uaanswer}
-Porque instrumentar tarde suele implicar:
-\begin{itemize}
-\item logs sin estructura;
-\item falta de trace\_id propagado;
-\item métricas insuficientes;
-\item ausencia de puntos de medición donde realmente importa.
-\end{itemize}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Cuando el sistema ya está en producción, agregar observabilidad de forma improvisada suele ser costoso y parcial. Diseñarla desde el inicio permite que el sistema sea explicable cuando más lo necesita: durante la falla.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué “buscar la línea exacta que falló” no suele ser el primer paso correcto en debugging distribuido.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

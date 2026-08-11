@@ -11,72 +11,223 @@
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
-\section{Resoluciones}
+\section{Criterio de lectura}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
+\section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Construir write skew.
+Defina atomicidad, consistencia, aislamiento y durabilidad, y explique por qué cada propiedad responde a un problema distinto.
 \end{uaexercise}
-
 \begin{uaanswer}
-Supongamos dos cuentas A y B, con la regla: al menos una debe tener saldo positivo.
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Estado inicial:
-\[
-A=10,\quad B=10
-\]
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
 
-Transacción \(T_1\):
-\begin{itemize}
-\item lee \(A=10, B=10\)
-\item escribe \(A=0\)
-\end{itemize}
-
-Transacción \(T_2\):
-\begin{itemize}
-\item lee \(A=10, B=10\)
-\item escribe \(B=0\)
-\end{itemize}
-
-Bajo Snapshot Isolation, ambas pueden confirmar porque no escriben el mismo dato.
-
-Estado final:
-\[
-A=0,\quad B=0
-\]
-
-Se viola la restricción global.
-
-Este es el fenómeno de \textbf{write skew}: cada transacción es válida en aislamiento, pero la ejecución concurrente no es equivalente a ninguna ejecución serial válida.
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \begin{uaexercise}
-2PC con falla.
+Diferencie atomicidad de aislamiento mediante una ejecución donde una se preserve y la otra no.
 \end{uaexercise}
-
 \begin{uaanswer}
-En Two-Phase Commit:
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-\begin{itemize}
-\item el coordinador solicita \emph{prepare}
-\item los participantes responden YES
-\end{itemize}
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
 
-Si el coordinador falla antes de enviar COMMIT:
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
-\begin{itemize}
-\item los participantes quedan en estado \emph{prepared}
-\item no pueden decidir commit ni abort por sí solos
-\end{itemize}
+\begin{uaexercise}
+Dado un schedule con dos transacciones, identifique conflictos RW, WR y WW.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en ACID, serializabilidad, grafos de precedencia, anomalías, Snapshot Isolation, 2PC y sagas. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo concurrencia, aborto parcial, coordinador caído y violación de invariantes. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
 
-Resultado:
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
 
-\begin{quote}
-\textbf{bloqueo indefinido}
-\end{quote}
+\begin{uaexercise}
+Construya el grafo de precedencia de un schedule y determine si es conflict-serializable.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
 
-Esto muestra que 2PC garantiza atomicidad, pero no disponibilidad.
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Demuestre informalmente por qué un ciclo en el grafo impide un orden serial equivalente.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un dirty read y explique el estado observable después de un abort.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en ACID, serializabilidad, grafos de precedencia, anomalías, Snapshot Isolation, 2PC y sagas. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo concurrencia, aborto parcial, coordinador caído y violación de invariantes. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya una non-repeatable read e indique qué nivel de aislamiento la permite.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Construya un phantom read con una consulta por predicado.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Desarrolle el caso de write skew de dos médicos y formule el invariante violado.
+\end{uaexercise}
+\begin{uaanswer}
+En write skew dos transacciones leen el mismo snapshot, escriben ítems distintos y preservan individualmente la condición observada, pero juntas violan un invariante. Como no hay conflicto WW directo, Snapshot Isolation puede aceptar ambas; serialización o materialización del conflicto la evita.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué Snapshot Isolation evita conflictos WW pero puede permitir write skew.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare Read Committed, Repeatable Read, Snapshot Isolation y Serializable usando anomalías permitidas.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una prueba que diferencie Snapshot Isolation de serializabilidad real.
+\end{uaexercise}
+\begin{uaanswer}
+Linearizabilidad exige que cada operación parezca ocurrir en un punto entre invocación y respuesta y que el orden respete tiempo real. Para validar una historia se propone un orden secuencial compatible; si ninguna ubicación de las operaciones satisface ambos requisitos, la historia no es linearizable.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Describa el protocolo 2PC con coordinador y tres participantes, incluyendo registros durables.
+\end{uaexercise}
+\begin{uaanswer}
+2PC separa voto durable y decisión global. Después de votar YES, un participante no puede abortar unilateralmente porque el coordinador podría haber decidido COMMIT. Por eso preserva atomicidad pero puede bloquear si la decisión final no está disponible.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Analice una caída del coordinador antes de prepare, durante prepare y después de recibir todos los votos YES.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en ACID, serializabilidad, grafos de precedencia, anomalías, Snapshot Isolation, 2PC y sagas. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo concurrencia, aborto parcial, coordinador caído y violación de invariantes. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué un participante prepared no puede decidir unilateralmente sin riesgo para atomicidad.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Compare 2PC con consenso: problema que resuelve cada uno, seguridad y progreso.
+\end{uaexercise}
+\begin{uaanswer}
+2PC separa voto durable y decisión global. Después de votar YES, un participante no puede abortar unilateralmente porque el coordinador podría haber decidido COMMIT. Por eso preserva atomicidad pero puede bloquear si la decisión final no está disponible.
+
+La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué supuesto adicional necesita 3PC y por qué no elimina las particiones reales.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una saga para reserva, pago y emisión; incluya compensaciones e idempotencia.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique P-F-G-S-T a una transacción distribuida de su Trabajo Final.
+\end{uaexercise}
+\begin{uaanswer}
+La respuesta debe situarse en ACID, serializabilidad, grafos de precedencia, anomalías, Snapshot Isolation, 2PC y sagas. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo concurrencia, aborto parcial, coordinador caído y violación de invariantes. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+
+Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\end{uaanswer}
+
+\begin{uaexercise}
+Defienda ante comité cuándo elegiría transacción fuerte, 2PC o saga para una operación crítica.
+\end{uaexercise}
+\begin{uaanswer}
+La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+
+La evidencia apropiada sería schedule, grafo de precedencia, estado prepared y resultado observable. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
 \end{document}

@@ -175,4 +175,45 @@ El log es la fuente de verdad; el estado es una vista derivada
 \end{block}
 \end{frame}
 
+
+\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\small
+\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{enumerate}
+\item ¿Cuál es el invariante o garantía que realmente importa?
+\item ¿Qué falla concreta amenaza esa garantía?
+\item ¿Qué mecanismo de Logs distribuidos y streaming es pertinente y cuál sería sobreingeniería?
+\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\end{enumerate}
+\end{frame}
+\begin{frame}{Checkpoint de comprensión}
+\small
+Al terminar esta clase deberías poder:
+\begin{itemize}
+\item explicar el problema sin apoyarte en nombres de productos;
+\item identificar el supuesto de falla más importante;
+\item distinguir una propiedad de seguridad de una de progreso;
+\item construir un escenario donde la solución deja de ser suficiente;
+\item defender el trade-off ante una objeción técnica.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Semántica extremo a extremo}
+\begin{frame}{Timeline de pérdida y duplicación}
+\begin{enumerate}
+\item commit del offset antes del efecto + crash $\Rightarrow$ pérdida lógica;
+\item efecto antes del commit del offset + crash $\Rightarrow$ repetición;
+\item efecto y offset en una unidad atómica $\Rightarrow$ efecto lógico único dentro de ese límite.
+\end{enumerate}
+\end{frame}
+\begin{frame}{Exactly-once tiene un alcance}
+Kafka puede coordinar escrituras y offsets dentro de su ecosistema, pero una llamada a un sistema externo exige idempotencia, deduplicación o una transacción adicional.
+\begin{alertblock}{Pregunta}
+¿Exactamente una vez en el broker, en el procesador o en el efecto de negocio?
+\end{alertblock}
+\end{frame}
+\begin{frame}{Rebalanceo y estado}
+Consumer groups escalan procesamiento, pero un rebalanceo mueve particiones. El diseño debe restaurar estado, preservar offsets y evitar dos consumidores activos sobre la misma responsabilidad lógica.
+\end{frame}
+
 \end{document}
