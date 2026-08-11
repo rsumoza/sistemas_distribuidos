@@ -177,7 +177,7 @@ El tiempo se divide en \textbf{términos} (terms).
 \item follower expira timeout
 \item se convierte en candidate
 \item solicita votos
-\item si obtiene mayoría → leader
+\item si obtiene mayoría $\to$ leader
 \end{enumerate}
 
 ---
@@ -188,7 +188,7 @@ El tiempo se divide en \textbf{términos} (terms).
 \item cliente envía request al leader
 \item leader agrega entrada a su log
 \item leader replica a followers
-\item cuando mayoría confirma → commit
+\item cuando mayoría confirma $\to$ commit
 \end{enumerate}
 
 ---
@@ -223,7 +223,7 @@ Si una entrada está comprometida, aparecerá en todos los líderes futuros.
 \begin{itemize}
 \item commit requiere mayoría
 \item futuros líderes también requieren mayoría
-\item intersección ⇒ preservación
+\item intersección $\Rightarrow$ preservación
 \end{itemize}
 
 ---
@@ -313,7 +313,7 @@ Si un valor es elegido, ningún otro valor distinto puede ser elegido.
 \begin{itemize}
 \item elección requiere mayoría
 \item nuevas propuestas deben consultar mayoría
-\item intersección ⇒ conocimiento previo
+\item intersección $\Rightarrow$ conocimiento previo
 \end{itemize}
 
 Por lo tanto:
@@ -334,7 +334,7 @@ El consenso permite implementar:
 \end{itemize}
 
 \begin{uakeybox}
-Consenso ⇒ orden total ⇒ linearizabilidad
+Consenso $\Rightarrow$ orden total $\Rightarrow$ linearizabilidad
 \end{uakeybox}
 
 ---
