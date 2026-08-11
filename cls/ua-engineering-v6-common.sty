@@ -108,11 +108,19 @@
 \newcommand{\UALogoPath}{logo_ingenieria_austral.png}
 \newcommand{\UAResolvedLogo}{}
 \newcommand{\UASetLogo}[1]{\renewcommand{\UALogoPath}{#1}\renewcommand{\UAResolvedLogo}{}}
+\newcommand{\UAFooterLogoPath}{logo_footer_austral.png}
+\newcommand{\UAResolvedFooterLogo}{}
+\newcommand{\UASetFooterLogo}[1]{\renewcommand{\UAFooterLogoPath}{#1}\renewcommand{\UAResolvedFooterLogo}{}}
 
 \makeatletter
 \newcommand{\UA@TryLogo}[1]{%
   \ifdefempty{\UAResolvedLogo}{%
     \IfFileExists{#1}{\renewcommand{\UAResolvedLogo}{#1}}{}%
+  }{}%
+}
+\newcommand{\UA@TryFooterLogo}[1]{%
+  \ifdefempty{\UAResolvedFooterLogo}{%
+    \IfFileExists{#1}{\renewcommand{\UAResolvedFooterLogo}{#1}}{}%
   }{}%
 }
 \newcommand{\UAResolveLogo}{%
@@ -124,6 +132,14 @@
   \UA@TryLogo{../../../assets/logo_ingenieria_austral.png}%
   \UA@TryLogo{../../../02_Fuentes_y_herramientas/assets/logo_ingenieria_austral.png}%
 }
+\newcommand{\UAResolveFooterLogo}{%
+  \renewcommand{\UAResolvedFooterLogo}{}%
+  \UA@TryFooterLogo{\UAFooterLogoPath}%
+  \UA@TryFooterLogo{assets/logo_footer_austral.png}%
+  \UA@TryFooterLogo{../assets/logo_footer_austral.png}%
+  \UA@TryFooterLogo{../../assets/logo_footer_austral.png}%
+  \UA@TryFooterLogo{../../../assets/logo_footer_austral.png}%
+}
 \newcommand{\UA@LogoFallback}{%
   \begingroup
   \setlength{\fboxsep}{0.28em}%
@@ -133,7 +149,7 @@
     {\color{UAIngOrange}|}\hspace{0.45em}INGENIERÍA}%
   \endgroup
 }
-\AtBeginDocument{\UAResolveLogo}
+\AtBeginDocument{\UAResolveLogo\UAResolveFooterLogo}
 
 % Compatibilidad: UAPrintLogo recibe altura. UAPrintLogoWide recibe ancho.
 \newcommand{\UAPrintLogo}[1][1.0cm]{%
@@ -145,6 +161,11 @@
   \ifdefempty{\UAResolvedLogo}{\UAResolveLogo}{}%
   \ifdefempty{\UAResolvedLogo}{\UA@LogoFallback}{%
     \includegraphics[width=#1,keepaspectratio]{\UAResolvedLogo}}%
+}
+\newcommand{\UAPrintFooterLogoWide}[1][2.55cm]{%
+  \ifdefempty{\UAResolvedFooterLogo}{\UAResolveFooterLogo}{}%
+  \ifdefempty{\UAResolvedFooterLogo}{\UAPrintLogoWide[#1]}{%
+    \includegraphics[width=#1,keepaspectratio]{\UAResolvedFooterLogo}}%
 }
 \makeatother
 

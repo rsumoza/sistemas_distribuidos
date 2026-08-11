@@ -79,22 +79,24 @@
 
 \setbeamertemplate{footline}{%
   \leavevmode
-  \vbox{%
-    \hbox{\color{UAIngOrange}\rule{\paperwidth}{0.75pt}}%
-    \hbox{%
-      \begin{beamercolorbox}[wd=.20\paperwidth,ht=3.5ex,dp=1.35ex,leftskip=0.30cm]{footline}
-        \UAPrintLogo[0.58cm]
-      \end{beamercolorbox}%
-      \begin{beamercolorbox}[wd=.66\paperwidth,ht=3.5ex,dp=1.35ex,center]{footline}
-        \usebeamerfont{footline}\color{UAIngMuted}\UACourse%
-        \ifstrempty{\UAClassNumber}{}{\ -- Clase \UAClassNumber}%
-      \end{beamercolorbox}%
-      \begin{beamercolorbox}[wd=.14\paperwidth,ht=3.5ex,dp=1.35ex,rightskip=0.34cm]{footline}
-        \hfill\usebeamerfont{footline}\color{UAIngNavy}\bfseries
-        \insertframenumber/\inserttotalframenumber
-      \end{beamercolorbox}%
-    }%
-  }
+  \hbox{%
+    \begin{beamercolorbox}[wd=.24\paperwidth,ht=3.5ex,dp=1.35ex,leftskip=0.24cm]{footline}
+      \raisebox{0.04cm}{\UAPrintFooterLogoWide[2.55cm]}
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.62\paperwidth,ht=3.5ex,dp=1.35ex,center]{footline}
+      \usebeamerfont{footline}\color{UAIngMuted}\UACourse%
+      \ifstrempty{\UAClassNumber}{}{\ -- Clase \UAClassNumber}%
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.14\paperwidth,ht=3.5ex,dp=1.35ex,rightskip=0.34cm]{footline}
+      \hfill\usebeamerfont{footline}\color{UAIngNavy}\bfseries
+      \insertframenumber/\inserttotalframenumber
+    \end{beamercolorbox}%
+  }%
+  \begin{tikzpicture}[remember picture,overlay]
+    \draw[UAIngOrange,line width=0.75pt]
+      ([yshift=0.72cm]current page.south west) --
+      ([yshift=0.72cm]current page.south east);
+  \end{tikzpicture}%
 }
 
 \newcommand{\UASectionSlide}[1]{%
