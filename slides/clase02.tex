@@ -49,11 +49,14 @@ En sistemas distribuidos:
 \begin{frame}{Comunicar no es instantáneo}
 Una operación remota atraviesa varias capas, y cada una puede responder distinto ante una falla.
 
+\vspace{-0.3em}
 \begin{center}
 \begin{tikzpicture}[
-  node distance=0.4cm,
-  every node/.style={font=\small},
-  box/.style={draw, rounded corners, minimum width=3.0cm, minimum height=0.5cm}
+  scale=0.78,
+  transform shape,
+  node distance=0.25cm,
+  every node/.style={font=\scriptsize},
+  box/.style={draw, rounded corners, minimum width=2.75cm, minimum height=0.42cm}
 ]
 \node[box] (app) {Aplicación};
 \node[box, below=of app] (rpc) {RPC / cliente HTTP};
@@ -66,6 +69,7 @@ Una operación remota atraviesa varias capas, y cada una puede responder distint
 \draw[->] (net)--(srv);
 \end{tikzpicture}
 \end{center}
+\vspace{-0.2em}
 
 \begin{itemize}
 \item una capa puede reintentar mientras otra ya venció su timeout
