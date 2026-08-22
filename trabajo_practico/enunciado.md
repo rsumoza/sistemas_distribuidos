@@ -1,9 +1,9 @@
-ASTERIA ONLINE - ENUNCIADO DE TRABAJO PRÁCTICO
-Sistemas Distribuidos - Universidad Austral
+# ASTERIA ONLINE - ENUNCIADO DE TRABAJO PRÁCTICO
+## Sistemas Distribuidos - Universidad Austral
 
-===========================================================
-1 - Introducción
-===========================================================
+-----------------------------------------------------------
+Introducción
+-----------------------------------------------------------
 
 Este trabajo práctico presenta un contexto de sistema distribuido.
 El objetivo final es que cada grupo construya un conjunto de tuplas D=(P, F, G, S, T) -Problema, Falla, Garantía, Solución, Trade-off- que cubran una cantidad significativa de los problemas reales que existen en este dominio.
@@ -24,13 +24,14 @@ En cada entrega, los problemas y las garantías de negocio ya definidas no cambi
 
 ¡Éxitos con el trabajo!
 
-===========================================================
-2 - Contexto de juego
-===========================================================
+-----------------------------------------------------------
+Contexto de juego
+-----------------------------------------------------------
 
 Asteria Online es un mundo medieval persistente. Los jugadores existen como personajes que se desplazan entre zonas del mapa.
 
-Zonas e instancias:
+**Zonas e instancias:**
+
 Una zona es un lugar del mundo donde puede ocurrir el combate contra un jefe controlado por el juego (por ejemplo, una mazmorra o un evento global).
 Cuando un jugador decide jugar en una zona donde no hay jugadores, se crea una instancia nueva. Si no, se une a una instancia concreta de esa zona donde hay otros jugadores.
 
@@ -39,7 +40,8 @@ qué instancias están abiertas (hay jugadores), cuántos jugadores hay en cada 
 
 Un jugador no puede estar en más de una instancia de juego a la vez.
 
-Combate:
+**Combate:**
+
 Todos los jugadores presentes en una instancia de zona de combate en un momento dado se enfrentan juntos contra el jefe de esa instancia.
 El jefe es un personaje controlado por el juego con una cantidad de puntos de vida compartido,
 y todos los jugadores pelean al mismo tiempo para bajar esos puntos de vida hasta llegar a cero, momento en el que el jefe es derrotado.
@@ -54,11 +56,13 @@ zona, o comprar un objeto de otro jugador en el mercado).
 El oro también se compra con dinero real: esta es la única operación del juego que involucra dinero real.
 Las compras de oro se facturan al jugador desde el país donde se registró cuando creó su cuenta.
 
-Objetos y mercado:
+**Objetos y mercado:**
+
 Los objetos obtenidos como recompensa pueden revenderse entre jugadores en un mercado global, a cambio de oro.
 Algunos objetos son únicos: si un objeto único es vendido, deja de estar disponible para cualquier otro jugador.
 
-Casos de uso de referencia:
+**Casos de uso de referencia:**
+
 Los siguientes tres casos de uso son ejemplos concretos de cómo se combinan los elementos anteriores.
 No agotan el universo de problemas posibles del dominio; se ofrecen como guía para entender el nivel de detalle esperado, y como punto de partida sugerido (no obligatorio ni excluyente) para buscar pares de problema-garantía.
 
@@ -66,9 +70,9 @@ No agotan el universo de problemas posibles del dominio; se ofrecen como guía p
 - Caso de uso 2, El Jefe de Evento Global: una cantidad masiva de jugadores, sin coordinación previa, paga con oro para entrar a una instancia de evento global (multi-datacenter), ataca en simultáneo al jefe, y al ser derrotado se reparten recompensas colectivas.
 - Caso de uso 3, Compra de Oro: un jugador compra una cantidad de oro pagando con dinero real; el cobro se factura a través de la empresa del datacenter hogar del jugador, y el oro comprado se acredita en su cuenta de juego, desde donde puede jugar en cualquier instancia de zona sin importar en qué datacenter corra esa instancia.
 
-===========================================================
-3 - Contexto de infraestructura
-===========================================================
+-----------------------------------------------------------
+Contexto de infraestructura
+-----------------------------------------------------------
 
 La empresa cuenta con 3 datacenters donde se ejecuta el servicio que controla el juego, situados en Brasil, US y Zurich.
 
@@ -92,7 +96,8 @@ distribuidos entre los tres a la vez:
 - Una instancia de evento global se ejecuta de forma simultánea entre los tres datacenters, dado el volumen de jugadores que puede recibir desde cualquier parte del mundo. Los puntos de vida del jefe de evento son un único estado compartido, modificado en paralelo por todos los jugadores presentes, y deben mantenerse coordinados entre los tres datacenters mientras el evento está activo.
 - El directorio de zonas accesibles, al tener que reflejar instancias que corren en todo el mundo (incluidas las de evento global), es en sí mismo un estado compartido multi-datacenter: cada datacenter puede recibir altas, bajas o cambios de ocupación de instancias que corren localmente, y esos cambios deben reflejarse en la visión del directorio que consultan jugadores conectados a los otros datacenters.
 
-Caída vs. particionamiento:
+**Caída vs. particionamiento:**
+
 - Caída completa de un datacenter: el datacenter deja de estar disponible por completo.
   Las instancias que corrían ahí (y, de ser necesario, la porción correspondiente de una instancia de evento global o del directorio de zonas) deben reubicarse o seguir operando en los datacenters restantes.
   No hay ambigüedad sobre la decisión a tomar, solo sobre el costo de la migración: es esperable que se pierda o degrade algo (estado en vuelo, latencia, disponibilidad momentánea).
@@ -106,9 +111,9 @@ Se espera que en caso de fallas catastróficas de un datacenter o de la infraest
 
 Puede haber fallas de infraestructuras parciales (caída del mapa de zonas, combates o pagos).
 
-===========================================================
-4 - Contexto de negocio
-===========================================================
+-----------------------------------------------------------
+Contexto de negocio
+-----------------------------------------------------------
 
 Cada datacenter está gestionado por una empresa local al país donde reside.
 Esa empresa gestiona los cobros a los jugadores registrados en ese país (ver Caso de uso 3, Compra de Oro).
@@ -123,9 +128,9 @@ Es un requerimiento prioritario del negocio que, ante picos de demanda muy por e
 
 Está en las condiciones de uso del juego que cualquier diferencia entre un jugador y el sistema, o entre dos jugadores, la resuelve únicamente la empresa.
 
-===========================================================
-5 - Garantías
-===========================================================
+-----------------------------------------------------------
+Garantías
+-----------------------------------------------------------
 
 Una garantía expresa un interés de negocio o de juego que hay que proteger: qué le pasa al jugador, a su oro, a sus objetos o a su experiencia si algo
 sale mal.
@@ -143,9 +148,9 @@ Eso no significa que la garantía haya cambiado o se haya adaptado: significa qu
 efectivamente logra se documenta como parte del Trade-off en la Entrega 3 (por ejemplo: "esta solución sostiene la garantía salvo durante la ventana de tiempo que dura la migración de una instancia caída a otro datacenter, donde puede perderse el estado de un combate en curso").
 El grado de certeza logrado nunca es parte de la garantía: siempre es parte de la solución y de su trade-off.
 
-===========================================================
-6 - Modelo de fallas
-===========================================================
+-----------------------------------------------------------
+Modelo de fallas
+-----------------------------------------------------------
 
 Se distinguen tres categorías de falla, según su origen:
 
@@ -186,13 +191,13 @@ El foco principal de esta entrega es trabajar las P y G del problema, y luego id
 Los tres casos de uso de la sección 2 son una guía y un punto de partida sugerido, pero no son de uso obligatorio ni excluyente: se puede identificar cualquier problema dentro del contexto de juego, infraestructura y negocio ya definido (secciones 2, 3 y 4).
 Antes de escribir las garantías, releer la sección 5: la forma en que se enuncia una garantía es lo que va a permitir (o impedir) que quede fija durante las tres entregas.
 
-Mínimo a entregar: 6 pares Problema-Garantía distintos, y para cada uno, al menos 1 falla de cliente que lo amenace (mínimo 8 fallas de cliente en total, pudiendo repetirse una falla en más de un par si corresponde).
+**Mínimo a entregar:** 6 pares Problema-Garantía distintos, y para cada uno, al menos 1 falla de cliente que lo amenace (mínimo 8 fallas de cliente en total, pudiendo repetirse una falla en más de un par si corresponde).
 
-IMPORTANTE: en esta entrega NO se pide solución ni trade-off.
+_IMPORTANTE_: en esta entrega NO se pide solución ni trade-off.
 El foco es exclusivamente identificar el problema, la falla y las garantías de negocio que hay que sostener.
 La pregunta de "cómo" se sostiene esa garantía se reserva para la Entrega 2 en adelante.
 
-Entregable: tabla de Problema - Garantía - Falla(s) de cliente identificada(s) para cada par.
+**Entregable:** tabla de Problema - Garantía - Falla(s) de cliente identificada(s) para cada par.
 
 -----------------------------------------------------------
 Entrega 2 - Incorporamos fallas de infraestructura y ofrecemos soluciones
@@ -211,7 +216,7 @@ Cada solución debe incorporar una descripción de las garantías que mantiene y
 Está permitido responder "no se encontró una solución para este P, G y F" solamente en uno de los pares definidos en la Entrega 1, pero en ese caso hay que explicar en detalle las alternativas exploradas y por qué se
 descartaron. Es una alternativa legítima solo cuando realmente no se encontró solución, no un atajo para acortar el alcance.
 
-Entregable: versión revisada de la tabla de la Entrega 1, agregando la columna de Solución para cada par P, G, F (incluyendo los casos sin solución encontrada, debidamente justificados), más los nuevos pares o fallas de infraestructura incorporados.
+**Entregable:** versión revisada de la tabla de la Entrega 1, agregando la columna de Solución para cada par P, G, F (incluyendo los casos sin solución encontrada, debidamente justificados), más los nuevos pares o fallas de infraestructura incorporados.
 
 -----------------------------------------------------------
 Entrega 3 - Incorporamos fallas de seguridad y damos los trade-off
@@ -229,7 +234,7 @@ Además, hay que identificar al menos 2 fallas de seguridad sobre los pares ya d
 
 Esta es la entrega final.
 
-Entregable: versión final e integrada de la tabla de garantías de negocio (fijas desde la Entrega 1), con su mecanismo/solución y el trade-off correspondiente, incorporando las tres categorías de falla, más la
+**Entregable:** versión final e integrada de la tabla de garantías de negocio (fijas desde la Entrega 1), con su mecanismo/solución y el trade-off correspondiente, incorporando las tres categorías de falla, más la
 comparación objetiva de los pares con dos soluciones.
 
 Este último entregable se hará una presentación oral del trabajo completo y deberán defenderlo y justificar sus decisiones.
