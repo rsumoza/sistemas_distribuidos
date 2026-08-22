@@ -10,6 +10,12 @@
 \author{\UAProfessor}
 \date{\UADate}
 
+\usepackage{booktabs}
+\usepackage{float}
+
+\let\originalsection\section
+\renewcommand{\section}{\clearpage\originalsection}
+
 \begin{document}
     \maketitle
     \tableofcontents
@@ -36,7 +42,7 @@
 
     \subsection{Modalidad sugerida}\label{subsec:modalidad-sugerida}
 
-    \begin{table}[htbp]
+    \begin{table}[H]
         \centering
         \begin{tabular}{p{0.28\textwidth}p{0.62\textwidth}}
             \toprule
@@ -50,9 +56,9 @@
         \caption{Modalidad de trabajo y evaluación.}\label{tab:modalidad}
     \end{table}
 
-    La dedicación estimada se reparte de forma despareja entre las tres entregas: la Entrega 2 concentra el grueso del trabajo, porque es donde aparecen las soluciones técnicas y las decisiones de CAP\@. Conviene planificar en consecuencia y no dejarla para la última semana.
+    La dedicación estimada se reparte de forma despareja entre las tres entregas: la Entrega 2 concentra el grueso del trabajo, porque es donde aparecen las soluciones técnicas y las decisiones de CAP. Conviene planificar en consecuencia y no dejarla para la última semana.
 
-    \begin{table}[htbp]
+    \begin{table}[H]
         \centering
         \begin{tabular}{p{0.28\textwidth}p{0.20\textwidth}p{0.42\textwidth}}
             \toprule
