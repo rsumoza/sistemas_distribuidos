@@ -11,6 +11,7 @@ GUIASR_DIR := guias_resueltas
 DOCENTE_DIR := docente
 RUBRICA_DIR := rubrica
 DEFENSA_DIR := defensa
+TRABAJO_PRACTICO_DIR := trabajo_practico
 
 SLIDES_SRC := $(wildcard $(SLIDES_DIR)/clase*.tex)
 APUNTES_SRC := $(wildcard $(APUNTES_DIR)/clase*-apuntes.tex)
@@ -19,6 +20,7 @@ GUIASR_SRC := $(wildcard $(GUIASR_DIR)/clase*-guiaresuelta.tex)
 DOCENTE_SRC := $(wildcard $(DOCENTE_DIR)/clase*-docente.tex)
 RUBRICA_SRC := $(wildcard $(RUBRICA_DIR)/*.tex)
 DEFENSA_SRC := $(wildcard $(DEFENSA_DIR)/*.tex)
+TRABAJO_PRACTICO_SRC := $(TRABAJO_PRACTICO_DIR)/enunciado.tex
 
 SLIDES_PDF := $(patsubst $(SLIDES_DIR)/%.tex,$(BUILD_DIR)/slides/%.pdf,$(SLIDES_SRC))
 APUNTES_PDF := $(patsubst $(APUNTES_DIR)/%.tex,$(BUILD_DIR)/apuntes/%.pdf,$(APUNTES_SRC))
@@ -27,14 +29,15 @@ GUIASR_PDF := $(patsubst $(GUIASR_DIR)/%.tex,$(BUILD_DIR)/guias_resueltas/%.pdf,
 DOCENTE_PDF := $(patsubst $(DOCENTE_DIR)/%.tex,$(BUILD_DIR)/docente/%.pdf,$(DOCENTE_SRC))
 RUBRICA_PDF := $(patsubst $(RUBRICA_DIR)/%.tex,$(BUILD_DIR)/rubrica/%.pdf,$(RUBRICA_SRC))
 DEFENSA_PDF := $(patsubst $(DEFENSA_DIR)/%.tex,$(BUILD_DIR)/defensa/%.pdf,$(DEFENSA_SRC))
+TRABAJO_PRACTICO_PDF := $(patsubst $(TRABAJO_PRACTICO_DIR)/%.tex,$(BUILD_DIR)/trabajo_practico/%.pdf,$(TRABAJO_PRACTICO_SRC))
 
 ALL_PDF := $(SLIDES_PDF) $(APUNTES_PDF) $(GUIAS_PDF) $(GUIASR_PDF) \
-           $(DOCENTE_PDF) $(RUBRICA_PDF) $(DEFENSA_PDF)
+           $(DOCENTE_PDF) $(RUBRICA_PDF) $(DEFENSA_PDF) $(TRABAJO_PRACTICO_PDF)
 
 CLASES := 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16
 CLASS_TARGETS := $(addprefix clase,$(CLASES))
 
-.PHONY: all slides apuntes guias guias_resueltas docente rubrica defensa \
+.PHONY: all slides apuntes guias guias_resueltas docente rubrica defensa trabajo_practico \
         validate dirs clean clean-aux distclean fix-times help $(CLASS_TARGETS)
 
 all: validate $(ALL_PDF)
@@ -62,6 +65,9 @@ rubrica: validate $(RUBRICA_PDF)
 defensa: validate $(DEFENSA_PDF)
 	@$(MAKE) --no-print-directory clean-aux
 
+trabajo_practico: validate $(TRABAJO_PRACTICO_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+
 validate:
 	@python3 tools/validate_tex.py
 
@@ -73,7 +79,8 @@ dirs:
 		"$(BUILD_DIR)/guias_resueltas" \
 		"$(BUILD_DIR)/docente" \
 		"$(BUILD_DIR)/rubrica" \
-		"$(BUILD_DIR)/defensa"
+		"$(BUILD_DIR)/defensa" \
+		"$(BUILD_DIR)/trabajo_practico"
 
 $(BUILD_DIR)/slides/%.pdf: $(SLIDES_DIR)/%.tex | dirs
 	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/slides" "$<"
@@ -96,6 +103,9 @@ $(BUILD_DIR)/rubrica/%.pdf: $(RUBRICA_DIR)/%.tex | dirs
 $(BUILD_DIR)/defensa/%.pdf: $(DEFENSA_DIR)/%.tex | dirs
 	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/defensa" "$<"
 
+$(BUILD_DIR)/trabajo_practico/%.pdf: $(TRABAJO_PRACTICO_DIR)/%.tex | dirs
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/trabajo_practico" "$<"
+
 define CLASS_TARGET
 clase$(1): validate
 	@$$(MAKE) --no-print-directory \
@@ -117,6 +127,7 @@ clean-aux:
 	fi
 	@find "$(SLIDES_DIR)" "$(APUNTES_DIR)" "$(GUIAS_DIR)" \
 		"$(GUIASR_DIR)" "$(DOCENTE_DIR)" "$(RUBRICA_DIR)" "$(DEFENSA_DIR)" \
+		"$(TRABAJO_PRACTICO_DIR)" \
 		-type f \( \
 		-name '*.aux' -o -name '*.log' -o -name '*.nav' -o -name '*.out' \
 		-o -name '*.toc' -o -name '*.snm' -o -name '*.fls' \
@@ -141,7 +152,7 @@ fix-times:
 help:
 	@echo "make all"
 	@echo "make slides | apuntes | guias | guias_resueltas | docente"
-	@echo "make rubrica | defensa"
+	@echo "make rubrica | defensa | trabajo_practico"
 	@echo "make clase01 ... make clase16"
 	@echo "make clean       # conserva PDF"
 	@echo "make distclean   # elimina build completo"
