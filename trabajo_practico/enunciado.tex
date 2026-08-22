@@ -13,12 +13,11 @@
 \usepackage{booktabs}
 \usepackage{float}
 
-\let\originalsection\section
-\renewcommand{\section}{\clearpage\originalsection}
+\newcommand{\sectionbreak}{\clearpage}
 
 \begin{document}
     \maketitle
-    \tableofcontents
+    \tableofcontents 
     \clearpage
 
     \section{Introducción}\label{sec:introduccion}
@@ -50,7 +49,8 @@
             \midrule
             Equipos & 3 o 4 estudiantes. \\
             Entregables & Un documento por entrega con los pares PFGST acumulados, más la defensa oral al cierre. \\
-            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. Cualquier integrante puede ser consultado sobre cualquier decisión del trabajo. \\
+            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. 
+            Cualquier integrante puede ser consultado sobre cualquier decisión del trabajo. \\
             \bottomrule
         \end{tabular}
         \caption{Modalidad de trabajo y evaluación.}\label{tab:modalidad}
@@ -126,7 +126,8 @@
 
     \begin{itemize}
         \item El diseño de la interfaz gráfica del jugador: pantallas, navegación, animaciones y efectos visuales.
-        Atención: esto excluye el diseño visual, no el comportamiento del cliente. Cómo reacciona la aplicación móvil ante una desconexión o un reintento sí forma parte del trabajo, porque es donde se originan las fallas de cliente (ver sección~\ref{sec:modelo-fallas}).
+        Atención: esto excluye el diseño visual, no el comportamiento del cliente.
+        Cómo reacciona la aplicación móvil ante una desconexión o un reintento sí forma parte del trabajo, porque es donde se originan las fallas de cliente (ver sección~\ref{sec:modelo-fallas}).
         \item La implementación: no se pide escribir código, ni elegir productos o tecnologías concretas.
         Las soluciones se describen a nivel de mecanismo, no de producto.
         \item El diseño de mecánicas de juego nuevas: no hace falta inventar zonas, enemigos, habilidades ni economía adicional.
