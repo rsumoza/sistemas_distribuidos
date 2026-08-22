@@ -17,7 +17,7 @@
 
 \begin{document}
     \maketitle
-    \tableofcontents 
+    \tableofcontents
     \clearpage
 
     \section{Introducción}\label{sec:introduccion}
@@ -49,7 +49,7 @@
             \midrule
             Equipos & 3 o 4 estudiantes. \\
             Entregables & Un documento por entrega con los pares PFGST acumulados, más la defensa oral al cierre. \\
-            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. 
+            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité.
             Cualquier integrante puede ser consultado sobre cualquier decisión del trabajo. \\
             \bottomrule
         \end{tabular}
@@ -73,6 +73,21 @@
         \end{tabular}
         \caption{Dedicación estimada por entrega para un equipo de 3 integrantes.}\label{tab:dedicacion}
     \end{table}
+
+    \subsection{Fuera de alcance}\label{subsec:fuera-de-alcance}
+
+    El foco del trabajo está puesto en la gestión distribuida del estado del juego y en las operaciones que lo sostienen.
+    Quedan fuera de alcance:
+
+    \begin{itemize}
+        \item El diseño de la interfaz gráfica del jugador: pantallas, navegación, animaciones y efectos visuales.
+        Atención: esto excluye el diseño visual, no el comportamiento del cliente.
+        Cómo reacciona la aplicación móvil ante una desconexión o un reintento sí forma parte del trabajo, porque es donde se originan las fallas de cliente (ver sección~\ref{sec:modelo-fallas}).
+        \item La implementación: no se pide escribir código, ni elegir productos o tecnologías concretas.
+        Las soluciones se describen a nivel de mecanismo, no de producto.
+        \item El diseño de mecánicas de juego nuevas: no hace falta inventar zonas, enemigos, habilidades ni economía adicional.
+        El contexto de juego se toma como dado, y el trabajo consiste en encontrar los problemas distribuidos que ese contexto genera.
+    \end{itemize}
 
     \section{Contexto de juego}\label{sec:contexto-juego}
 
@@ -119,21 +134,6 @@
         \item Caso de uso 3, Compra de Oro: un jugador compra una cantidad de oro pagando con dinero real; el cobro se factura a través de la empresa del datacenter hogar del jugador, y el oro comprado se acredita en su cuenta de juego, desde donde puede jugar en cualquier instancia de zona sin importar en qué datacenter corra esa instancia.
     \end{itemize}
 
-    \subsection{Fuera de alcance}\label{subsec:fuera-de-alcance}
-
-    El foco del trabajo está puesto en la gestión distribuida del estado del juego: las instancias, los combates, el oro, los objetos, las recompensas y las operaciones que los sostienen.
-    Quedan fuera de alcance:
-
-    \begin{itemize}
-        \item El diseño de la interfaz gráfica del jugador: pantallas, navegación, animaciones y efectos visuales.
-        Atención: esto excluye el diseño visual, no el comportamiento del cliente.
-        Cómo reacciona la aplicación móvil ante una desconexión o un reintento sí forma parte del trabajo, porque es donde se originan las fallas de cliente (ver sección~\ref{sec:modelo-fallas}).
-        \item La implementación: no se pide escribir código, ni elegir productos o tecnologías concretas.
-        Las soluciones se describen a nivel de mecanismo, no de producto.
-        \item El diseño de mecánicas de juego nuevas: no hace falta inventar zonas, enemigos, habilidades ni economía adicional.
-        El contexto de juego se toma como dado, y el trabajo consiste en encontrar los problemas distribuidos que ese contexto genera.
-    \end{itemize}
-
     \section{Contexto de infraestructura}\label{sec:contexto-infraestructura}
 
     La empresa cuenta con 3 datacenters donde se ejecuta el servicio que controla el juego, situados en Brasil, US y Zurich.
@@ -178,7 +178,7 @@
 
     Se espera que en caso de fallas catastróficas de un datacenter o de la infraestructura de comunicación entre datacenters, los jugadores puedan continuar con la mayor cantidad de acciones posible dentro del juego.
 
-    Puede haber fallas de infraestructuras parciales (caída del mapa de zonas, combates o pagos).
+    Puede haber fallas parciales de infraestructura (caída del mapa de zonas, combates o pagos).
 
     \section{Contexto de negocio}\label{sec:contexto-negocio}
 
