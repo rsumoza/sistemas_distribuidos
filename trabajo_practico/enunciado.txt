@@ -8,13 +8,13 @@ Sistemas Distribuidos - Universidad Austral
 Este trabajo práctico presenta un contexto de sistema distribuido.
 El objetivo final es que cada grupo construya un conjunto de tuplas D=(P, F, G, S, T) -Problema, Falla, Garantía, Solución, Trade-off- que cubran una cantidad significativa de los problemas reales que existen en este dominio.
 
-Este conjunto de tuplas debe tener coherencia funcional y técnica, y debe delimitar con claridad como se implementaría el sistema resultante.
+Este conjunto de tuplas debe tener coherencia funcional y técnica, y debe delimitar con claridad cómo se implementaría el sistema resultante.
 
 El contexto de juego describe el mundo de Asteria Online con sus conceptos y reglas.
-Luego en el contexto de infraestructura definimos como el juego es soportado efectivamente en el mundo real.
+Luego en el contexto de infraestructura definimos cómo el juego es soportado efectivamente en el mundo real.
 Finalmente, describimos el contexto de negocio con reglamentaciones, definiciones corporativas y de auditoría.
 
-Después definimos que es una garantía y como debe escribirse, y hacemos una agrupación de los tipos de fallas que vamos a requerir en cada entrega.
+Después definimos qué es una garantía y cómo debe escribirse, y hacemos una agrupación de los tipos de fallas que vamos a requerir en cada entrega.
 
 El trabajo se organiza en tres entregas evolutivas: primero se identifican problemas, garantías de negocio y fallas de cliente;
 luego se incorporan fallas de infraestructura y se proponen soluciones;
@@ -34,37 +34,37 @@ Zonas e instancias:
 Una zona es un lugar del mundo donde puede ocurrir el combate contra un jefe controlado por el juego (por ejemplo, una mazmorra o un evento global).
 Cuando un jugador decide jugar en una zona donde no hay jugadores, se crea una instancia nueva. Si no, se une a una instancia concreta de esa zona donde hay otros jugadores.
 
-Existe un directorio de zonas accesibles, que el jugador consulta para decidir donde jugar:
-qué instancias están abiertas (hay jugadores), cuantos jugadores hay en cada una, y si un evento global está activo.
+Existe un directorio de zonas accesibles, que el jugador consulta para decidir dónde jugar:
+qué instancias están abiertas (hay jugadores), cuántos jugadores hay en cada una, y si un evento global está activo.
 
 Un jugador no puede estar en más de una instancia de juego a la vez.
 
 Combate:
 Todos los jugadores presentes en una instancia de zona de combate en un momento dado se enfrentan juntos contra el jefe de esa instancia.
 El jefe es un personaje controlado por el juego con una cantidad de puntos de vida compartido,
-y todos los jugadores pelean al mismo tiempo para bajar esos puntos de vida hasta llegar a cero donde el jefe es derrotado.
+y todos los jugadores pelean al mismo tiempo para bajar esos puntos de vida hasta llegar a cero, momento en el que el jefe es derrotado.
 Cada zona define un tiempo de combate, si pasado ese tiempo el jefe no es derrotado, todos los jugadores pierden y salen de la zona.
 
 Para entrar a una instancia de zona de combate, un jugador debe pagar una cantidad de oro definida por la zona; sin ese oro, no puede entrar.
 Si el jefe es derrotado, reparte una recompensa (oro, o algún objeto, algunos de ellos únicos) entre los jugadores que participaron.
 Si el jefe no es derrotado, no hay recompensa.
 
-Dentro del juego existe una unica moneda interna, el oro, que se usa para cualquier acción que requiera pago (por ejemplo, entrar a una instancia de
+Dentro del juego existe una única moneda interna, el oro, que se usa para cualquier acción que requiera pago (por ejemplo, entrar a una instancia de
 zona, o comprar un objeto de otro jugador en el mercado).
-El oro también se compra con dinero real: esta es la unica operacion del juego que involucra dinero real.
+El oro también se compra con dinero real: esta es la única operación del juego que involucra dinero real.
 Las compras de oro se facturan al jugador desde el país donde se registró cuando creó su cuenta.
 
 Objetos y mercado:
 Los objetos obtenidos como recompensa pueden revenderse entre jugadores en un mercado global, a cambio de oro.
-Algunos objetos son únicos: si un objeto unico es vendido, deja de estar disponible para cualquier otro jugador.
+Algunos objetos son únicos: si un objeto único es vendido, deja de estar disponible para cualquier otro jugador.
 
 Casos de uso de referencia:
-Los siguientes tres casos de uso son ejemplos concretos de como se combinan los elementos anteriores.
-No agotan el universo de problemas posibles del dominio; se ofrecen como guia para entender el nivel de detalle esperado, y como punto de partida sugerido (no obligatorio ni excluyente) para buscar pares de problema-garantía.
+Los siguientes tres casos de uso son ejemplos concretos de cómo se combinan los elementos anteriores.
+No agotan el universo de problemas posibles del dominio; se ofrecen como guía para entender el nivel de detalle esperado, y como punto de partida sugerido (no obligatorio ni excluyente) para buscar pares de problema-garantía.
 
 - Caso de uso 1, La Mazmorra del Jefe: un grupo reducido de jugadores paga con oro para entrar a una instancia de mazmorra, combate contra el jefe de esa instancia, recibe una recompensa si lo derrota, y esa recompensa puede revenderse luego en el mercado.
 - Caso de uso 2, El Jefe de Evento Global: una cantidad masiva de jugadores, sin coordinación previa, paga con oro para entrar a una instancia de evento global (multi-datacenter), ataca en simultáneo al jefe, y al ser derrotado se reparten recompensas colectivas.
-- Caso de uso 3, Compra de Oro: un jugador compra una cantidad de oro pagando con dinero real; el cobro se factura a traves de la empresa del datacenter hogar del jugador, y el oro comprado se acredita en su cuenta de juego, desde donde puede jugar en cualquier instancia de zona sin importar en que datacenter corra esa instancia.
+- Caso de uso 3, Compra de Oro: un jugador compra una cantidad de oro pagando con dinero real; el cobro se factura a través de la empresa del datacenter hogar del jugador, y el oro comprado se acredita en su cuenta de juego, desde donde puede jugar en cualquier instancia de zona sin importar en qué datacenter corra esa instancia.
 
 ===========================================================
 3 - Contexto de infraestructura
@@ -72,7 +72,7 @@ No agotan el universo de problemas posibles del dominio; se ofrecen como guia pa
 
 La empresa cuenta con 3 datacenters donde se ejecuta el servicio que controla el juego, situados en Brasil, US y Zurich.
 
-La instancia de una zona es la ejecución real de una zona en un momento dado, y es la instancia (no la zona en abstracto) la que corre en un datacenter especifico.
+La instancia de una zona es la ejecución real de una zona en un momento dado, y es la instancia (no la zona en abstracto) la que corre en un datacenter específico.
 Esto es una asignación de funcionamiento normal, no una regla fija: ninguna instancia está atada de forma permanente a un datacenter, y ante una falla debe poder reubicarse en otro de los tres disponibles.
 
 Las instancias normales (por ejemplo, una mazmorra) nacen en el datacenter hogar del jugador que las crea, salvo que se una a una instancia ya creada por otro jugador en otro datacenter.
@@ -80,31 +80,31 @@ Las instancias de evento global son un caso especial: corren de forma distribuid
 
 Datacenter:
 Cada jugador tiene un datacenter hogar fijo, definido por el país en el que se registró.
-Alli vive de forma permanente su información personal y bancaria.
+Allí vive de forma permanente su información personal y bancaria.
 Mientras el jugador está jugando, siempre se encuentra dentro de alguna instancia de zona, cuyo datacenter puede ser distinto al de su datacenter hogar.
-Cuando un jugador se registra, elige uno de esos tres paises como su datacenter hogar, desde donde realiza sus operaciones bancarias (es el país que emite las facturas por sus compras de oro con dinero real).
-Por políticas de la Union Europea y de Brasil, esa información no puede salir de la zona donde el jugador se registró.
+Cuando un jugador se registra, elige uno de esos tres países como su datacenter hogar, desde donde realiza sus operaciones bancarias (es el país que emite las facturas por sus compras de oro con dinero real).
+Por políticas de la Unión Europea y de Brasil, esa información no puede salir de la zona donde el jugador se registró.
 El resto de la información del jugador (por ejemplo, su progreso o su inventario) no tiene esa restricción y puede almacenarse o moverse a otros datacenters.
 
 Casos especiales multi-datacenter: evento global y directorio de zonas.
-Dos elementos del contexto de juego no corren en un unico datacenter, sino
+Dos elementos del contexto de juego no corren en un único datacenter, sino
 distribuidos entre los tres a la vez:
-- Una instancia de evento global se ejecuta de forma simultánea entre los tres datacenters, dado el volumen de jugadores que puede recibir desde cualquier parte del mundo. Los puntos de vida del jefe de evento son un unico estado compartido, modificado en paralelo por todos los jugadores presentes, y deben mantenerse coordinados entre los tres datacenters mientras el evento está activo.
-- El directorio de zonas accesibles, al tener que reflejar instancias que corren en todo el mundo (incluidas las de evento global), es en sí mismo un estado compartido multi-datacenter: cada datacenter puede recibir altas, bajas o cambios de ocupacion de instancias que corren localmente, y esos cambios deben reflejarse en la vision del directorio que consultan jugadores conectados a los otros datacenters.
+- Una instancia de evento global se ejecuta de forma simultánea entre los tres datacenters, dado el volumen de jugadores que puede recibir desde cualquier parte del mundo. Los puntos de vida del jefe de evento son un único estado compartido, modificado en paralelo por todos los jugadores presentes, y deben mantenerse coordinados entre los tres datacenters mientras el evento está activo.
+- El directorio de zonas accesibles, al tener que reflejar instancias que corren en todo el mundo (incluidas las de evento global), es en sí mismo un estado compartido multi-datacenter: cada datacenter puede recibir altas, bajas o cambios de ocupación de instancias que corren localmente, y esos cambios deben reflejarse en la visión del directorio que consultan jugadores conectados a los otros datacenters.
 
 Caída vs. particionamiento:
 - Caída completa de un datacenter: el datacenter deja de estar disponible por completo.
-  Las instancias que corrían ahi (y, de ser necesario, la porción correspondiente de una instancia de evento global o del directorio de zonas) deben reubicarse o seguir operando en los datacenters restantes.
-  No hay ambigüedad sobre la decision a tomar, solo sobre el costo de la migración: es esperable que se pierda o degrade algo (estado en vuelo, latencia, disponibilidad momentánea).
-  El enunciado no define de antemano que se pierde ni que garantía se sostiene durante y después de esa migración; es responsabilidad del grupo definirla y justificarla.
+  Las instancias que corrían ahí (y, de ser necesario, la porción correspondiente de una instancia de evento global o del directorio de zonas) deben reubicarse o seguir operando en los datacenters restantes.
+  No hay ambigüedad sobre la decisión a tomar, solo sobre el costo de la migración: es esperable que se pierda o degrade algo (estado en vuelo, latencia, disponibilidad momentánea).
+  El enunciado no define de antemano qué se pierde ni qué garantía se sostiene durante y después de esa migración; es responsabilidad del grupo definirla y justificarla.
 - Particionamiento entre datacenters (sin caída): los datacenters siguen vivos y operativos, pero pierden conectividad entre sí por un tiempo.
-  Aca aplica directamente el teorema CAP: cada datacenter, aislado, debe decidir si sigue respondiendo con el riesgo de volverse inconsistente respecto a los demás (prioriza disponibilidad), o deja de responder ciertas operaciones hasta que la conectividad se restaure (prioriza consistencia).
-  El grupo debe elegir y justificar esa decision por subsistema, no de forma global unica.
+  Acá aplica directamente el teorema CAP: cada datacenter, aislado, debe decidir si sigue respondiendo con el riesgo de volverse inconsistente respecto a los demás (prioriza disponibilidad), o deja de responder ciertas operaciones hasta que la conectividad se restaure (prioriza consistencia).
+  El grupo debe elegir y justificar esa decisión por subsistema, no de forma global única.
   Este escenario es particularmente relevante para el directorio de zonas y para el estado compartido de una instancia de evento global, que por definición involucran a los tres datacenters a la vez.
 
-Se espera que en caso de fallas catastroficas de un datacenter o de la infraestructura de comunicacion entre datacenters, los jugadores puedan continuar con la mayor cantidad de acciones posible dentro del juego.
+Se espera que en caso de fallas catastróficas de un datacenter o de la infraestructura de comunicación entre datacenters, los jugadores puedan continuar con la mayor cantidad de acciones posible dentro del juego.
 
-Puede haber fallas de infraestructura parcial (caída del mapa de zonas, combates o pagos).
+Puede haber fallas de infraestructuras parciales (caída del mapa de zonas, combates o pagos).
 
 ===========================================================
 4 - Contexto de negocio
@@ -113,13 +113,13 @@ Puede haber fallas de infraestructura parcial (caída del mapa de zonas, combate
 Cada datacenter está gestionado por una empresa local al país donde reside.
 Esa empresa gestiona los cobros a los jugadores registrados en ese país (ver Caso de uso 3, Compra de Oro).
 Solo se devuelve dinero real a un jugador en caso de disputas o errores del sistema.
-No hay intercambio de dinero real entre empresas o paises: entre datacenters solo se mueve estado de juego (oro, objetos, progreso), nunca dinero real.
+No hay intercambio de dinero real entre empresas o países: entre datacenters solo se mueve estado de juego (oro, objetos, progreso), nunca dinero real.
 
 Todas las acciones de un jugador que representen cambios en sus pertenencias -oro u objetos- deben quedar registradas y almacenadas por 90 días, para resolver disputas, uso indebido por parte del jugador, o recuperación ante fallas.
 
 El juego debe protegerse del uso indebido por parte de jugadores que intenten obtener oro, objetos o resultados de combate por medios ilícitos.
 
-Es un requerimiento prioritario del negocio que, ante picos de demanda muy por encima de la capacidad fisica de los datacenters, el juego siga funcionando priorizando a los jugadores que ya están jugando por sobre los jugadores nuevos que intentan ingresar al sistema o ingresar en zonas locales o globales.
+Es un requerimiento prioritario del negocio que, ante picos de demanda muy por encima de la capacidad física de los datacenters, el juego siga funcionando priorizando a los jugadores que ya están jugando por sobre los jugadores nuevos que intentan ingresar al sistema o ingresar en zonas locales o globales.
 
 Está en las condiciones de uso del juego que cualquier diferencia entre un jugador y el sistema, o entre dos jugadores, la resuelve únicamente la empresa.
 
@@ -127,16 +127,16 @@ Está en las condiciones de uso del juego que cualquier diferencia entre un juga
 5 - Garantías
 ===========================================================
 
-Una garantía expresa un interés de negocio o de juego que hay que proteger: que le pasa al jugador, a su oro, a sus objetos o a su experiencia si algo
+Una garantía expresa un interés de negocio o de juego que hay que proteger: qué le pasa al jugador, a su oro, a sus objetos o a su experiencia si algo
 sale mal.
-No describe un problema técnico, ni una falla específica, ni el mecanismo que la sostiene. Una garantía bien escrita tiene que poder leerse sin mencionar de qué tipo de falla se está protegiendo ni como se va a
+No describe un problema técnico, ni una falla específica, ni el mecanismo que la sostiene. Una garantía bien escrita tiene que poder leerse sin mencionar de qué tipo de falla se está protegiendo ni cómo se va a
 implementar.
 
-Una garantía no debe formularse con promesas absolutas ("nunca", "siempre") ni con números concretos ("en menos de 2 segundos", "0% de perdida").
-Esos compromisos de certeza no son parte del interés que se protege: son un atributo de la solución elegida para sostenerlo, y por lo tanto van a variar según que tan exigente sea la falla contra la que esa solución tiene que responder. Por ejemplo, "el jugador no debe perder el oro pagado por un combate que no llego a resolverse" es una garantía; "el jugador nunca pierde el oro pagado" ya no lo es, porque el "nunca" es una promesa de certeza que todavía no se sabe si se va a poder sostener.
+Una garantía no debe formularse con promesas absolutas ("nunca", "siempre") ni con números concretos ("en menos de 2 segundos", "0% de pérdida").
+Esos compromisos de certeza no son parte del interés que se protege: son un atributo de la solución elegida para sostenerlo, y por lo tanto van a variar según qué tan exigente sea la falla contra la que esa solución tiene que responder. Por ejemplo, "el jugador no debe perder el oro pagado por un combate que no llegó a resolverse" es una garantía; "el jugador nunca pierde el oro pagado" ya no lo es, porque el "nunca" es una promesa de certeza que todavía no se sabe si se va a poder sostener.
 
 Esta distinción es la que permite que la garantía quede fija desde la Entrega 1 y no cambie en las entregas siguientes, aunque las fallas se vuelvan más exigentes.
-Lo que evoluciona con cada entrega no es el interés que se protege, sino el mecanismo (la Solución S) y que tan bien ese mecanismo logra sostener ese interés frente a una falla cada vez más difícil de tolerar.
+Lo que evoluciona con cada entrega no es el interés que se protege, sino el mecanismo (la Solución S) y qué tan bien ese mecanismo logra sostener ese interés frente a una falla cada vez más difícil de tolerar.
 
 Puede pasar que, frente a una falla particularmente exigente (típicamente de infraestructura), ninguna solución disponible logre sostener el interés de forma completa.
 Eso no significa que la garantía haya cambiado o se haya adaptado: significa que la solución elegida solo la sostiene de forma parcial, y esa brecha entre lo que la garantía pide y lo que la solución
@@ -147,31 +147,31 @@ El grado de certeza logrado nunca es parte de la garantía: siempre es parte de 
 6 - Modelo de fallas
 ===========================================================
 
-Se distinguen tres categorias de falla, según su origen:
+Se distinguen tres categorías de falla, según su origen:
 
 - Fallas de cliente: originadas por el uso normal y esperado de un
   dispositivo móvil (el juego se juega exclusivamente en celulares).
- Perdida de señal, cambio de red, latencia variable y desconexiones
+  Pérdida de señal, cambio de red, latencia variable y desconexiones
   intermitentes son parte del funcionamiento normal del dominio, no casos
   de borde. Ejemplo fuera de contexto: en una aplicación bancaria móvil, un
   usuario confirma una transferencia y pierde señal antes de recibir la
   confirmación del servidor; al recuperar señal, la app reintenta la
-  operacion.
+  operación.
 
 - Fallas de infraestructura: caída completa de un datacenter, o
   particionamiento temporal entre datacenters que siguen operativos, pero
   sin verse entre sí (ver sección 3). Ejemplo fuera de contexto: en un
-  sistema de reservas de vuelos con servidores en distintos paises, dos
+  sistema de reservas de vuelos con servidores en distintos países, dos
   datacenters quedan temporalmente incomunicados y cada uno permite
   reservar el mismo asiento sin saber del otro.
 
-- Fallas de seguridad: originadas por un cliente que actua de forma
+- Fallas de seguridad: originadas por un cliente que actúa de forma
   deliberadamente maliciosa o adversarial, explotando mecanismos pensados
   para tolerar fallas de cliente o de infraestructura (por ejemplo, un
   reintento pensado para reconexión, usado a propósito para intentar
-  duplicar una operacion). Ejemplo fuera de contexto: en un sistema de
-  e-commerce, un usuario reenvia deliberadamente la confirmación de un pago
-  ya procesado, simulando una perdida de red, para intentar que el sistema
+  duplicar una operación). Ejemplo fuera de contexto: en un sistema de
+  e-commerce, un usuario reenvía deliberadamente la confirmación de un pago
+  ya procesado, simulando una pérdida de red, para intentar que el sistema
   le acredite el producto dos veces.
 
 -----------------------------------------------------------
@@ -182,15 +182,15 @@ En esta entrega se deben detectar y describir los problemas que se van a cubrir,
 
 Para un problema cualquiera pueden plantearse más de una garantía, y una garantía puede y debe sostenerse ante más de una falla del mismo o distintos tipos.
 
-El foco principal de esta entrega es trabajar las P y G del problema, y luego identificar que fallas de cliente podrían afectar a cada uno.
-Los tres casos de uso de la sección 2 son guías y un punto de partida sugerido, pero no son de uso obligatorio ni excluyente: se puede identificar cualquier problema dentro del contexto de juego, infraestructura y negocio ya definido (secciones 2, 3 y 4).
+El foco principal de esta entrega es trabajar las P y G del problema, y luego identificar qué fallas de cliente podrían afectar a cada uno.
+Los tres casos de uso de la sección 2 son una guía y un punto de partida sugerido, pero no son de uso obligatorio ni excluyente: se puede identificar cualquier problema dentro del contexto de juego, infraestructura y negocio ya definido (secciones 2, 3 y 4).
 Antes de escribir las garantías, releer la sección 5: la forma en que se enuncia una garantía es lo que va a permitir (o impedir) que quede fija durante las tres entregas.
 
-Mínimo a entregar: 6 pares Problema-Garantía distintos, y para cada uno, al menos 1 falla de cliente que lo amenace (minimo 8 fallas de cliente en total, pudiendo repetirse una falla en más de un par si corresponde).
+Mínimo a entregar: 6 pares Problema-Garantía distintos, y para cada uno, al menos 1 falla de cliente que lo amenace (mínimo 8 fallas de cliente en total, pudiendo repetirse una falla en más de un par si corresponde).
 
 IMPORTANTE: en esta entrega NO se pide solución ni trade-off.
 El foco es exclusivamente identificar el problema, la falla y las garantías de negocio que hay que sostener.
-La pregunta de "como" se sostiene esa garantía se reserva para la Entrega 2 en adelante.
+La pregunta de "cómo" se sostiene esa garantía se reserva para la Entrega 2 en adelante.
 
 Entregable: tabla de Problema - Garantía - Falla(s) de cliente identificada(s) para cada par.
 
@@ -198,7 +198,7 @@ Entregable: tabla de Problema - Garantía - Falla(s) de cliente identificada(s) 
 Entrega 2 - Incorporamos fallas de infraestructura y ofrecemos soluciones
 -----------------------------------------------------------
 
-Se incorporan dos elementos: fallas de infraestructura, y una Solucion S para cada par P, G,F ya definido.
+Se incorporan dos elementos: fallas de infraestructura, y una Solución S para cada par P, G, F ya definido.
 
 Hay que incorporar al menos 4 fallas de infraestructura (caída de un datacenter o particionamiento entre datacenters), repartidas sobre al menos 3 pares Problema-Garantía distintos de los definidos en la Entrega 1. Pueden ser fallas de infra globales o locales, totales del datacenter o de algún módulo del sistema.
 
@@ -206,30 +206,30 @@ Para cada par P, G y F de la Entrega 1 más las nuevas F de infraestructura, hay
 
 Sin embargo, para al menos un par P, G y F hay que ofrecer dos soluciones distintas, que se van a comparar objetivamente en la Entrega 3.
 
-Cada solución debe incorporar una descripción de las garantías que mantiene y en el caso de que contemple fallas de particionamiento, qué aspecto de CAP elige priorizar.
+Cada solución debe incorporar una descripción de las garantías que mantiene y, en el caso de que contemple fallas de particionamiento, qué aspecto de CAP elige priorizar.
 
 Está permitido responder "no se encontró una solución para este P, G y F" solamente en uno de los pares definidos en la Entrega 1, pero en ese caso hay que explicar en detalle las alternativas exploradas y por qué se
 descartaron. Es una alternativa legítima solo cuando realmente no se encontró solución, no un atajo para acortar el alcance.
 
-Entregable: version revisada de la tabla de la Entrega 1, agregando la columna de Solución para cada par P, G,F (incluyendo los casos sin solución encontrada, debidamente justificados), más los nuevos pares o fallas de infraestructura incorporados.
+Entregable: versión revisada de la tabla de la Entrega 1, agregando la columna de Solución para cada par P, G, F (incluyendo los casos sin solución encontrada, debidamente justificados), más los nuevos pares o fallas de infraestructura incorporados.
 
 -----------------------------------------------------------
 Entrega 3 - Incorporamos fallas de seguridad y damos los trade-off
 -----------------------------------------------------------
 
-Se incorporan fallas de seguridad, y para cada solucion ya presentada hay que presentar los trade-off correspondientes.
+Se incorporan fallas de seguridad, y para cada solución ya presentada hay que presentar los trade-off correspondientes.
 
 Para cada P, G, F y S de las entregas anteriores, hay que presentar con claridad las ventajas y las desventajas que presenta la solución.
 
-Si alguna solución sostiene su garantía solo de forma parcial (ver sección 5), hay que explicitar en el trade-off cuál es exactamente la brecha: bajo que condiciones el interés protegido queda expuesto, y por qué se aceptó esa exposición en lugar de otra alternativa.
+Si alguna solución sostiene su garantía solo de forma parcial (ver sección 5), hay que explicitar en el trade-off cuál es exactamente la brecha: bajo qué condiciones el interés protegido queda expuesto, y por qué se aceptó esa exposición en lugar de otra alternativa.
 
 En el o los problemas con más de una solución (identificados en la Entrega 2), hay que incluir una comparación objetiva y técnica de cada una, marcando con claridad las diferencias a la hora de elegir una u otra.
 
-Además, hay que identificar al menos 2 fallas de seguridad sobre los pares ya definidos: revisar si algún mecanismo pensado para tolerar fallas de cliente o de infraestructura podría ser explotado deliberadamente por un cliente malicioso, y que validación adicional del lado del servidor hace falta para distinguir, en la medida de lo posible, una falla genuina de un intento de ataque.
+Además, hay que identificar al menos 2 fallas de seguridad sobre los pares ya definidos: revisar si algún mecanismo pensado para tolerar fallas de cliente o de infraestructura podría ser explotado deliberadamente por un cliente malicioso, y qué validación adicional del lado del servidor hace falta para distinguir, en la medida de lo posible, una falla genuina de un intento de ataque.
 
 Esta es la entrega final.
 
-Entregable: version final e integrada de la tabla de garantías de negocio (fijas desde la Entrega 1), con su mecanismo/solucion y el trade-off correspondiente, incorporando las tres categorías de falla, más la
+Entregable: versión final e integrada de la tabla de garantías de negocio (fijas desde la Entrega 1), con su mecanismo/solución y el trade-off correspondiente, incorporando las tres categorías de falla, más la
 comparación objetiva de los pares con dos soluciones.
 
 Este último entregable se hará una presentación oral del trabajo completo y deberán defenderlo y justificar sus decisiones.
