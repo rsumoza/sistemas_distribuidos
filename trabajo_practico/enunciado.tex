@@ -43,11 +43,29 @@
             \textbf{Elemento} & \textbf{Propuesta} \\
             \midrule
             Equipos & 3 o 4 estudiantes. \\
-            Dedicación estimada & Entre 18 y 24 horas de trabajo por equipo. \\
-            Entregables & Documentación de los pares PFGST y defensa oral. \\
-            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. \\
+            Entregables & Un documento por entrega con los pares PFGST acumulados, más la defensa oral al cierre. \\
+            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. Cualquier integrante puede ser consultado sobre cualquier decisión del trabajo. \\
             \bottomrule
         \end{tabular}
+        \caption{Modalidad de trabajo y evaluación.}\label{tab:modalidad}
+    \end{table}
+
+    La dedicación estimada se reparte de forma despareja entre las tres entregas: la Entrega 2 concentra el grueso del trabajo, porque es donde aparecen las soluciones técnicas y las decisiones de CAP\@. Conviene planificar en consecuencia y no dejarla para la última semana.
+
+    \begin{table}[htbp]
+        \centering
+        \begin{tabular}{p{0.28\textwidth}p{0.20\textwidth}p{0.42\textwidth}}
+            \toprule
+            \textbf{Entrega} & \textbf{Dedicación} & \textbf{Dónde se va el tiempo} \\
+            \midrule
+            Entrega 1 & 10 a 14 horas & Menos en escribir que en reformular: es habitual descartar la primera tanda de garantías. \\
+            Entrega 2 & 25 a 30 horas & Diseño de las soluciones, decisión de CAP por subsistema y el par con dos soluciones alternativas. \\
+            Entrega 3 & 15 a 20 horas & Trade-offs, análisis adversarial y preparación de la defensa. \\
+            \midrule
+            \textbf{Total} & \textbf{50 a 65 horas} & Horas de trabajo de equipo, no por persona. \\
+            \bottomrule
+        \end{tabular}
+        \caption{Dedicación estimada por entrega para un equipo de 3 integrantes.}\label{tab:dedicacion}
     \end{table}
 
     \section{Contexto de juego}\label{sec:contexto-juego}
@@ -97,9 +115,17 @@
 
     \subsection{Fuera de alcance}\label{subsec:fuera-de-alcance}
 
-    El análisis no incluye la evaluación de la interfaz de usuario del jugador.
-    El foco está puesto exclusivamente en la gestión interna de los elementos de juego, como las instancias, los combates, el oro, los objetos, las recompensas y las operaciones distribuidas que los sostienen.
-    No es necesario analizar las animaciones visuales, los efectos gráficos ni el diseño de la interfaz gráfica.
+    El foco del trabajo está puesto en la gestión distribuida del estado del juego: las instancias, los combates, el oro, los objetos, las recompensas y las operaciones que los sostienen.
+    Quedan fuera de alcance:
+
+    \begin{itemize}
+        \item El diseño de la interfaz gráfica del jugador: pantallas, navegación, animaciones y efectos visuales.
+        Atención: esto excluye el diseño visual, no el comportamiento del cliente. Cómo reacciona la aplicación móvil ante una desconexión o un reintento sí forma parte del trabajo, porque es donde se originan las fallas de cliente (ver sección~\ref{sec:modelo-fallas}).
+        \item La implementación: no se pide escribir código, ni elegir productos o tecnologías concretas.
+        Las soluciones se describen a nivel de mecanismo, no de producto.
+        \item El diseño de mecánicas de juego nuevas: no hace falta inventar zonas, enemigos, habilidades ni economía adicional.
+        El contexto de juego se toma como dado, y el trabajo consiste en encontrar los problemas distribuidos que ese contexto genera.
+    \end{itemize}
 
     \section{Contexto de infraestructura}\label{sec:contexto-infraestructura}
 
