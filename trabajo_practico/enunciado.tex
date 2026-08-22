@@ -34,6 +34,22 @@
 
     ¡Éxitos con el trabajo!
 
+    \subsection{Modalidad sugerida}\label{subsec:modalidad-sugerida}
+
+    \begin{table}[htbp]
+        \centering
+        \begin{tabular}{p{0.28\textwidth}p{0.62\textwidth}}
+            \toprule
+            \textbf{Elemento} & \textbf{Propuesta} \\
+            \midrule
+            Equipos & 3 o 4 estudiantes. \\
+            Dedicación estimada & Entre 18 y 24 horas de trabajo por equipo. \\
+            Entregables & Documentación de los pares PFGST y defensa oral. \\
+            Defensa & 10 minutos de presentación y 5 minutos de preguntas del comité. \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
     \section{Contexto de juego}\label{sec:contexto-juego}
 
     Asteria Online es un mundo medieval persistente.
@@ -79,6 +95,12 @@
         \item Caso de uso 3, Compra de Oro: un jugador compra una cantidad de oro pagando con dinero real; el cobro se factura a través de la empresa del datacenter hogar del jugador, y el oro comprado se acredita en su cuenta de juego, desde donde puede jugar en cualquier instancia de zona sin importar en qué datacenter corra esa instancia.
     \end{itemize}
 
+    \subsection{Fuera de alcance}\label{subsec:fuera-de-alcance}
+
+    El análisis no incluye la evaluación de la interfaz de usuario del jugador.
+    El foco está puesto exclusivamente en la gestión interna de los elementos de juego, como las instancias, los combates, el oro, los objetos, las recompensas y las operaciones distribuidas que los sostienen.
+    No es necesario analizar las animaciones visuales, los efectos gráficos ni el diseño de la interfaz gráfica.
+
     \section{Contexto de infraestructura}\label{sec:contexto-infraestructura}
 
     La empresa cuenta con 3 datacenters donde se ejecuta el servicio que controla el juego, situados en Brasil, US y Zurich.
@@ -89,14 +111,17 @@
     Las instancias normales (por ejemplo, una mazmorra) nacen en el datacenter hogar del jugador que las crea, salvo que se una a una instancia ya creada por otro jugador en otro datacenter.
     Las instancias de evento global son un caso especial: corren de forma distribuida, de forma simultánea entre los tres datacenters.
 
-    Datacenter: Cada jugador tiene un datacenter hogar fijo, definido por el país en el que se registró.
+    \subsection{Datacenter}\label{subsec:datacenter}
+
+    Cada jugador tiene un datacenter hogar fijo, definido por el país en el que se registró.
     Allí vive de forma permanente su información personal y bancaria.
     Mientras el jugador está jugando, siempre se encuentra dentro de alguna instancia de zona, cuyo datacenter puede ser distinto al de su datacenter hogar.
     Cuando un jugador se registra, elige uno de esos tres países como su datacenter hogar, desde donde realiza sus operaciones bancarias (es el país que emite las facturas por sus compras de oro con dinero real).
     Por políticas de la Unión Europea y de Brasil, esa información no puede salir de la zona donde el jugador se registró.
     El resto de la información del jugador (por ejemplo, su progreso o su inventario) no tiene esa restricción y puede almacenarse o moverse a otros datacenters.
 
-    Casos especiales multi-datacenter: evento global y directorio de zonas.
+    \subsection{Casos especiales multi-datacenter: evento global y directorio de zonas}\label{subsec:casos-multi-datacenter}
+
     Dos elementos del contexto de juego no corren en un único datacenter, sino distribuidos entre los tres a la vez:
 
     \begin{itemize}
