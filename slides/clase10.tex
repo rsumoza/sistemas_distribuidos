@@ -1,5 +1,5 @@
 % !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
+\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
 
 % Fallback local para mantener el archivo portable entre el entorno local y CI.
@@ -35,42 +35,51 @@
 
 \begin{frame}{Puente desde clase 9}
 \begin{itemize}
-\item Más servicios implican más procesos, relojes y fallas parciales.
-\item Eventos desacoplan el flujo, pero fragmentan la causalidad.
-\item Ownership distribuido necesita evidencia compartida.
+\item RPC, retries, consistencia
+\item Transacciones, logs, arquitectura
 \end{itemize}
-\begin{block}{Pregunta}
-¿Cómo investigamos una compra que tardó 12 segundos y terminó duplicada si atravesó seis servicios y dos topics?
+
+\pause
+
+\begin{block}{El desafío real}
+¿Cómo entendemos qué está pasando en un sistema distribuido real cuando algo degrada o falla en producción?
 \end{block}
 \end{frame}
 
-\begin{frame}{Caso conductor: error 500 en checkout}
-\begin{uacase}
-A las 21:10 los errores 500 suben del 0.2\% al 8\%. La API parece sana, Payments tiene latencia irregular y la base reporta CPU normal. ¿Dónde empieza la investigación?
-\end{uacase}
+\begin{frame}{¿Por qué monitorear?}
 \begin{itemize}
-\item Un dashboard muestra síntomas agregados.
-\item Un log muestra eventos locales.
-\item Una traza conecta la request.
-\item Ninguna señal aislada cuenta toda la historia.
+\item Hay problemas que no se resuelven de manera automática y es necesario informar
+      a un humano: un disco que se está llenando, un certificado por vencer,
+      un servicio que degrada lentamente.
+\item Sin monitoreo, la primera señal de fallo suele ser un usuario quejándose.
+\item Los datos de monitoreo permiten tomar decisiones informadas:
+      ¿cuánto mejoró el hit rate de memcache al agregar un nodo?
+      Sin métricas, esa respuesta es una apuesta.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Monitoreo y observabilidad}
-\begin{columns}[T]
-\column{0.47\textwidth}
-\textbf{Monitoreo}
+\pause
+
+\begin{block}{Idea}
+No monitoreamos porque podemos. Monitoreamos porque sin visibilidad operativa,
+no hay forma de sostener un sistema distribuido en producción.
+\end{block}
+\end{frame}
+
+\begin{frame}{La intuición del monolito vs. la realidad distribuida}
+En un monolito local:
 \begin{itemize}
-\item preguntas conocidas;
-\item umbrales y alertas;
-\item ¿está cumpliendo el objetivo?
+\item Stack trace único, reproduzco localmente, pongo breakpoints.
 \end{itemize}
-\column{0.49\textwidth}
-\textbf{Observabilidad}
+
+\pause
+
+En un sistema distribuido moderno:
 \begin{itemize}
-\item preguntas nuevas;
-\item inferir estado desde señales;
-\item ¿por qué ocurre este comportamiento?
+\item Múltiples procesos y lenguajes en red.
+\item No hay un único reloj físico confiable (\emph{clock drift}).
+\item La narrativa de una request se fragmenta.
+\item Las fallas son parciales y en cascada.
 \end{itemize}
 \end{columns}
 \begin{alertblock}{Cuidado}
@@ -78,146 +87,87 @@ Recolectar mucha telemetría no garantiza poder explicar el sistema.
 \end{alertblock}
 \end{frame}
 
-\UASectionSlide{Logs: eventos con contexto, no frases sueltas}
+\UASectionSlide{Redefiniendo la Observabilidad}
 
-\begin{frame}[fragile]{Texto libre vs log estructurado}
-\small
-\textbf{Texto libre:}
-\begin{quote}
-“Error procesando pedido”
-\end{quote}
-\textbf{Estructurado:}
-\begin{verbatim}
-{service:"payments", trace_id:"a9...",
- order_id:"o-81", attempt:2,
- latency_ms:1840, error:"TIMEOUT"}
-\end{verbatim}
-\begin{block}{Valor}
-Campos estables permiten correlación, consulta y agregación; el mensaje humano aporta detalle.
+\begin{frame}{Observabilidad (Teoría de Control a Software)}
+\begin{block}{Definición}
+Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
 \end{block}
-\end{frame}
 
-\begin{frame}{Qué contexto debe viajar}
+\pause
+
 \begin{itemize}
-\item trace ID y span ID;
-\item request/event ID;
-\item aggregate ID: order, payment, user;
-\item intento y política de retry;
-\item servicio, versión y región;
-\item resultado, error y latencia;
-\item identidad segura, sin exponer secretos.
+\item \textbf{Monitoreo:} ¿Está el sistema funcionando? (\emph{known-unknowns}).
+\item \textbf{Observabilidad:} ¿Por qué está ocurriendo este comportamiento anómalo e imprevisto? (\emph{unknown-unknowns}).
 \end{itemize}
 \begin{alertblock}{Privacidad}
 Más contexto no justifica loguear tokens, contraseñas, datos de tarjeta o PII innecesaria.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Caso real: perder los logs también es un incidente}
-\small
-Cloudflare informó en 2024 una interrupción donde aproximadamente 55\% de los logs que normalmente enviaba a clientes se perdieron durante unas 3.5 horas.
-\begin{itemize}
-\item El sistema de observación también tiene SLOs y fallas.
-\item “No vemos errores” puede significar ausencia de telemetría.
-\item Debe monitorearse la completitud del pipeline de logs.
-\end{itemize}
-{\scriptsize Fuente: postmortem oficial de Cloudflare sobre pérdida de logs, noviembre de 2024.}
+\begin{frame}{¿Qué debe responder un buen monitor?}
+Un sistema de monitoreo útil debe responder dos preguntas:
+\begin{enumerate}
+\item \textbf{¿Qué está roto?} --- Identificar el componente o servicio que
+      está fallando o degradando.
+\item \textbf{¿Por qué está roto?} --- Dar suficiente contexto para entender
+      la causa, no solo el síntoma.
+\end{enumerate}
+
+\pause
+
+\begin{alertblock}{Consecuencia de diseño}
+Si tu alerta solo dice ``error rate alto'' pero no ayuda a responder qué ni
+por qué, no es monitoreo: es una alarma de incendio sin indicar dónde está
+el fuego.
+\end{alertblock}
 \end{frame}
 
-\UASectionSlide{Métricas: comprimir comportamiento sin perder la pregunta}
+\begin{frame}{La trampa de los 3 pilares: "Las 3 Pestañas"}
+El modelo tradicional de 3 pilares crea silos independientes:
 
-\begin{frame}{Golden Signals}
-Según Google SRE, para un servicio orientado a usuarios conviene observar:
+\begin{alertblock}{Antipatrón: Three Browser Tabs}
 \begin{itemize}
-\item \textbf{Latency}: cuánto tarda el trabajo exitoso y fallido;
-\item \textbf{Traffic}: cuánta demanda llega;
-\item \textbf{Errors}: qué proporción no cumple;
-\item \textbf{Saturation}: cuán cerca está un recurso de su límite.
+\item Pestaña 1: Dashboards de métricas (Grafana).
+\item Pestaña 2: Buscador de logs (Elasticsearch).
+\item Pestaña 3: Trazas aisladas (Jaeger).
 \end{itemize}
-{\scriptsize Fuente: Google SRE Book, “Monitoring Distributed Systems”.}
+\end{alertblock}
+
+\pause
+
+\textbf{Resultado:} El ser humano tiene que ser el "puente manual" adivinando correlaciones mirando líneas torcidas con los ojos.
 \end{frame}
 
-\begin{frame}{Promedio: una cifra que puede esconder usuarios}
-\small
-Latencias de 100 requests:
-\begin{itemize}
-\item 95 requests: 100 ms;
-\item 5 requests: 8 s.
-\end{itemize}
-Media aproximada: 495 ms. Pero p95/p99 muestra una cola problemática.
-\begin{block}{Lección}
-Los percentiles responden “qué experimenta una fracción de usuarios”; la media responde otra pregunta.
+\begin{frame}{La alternativa: "La Trenza Única de Datos"}
+\begin{block}{Single Braid of Data (OpenTelemetry / OTLP)}
+Las tres señales (logs, métricas, trazas) conservan su identidad, pero están \textbf{entrelazadas por contexto compartido}.
 \end{block}
-\end{frame}
 
-\begin{frame}{RED y USE: dos vistas complementarias}
-\begin{columns}[T]
-\column{0.47\textwidth}
-\textbf{RED para servicios}
-\begin{itemize}
-\item Rate;
-\item Errors;
-\item Duration.
-\end{itemize}
-\column{0.49\textwidth}
-\textbf{USE para recursos}
-\begin{itemize}
-\item Utilization;
-\item Saturation;
-\item Errors.
-\end{itemize}
-\end{columns}
-\begin{block}{Debugging}
-RED detecta el síntoma de servicio; USE ayuda a localizar presión en recursos.
-\end{block}
-\end{frame}
+\pause
 
-\begin{frame}{Cardinalidad: la métrica que puede derribar el observability stack}
 \begin{itemize}
-\item Etiquetas como \texttt{status} o \texttt{region} tienen cardinalidad controlada.
-\item \texttt{user\_id} o \texttt{request\_id} crean millones de series.
-\item Alta cardinalidad aumenta memoria, costo y latencia de consulta.
-\end{itemize}
-\begin{uakeybox}
-Use métricas para agregados; use logs/traces para identidades individuales.
-\end{uakeybox}
-\end{frame}
-
-\UASectionSlide{Tracing: reconstruir causalidad por request}
-
-\begin{frame}{Trace y span}
-\begin{itemize}
-\item Trace: recorrido causal completo de una operación.
-\item Span: unidad de trabajo con inicio, duración, atributos y resultado.
-\item Parent/child expresa dependencia causal, no solo orden temporal.
+\item Permite que las computadoras (y no solo los ojos del operador) calculen correlaciones automáticas entre datos.
 \end{itemize}
 \begin{block}{Pregunta}
 ¿La latencia del checkout está en Payments, en una espera de cola o en retries invisibles?
 \end{block}
 \end{frame}
 
-\begin{frame}{Trace de checkout con retry}
-\begin{center}
-\begin{tikzpicture}[x=1cm,y=0.65cm,every node/.style={font=\scriptsize}]
-\node[left] at (0,3){API}; \draw[very thick] (0.6,3)--(8.2,3);
-\node[left] at (0,2){Orders}; \draw[very thick,UAIngNavy] (1.4,2)--(3.1,2);
-\node[left] at (0,1){Payments}; \draw[very thick,UAIngOrange] (3.3,1)--(5.2,1); \draw[very thick,UAIngOrange] (5.6,1)--(7.5,1);
-\node[above] at (4.25,1){intento 1 timeout};
-\node[above] at (6.55,1){intento 2 éxito};
-\draw[dashed] (1.4,3)--(1.4,2); \draw[dashed] (3.3,3)--(3.3,1);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Valor}
-La traza muestra que la request no estuvo “12 s en la API”: pasó la mayor parte del tiempo esperando Payments y reintentando.
-\end{block}
+\begin{frame}{Hard Context vs. Soft Context}
+\begin{description}
+\item[Soft Context:] Correlación implícita por ventanas de tiempo o filtros de texto. Requiere que un humano ``haga zoom'' e intuya la causa.
+\pause
+\item[Hard Context:] Enlaces explícitos e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Define la topología y causalidad exacta.
+\end{description}
 \end{frame}
 
-\begin{frame}{Context propagation}
-\small
-OpenTelemetry define propagación de contexto para correlacionar spans a través de procesos y límites de red.
+\UASectionSlide{Eventos Estructurados y Métricas}
+
+\begin{frame}{Eventos Estructurados Anchos}
 \begin{itemize}
-\item HTTP/gRPC: headers como \texttt{traceparent}.
-\item Mensajería: metadata del evento.
-\item Background jobs: copiar explícitamente el contexto relevante.
+\item Logs de texto libre $\rightarrow$ difíciles de parsear a escala.
+\item Logs estructurados (JSON) $\rightarrow$ legibles por máquinas.
 \end{itemize}
 \begin{alertblock}{Falla común}
 Un servicio que no propaga contexto corta la traza y vuelve “huérfana” la causalidad downstream.
@@ -225,85 +175,101 @@ Un servicio que no propaga contexto corta la traza y vuelve “huérfana” la c
 {\scriptsize Fuente: documentación oficial de OpenTelemetry.}
 \end{frame}
 
-\begin{frame}{Sampling: observar todo no siempre es viable}
-\begin{itemize}
-\item Head sampling decide al comienzo: barato, puede perder errores raros.
-\item Tail sampling decide después de ver la traza: retiene errores/colas, requiere buffering.
-\item Sampling adaptativo puede priorizar rutas críticas.
-\end{itemize}
-\begin{block}{Principio}
-La estrategia debe preservar evidencia de incidentes, no solo reducir costo promedio.
+\pause
+
+\begin{block}{Unidad de trabajo (Unit of Work)}
+Inicializar un mapa en memoria al recibir la solicitud, acumular atributos durante la ejecución y emitir un \textbf{Evento Estructurado Ancho} al finalizar.
 \end{block}
 \end{frame}
 
-\UASectionSlide{Correlacionar señales: del síntoma a una hipótesis}
-
-\begin{frame}{Un método de debugging causal}
-\begin{enumerate}
-\item Confirmar impacto con SLI/SLO.
-\item Delimitar tiempo, región, versión y endpoint.
-\item Comparar golden signals y cambios recientes.
-\item Seleccionar trazas representativas de éxito y fallo.
-\item Localizar el primer span degradado.
-\item Consultar logs/contexto del componente.
-\item Formular hipótesis y buscar evidencia que podría refutarla.
-\end{enumerate}
-\end{frame}
-
-\begin{frame}{Síntoma, causa próxima y causa sistémica}
-\begin{uacase}
-Síntoma: API devuelve 500.\newline
-Causa próxima: pool de conexiones agotado.\newline
-Cadena sistémica: query lenta $\rightarrow$ timeouts $\rightarrow$ retries $\rightarrow$ más conexiones $\rightarrow$ saturación.
-\end{uacase}
-\begin{alertblock}{Lección}
-Arreglar el último error visible puede dejar intacta la dinámica que lo produjo.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Caso real: una configuración propagada a toda la red}
-\small
-Cloudflare describió en noviembre de 2025 un outage disparado por un cambio de permisos que produjo un archivo de features mucho mayor, luego distribuido a máquinas de la red.
+\begin{frame}{Métricas: Golden Signals y Percentiles}
 \begin{itemize}
-\item El disparador local se volvió sistémico por propagación global.
-\item Tamaño, rollout y validación eran señales críticas.
-\item Un buen postmortem conecta trigger, blast radius y defensas faltantes.
+\item \textbf{Golden Signals:} Latencia, Tráfico, Errores, Saturación.
+\item \textbf{Promedio vs. Percentiles:} El promedio oculta la ``cola larga''. Mirar siempre \textbf{p95} y \textbf{p99}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{El peligro de la Explosión de Cardinalidad}
+\begin{alertblock}{TSDBs y Cardinalidad}
+En bases de datos de series temporales (Prometheus), agregar etiquetas de alta cardinalidad (ej: \texttt{customer\_id} o \texttt{order\_id}) crea una serie temporal nueva por cada valor único.
+\end{alertblock}
+
+\pause
+
+\begin{itemize}
+\item \textbf{Regla de diseño:} Alta cardinalidad vive en Eventos Estructurados y Spans, NUNCA en métricas agregadas.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Tracing Distribuido y Causalidad}
+
+\begin{frame}{Trazas y Spans (DAG)}
+\begin{itemize}
+\item \textbf{Trace:} Grafo Acíclico Dirigido (DAG) del viaje completo de la solicitud.
+\item \textbf{Span:} Unidad individual de trabajo delimitada en tiempo.
+\end{itemize}
+
+\pause
+
+Campos esenciales de un Span:
+\begin{center}
+\texttt{Trace ID} $\vert$ \texttt{Span ID} $\vert$ \texttt{Parent Span ID} $\vert$ \texttt{Timestamp} $\vert$ \texttt{Duration}
+\end{center}
+\end{frame}
+
+\begin{frame}{Conexión con Clase 03: Lamport vs. Clock Drift}
+\begin{block}{¿Por qué no alcanza el timestamp?}
+En sistemas distribuidos, los relojes físicos sufren \emph{clock drift}. Ordenar por tiempo real produce falsas causalidades.
+\end{block}
+
+\pause
+
+\begin{itemize}
+\item El \texttt{parent\_span\_id} implementa la relación \textbf{\emph{happened-before} ($\rightarrow$) de Lamport}.
+\item Preserva el orden causal estricto sin depender de sincronización de relojes físicos.
 \end{itemize}
 {\scriptsize Fuente: postmortem oficial de Cloudflare, 18 de noviembre de 2025.}
 \end{frame}
 
-\begin{frame}{Observabilidad del pipeline asincrónico}
+\begin{frame}{Propagación de Contexto}
 \begin{itemize}
-\item Trace ID/correlation ID viaja en eventos.
-\item Lag y edad del evento muestran frescura.
-\item DLQ, retries y redrive necesitan métricas.
-\item Una saga requiere estado y timeline por saga ID.
-\item La causalidad puede ser grafo, no una única cadena.
+\item \textbf{In-Band (En banda):} Cabeceras W3C (\texttt{traceparent}) viajan junto al mensaje HTTP/gRPC. Si un servicio no las re-inyecta, la traza se rompe.
+\item \textbf{Out-of-Band (Fuera de banda):} Envío asíncrono de Spans terminados hacia el recolector (OTel Collector / Jaeger) sin bloquear la solicitud.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Diseñar señales útiles y sostenibles}
+\UASectionSlide{Estrategia en Dos Capas y Debugging}
 
-\begin{frame}{Telemetría con propósito}
-Para cada señal, responder:
-\begin{itemize}
-\item ¿qué pregunta permite contestar?;
-\item ¿qué decisión activa?;
-\item ¿qué cardinalidad y volumen produce?;
-\item ¿cuánto se retiene?;
-\item ¿qué ocurre si la señal se pierde?;
-\item ¿contiene datos sensibles?
-\end{itemize}
+\begin{frame}{Estrategia de Instrumentación en 2 Capas}
+\begin{description}
+\item[Capa 1: Infraestructura (Auto-instrumentación)]~\\
+Captura el esqueleto de red y propagación de cabeceras W3C automáticamente.
+\pause
+\item[Capa 2: Dominio (Instrumentación Manual)]~\\
+Inyecta metadatos de negocio de alta cardinalidad (\texttt{tenant\_id}, \texttt{payment\_status}).
+\end{description}
 \end{frame}
 
-\begin{frame}{Alertar por síntomas de usuario}
-\begin{itemize}
-\item Mejor: burn rate del SLO de checkout.
-\item Complementario: saturación de pool o lag de consumidor.
-\item Peor: “CPU >70\%” sin contexto de servicio.
-\end{itemize}
-\begin{block}{Principio SRE}
-Pagear por condiciones que requieren acción humana urgente; usar dashboards/tickets para el resto.
+\begin{frame}{Cascadas de Falla y el Core Analysis Loop}
+\begin{alertblock}{La trampa de la causa raíz}
+El síntoma visible explota en el borde (HTTP 504 en API Gateway), pero la causa raíz está 4 capas aguas abajo en una DB lenta.
+\end{alertblock}
+
+\pause
+
+\begin{block}{Core Analysis Loop (Análisis por Primeros Principios)}
+\begin{enumerate}
+\item Observar anomalía agregada.
+\item Aislar muestra (Heatmap / BubbleUp).
+\item Diferenciar dimensiones cuantitativamente.
+\item Confirmar causa raíz mediante traza individual.
+\end{enumerate}
+\end{block}
+\end{frame}
+
+\begin{frame}{Cierre y Frase de Cátedra}
+\begin{block}{Idea central}
+Observabilidad distribuida no es "mirar dashboards ni abrir tres pestañas". Es diseñar el software para que transporte contexto causal y pueda explicarse a sí mismo cuando falle.
 \end{block}
 \end{frame}
 
