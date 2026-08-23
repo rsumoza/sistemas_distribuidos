@@ -15,12 +15,20 @@
 
 \section{Objetivo pedagógico profundo}
 
-La meta de esta clase es que el estudiante comprenda que el problema de un sistema distribuido no termina cuando el sistema “funciona”. También debe poder \emph{ser entendido} cuando degrada o falla.
+La meta de esta clase es que el estudiante comprenda que el problema de un sistema distribuido no termina cuando el sistema “funciona”. También debe poder \emph{ser entendido} cuando degrada o falla en producción.
 
-La clase debe instalar esta idea:
+La clase debe instalar tres ideas centrales:
 
 \begin{center}
-\textbf{la observabilidad distribuida es la condición de posibilidad de la operación seria}
+\textbf{1. La observabilidad es una propiedad arquitectónica de diseño, no un conjunto de herramientas agregadas al final.}
+\end{center}
+
+\begin{center}
+\textbf{2. Separar la telemetría en silos (``Tres Pestañas'') es un accidente histórico; la observabilidad moderna exige una ``Trenza Única de Datos''.}
+\end{center}
+
+\begin{center}
+\textbf{3. Sin propagación de Hard Context (\texttt{traceparent}), el sistema distribuido pierde su veracidad causal e inteligibilidad.}
 \end{center}
 
 \section{Resultados de aprendizaje esperados}
@@ -28,157 +36,116 @@ La clase debe instalar esta idea:
 Al finalizar, el estudiante debería poder:
 
 \begin{itemize}
-\item distinguir logs, métricas y trazas sin confundir sus roles;
-\item justificar por qué el contexto distribuido debe propagarse;
-\item explicar una estrategia razonable de debugging distribuido;
-\item diseñar instrumentación mínima para un sistema real.
+\item diferenciar \textbf{Hard Context} (relaciones causales estructurales) de \textbf{Soft Context} (correlaciones implícitas por tiempo);
+\item criticar el modelo de los ``Tres Pilares aislados'' y defender el modelo de ``Trenza Única de Datos'';
+\item explicar por qué el \emph{clock drift} entre servidores impide usar tiempo físico para ordenar eventos y exige una estructura DAG basada en Lamport;
+\item justificar la estrategia de instrumentación en 2 capas (auto-instrumentación de red + enriquecimiento semántico de dominio);
+\item explicar la diferencia entre explosión de cardinalidad en métricas TSDB vs. eventos estructurados anchos.
 \end{itemize}
 
 \section{Estructura sugerida para 90 minutos}
 
-\subsection*{Bloque 1 (15 min): el problema operacional}
-Abrir con una pregunta:
+\subsection*{Bloque 1 (15 min): El problema operacional, motivación y las 3 pestañas}
+Abrir con una pregunta provocadora:
 \begin{quote}
-¿Cómo depurás una request que pasó por cinco servicios y falló intermitentemente?
+¿Cómo depurás una solicitud que atravesó cinco microservicios y falló intermitentemente sin poder poner un breakpoint local?
 \end{quote}
 
-Esto obliga a reconocer la insuficiencia del debugging local clásico.
+\paragraph{Motivación fundamental}
+Plantear al curso: \emph{¿Y si directamente no monitoreamos? ¿Qué pasa?}
+En un sistema local, un error es explícito (crash, stack trace). En sistemas distribuidos, las fallas son parciales, silenciosas y asincrónicas. Sin monitoreo activo, la primera señal de fallo es el usuario final insatisfecho. Además, sin métricas no hay base empírica para decisiones de capacidad (ej: ¿mejoró el hit rate al agregar un nodo?).
 
-\paragraph{Objetivo didáctico}
-Mostrar que el problema ya no es solo programar, sino reconstruir causalidad distribuida.
+\paragraph{Principio rector}
+Instalar las dos preguntas que todo sistema de monitoreo debe responder:
+\begin{enumerate}
+\item \textbf{¿Qué está roto?} (identificar el componente o servicio degradado).
+\item \textbf{¿Por qué está roto?} (aportar contexto suficiente para aislar la causa raíz).
+\end{enumerate}
+Si una alerta solo notifica ``error rate > 5\%'' sin contexto, es una alarma de incendio sin ubicación de fuego.
 
-\subsection*{Bloque 2 (20 min): logs}
-Presentar logs estructurados y comparar con texto libre.
+\paragraph{Desarrollo didáctico}
+Presentar la metáfora de \textbf{``Las Tres Pestañas del Navegador''} (\emph{Three Browser Tabs}): Grafana (métricas), ELK (logs) y Jaeger (trazas). Mostrar que este modelo obliga al operador a ser el ``puente manual'' adivinando correlaciones con los ojos. Introducir la solución del paradigma moderno: \textbf{``La Trenza Única de Datos''} (\emph{Single Braid of Data}).
 
-Insistir en:
+\subsection*{Bloque 2 (20 min): Contexto Duro vs. Blando e Instrumentación}
+Explicar la diferencia entre:
 \begin{itemize}
-\item request\_id;
-\item trace\_id;
-\item campos estructurados;
-\item contexto mínimo indispensable.
+\item \textbf{Soft Context:} Correlación por ventanas temporales coincidentes o texto libre.
+\item \textbf{Hard Context:} Cabeceras W3C TraceContext (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id}).
 \end{itemize}
 
-\paragraph{Objetivo didáctico}
-Que el alumno vea que “tener logs” no alcanza: tienen que ser diseñados.
+\paragraph{Desarrollo didáctico}
+Presentar la \textbf{Estrategia de Instrumentación en 2 Capas}:
+\begin{enumerate}
+\item Capa de Infraestructura (Auto-instrumentación / middleware HTTP): crea el esqueleto y propaga cabeceras automáticamente.
+\item Capa de Dominio (Instrumentación manual): agrega atributos semánticos de negocio (\texttt{tenant\_id}, \texttt{cart\_id}).
+\end{enumerate}
 
-\subsection*{Bloque 3 (15 min): métricas}
-Introducir Golden Signals y diferenciar promedio vs percentiles.
+\subsection*{Bloque 3 (15 min): Métricas, Percentiles y Cardinalidad}
+Repasar las Golden Signals (Latencia, Tráfico, Errores, Saturación).
 
-\paragraph{Objetivo didáctico}
-Que el alumno entienda por qué una media “aceptable” puede ocultar un sistema roto para una fracción importante de requests.
+\paragraph{Desarrollo didáctico}
+Demostrar por qué el promedio oculta picos de latencia que sí se ven en el percentil p99. Explicar el fenómeno de \textbf{Explosión de Cardinalidad} en métricas TSDB cuando se agregan IDs únicos (\texttt{customer\_id}), justificando por qué esos datos pertenecen a trazas y eventos anchos.
 
-\subsection*{Bloque 4 (20 min): tracing}
-Explicar trace y span, y mostrar una request distribuida simple.
+\subsection*{Bloque 4 (20 min): Tracing y Puente con Clase 03 (Lamport)}
+Explicar Trace, Span y SpanKind.
 
-\paragraph{Objetivo didáctico}
-Que el estudiante comprenda que el tracing organiza causalidad por request, no solo eventos aislados.
+\paragraph{Momento Eureka}
+Conectar directamente con la Clase 03 (Consistencia y replicación / Lamport): el reloj físico de un servidor sufre \emph{clock drift/skew}. No se pueden ordenar logs de distintas máquinas por timestamp real. Un Trace no es una lista ordenada por tiempo físico: \textbf{es la implementación del Grafo Acíclico Dirigido (DAG) basado en la relación \emph{happened-before} ($\rightarrow$) de Lamport.} El \texttt{parent\_span\_id} preserva la causalidad sin importar el desvío de reloj.
 
-\subsection*{Bloque 5 (20 min): debugging distribuido}
-Trabajar una cascada de fallas:
+\subsection*{Bloque 5 (20 min): Cascadas de Falla y Core Analysis Loop}
+Simular una cascada de falla (DB lenta $\rightarrow$ pool consumido $\rightarrow$ retries $\rightarrow$ timeout 504 en API Gateway).
 
-\begin{itemize}
-\item dependencia lenta;
-\item retries;
-\item saturación;
-\item error visible en borde.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Mostrar que la causa raíz rara vez coincide con el lugar donde explota el síntoma visible.
-
-\section{Qué explicar y por qué}
-
-\subsection*{1. Observabilidad}
-Porque pone el problema en términos de comprensión del sistema, no solo de recolección de señales.
-
-\subsection*{2. Logs}
-Porque son la base de toda narrativa causal y de auditoría local.
-
-\subsection*{3. Métricas}
-Porque permiten detectar degradación agregada y guiar el diagnóstico.
-
-\subsection*{4. Trazas}
-Porque permiten reconstruir recorrido y dependencia de una request individual.
-
-\subsection*{5. Debugging}
-Porque une todos los elementos en una práctica operativa real.
+\paragraph{Desarrollo didáctico}
+Demostrar por qué el síntoma explota en el borde pero la causa vive aguas abajo. Presentar el \textbf{Core Analysis Loop} (Debugging por Primeros Principios): aislar muestra anómala, computar diferencias estadísticas de atributos (BubbleUp) y drill-down hacia la traza.
 
 \section{Preguntas disparadoras recomendadas}
 
 \begin{itemize}
-\item ¿Qué sabe cada herramienta que las otras no saben?
-\item ¿Qué pasa si una request no lleva trace\_id?
-\item ¿Cómo descubrís la diferencia entre síntoma y causa raíz?
-\item ¿Qué métrica mirarías primero si el sistema “anda lento”?
-\item ¿Cómo cambia el problema en una arquitectura event-driven?
+\item ¿Por qué el monitoreo activo en producción no puede reemplazarse únicamente con testing previo en ambientes de QA/staging?
+\item Si tu alerta solo dice ``error rate > 5\%'' sin más contexto ni IDs correlacionados, ¿por qué es inútil para la guardia y qué información falta para responder qué y por qué está roto?
+\item Si dos servidores difieren por 50ms de tiempo físico (\emph{clock drift}), ¿por qué los logs ordenados por timestamp nos engañan y cómo lo resuelve el \texttt{parent\_span\_id}?
+\item ¿Por qué la arquitectura de ``tres pilares en tres pestañas'' exige que el operador memorice la topología del sistema en su cabeza?
+\item Si auto-instrumentamos una app y nos genera 10 GB de trazas genéricas sin datos de negocio, ¿tenemos observabilidad o solo almacenamiento caro?
+\item ¿Qué pasa si una llamada HTTP a un servicio downstream olvida re-inyectar la cabecera W3C \texttt{traceparent}?
+\item ¿Por qué agregar \texttt{user\_id} a una métrica de Prometheus es un error de diseño grave, pero agregarlo a un Span es una excelente práctica?
 \end{itemize}
 
 \section{Errores frecuentes del alumnado}
 
 \begin{itemize}
-\item creer que observabilidad equivale a dashboards;
-\item pensar que logs libres son suficientes;
-\item no distinguir métricas agregadas de trazas individuales;
-\item asumir que el error visible coincide con la causa;
-\item olvidar que los retries también son parte de la dinámica observable.
+\item Creer que observabilidad equivale a instalar Grafana o mirar dashboards.
+\item Asumir que los timestamps de logs locales son suficientes para ordenar eventos en la red.
+\item Confundir Soft Context (coincidencia de tiempo) con Hard Context (relación causal en la traza).
+\item Pensar que la auto-instrumentación reemplaza la necesidad de enriquecer con atributos semánticos de dominio.
+\item Buscar ``la línea exacta que falló'' en la API de borde antes de mapear la topología del error aguas abajo.
 \end{itemize}
 
 \section{Ejercicio en vivo sugerido}
 
-Tomar un ejemplo de checkout distribuido y simular:
-
-\begin{itemize}
-\item request entra por API;
-\item Auth responde lento;
-\item Payments se reintenta;
-\item aparece timeout en frontend.
-\end{itemize}
-
-Preguntar al curso:
-\begin{itemize}
-\item qué mostrarían las métricas;
-\item qué mostrarían los logs;
-\item qué mostraría la traza;
-\item cuál parece ser la causa raíz.
-\end{itemize}
-
-\paragraph{Objetivo}
-Que el estudiante vea cómo cada capa de observabilidad aporta información distinta.
-
-\section{Momento crítico de la clase}
-
-El momento importante ocurre cuando el estudiante entiende que:
-
-\begin{center}
-\textbf{sin contexto propagado, el sistema distribuido pierde su inteligibilidad}
-\end{center}
-
-Ese punto debe remarcarse explícitamente.
+Tomar un ejemplo de checkout distribuido (API $\rightarrow$ Auth $\rightarrow$ Orders $\rightarrow$ DB):
+\begin{enumerate}
+\item Simular que DB entra en contención de bloqueos.
+\item Preguntar al curso: ¿Qué mostraría Grafana en el API Gateway? ¿Qué mostraría el buscador de logs? ¿Qué mostraría la traza distribuida?
+\item Guiar la discusión para que vean cómo la traza y la diferencia de atributos señalan de inmediato la causa raíz en la DB.
+\end{enumerate}
 
 \section{Criterio de éxito docente}
 
 La clase salió bien si el estudiante puede:
-
 \begin{itemize}
-\item diseñar logs estructurados mínimos para un servicio;
-\item proponer métricas relevantes para una API distribuida;
-\item dibujar una traza simple correctamente;
-\item plantear una estrategia razonable de debugging en producción.
+\item justificar por qué la propagación de Hard Context (\texttt{traceparent}) es obligatoria en microservicios;
+\item explicar por qué un Trace usa estructura DAG para superar el \emph{clock drift};
+\item diseñar un esquema de 2 capas para un servicio real (esqueleto auto + atributos semánticos);
+\item plantear una estrategia de debugging por primeros principios basada en correlaciones automáticas.
 \end{itemize}
 
 \section{Conexión con la clase siguiente}
 
-Esta clase deja planteada una pregunta natural:
-
 \begin{quote}
-Si ya sabemos observar un sistema distribuido, ¿cómo diseñamos para que resista fallas, se degrade con gracia y no colapse en cascada?
+Si ya sabemos observar un sistema distribuido y entender sus fallas en producción, ¿cómo diseñamos el software para que resista esas fallas, se degrade con gracia y corte las cascadas antes de colapsar?
 \end{quote}
 
-Eso abre la puerta a resiliencia, fault tolerance y patrones de estabilidad operacional.
-
-\begin{uakeybox}
-Pregunta puente: observar es necesario, pero no suficiente. ¿Qué patrones hacen que un sistema no solo sea entendible, sino también robusto bajo presión?
-\end{uakeybox}
+Esto abre la puerta a la Clase 11: Resiliencia distribuida (Circuit Breakers, Bulkheads, Exponential Backoff + Jitter).
 
 
 \section{Plan de conducción ampliado}

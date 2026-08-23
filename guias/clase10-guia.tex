@@ -13,7 +13,7 @@
 \begin{document}
 
 \section{Indicaciones generales}
-Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
+Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable. Justificar siempre. En esta clase no alcanza con decir “usar logs” o “mirar trazas”: se espera explicar qué problema resuelve cada herramienta, qué límites tiene y qué patrones de diseño exige.
 
 \section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
@@ -21,86 +21,85 @@ Defina observabilidad distribuida y explique en qué se diferencia de monitoreo 
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué un sistema distribuido necesita algo más que logs locales para ser entendible en producción.
+Explique al menos tres razones por las cuales un sistema distribuido en producción necesita monitoreo activo, y por qué cada una no se satisface solo con testing pre-producción.
 \end{uaexercise}
 
 \begin{uaexercise}
-Compare logs, métricas y trazas en términos de qué pregunta responde cada uno.
+Un equipo recibe una alerta que dice ``error rate > 5\%''. Explique por qué esta alerta, por sí sola, es insuficiente para actuar. ¿Qué información adicional necesitaría el equipo para responder ``qué está roto'' y ``por qué está roto''?
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un ejemplo donde las métricas muestren degradación, pero no permitan identificar por sí solas la causa.
+Explique el antipatrón de las ``Tres Pestañas del Navegador'' (\emph{Three Browser Tabs}) y compárelo con el modelo de ``La Trenza Única de Datos'' (\emph{Single Braid of Data}).
+\end{uaexercise}
+
+\begin{uaexercise}
+Diferencie \textbf{Hard Context} de \textbf{Soft Context}. Explique por qué el Hard Context es indispensable para que las computadoras puedan calcular correlaciones automáticas entre telemetrías.
+\end{uaexercise}
+
+
+\section{Nivel 2: ejecuciones y fallas}
+\begin{uaexercise}
+Compare logs, métricas y trazas en términos de qué pregunta responde cada uno y cómo se entrelazan mediante OpenTelemetry.
 \end{uaexercise}
 
 \begin{uaexercise}
 Explique por qué los logs estructurados son preferibles a los logs de texto libre en sistemas distribuidos.
 \end{uaexercise}
 
-
-\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
-Diseñe un esquema mínimo de campos para logs en un servicio HTTP distribuido.
+Defina la noción de \textbf{Evento Estructurado Ancho} (\emph{Arbitrarily Wide Structured Event}) y explique por qué agrupar la telemetría de una unidad de trabajo es superior a emitir múltiples líneas de log sueltas.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué problema resuelve un correlation ID.
+Diseñe un esquema JSON de campos para un evento estructurado en un servicio HTTP de comercio electrónico.
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un ejemplo donde logs sin request\_id o trace\_id dificulten severamente el debugging.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique qué son las Golden Signals y por qué son útiles.
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe un conjunto mínimo de métricas para una API distribuida de pagos.
+Construya un escenario donde la ausencia de \texttt{trace\_id} o \texttt{span\_id} en un log impida determinar el impacto de un error en el cliente final.
 \end{uaexercise}
 
 
 \section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
-Explique por qué mirar promedios de latencia puede ocultar problemas serios.
+Explique qué son las Golden Signals y por qué son útiles para evaluar la salud de un servicio.
 \end{uaexercise}
 
 \begin{uaexercise}
-Describa una situación donde la latencia p99 sea más importante que la media.
+Explique qué es la \textbf{Explosión de Cardinalidad} en bases de datos de series temporales (TSDB como Prometheus) y por qué los identificadores de alta cardinalidad (\texttt{user\_id}, \texttt{order\_id}) pertenecen a trazas/eventos y no a métricas agregadas.
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina trace y span.
+Explique por qué mirar promedios de latencia puede ocultar problemas serios que sí se reflejan en el percentil p99.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué información aporta una traza que no aportan logs agregados.
+\textbf{Conexión con Clase 03:} Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe una traza para una request que pasa por API, Auth, Orders y Payments.
+Diferencie la propagación de contexto \textbf{In-Band} (en cabeceras HTTP/gRPC como W3C \texttt{traceparent}) de la recolección \textbf{Out-of-Band} (exportación asíncrona OTLP al Collector).
 \end{uaexercise}
 
 
 \section{Nivel 4: integración y defensa}
 \begin{uaexercise}
-Explique por qué la propagación de contexto es indispensable en tracing distribuido.
+Explique la \textbf{Estrategia de Instrumentación en 2 Capas}: Capa 1 de Infraestructura (Auto-instrumentación / esqueleto de propagación) vs. Capa 2 de Dominio (Enriquecimiento semántico manual).
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas iniciada en una base de datos lenta.
+Construya un escenario de cascada de fallas donde el síntoma visible sea un error HTTP 504 en la API de borde, pero la causa raíz sea una base de datos downstream saturada.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué el síntoma visible puede no coincidir con la causa raíz en un sistema distribuido.
+Describa los 4 pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción y explique por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe una estrategia paso a paso para diagnosticar un aumento repentino de errores 500 en una API distribuida.
+Explique cómo cambia el problema de propagación de contexto en un sistema basado en eventos (Event-Driven / Kafka) respecto de uno sincrónico (HTTP/gRPC).
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué “buscar la línea exacta que falló” no suele ser el primer paso correcto en debugging distribuido.
+Aplique el modelo del curso $D=(P,F,G,S,T)$ al problema de la observabilidad distribuida.
 \end{uaexercise}
-
 
 \end{document}

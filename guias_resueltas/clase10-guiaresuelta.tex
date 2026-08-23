@@ -16,212 +16,399 @@
 Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
 \section{Ejercicios y resoluciones completas}
+
+\subsection*{Nivel 1: Fundamentos y reconocimiento}
+
 \begin{uaexercise}
 Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
 \end{uaexercise}
 \begin{uaanswer}
-La observabilidad distribuida es la capacidad de inferir el estado interno de un sistema distribuido a partir de sus salidas: logs, métricas y trazas. Se diferencia del monitoreo básico en que no se limita a verificar si algo “está arriba o abajo”, sino que busca hacer inteligible la dinámica interna del sistema, especialmente bajo fallas parciales y ejecuciones complejas.
+La \textbf{observabilidad} (derivada de la Teoría de Control por R.~E.~Kálmán y adaptada a la ingeniería de software) es la propiedad que mide en qué grado es posible inferir y reconstruir el estado interno de un sistema a partir del conocimiento de sus salidas externas y de sus señales de telemetría. En software moderno, un sistema es observable si permite formular preguntas abiertas sobre comportamientos imprevistos o no anticipados (\emph{unknown-unknowns}) y llegar a su causa raíz sin necesidad de adivinar, alterar o desplegar nuevo código con logs adicionales.
+
+Se diferencia del \textbf{monitoreo básico} en varios aspectos fundamentales:
+\begin{itemize}
+\item \textbf{Monitoreo tradicional (orientado a comprobación):} Vigila umbrales y estados predefinidos (\emph{known-unknowns}, por ejemplo: ``¿el proceso está arriba o abajo?'', ``¿el uso de CPU superó el 90\%?''). Es intrínsecamente binario y reactivo.
+\item \textbf{Observabilidad distribuida (orientada a investigación):} Permite aislar y entender comportamientos emergentes complejos, degradaciones graduales y fallas parciales intermitentes que atraviesan múltiples servicios autónomos conectados por red.
+\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué un sistema distribuido necesita algo más que logs locales para ser entendible en producción.
+Explique al menos tres razones por las cuales un sistema distribuido en producción necesita monitoreo activo, y por qué cada una no se satisface solo con testing pre-producción.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Las tres razones fundamentales para el monitoreo activo en producción son:
+\begin{enumerate}
+\item \textbf{Detección temprana de degradaciones silenciosas y acumulativas:} Fenómenos como fugas lentas de memoria, agotamiento paulatino de conexiones en un pool de base de datos o vencimiento inminente de certificados TLS no generan un error instantáneo, sino una degradación asintótica. El testing pre-producción no las detecta porque los tests corren durante minutos en entornos limpios y efímeros.
+\item \textbf{Diagnóstico causal ante estados emergentes no reproducibles:} En un sistema distribuido real concurren millones de solicitudes con combinaciones infinitas de estados, particiones parciales de red y latencias de proveedores externos imposibles de reproducir fielmente en QA o staging.
+\item \textbf{Toma de decisiones de capacidad y arquitectura con evidencia empírica:} Permite medir el impacto real de optimizaciones o cambios arquitectónicos (por ejemplo, cuantificar cuánto mejoró el hit rate de cache al duplicar nodos y si justifica el costo). En ambientes de prueba los datos sintéticos no reflejan el comportamiento ni la distribución de clientes reales.
+\end{enumerate}
+El testing pre-producción valida que el software cumpla hipótesis y contratos conocidos; el monitoreo activo permite entender y gobernar el comportamiento real del sistema bajo condiciones no controladas.
 \end{uaanswer}
 
 \begin{uaexercise}
-Compare logs, métricas y trazas en términos de qué pregunta responde cada uno.
+Un equipo recibe una alerta que dice ``error rate > 5\%''. Explique por qué esta alerta, por sí sola, es insuficiente para actuar. ¿Qué información adicional necesitaría el equipo para responder ``qué está roto'' y ``por qué está roto''?
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+La alerta ``error rate > 5\%'' es insuficiente porque notifica un síntoma global agregado sin ninguna dimensionalidad ni contexto causal: es el equivalente operativo a una alarma de incendio que suena sin indicar en qué piso ni en qué habitación está el fuego.
 
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Para que la guardia operativa pueda actuar eficazmente, se requiere responder:
+\begin{itemize}
+\item \textbf{¿Qué está roto? (Aislamiento del componente):} Se necesita desglosar la tasa de error por servicio, ruta/endpoint (ej: \texttt{POST /api/v1/checkout} vs. \texttt{GET /health}), código de estado HTTP (500 internal server error vs. 503 unavailable vs. 504 gateway timeout) y segmento de usuarios afectados (ej: usuarios de una región específica o de una versión móvil particular).
+\item \textbf{¿Por qué está roto? (Contexto de causa raíz):} Se requiere acceso inmediato a trazas correlacionadas (\texttt{trace\_id}) que conecten la solicitud fallida con los servicios aguas abajo (\emph{downstream}), logs estructurados con stack traces en el punto de fallo, y métricas de saturación asociadas (agotamiento de conexiones a la base de datos, timeout en pasarela de pagos externa o despliegue reciente de una nueva versión del servicio).
+\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde las métricas muestren degradación, pero no permitan identificar por sí solas la causa.
+Explique el antipatrón de las ``Tres Pestañas del Navegador'' (\emph{Three Browser Tabs}) y compárelo con el modelo de ``La Trenza Única de Datos'' (\emph{Single Braid of Data}).
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+El antipatrón de las \textbf{Tres Pestañas del Navegador} consiste en estructurar la telemetría en tres silos verticales independientes e inconexos:
+\begin{itemize}
+\item Pestaña 1: Dashboards de métricas agregadas (ej: Prometheus/Grafana).
+\item Pestaña 2: Buscador de logs de texto libre (ej: Elasticsearch/Kibana).
+\item Pestaña 3: Herramienta de trazas distribuidas (ej: Jaeger/Zipkin).
+\end{itemize}
+Bajo este esquema, ante un incidente el operador humano debe actuar como un ``puente manual'': ver un pico en una gráfica, copiar mentalmente la marca de tiempo aproximada, saltar al buscador de logs para intentar adivinar qué error ocurrió mediante filtros de texto, encontrar un ID y pegarlo en el visor de trazas. Esto genera fatiga cognitiva, demoras críticas y diagnósticos basados en intuición.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+En contraste, el modelo de **La Trenza Única de Datos** (\emph{Single Braid of Data}, materializado en OpenTelemetry/OTLP) integra las tres señales de forma estructural: las señales conservan su función especializada pero están entrelazadas mediante contexto compartido inyectado en el protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{attributes}). De este modo, el sistema computacional realiza las correlaciones de forma automática: al seleccionar un punto atípico en un gráfico de percentiles (\emph{exemplar}), se abre directamente la traza individual correspondiente y sus logs estructurados vinculados, sin intervención manual.
+\end{uaanswer}
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{uaexercise}
+Diferencie \textbf{Hard Context} de \textbf{Soft Context}. Explique por qué el Hard Context es indispensable para que las computadoras puedan calcular correlaciones automáticas entre telemetrías.
+\end{uaexercise}
+\begin{uaanswer}
+La diferencia radica en la naturaleza de la correlación:
+\begin{itemize}
+\item \textbf{Soft Context (Contexto Blando):} Correlaciones implícitas y probabilísticas basadas en coincidencias temporales o etiquetas genéricas (por ejemplo, agrupar eventos porque ocurrieron en el mismo minuto y comparten la etiqueta \texttt{env=prod} o \texttt{region=us-east}). En sistemas con alto tráfico (miles de solicitudes por segundo), miles de ejecuciones no relacionadas coinciden en la misma ventana temporal, haciendo que la correlación sea ambigua y requiera inspección visual humana.
+\item \textbf{Hard Context (Contexto Duro):} Enlaces determinísticos, explícitos e inmutables inyectados directamente en las cabeceras de los protocolos de comunicación (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id} bajo el estándar W3C Trace Context). Define de forma unívoca la topología y la causalidad estricta de una solicitud individual.
+\end{itemize}
+El Hard Context es indispensable porque permite que los algoritmos de análisis automático (como el análisis dimensional BubbleUp o la detección de cuellos de botella en grafos acíclicos dirigidos) operen sobre relaciones de pertenencia exactas, sin incurrir en falsas correlaciones estadísticas.
+\end{uaanswer}
+
+
+\subsection*{Nivel 2: Ejecuciones y fallas}
+
+\begin{uaexercise}
+Compare logs, métricas y trazas en términos de qué pregunta responde cada uno y cómo se entrelazan mediante OpenTelemetry.
+\end{uaexercise}
+\begin{uaanswer}
+Cada una de las señales responde a una necesidad operativa específica:
+\begin{itemize}
+\item \textbf{Métricas:} Responden a \emph{¿Cuál es la tendencia o salud agregada del sistema a lo largo del tiempo?} (volumen de tráfico, percentiles de latencia, tasa de errores). Son series numéricas agregadas, livianas y de retención prolongada.
+\item \textbf{Logs (Eventos estructurados):} Responden a \emph{¿Qué ocurrió en un instante específico de la ejecución dentro de un componente?} Aportan el detalle fino de variables internas, decisiones de bifurcación y excepciones.
+\item \textbf{Trazas:} Responden a \emph{¿Cómo atravesó la solicitud la topología distribuida y en qué tramo se consumió el tiempo?} Proveen el mapa del Grafo Acíclico Dirigido (DAG) y la causalidad entre servicios.
+\end{itemize}
+En OpenTelemetry se entrelazan mediante el modelo de datos OTLP:
+\begin{enumerate}
+\item Una métrica de latencia registra un histograma y asocia a los valores extremos un **exemplar** (referencia al \texttt{trace\_id} de la solicitud real que produjo esa muestra).
+\item La traza desglosa el recorrido en Spans jerárquicos conectados por \texttt{parent\_span\_id}.
+\item Los logs emitidos durante la ejecución de ese Span heredan automáticamente su \texttt{trace\_id} y \texttt{span\_id}, quedando indexados dentro del mismo hilo causal.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
 Explique por qué los logs estructurados son preferibles a los logs de texto libre en sistemas distribuidos.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe un esquema mínimo de campos para logs en un servicio HTTP distribuido.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique qué problema resuelve un correlation ID.
-\end{uaexercise}
-\begin{uaanswer}
-Resuelve el problema de unir eventos dispersos de una misma request. En un sistema distribuido, la ejecución se fragmenta entre servicios. El correlation ID permite reconstruir el recorrido lógico de esa request a través de logs y trazas. Sin él, cada servicio cuenta solo una historia local incompleta.
-\end{uaanswer}
-
-\begin{uaexercise}
-Construya un ejemplo donde logs sin request\_id o trace\_id dificulten severamente el debugging.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique qué son las Golden Signals y por qué son útiles.
-\end{uaexercise}
-\begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe un conjunto mínimo de métricas para una API distribuida de pagos.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué mirar promedios de latencia puede ocultar problemas serios.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Describa una situación donde la latencia p99 sea más importante que la media.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Defina trace y span.
-\end{uaexercise}
-\begin{uaanswer}
-Una trace representa el recorrido completo de una request distribuida. Un span representa una unidad individual de trabajo dentro de esa trace. Por ejemplo:
+Los logs de texto libre (como \texttt{"[ERROR] User 102 failed to pay \$50: db timeout"}) presentan severas limitaciones a escala:
 \begin{itemize}
-\item trace: checkout completo;
-\item spans: API, autenticación, validación de stock, cobro, persistencia.
+\item Requieren expresiones regulares (regex) costosas y frágiles en los agentes de ingesta para extraer variables.
+\item Un cambio menor en la redacción introducido por un desarrollador rompe los dashboards, alertas y parsers existentes.
+\item No preservan los tipos de datos (un monto numérico o una duración se almacena como string, impidiendo agregaciones matemáticas o filtros por rango).
+\end{itemize}
+
+Los \textbf{logs estructurados} (típicamente en formato JSON con clave-valor tipado) son superiores porque:
+\begin{enumerate}
+\item Son interpretables de forma nativa y determinística por máquinas sin necesidad de parsing por patrones de texto.
+\item Mantienen tipado fuerte (campos numéricos, booleanos y objetos anidados), permitiendo realizar consultas analíticas complejas (ej: \texttt{duration\_ms > 500 AND customer\_tier = 'premium'}).
+\item Estandarizan la inyección de metadatos del entorno (\texttt{service.name}, \texttt{service.version}, \texttt{host.name}) y del Hard Context (\texttt{trace\_id}, \texttt{span\_id}).
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Defina la noción de \textbf{Evento Estructurado Ancho} (\emph{Arbitrarily Wide Structured Event}) y explique por qué agrupar la telemetría de una unidad de trabajo es superior a emitir múltiples líneas de log sueltas.
+\end{uaexercise}
+\begin{uaanswer}
+Un \textbf{Evento Estructurado Ancho} (\emph{Arbitrarily Wide Structured Event}) es un patrón de diseño de telemetría en el cual un servicio, al iniciar una unidad de trabajo (como una solicitud HTTP o el consumo de un mensaje), inicializa en memoria un contexto estructurado en forma de mapa clave-valor. A lo largo de la ejecución, cualquier función o módulo enriquece ese contexto agregando atributos (parámetros de entrada, mediciones intermedias, flags de negocio). Al completarse la unidad de trabajo, se emite un único registro estructurado con decenas o cientos de campos.
+
+Es superior a emitir múltiples líneas de log tradicionales porque:
+\begin{itemize}
+\item \textbf{Cohesión semántica:} Toda la historia de la solicitud (entradas, resultados intermedios, errores y código de salida) reside en un único registro indivisible.
+\item \textbf{Eficiencia analítica:} Permite realizar correlaciones multidimensionales directas sobre una sola tabla o colección sin tener que reconstruir el estado uniendo múltiples líneas dispersas mediante joins costosos.
+\item \textbf{Menor sobrecarga de indexación:} Reduce drásticamente la cantidad total de documentos individuales enviados al pipeline de telemetría, disminuyendo costos de red y almacenamiento.
 \end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué información aporta una traza que no aportan logs agregados.
+Diseñe un esquema JSON de campos para un evento estructurado en un servicio HTTP de comercio electrónico.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Un esquema JSON de evento estructurado ancho para un servicio de órdenes debe separar claramente los metadatos de infraestructura y contexto duro de los atributos de dominio de negocio:
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{verbatim}
+{
+  "timestamp": "2026-08-22T15:30:00.124500Z",
+  "service": {
+    "name": "checkout-service",
+    "version": "v2.5.0",
+    "environment": "production"
+  },
+  "trace": {
+    "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "span_id": "00f067aa0ba902b7",
+    "parent_span_id": "5fb397be34d23b0f"
+  },
+  "http": {
+    "method": "POST",
+    "route": "/api/v1/orders/checkout",
+    "status_code": 201,
+    "duration_ms": 138.45,
+    "client_ip": "190.210.45.12"
+  },
+  "domain": {
+    "customer_id": "usr_998822",
+    "customer_tier": "enterprise",
+    "cart_id": "crt_114477",
+    "items_count": 3,
+    "total_amount_usd": 249.99,
+    "payment_gateway": "stripe",
+    "payment_latency_ms": 84.2,
+    "coupon_code": "PROMO2026",
+    "inventory_reserved": true
+  },
+  "error": null
+}
+\end{verbatim}
+
+\textbf{Justificación del diseño:}
+\begin{itemize}
+\item Los campos \texttt{trace} permiten correlacionar el evento con la traza distribuida.
+\item Los campos \texttt{http} aportan las métricas estándar de transporte (latencia, status code).
+\item Los campos \texttt{domain} permiten investigar incidentes segmentando por dimensiones de negocio (ej: si los fallos ocurren solo para \texttt{payment\_gateway: "stripe"} o para un \texttt{customer\_tier} en particular).
+\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una traza para una request que pasa por API, Auth, Orders y Payments.
+Construya un escenario donde la ausencia de \texttt{trace\_id} o \texttt{span\_id} en un log impida determinar el impacto de un error en el cliente final.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+\textbf{Escenario:} Un sistema de comercio electrónico compuesto por \texttt{API Gateway}, \texttt{Order Service} e \texttt{Inventory Service}, procesando un régimen de 600 solicitudes por segundo.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+\textbf{Ejecución de la falla:}
+\begin{enumerate}
+\item A las 14:00:05.120, el log de \texttt{Inventory Service} registra:
+\begin{verbatim}
+[ERROR] Database connection pool exhausted while acquiring row lock for item_id=4021
+\end{verbatim}
+\item A esa misma hora, cientos de solicitudes concurrentes de múltiples usuarios acceden al inventario.
+\item Al no contar con \texttt{trace\_id} ni \texttt{span\_id} en el registro de log:
+\begin{itemize}
+\item Es imposible saber qué cliente final o qué número de carrito experimentó el error.
+\item No se puede determinar si el \texttt{Order Service} ejecutó un reintento exitoso sobre otra réplica, si aplicó un mecanismo de degradación elegante (reserva diferida) o si la solicitud falló catastróficamente con un HTTP 500 hacia el usuario.
+\item Si el usuario luego contacta a soporte técnico reportando un cobro indebido o una orden cancelada, el equipo de ingeniería no puede asociar el ticket de soporte con la línea de log en la base de datos de inventario.
+\end{itemize}
+\end{enumerate}
+La presencia del \texttt{trace\_id} inmutable en todas las capas hubiera permitido vincular la queja del usuario con la línea exacta de fallo en el pool de conexiones del inventario.
+\end{uaanswer}
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+
+\subsection*{Nivel 3: Diseño y comparación}
+
+\begin{uaexercise}
+Explique qué son las Golden Signals y por qué son útiles para evaluar la salud de un servicio.
+\end{uaexercise}
+\begin{uaanswer}
+Las **Cuatro Señales Doradas** (\emph{Four Golden Signals}), formuladas por la práctica de Site Reliability Engineering (SRE) de Google, representan las métricas esenciales para caracterizar el comportamiento y la salud de cualquier servicio orientado a solicitudes:
+\begin{enumerate}
+\item \textbf{Latencia:} El tiempo que toma procesar una solicitud. Es crítico diferenciar la latencia de solicitudes exitosas de la de solicitudes fallidas (ya que errores rápidos por validación pueden maquillar una degradación de llamadas exitosas lentas).
+\item \textbf{Tráfico:} La medida de cuánta demanda se ejerce sobre el sistema (solicitudes HTTP por segundo, transacciones de base de datos o mensajes consumidos por segundo).
+\item \textbf{Errores:} La tasa de solicitudes que fallan, ya sea de forma explícita (códigos HTTP 5xx) o implícita (respuestas HTTP 200 que retornan un payload erróneo o vacío).
+\item \textbf{Saturación:} La fracción del recurso más restringido que está siendo utilizada (porcentaje de uso de CPU, utilización de memoria, o porcentaje de conexiones ocupadas en el pool de base de datos). Mide qué tan cerca está el sistema de alcanzar su límite operativo.
+\end{enumerate}
+Son útiles porque proveen un conjunto mínimo, balanceado y estandarizado de métricas de alto nivel para configurar alertas tempranas (antes de que la saturación provoque un colapso en cascada) y evaluar de forma homogénea cualquier componente de la arquitectura.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la propagación de contexto es indispensable en tracing distribuido.
+Explique qué es la \textbf{Explosión de Cardinalidad} en bases de datos de series temporales (TSDB como Prometheus) y por qué los identificadores de alta cardinalidad (\texttt{user\_id}, \texttt{order\_id}) pertenecen a trazas/eventos y no a métricas agregadas.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+La \textbf{cardinalidad} es la cantidad de valores únicos posibles que puede asumir una dimensión o etiqueta (\emph{label/tag}).
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+En una base de datos de series temporales (TSDB como Prometheus), cada combinación única de etiquetas genera una serie temporal independiente que debe ser almacenada en índices en memoria RAM y persistida en disco.
+\begin{itemize}
+\item Si una métrica tiene etiquetas de baja cardinalidad:
+\[
+\text{Series} = (\text{métodos: } 4) \times (\text{status codes: } 5) \times (\text{handlers: } 10) = 200 \text{ series temporales (totalmente manejable)}.
+\]
+\item Si se agrega una etiqueta de alta cardinalidad como \texttt{user\_id} (con 1.000.000 de usuarios activos):
+\[
+\text{Series} = 200 \times 1.000.000 = 200.000.000 \text{ series temporales}.
+\]
+\end{itemize}
+Esto provoca la **Explosión de Cardinalidad**: el servidor TSDB agota su memoria RAM (\emph{Out-Of-Memory}), degrada severamente las consultas y colapsa el sistema de monitoreo.
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\textbf{Regla de diseño:} Las métricas agregadas solo deben contener dimensiones con un espacio de valores finito y acotado (\texttt{method}, \texttt{status}, \texttt{region}). Los identificadores de alta cardinalidad (\texttt{user\_id}, \texttt{order\_id}, \texttt{cart\_id}) pertenecen a **trazas y eventos estructurados**, los cuales son procesados por motores de búsqueda columnar o documental (Elasticsearch, ClickHouse, Grafana Tempo) diseñados específicamente para manejar conjuntos de datos de alta cardinalidad sin generar combinatoria de series.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas iniciada en una base de datos lenta.
+Explique por qué mirar promedios de latencia puede ocultar problemas serios que sí se reflejan en el percentil p99.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+El promedio (media aritmética) distribuye y diluye el impacto de los valores extremos entre la masa de datos centrales. En distribuciones de latencia en sistemas distribuidos, el comportamiento rara vez sigue una curva normal (Gaussiana); suele ser una distribución asimétrica con colas pesadas (\emph{heavy-tailed}).
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+\textbf{Demostración numérica:}
+Supóngase una muestra de 100 solicitudes:
+\begin{itemize}
+\item 99 solicitudes son atendidas rápidamente en 10 ms (atendidas desde cache).
+\item 1 solicitud sufre una contención severa de lock en base de datos y tarda 10.000 ms (10 segundos).
+\end{itemize}
+El promedio calculado es:
+\[
+\bar{x} = \frac{(99 \times 10) + (1 \times 10.000)}{100} = \frac{990 + 10.000}{100} = 109.9\text{ ms}.
+\]
+Para un operador que observe un promedio de 110 ms, el sistema parece saludable. Sin embargo, el **percentil p99 es de 10.000 ms** (10 segundos).
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\textbf{Consecuencia en sistemas distribuidos:}
+Si una página web realiza 50 llamadas internas paralelas a distintos microservicios para armar su vista, la probabilidad de que al menos una llamada experimente la latencia del percentil p99 es:
+\[
+P(\text{al menos una llamada lenta}) = 1 - (0.99)^{50} = 1 - 0.605 = 39.5\%.
+\]
+Casi el 40\% de los usuarios finales sufrirá una degradación inaceptable de 10 segundos, a pesar de que el promedio aparente estar en 110 ms.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué el síntoma visible puede no coincidir con la causa raíz en un sistema distribuido.
+\textbf{Conexión con Clase 03:} Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Como se estudió en la Clase 03, los relojes de hardware de distintos servidores sufren \emph{clock drift} y \emph{clock skew} debido a variaciones térmicas e imprecisiones de sincronización NTP.
+Si el Servidor A tiene su reloj físico adelantado por 30 ms respecto al Servidor B, un mensaje enviado por A a las \texttt{12:00:00.040} puede registrarse como recibido en B a las \texttt{12:00:00.015}. Si se ordenan los logs por timestamp físico, el sistema mostrará falsamente que el efecto ocurrió antes que la causa.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Para resolver este problema sin depender de relojes físicos sincronizados, el tracing distribuido implementa el modelo formal de **Relojes Lógicos de Lamport** y la relación \emph{happened-before} ($\rightarrow$):
+\begin{itemize}
+\item Cada Span contiene un identificador propio (\texttt{span\_id}) y una referencia explícita a su causante (\texttt{parent\_span\_id}).
+\item Al emitir un Span hijo en respuesta a una llamada RPC, se establece la relación causal estricta $Span_{\text{padre}} \rightarrow Span_{\text{hijo}}$.
+\item La totalidad de los Spans forman un **Grafo Acíclico Dirigido (DAG)** donde el orden topológico preserva la causalidad verdadera de los eventos, independientemente del desfase temporal de los relojes físicos de las máquinas.
+\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una estrategia paso a paso para diagnosticar un aumento repentino de errores 500 en una API distribuida.
+Diferencie la propagación de contexto \textbf{In-Band} (en cabeceras HTTP/gRPC como W3C \texttt{traceparent}) de la recolección \textbf{Out-of-Band} (exportación asíncrona OTLP al Collector).
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+La arquitectura de observabilidad separa estrictamente dos vías de comunicación:
+\begin{enumerate}
+\item \textbf{Propagación In-Band (En banda / en el camino crítico):}
+\begin{itemize}
+\item \textbf{Qué viaja:} El contexto mínimo de trazabilidad (la cabecera W3C Trace Context \texttt{traceparent}, con formato \texttt{00-trace\_id-parent\_id-flags}).
+\item \textbf{Cómo viaja:} Dentro de los mensajes de red del negocio (cabeceras HTTP, metadatos de gRPC o cabeceras de registros en Kafka).
+\item \textbf{Propósito:} Transmitir el identificador causal entre servicios para que el receptor pueda asociar sus Spans al mismo trace sin perder el vínculo causal.
+\item \textbf{Riesgo:} Si un servicio no reinyecta la cabecera en una llamada saliente, la traza se fragmenta.
+\end{itemize}
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+\item \textbf{Recolección Out-of-Band (Fuera de banda / asincrónica):}
+\begin{itemize}
+\item \textbf{Qué viaja:} Los datos detallados y pesados del Span (nombres de operación, timestamps de inicio/fin, eventos internos, diccionarios de atributos de dominio y stack traces).
+\item \textbf{Cómo viaja:} De forma asincrónica, agrupada en lotes (\emph{batching}) mediante buffers en memoria hacia un recolector (OpenTelemetry Collector) utilizando el protocolo OTLP (gRPC/HTTP).
+\item \textbf{Propósito:} Evitar introducir latencia en el camino crítico del usuario final y aislar el rendimiento de la aplicación del backend de almacenamiento de telemetría.
+\end{itemize}
+\end{enumerate}
+\end{uaanswer}
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+
+\subsection*{Nivel 4: Integración y defensa}
+
+\begin{uaexercise}
+Explique la \textbf{Estrategia de Instrumentación en 2 Capas}: Capa 1 de Infraestructura (Auto-instrumentación / esqueleto de propagación) vs. Capa 2 de Dominio (Enriquecimiento semántico manual).
+\end{uaexercise}
+\begin{uaanswer}
+Una estrategia de instrumentación sostenible en microservicios debe estructurarse en dos capas complementarias:
+\begin{description}
+\item[Capa 1: Infraestructura (Auto-instrumentación / Middlewares):]
+\begin{itemize}
+\item \textbf{Implementación:} Mediante agentes automáticos o middlewares estándar en routers HTTP, clientes gRPC, pools de base de datos y clientes de mensajería.
+\item \textbf{Responsabilidad:} Capturar automáticamente el esqueleto de la red (duración de llamadas, códigos HTTP/gRPC, URLs de endpoints, errores no capturados) e inyectar/extraer las cabeceras de contexto (\texttt{traceparent}).
+\item \textbf{Ventaja:} Se despliega en toda la flota sin modificar el código de negocio de las aplicaciones.
+\end{itemize}
+\item[Capa 2: Dominio (Instrumentación Manual Semántica):]
+\begin{itemize}
+\item \textbf{Implementación:} Enriquecimiento explícito dentro del código de los servicios utilizando la API de OpenTelemetry (por ejemplo: \texttt{span.SetAttribute("customer.id", id)}, \texttt{span.SetAttribute("payment.provider", "stripe")}).
+\item \textbf{Responsabilidad:} Adjuntar variables críticas de negocio que determinan las decisiones del flujo lógico.
+\item \textbf{Ventaja:} Convierte trazas técnicas genéricas en herramientas de diagnóstico capaces de responder preguntas de negocio durante incidentes.
+\end{itemize}
+\end{description}
+La Capa 1 provee el esqueleto estructural y la conectividad causal; la Capa 2 aporta el significado semántico para entender por qué fallan los casos particulares.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué “buscar la línea exacta que falló” no suele ser el primer paso correcto en debugging distribuido.
+Construya un escenario de cascada de fallas donde el síntoma visible sea un error HTTP 504 en la API de borde, pero la causa raíz sea una base de datos downstream saturada.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+\textbf{Escenario de propagación de falla:}
+\begin{enumerate}
+\item \textbf{Causa raíz (Capa 4 - Base de Datos de Pagos):} Se ejecuta una consulta masiva sin índice que bloquea tablas críticas. La latencia de respuesta para validar transacciones salta de 10 ms a 25 segundos.
+\item \textbf{Degradación en Payments Service (Capa 3):} Las conexiones del pool se bloquean esperando la base de datos. Nuevas solicitudes se encolan hasta que el pool se satura completamente.
+\item \textbf{Propagación hacia Orders Service (Capa 2):} \texttt{Orders Service} invoca a \texttt{Payments Service} con un timeout de 4 segundos. Al agotarse el timeout, ejecuta una política ingenua de 3 reintentos inmediatos, quintuplicando la carga sobre el servicio de pagos ya saturado.
+\item \textbf{Síntoma en el Borde (Capa 1 - API Gateway):} El API Gateway tiene configurado un timeout global de 10 segundos. Al no recibir respuesta de \texttt{Orders Service}, corta la conexión y devuelve al cliente un error **HTTP 504 Gateway Timeout**.
+\end{enumerate}
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+\textbf{Análisis con observabilidad:}
+\begin{itemize}
+\item Si el operador solo mira el dashboard del API Gateway, verá un pico de errores 504 y asumirá erróneamente que el Gateway o la red de borde están fallando.
+\item Al inspeccionar la traza distribuida (Trace DAG), se observa que el Span raíz del API Gateway (10.000 ms) contiene al Span de Orders (9.980 ms), el cual contiene a los Spans de reintentos hacia Payments (4.000 ms cada uno), los cuales a su vez contienen el Span terminal bloqueado en la consulta SQL de la base de datos. La traza aísla inmediatamente la causa raíz en la base de datos downstream.
+\end{itemize}
+\end{uaanswer}
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{uaexercise}
+Describa los 4 pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción y explique por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
+\end{uaexercise}
+\begin{uaanswer}
+El **Core Analysis Loop** (Majors et al., 2022) es la metodología sistemática de diagnóstico basada en evidencia y primeros principios:
+\begin{enumerate}
+\item \textbf{Observar la anomalía agregada:} Detectar el síntoma en las señales de alto nivel (por ejemplo: un incremento abrupto en la latencia p99 o en la tasa de errores en un endpoint).
+\item \textbf{Aislar la muestra anómala:} Filtrar y delimitar el conjunto de eventos/trazas que experimentan la degradación frente a la línea base de ejecuciones normales (ej: separar las solicitudes con latencia > 2 s de las nominales < 100 ms).
+\item \textbf{Computar diferencias dimensionales (BubbleUp / Análisis estadístico):} Comparar automáticamente la distribución de todas las dimensiones y atributos entre la muestra anómala y la muestra de control para identificar qué atributo explica la desviación (por ejemplo: el 98\% de las solicitudes lentas comparten \texttt{db.host = replica-3} o \texttt{client.version = 3.1.0}).
+\item \textbf{Confirmar causalidad mediante traza individual y drill-down:} Seleccionar una traza representativa del grupo anómalo para inspeccionar la secuencia de Spans y confirmar el mecanismo causal del fallo antes de aplicar la mitigación.
+\end{enumerate}
+
+\textbf{Por qué no es sostenible ``buscar la línea exacta que falló'':}
+En sistemas distribuidos complejos, la mayoría de los incidentes en producción no son provocados por errores de sintaxis o excepciones no controladas en una línea de código local. Son el resultado de interacciones dinámicas emergentes: agotamiento de recursos compartidos, cascadas de reintentos, saturación de hilos o incompatibilidad de versiones. Buscar una línea en miles de archivos de log sin una guía causal es un proceso ineficiente y dependiente de la suerte.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique cómo cambia el problema de propagación de contexto en un sistema basado en eventos (Event-Driven / Kafka) respecto de uno sincrónico (HTTP/gRPC).
+\end{uaexercise}
+\begin{uaanswer}
+El pasaje de un modelo sincrónico (HTTP/gRPC) a un modelo basado en eventos (Kafka, RabbitMQ) altera tres premisas estructurales de la propagación de contexto:
+\begin{enumerate}
+\item \textbf{Desacoplamiento temporal:} En HTTP/gRPC, el cliente y el servidor ejecutan en sincronía temporal inmediata. En Kafka, un productor puede publicar un mensaje y el consumidor procesarlo segundos, horas o días después. Si se modelara el procesamiento del consumidor como un Span hijo directo del productor, la duración del trace parecería ser de horas, falseando las métricas de latencia.
+\item \textbf{Patrón 1 a N (Fan-out):} Un único mensaje producido en un topic puede ser consumido en paralelo por múltiples microservicios independientes (ej: Facturación, Notificaciones y Stock).
+\item \textbf{Procesamiento por lotes (\emph{Batch Consumption}):} Un consumidor suele recibir un lote de 100 o 500 mensajes juntos en una sola llamada de sondeo.
+\end{enumerate}
+
+\textbf{Solución técnica:}
+\begin{itemize}
+\item El productor inyecta la cabecera W3C \texttt{traceparent} en los **Record Headers** del mensaje de Kafka.
+\item Al consumir un lote de mensajes, el consumidor crea un Span propio para el procesamiento del batch y vincula cada mensaje procesado a su traza originaria utilizando **Span Links** (enlaces semánticos de OpenTelemetry) en lugar de una relación jerárquica padre-hijo tradicional. De este modo, se preserva la correlación causal sin distorsionar la duración de la traza original.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Aplique el modelo del curso $D=(P,F,G,S,T)$ al problema de la observabilidad distribuida.
+\end{uaexercise}
+\begin{uaanswer}
+La formalización del problema de observabilidad distribuida bajo la tupla $D=(P, F, G, S, T)$ es:
+\begin{description}
+\item[$P$ (Problema):] Comprender el estado interno, la topología de ejecución y el comportamiento emergente de un sistema de procesos desacoplados en red, permitiendo diagnosticar fallas imprevistas (\emph{unknown-unknowns}) en producción.
+\item[$F$ (Modelo de fallas considerado):] Canales de red asincrónicos con latencia variable, caídas y reinicios no coordinados de nodos, desvío de relojes físicos (\emph{clock drift/skew}), cascadas de fallas aguas abajo, pérdida de cabeceras de contexto y sobrecarga del propio pipeline de telemetría (explosión de cardinalidad).
+\item[$G$ (Garantía ofrecida):] Reconstrucción determinística del Grafo Acíclico Dirigido (DAG) de causalidad de cada solicitud, correlación automática entre señales de telemetría (métricas, trazas, logs) mediante Hard Context, e identificación de causa raíz sin alterar el binario en ejecución.
+\item[$S$ (Solución / Protocolo):] Implementación de la Trenza Única de Datos (estándar OpenTelemetry/OTLP) con propagación In-Band de contexto W3C (\texttt{traceparent}), recolección Out-of-Band asincrónica, emisión de Eventos Estructurados Anchos por unidad de trabajo, y diagnóstico mediante el Core Analysis Loop.
+\item[$T$ (Trade-offs y costos aceptados):]
+\begin{itemize}
+\item Sobrecarga de CPU, memoria y ancho de banda para serializar y transmitir telemetría.
+\item Costo financiero de almacenamiento e indexación en backends de observabilidad.
+\item Disciplina rigurosa requerida en todos los equipos para propagar cabeceras y evitar la fragmentación de trazas.
+\end{itemize}
+\end{description}
 \end{uaanswer}
 
 \end{document}

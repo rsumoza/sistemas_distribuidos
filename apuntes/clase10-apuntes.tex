@@ -11,245 +11,249 @@
 \date{\UADate}
 
 \begin{document}
+\sloppy
 \maketitle
 
 \section{Introducción}
 
-Una vez que un sistema distribuido está desplegado, el problema central deja de ser solo diseñarlo correctamente y pasa a ser también \emph{entenderlo en producción}. Esto es mucho más difícil que en sistemas locales, porque:
+Una vez que un sistema distribuido está desplegado en producción, el problema central deja de ser únicamente diseñarlo o codificarlo correctamente: pasa a ser también \emph{entenderlo mientras opera}.
+
+En sistemas locales o monolíticos, el debugging suele ser reactivo e intuitivo (examinar un stack trace local, colocar un breakpoint o revisar un archivo de log). En sistemas distribuidos modernos, este enfoque colapsa por cuatro razones estructurales:
 
 \begin{itemize}
-\item la ejecución se distribuye entre múltiples procesos;
-\item las fallas pueden ser parciales;
-\item no hay un reloj global confiable;
-\item la narrativa causal de una request se fragmenta entre servicios.
+\item La ejecución se fragmenta entre múltiples procesos y servicios autónomos.
+\item Las fallas son parciales y degradaciones progresivas, no simples estados binarios (up/down).
+\item No existe un reloj físico global y confiable entre nodos (\emph{clock drift/skew}).
+\item La narrativa causal de una única solicitud se dispersa a través de la red.
 \end{itemize}
 
-Por eso, la observabilidad no debe tratarse como un agregado cosmético. Es una capacidad estructural del sistema.
+Por estas razones, la observabilidad no es un agregado opcional al final del desarrollo. Es una \textbf{propiedad arquitectónica estructural} del sistema.
 
-\section{Observabilidad}
+\section{¿Por qué monitorear?}
 
-Una formulación útil es:
+Antes de hablar de herramientas o de la definición formal de observabilidad,
+conviene responder una pregunta más básica: ¿por qué invertir esfuerzo en monitoreo?
+
+En un sistema local, un error suele ser visible de inmediato: una excepción, un crash,
+un test que falla. En un sistema distribuido, las fallas pueden ser \textbf{parciales,
+intermitentes y silenciosas}.
+
+Las razones fundamentales para monitorear son:
+
+\begin{description}
+\item[Detección temprana:] Hay problemas que no se resuelven de manera automática
+y es necesario informar a un humano: un disco que se está llenando, un certificado
+por vencer, un servicio que degrada lentamente. Sin monitoreo, estos problemas se
+descubren cuando ya es demasiado tarde (típicamente por quejas de usuarios).
+\item[Diagnóstico:] Poder reconstruir qué pasó y por qué, no solo constatar que algo falló.
+\item[Decisiones informadas:] Sin datos operativos, las decisiones de capacidad,
+despliegue y priorización son apuestas a ciegas. Por ejemplo: ¿cuánto mejoró el hit rate de
+memcache al agregar un nodo nuevo? ¿Justifica el costo de infraestructura? Sin métricas, no hay forma
+de saberlo.
+\item[Contención de daño:] Un sistema que detecta su propia degradación puede activar
+mecanismos de resiliencia (circuit breakers, graceful degradation, rate limiting) antes de que el
+daño se propague en cascada.
+\item[Aprendizaje continuo:] Los datos de monitoreo alimentan postmortems blameless, experimentos
+de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
+\end{description}
+
+\section{Observabilidad: De la Teoría de Control al Software}
+
+\subsection{Definición conceptual}
+
+La formulación canónica, heredada de la Teoría de Control (Rudolf E. Kálmán, 1960), establece que:
 
 \begin{quote}
-Un sistema es observable si su estado interno puede inferirse razonablemente a partir de sus salidas.
+Un sistema es observable si su estado interno puede inferirse razonablemente a partir del conocimiento de sus salidas externas.
 \end{quote}
 
-En sistemas distribuidos, las salidas principales son:
+Aplicado a la ingeniería de software moderna (Majors et al., 2022; Young \& Parker, 2024), un sistema es observable si permite a los ingenieros investigar y explicar cualquier estado arbitrario en el que se encuentre el sistema ---especialmente estados imprevistos o nunca antes vistos (\emph{unknown-unknowns})--- mediante preguntas exploratorias sin necesidad de adivinar, predecir el fallo de antemano o desplegar nuevo código para agregar más logs.
 
+\subsection{La trampa de los ``Tres Pilares'' vs. ``La Trenza Única de Datos''}
+
+Tradicionalmente, la industria ha presentado la observabilidad como los ``tres pilares'': \textbf{logs, métricas y trazas}. Sin embargo, la literatura moderna advierte que esta visión es engañosa (Young \& Parker, 2024). 
+
+Construir logs, métricas y trazas como tres sistemas verticales aislados produce el antipatrón conocido como \textbf{``Las Tres Pestañas del Navegador''} (\emph{Three Browser Tabs of Observability}):
 \begin{itemize}
-\item logs;
-\item métricas;
-\item trazas distribuidas.
+\item Una pestaña con dashboards de métricas agregadas (Prometheus/Grafana).
+\item Otra pestaña con buscadores de logs de texto libre (ELK/OpenSearch).
+\item Una tercera pestaña con herramientas de tracing (Jaeger/Zipkin).
 \end{itemize}
 
-Estas tres dimensiones se complementan. Ninguna por sí sola alcanza.
+El problema de las tres pestañas es que la información vive en silos inconexos. Cuando ocurre un incidente, el operador se ve forzado a hacer de puente manual, memorizando IDs y saltando entre pestañas intentando correlacionar eventos a simple vista.
 
-\section{Logs}
+La observabilidad moderna trasciende las tres pestañas mediante \textbf{``La Trenza Única de Datos''} (\emph{Single Braid of Data}): las señales de telemetría (logs, métricas, trazas) conservan sus propósitos especializados, pero están \textbf{interconectadas y entrelazadas estructuralmente mediante contexto compartido} (OpenTelemetry Protocol - OTLP).
 
-\subsection{Qué responden}
+\subsection{Hard Context vs. Soft Context}
 
-Los logs responden principalmente:
-\begin{quote}
-¿Qué ocurrió?
-\end{quote}
-
-\subsection{Logs tradicionales vs estructurados}
-
-Un log de texto libre puede ser útil para inspección humana rápida, pero escala mal para análisis distribuido. Por eso, en sistemas modernos se prefiere log estructurado con campos como:
+Para que las herramientas puedan calcular correlaciones automáticas en la trenza de datos, es vital distinguir entre dos tipos de contexto:
 
 \begin{itemize}
-\item timestamp;
-\item service\_name;
-\item request\_id;
-\item trace\_id;
-\item user\_id;
-\item endpoint;
-\item status;
-\item latency;
-\item error\_code.
+\item \textbf{Soft Context (Contexto Blando):} Correlaciones implícitas o agregadas basadas en ventanas de tiempo o etiquetas genéricas (como \texttt{service\_name} o \texttt{environment}). Es frágil porque exige que un operador humano deduzca manualmente la relación causa-efecto.
+\item \textbf{Hard Context (Contexto Duro):} Enlaces explícitos, estructurales e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id}, cabeceras W3C Trace Context). Define la topología causal exacta de una solicitud individual, permitiendo conectar logs y métricas (vía \emph{exemplars}) directamente con su traza correspondiente.
 \end{itemize}
 
-\subsection{Idea importante}
+\section{¿Qué debe responder un buen monitor?}
 
-En sistemas distribuidos, un log aislado casi nunca dice toda la verdad. El valor del log aparece cuando puede correlacionarse con otros eventos de la misma request o del mismo flujo.
-
-\section{Métricas}
-
-\subsection{Qué responden}
-
-Las métricas responden:
-\begin{quote}
-¿Cómo está funcionando el sistema en agregado?
-\end{quote}
-
-\subsection{Ejemplos típicos}
-
-\begin{itemize}
-\item throughput;
-\item tasa de error;
-\item latencia p50/p95/p99;
-\item uso de CPU;
-\item memoria;
-\item saturación de colas;
-\item conexiones activas.
-\end{itemize}
-
-\subsection{Golden Signals}
-
-Una guía clásica de operación distribuida es mirar:
-\begin{itemize}
-\item latency;
-\item traffic;
-\item errors;
-\item saturation.
-\end{itemize}
-
-\subsection{Límite}
-
-Las métricas muestran patrones agregados, pero no explican por sí solas una request individual. Por eso no reemplazan a logs ni trazas.
-
-\section{Tracing distribuido}
-
-\subsection{Qué responde}
-
-El tracing distribuido responde:
-\begin{quote}
-¿Cómo atravesó esta request el sistema?
-\end{quote}
-
-\subsection{Conceptos}
-
-\begin{itemize}
-\item \textbf{Trace}: historia completa de una request distribuida.
-\item \textbf{Span}: unidad individual de trabajo dentro de esa traza.
-\end{itemize}
-
-Una request que pasa por API, Auth, Orders y Payments puede representarse como una traza con múltiples spans enlazados causalmente.
-
-\subsection{Valor}
-
-El tracing permite:
-\begin{itemize}
-\item ver dependencia crítica;
-\item detectar dónde se concentra la latencia;
-\item localizar fallas upstream;
-\item entender el árbol causal de una ejecución.
-\end{itemize}
-
-\section{Propagación de contexto}
-
-\subsection{Correlation IDs}
-
-Para correlacionar logs y spans, el sistema debe propagar contexto explícito:
-
-\begin{itemize}
-\item request\_id;
-\item trace\_id;
-\item span\_id;
-\item eventualmente tenant\_id o user\_id.
-\end{itemize}
-
-\subsection{Punto clave}
-
-Sin propagación de contexto, cada servicio genera una historia local desconectada. El resultado es que el sistema se vuelve opaco justo cuando más necesita ser entendible.
-
-\section{Debugging en producción}
-
-\subsection{Por qué es difícil}
-
-El debugging distribuido es difícil porque los síntomas visibles suelen ser tardíos y desplazados respecto de la causa real.
-
-Ejemplo típico:
-\begin{itemize}
-\item una base de datos empieza a responder lentamente;
-\item los servicios intermedios activan retries;
-\item aumenta la presión sobre la base;
-\item la API frontal empieza a devolver timeout;
-\item el error visible aparece en el borde, pero la causa está en otro sitio.
-\end{itemize}
-
-\subsection{Lección}
-
-La observabilidad debe permitir reconstruir causalidad, no solo enumerar síntomas.
-
-\section{Estrategia de diagnóstico}
-
-Una estrategia razonable para investigar fallas distribuidas es:
+Las dos preguntas fundamentales que cualquier sistema de telemetría y monitoreo debe responder son:
 
 \begin{enumerate}
-\item identificar el síntoma observable principal;
-\item encontrar la request o conjunto de requests afectadas;
-\item ubicar el servicio donde comienza la degradación;
-\item revisar dependencias downstream y upstream;
-\item correlacionar métricas, logs y trazas.
+\item \textbf{¿Qué está roto?} --- El monitor debe poder señalar con razonable
+precisión qué componente, servicio o recurso está degradado. ``El sistema está
+lento'' no es una respuesta útil; ``el servicio de pagos tiene latencia p99 > 2s''
+sí lo es.
+
+\item \textbf{¿Por qué está roto?} --- El monitor debe proporcionar suficiente
+contexto para iniciar el diagnóstico: ¿saturación de CPU? ¿dependencia downstream caída? ¿cambio
+de configuración reciente? ¿un cliente específico saturando el ancho de banda?
 \end{enumerate}
 
-\subsection{Error común}
-
-Un error típico es empezar buscando “la línea exacta de código” antes de reconstruir la topología de la falla. En sistemas distribuidos, el diagnóstico suele requerir primero mapear causalidad y dependencia.
-
-\section{Diseño para observabilidad}
-
-La observabilidad debe ser una propiedad de diseño, no un parche posterior. Eso implica:
-
+Este principio tiene consecuencias directas sobre el diseño de la trenza de datos:
 \begin{itemize}
-\item logs estructurados desde el inicio;
-\item trazas distribuidas habilitadas;
-\item propagación de contexto entre servicios;
-\item métricas orientadas a capacidad, latencia y errores;
-\item alertas pensadas según objetivos del sistema.
+\item Las \textbf{métricas} son ideales para responder rápidamente ``qué está roto''.
+\item Las \textbf{trazas} conectan el ``qué'' con el ``por qué'' a través del camino distribuido.
+\item Los \textbf{eventos estructurados} aportan el detalle fino de dominio para aislar la causa raíz del ``por qué''.
 \end{itemize}
 
-\section{Observabilidad y arquitectura}
+\section{Logs: De Texto Libre a Eventos Estructurados}
 
-Cada estilo arquitectónico cambia el problema observacional:
+\subsection{Qué responden}
+Los logs responden a la pregunta: \emph{¿Qué ocurrió en un instante específico de la ejecución?}
 
-\subsection{Monolito}
+\subsection{Texto libre vs. Logs estructurados}
+Un log de texto libre (por ejemplo, \texttt{"User 42 logged in from 10.0.0.1"}) es legible para humanos pero inadecuado para procesamiento distribuido, ya que exige expresiones regulares frágiles ante cambios de formato.
+
+En sistemas distribuidos se exige \textbf{log estructurado} (típicamente JSON) con campos bien definidos:
 \begin{itemize}
-\item el tracing es menos crítico;
-\item los logs locales suelen ser más fáciles de correlacionar.
+\item \texttt{timestamp} (ISO-8601 con precisión de microsegundos);
+\item \texttt{service\_name} y \texttt{service\_version};
+\item \texttt{trace\_id} y \texttt{span\_id} (\textbf{Hard Context});
+\item \texttt{severity\_text} (INFO, WARN, ERROR);
+\item \texttt{attributes} (diccionario de clave-valor de dominio).
 \end{itemize}
 
-\subsection{Microservicios}
+\subsection{La unidad de trabajo: Eventos Estructurados Anchos}
+La tendencia moderna es agrupar la información de una unidad de trabajo en un \textbf{Evento Estructurado Ancho} (\emph{Arbitrarily Wide Structured Event}, Majors et al., 2022). En lugar de emitir múltiples líneas sueltas durante un pedido, el servicio inicializa un mapa en memoria al recibir la solicitud, acumula metadatos durante su ejecución y emite un único evento estructurado rico al finalizar.
+
+\section{Métricas: Agregaciones, Series Temporales y Percentiles}
+
+\subsection{Qué responden}
+Las métricas responden a la pregunta: \emph{¿Cuál es la tendencia o salud agregada del sistema a lo largo del tiempo?}
+
+\subsection{Golden Signals}
+Las cuatro señales doradas (Google SRE, 2016) constituyen la base del monitoreo de servicios:
 \begin{itemize}
-\item aumenta la necesidad de tracing;
-\item las dependencias se multiplican;
-\item la causalidad se fragmenta.
+\item \textbf{Latencia:} Tiempo que toma procesar una solicitud (diferenciando éxito de error).
+\item \textbf{Tráfico:} Demanda sobre el sistema (ej: solicitudes HTTP/segundo).
+\item \textbf{Errores:} Tasa de solicitudes que fallan (explícitas como HTTP 500, implícitas como payload incorrecto).
+\item \textbf{Saturación:} Qué tan lleno está el recurso más restringido (memoria, pool de conexiones de DB, CPU).
 \end{itemize}
 
-\subsection{Event-driven}
+\subsection{La falacia del promedio: Percentiles vs. Media}
+En sistemas distribuidos, el promedio de latencia oculta las anomalías de la cola larga. Si 99 usuarios tardan 10 ms y 1 usuario tarda 10\,000 ms, el promedio es 110 ms, ocultando que un usuario sufrió una degradación inaceptable.
+
+Se debe medir y alertar siempre sobre percentiles:
 \begin{itemize}
-\item el orden puede ser parcial;
-\item el tracing extremo a extremo es más difícil;
-\item la correlación por event\_id o trace\_id se vuelve crítica.
+\item \textbf{p50 (Mediana):} Experiencia típica del usuario.
+\item \textbf{p95 / p99:} Comportamiento de la cola larga bajo estrés o contención de bloqueos.
 \end{itemize}
 
-\section{Modelo del curso}
+\subsection{El peligro de la Explosión de Cardinalidad en TSDBs}
+Una base de datos de series temporales (TSDB como Prometheus) crea una serie temporal por cada combinación única de etiquetas (dimensiones).
 
-Podemos formular el problema observacional con:
+Si se inyecta un campo con alta cardinalidad (como \texttt{user\_id} con 10 millones de usuarios o \texttt{order\_id}) en una métrica:
+\[
+\text{Total series} = \text{métricas} \times \text{métodos} \times \text{status\_codes} \times \text{user\_ids}
+\]
+Esto produce un colapso por consumo exponencial de memoria (\textbf{Explosión de Cardinalidad}).
+
+\begin{quote}
+\textbf{Regla de diseño fundamental:} Las métricas agregadas solo deben contener etiquetas de baja cardinalidad finita (\texttt{http\_method}, \texttt{status\_code}, \texttt{endpoint}). La alta cardinalidad pertenece a los Spans y Eventos Estructurados.
+\end{quote}
+
+\section{Tracing Distribuido y Causalidad}
+
+\subsection{Qué responde}
+El tracing distribuido responde a la pregunta: \emph{¿Cómo atravesó esta solicitud la red a través de los múltiples servicios?}
+
+\subsection{Conceptos fundamentales}
+\begin{itemize}
+\item \textbf{Trace:} El viaje completo de una solicitud a través de la topología distribuida, modelado como un Grafo Acíclico Dirigido (DAG).
+\item \textbf{Span:} La unidad individual de trabajo delimitada en tiempo dentro de un trace (ej: llamada RPC, consulta SQL o cómputo interno).
+\end{itemize}
+
+Un Span contiene cinco elementos obligatorios: Trace ID, Span ID, Parent Span ID (ausente en el root span), Timestamp de inicio y Duración.
+
+\subsection{Conexión teórica con la Clase 03: Causalidad de Lamport vs. Clock Drift}
+
+En la Clase 03 estudiamos los Relojes Lógicos de Lamport y la relación \emph{happened-before} ($\rightarrow$). En sistemas distribuidos no podemos confiar en el tiempo físico para ordenar eventos debido al desvío de los relojes de hardware (\emph{clock drift/skew}).
+
+\textbf{Un Trace no es una simple lista ordenada por tiempo físico.} Un Trace es la materialización del modelo de causalidad de Lamport. El campo \texttt{parent\_span\_id} establece la relación causal estricta $Span_A \rightarrow Span_B$ independientemente de los desfases en los relojes de las máquinas.
+
+\subsection{Propagación de Contexto (In-Band vs. Out-of-Band)}
+Basado en el modelo Dapper (Sigelman et al., 2010):
+\begin{itemize}
+\item \textbf{Propagación In-Band (En banda):} El contexto de la traza (\texttt{traceparent} bajo estándar W3C: \texttt{00-trace\_id-parent\_id-flags}) viaja \textbf{dentro de los mensajes de red} (cabeceras HTTP, metadatos gRPC). Si un servicio no reinyecta estas cabeceras al invocar aguas abajo, la cadena causal se quiebra.
+\item \textbf{Recolección Out-of-Band (Fuera de banda):} Al completarse un Span, sus datos se transmiten asíncronamente a un recolector (OpenTelemetry Collector) mediante buffers en memoria para no penalizar la latencia del usuario.
+\end{itemize}
+
+\section{Estrategia de Instrumentación en Dos Capas}
+
+Para lograr observabilidad sostenible, se recomienda una estrategia en dos capas:
+
+\begin{itemize}
+\item \textbf{Capa 1: Infraestructura de Propagación (Auto-instrumentación / Framework)}\\
+Mediante agentes o middlewares automáticos (OpenTelemetry), se captura el esqueleto del sistema: spans raíz, propagación de cabeceras W3C y latencias de transporte. No requiere modificar lógica de negocio.
+\item \textbf{Capa 2: Enriquecimiento Semántico de Dominio (Instrumentación Manual)}\\
+El desarrollador inyecta atributos de negocio en los spans activos (por ejemplo: \texttt{tenant.id} o \texttt{payment.method}). Otorga significado semántico a la traza para responder preguntas de negocio en producción.
+\end{itemize}
+
+\section{Debugging en Producción y el Core Analysis Loop}
+
+\subsection{Por qué la causa raíz no coincide con el síntoma visible}
+En arquitecturas distribuidas, las fallas se propagan en cascada:
+\begin{enumerate}
+\item Una base de datos downstream se degrada por contención de bloqueos.
+\item El servicio intermedio agota su pool de hilos encolando peticiones.
+\item Los clientes upstream reintentan automáticamente, amplificando el tráfico.
+\item El API Gateway de borde comienza a retornar errores HTTP 504.
+\end{enumerate}
+
+El síntoma visible estalla en el borde, pero la causa raíz reside aguas abajo.
+
+\subsection{El Core Analysis Loop (Análisis por Primeros Principios)}
+En lugar de depender de la intuición o de dashboards estáticos, la observabilidad propone un flujo iterativo y estructurado (\emph{Core Analysis Loop}, Majors et al., 2022):
+
+\begin{enumerate}
+\item \textbf{Observar la anomalía agregada:} Detectar un salto en el percentil p99 de latencia o tasa de errores.
+\item \textbf{Aislar la muestra (\emph{BubbleUp}):} Seleccionar el subconjunto de eventos y trazas anómalos frente a la línea base normal.
+\item \textbf{Diferenciar dimensiones (\emph{Compute Diff}):} Computar la discrepancia estadística de todos los atributos entre la muestra anómala y la base (por ejemplo: identificar que el atributo \texttt{availability\_zone=us-east-1a} concentra el 98\% de los fallos frente al 15\% usual).
+\item \textbf{Drill-down y trazabilidad:} Filtrar por esa dimensión y examinar las trazas individuales para diagnosticar la causa raíz.
+\end{enumerate}
+
+\section{Modelo del Curso}
+
+Expresamos el problema operacional de la observabilidad mediante el framework del curso:
 
 \[
 D = (P, F, G, S, T)
 \]
 
-Por ejemplo:
-
 \begin{itemize}
-\item $P$: diagnosticar fallas en un sistema distribuido;
-\item $F$: fallas parciales, latencia variable, cascadas de retries;
-\item $G$: capacidad de reconstruir causalidad y localizar degradación;
-\item $S$: logs estructurados + métricas + trazas + propagación de contexto;
-\item $T$: más sobrecarga, más complejidad de instrumentación, más costo operacional.
+\item \textbf{$P$ (Problema):} Diagnosticar y entender el comportamiento de un sistema distribuido en producción ante fallas imprevistas.
+\item \textbf{$F$ (Factores/Restricciones):} Ausencia de reloj global (\emph{clock drift}), fallas en cascada, latencia variable de red, explosión de cardinalidad.
+\item \textbf{$G$ (Garantías/Objetivos):} Reconstrucción de la causalidad distribuida, detección de causas raíz en minutos, preservación del valor de negocio.
+\item \textbf{$S$ (Solución):} Trenza única de datos (OTEL/OTLP) + Propagación de contexto duro (W3C) + Instrumentación en 2 capas + Debugging por primeros principios.
+\item \textbf{$T$ (Trade-offs/Costos):} Sobrecarga de cómputo y red por telemetría, costo de almacenamiento para alta cardinalidad, complejidad de configuración.
 \end{itemize}
 
 \section{Conclusión}
 
-No se puede operar seriamente un sistema distribuido si no puede observarse con claridad. Logs, métricas y trazas no son herramientas accesorias, sino mecanismos para recuperar inteligibilidad en un entorno donde la ejecución real está fragmentada.
+No es posible operar confiablemente un sistema distribuido sin diseñar su observabilidad desde el inicio. Entrelazar logs, métricas y trazas mediante propagación de contexto transforma la complejidad del sistema en una estructura navegable y comprensible.
 
 \begin{uakeybox}
-Observabilidad distribuida no es “mirar dashboards”. Es diseñar el sistema para que pueda explicarse a sí mismo cuando falle.
+Observabilidad distribuida no es ``mirar dashboards ni abrir tres pestañas''. Es diseñar el software para que transporte contexto causal y pueda explicarse a sí mismo cuando falle en producción.
 \end{uakeybox}
-
 
 \section{Síntesis razonada de la clase}
 Esta unidad debe leerse como parte de una cadena de decisiones de diseño y no como un catálogo de mecanismos. Para estudiar el tema con profundidad conviene reconstruir cuatro preguntas: \emph{qué problema aparece}, \emph{qué garantía se desea}, \emph{qué mecanismo la aproxima} y \emph{qué costo introduce}. En cada ejemplo debe identificarse además el modelo de falla implícito.
@@ -260,6 +264,14 @@ Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón:
 
 \section{Bibliografía guiada y ruta de profundización}
 Para profundizar esta clase se recomienda: Google SRE Book; OpenTelemetry conceptual model; Kleppmann para causalidad y fallas parciales.
+
+\subsection*{Referencias canónicas}
+\begin{enumerate}
+\item \textbf{Young, T. y Parker, A.} (2024). \emph{Learning OpenTelemetry: Setting Up and Operating a Modern Observability System}. O'Reilly Media. (Capítulos 1, 2 y 3).
+\item \textbf{Majors, C., Fong-Jones, L. y Miranda, G.} (2022). \emph{Observability Engineering: Achieving Production-Excellence}. O'Reilly Media. (Capítulos 1, 5 y 6).
+\item \textbf{Sigelman, B. H., et al.} (2010). \emph{Dapper, a Large-Scale Distributed Systems Tracing Infrastructure}. Google Technical Report.
+\item \textbf{Beyer, B., et al.} (2016). \emph{Site Reliability Engineering: How Google Runs Production Systems}. O'Reilly Media. (Capítulo 6).
+\end{enumerate}
 
 La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
 
@@ -321,3 +333,4 @@ El equipo debe producir un ADR breve con la decisión asociada a esta clase. Deb
 \end{enumerate}
 
 \end{document}
+

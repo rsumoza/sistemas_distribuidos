@@ -1,5 +1,5 @@
 % !TeX encoding = UTF-8
-\documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
+\documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
 
 \UASetClassNumber{10}
@@ -24,212 +24,223 @@
 Ya vimos:
 \begin{itemize}
 \item RPC, retries, consistencia
-\item transacciones, logs, arquitectura
+\item Transacciones, logs, arquitectura
 \end{itemize}
 
 \pause
 
-\begin{block}{Problema}
-¿Cómo entendemos qué está pasando en un sistema distribuido real cuando algo sale mal?
+\begin{block}{El desafío real}
+¿Cómo entendemos qué está pasando en un sistema distribuido real cuando algo degrada o falla en producción?
 \end{block}
 \end{frame}
 
-\begin{frame}{La intuición equivocada}
-En un monolito local, debugging suele significar:
+\begin{frame}{¿Por qué monitorear?}
 \begin{itemize}
-\item mirar stack trace
-\item revisar logs
-\item reproducir error
+\item Hay problemas que no se resuelven de manera automática y es necesario informar
+      a un humano: un disco que se está llenando, un certificado por vencer,
+      un servicio que degrada lentamente.
+\item Sin monitoreo, la primera señal de fallo suele ser un usuario quejándose.
+\item Los datos de monitoreo permiten tomar decisiones informadas:
+      ¿cuánto mejoró el hit rate de memcache al agregar un nodo?
+      Sin métricas, esa respuesta es una apuesta.
 \end{itemize}
 
 \pause
 
-En un sistema distribuido:
-\begin{itemize}
-\item no hay un único proceso
-\item no hay un único reloj
-\item no hay una única narrativa local
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Observabilidad}
 \begin{block}{Idea}
-Un sistema observable es uno cuyo estado interno puede inferirse a partir de sus salidas.
+No monitoreamos porque podemos. Monitoreamos porque sin visibilidad operativa,
+no hay forma de sostener un sistema distribuido en producción.
+\end{block}
+\end{frame}
+
+\begin{frame}{La intuición del monolito vs. la realidad distribuida}
+En un monolito local:
+\begin{itemize}
+\item Stack trace único, reproduzco localmente, pongo breakpoints.
+\end{itemize}
+
+\pause
+
+En un sistema distribuido moderno:
+\begin{itemize}
+\item Múltiples procesos y lenguajes en red.
+\item No hay un único reloj físico confiable (\emph{clock drift}).
+\item La narrativa de una request se fragmenta.
+\item Las fallas son parciales y en cascada.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Redefiniendo la Observabilidad}
+
+\begin{frame}{Observabilidad (Teoría de Control a Software)}
+\begin{block}{Definición}
+Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
 \end{block}
 
 \pause
 
-En práctica:
 \begin{itemize}
-\item logs
-\item métricas
-\item trazas
+\item \textbf{Monitoreo:} ¿Está el sistema funcionando? (\emph{known-unknowns}).
+\item \textbf{Observabilidad:} ¿Por qué está ocurriendo este comportamiento anómalo e imprevisto? (\emph{unknown-unknowns}).
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Logs}
-
-\begin{frame}{Logs}
-Los logs responden principalmente:
-\begin{quote}
-¿Qué pasó?
-\end{quote}
-
-\pause
-
-Tipos:
-\begin{itemize}
-\item texto plano
-\item estructurados
-\item enriquecidos con contexto
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Logs estructurados}
-Ejemplo:
-\begin{itemize}
-\item timestamp
-\item service\_name
-\item request\_id
-\item user\_id
-\item error\_code
-\end{itemize}
+\begin{frame}{¿Qué debe responder un buen monitor?}
+Un sistema de monitoreo útil debe responder dos preguntas:
+\begin{enumerate}
+\item \textbf{¿Qué está roto?} --- Identificar el componente o servicio que
+      está fallando o degradando.
+\item \textbf{¿Por qué está roto?} --- Dar suficiente contexto para entender
+      la causa, no solo el síntoma.
+\end{enumerate}
 
 \pause
 
-\begin{alertblock}{Clave}
-Un log sin contexto distribuido sirve poco.
+\begin{alertblock}{Consecuencia de diseño}
+Si tu alerta solo dice ``error rate alto'' pero no ayuda a responder qué ni
+por qué, no es monitoreo: es una alarma de incendio sin indicar dónde está
+el fuego.
 \end{alertblock}
 \end{frame}
 
-\UASectionSlide{Métricas}
+\begin{frame}{La trampa de los 3 pilares: "Las 3 Pestañas"}
+El modelo tradicional de 3 pilares crea silos independientes:
 
-\begin{frame}{Métricas}
-Las métricas responden:
-\begin{quote}
-¿Qué tan bien o qué tan mal está funcionando el sistema?
-\end{quote}
+\begin{alertblock}{Antipatrón: Three Browser Tabs}
+\begin{itemize}
+\item Pestaña 1: Dashboards de métricas (Grafana).
+\item Pestaña 2: Buscador de logs (Elasticsearch).
+\item Pestaña 3: Trazas aisladas (Jaeger).
+\end{itemize}
+\end{alertblock}
 
 \pause
 
-Ejemplos:
+\textbf{Resultado:} El ser humano tiene que ser el "puente manual" adivinando correlaciones mirando líneas torcidas con los ojos.
+\end{frame}
+
+\begin{frame}{La alternativa: "La Trenza Única de Datos"}
+\begin{block}{Single Braid of Data (OpenTelemetry / OTLP)}
+Las tres señales (logs, métricas, trazas) conservan su identidad, pero están \textbf{entrelazadas por contexto compartido}.
+\end{block}
+
+\pause
+
 \begin{itemize}
-\item throughput
-\item error rate
-\item latency
-\item saturation
+\item Permite que las computadoras (y no solo los ojos del operador) calculen correlaciones automáticas entre datos.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Golden Signals}
+\begin{frame}{Hard Context vs. Soft Context}
+\begin{description}
+\item[Soft Context:] Correlación implícita por ventanas de tiempo o filtros de texto. Requiere que un humano ``haga zoom'' e intuya la causa.
+\pause
+\item[Hard Context:] Enlaces explícitos e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Define la topología y causalidad exacta.
+\end{description}
+\end{frame}
+
+\UASectionSlide{Eventos Estructurados y Métricas}
+
+\begin{frame}{Eventos Estructurados Anchos}
 \begin{itemize}
-\item Latency
-\item Traffic
-\item Errors
-\item Saturation
+\item Logs de texto libre $\rightarrow$ difíciles de parsear a escala.
+\item Logs estructurados (JSON) $\rightarrow$ legibles por máquinas.
+\end{itemize}
+
+\pause
+
+\begin{block}{Unidad de trabajo (Unit of Work)}
+Inicializar un mapa en memoria al recibir la solicitud, acumular atributos durante la ejecución y emitir un \textbf{Evento Estructurado Ancho} al finalizar.
+\end{block}
+\end{frame}
+
+\begin{frame}{Métricas: Golden Signals y Percentiles}
+\begin{itemize}
+\item \textbf{Golden Signals:} Latencia, Tráfico, Errores, Saturación.
+\item \textbf{Promedio vs. Percentiles:} El promedio oculta la ``cola larga''. Mirar siempre \textbf{p95} y \textbf{p99}.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Tracing distribuido}
+\begin{frame}{El peligro de la Explosión de Cardinalidad}
+\begin{alertblock}{TSDBs y Cardinalidad}
+En bases de datos de series temporales (Prometheus), agregar etiquetas de alta cardinalidad (ej: \texttt{customer\_id} o \texttt{order\_id}) crea una serie temporal nueva por cada valor único.
+\end{alertblock}
 
-\begin{frame}{Tracing}
-Tracing responde:
-\begin{quote}
-¿Cómo viajó esta request a través del sistema?
-\end{quote}
-\end{frame}
+\pause
 
-\begin{frame}{Trazas y spans}
 \begin{itemize}
-\item Trace = request completa
-\item Span = operación individual
+\item \textbf{Regla de diseño:} Alta cardinalidad vive en Eventos Estructurados y Spans, NUNCA en métricas agregadas.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo}
+\UASectionSlide{Tracing Distribuido y Causalidad}
+
+\begin{frame}{Trazas y Spans (DAG)}
+\begin{itemize}
+\item \textbf{Trace:} Grafo Acíclico Dirigido (DAG) del viaje completo de la solicitud.
+\item \textbf{Span:} Unidad individual de trabajo delimitada en tiempo.
+\end{itemize}
+
+\pause
+
+Campos esenciales de un Span:
 \begin{center}
-\begin{tikzpicture}[node distance=2.8cm]
-\node[draw] (api) {API};
-\node[draw,right of=api] (auth) {Auth};
-\node[draw,right of=auth] (db) {DB};
-
-\draw[->] (api) -- node[above]{span 1} (auth);
-\draw[->] (auth) -- node[above]{span 2} (db);
-\end{tikzpicture}
+\texttt{Trace ID} $\vert$ \texttt{Span ID} $\vert$ \texttt{Parent Span ID} $\vert$ \texttt{Timestamp} $\vert$ \texttt{Duration}
 \end{center}
 \end{frame}
 
-\begin{frame}{Correlation IDs}
-\begin{itemize}
-\item request-id
-\item trace-id
-\item span-id
-\end{itemize}
+\begin{frame}{Conexión con Clase 03: Lamport vs. Clock Drift}
+\begin{block}{¿Por qué no alcanza el timestamp?}
+En sistemas distribuidos, los relojes físicos sufren \emph{clock drift}. Ordenar por tiempo real produce falsas causalidades.
+\end{block}
 
 \pause
 
-\begin{block}{}
-Sin correlación, cada log local queda aislado.
+\begin{itemize}
+\item El \texttt{parent\_span\_id} implementa la relación \textbf{\emph{happened-before} ($\rightarrow$) de Lamport}.
+\item Preserva el orden causal estricto sin depender de sincronización de relojes físicos.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Propagación de Contexto}
+\begin{itemize}
+\item \textbf{In-Band (En banda):} Cabeceras W3C (\texttt{traceparent}) viajan junto al mensaje HTTP/gRPC. Si un servicio no las re-inyecta, la traza se rompe.
+\item \textbf{Out-of-Band (Fuera de banda):} Envío asíncrono de Spans terminados hacia el recolector (OTel Collector / Jaeger) sin bloquear la solicitud.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Estrategia en Dos Capas y Debugging}
+
+\begin{frame}{Estrategia de Instrumentación en 2 Capas}
+\begin{description}
+\item[Capa 1: Infraestructura (Auto-instrumentación)]~\\
+Captura el esqueleto de red y propagación de cabeceras W3C automáticamente.
+\pause
+\item[Capa 2: Dominio (Instrumentación Manual)]~\\
+Inyecta metadatos de negocio de alta cardinalidad (\texttt{tenant\_id}, \texttt{payment\_status}).
+\end{description}
+\end{frame}
+
+\begin{frame}{Cascadas de Falla y el Core Analysis Loop}
+\begin{alertblock}{La trampa de la causa raíz}
+El síntoma visible explota en el borde (HTTP 504 en API Gateway), pero la causa raíz está 4 capas aguas abajo en una DB lenta.
+\end{alertblock}
+
+\pause
+
+\begin{block}{Core Analysis Loop (Análisis por Primeros Principios)}
+\begin{enumerate}
+\item Observar anomalía agregada.
+\item Aislar muestra (Heatmap / BubbleUp).
+\item Diferenciar dimensiones cuantitativamente.
+\item Confirmar causa raíz mediante traza individual.
+\end{enumerate}
 \end{block}
 \end{frame}
 
-\UASectionSlide{Debugging en producción}
-
-\begin{frame}{Qué vuelve difícil el debugging}
-\begin{itemize}
-\item fallas parciales
-\item timing issues
-\item concurrencia
-\item estado distribuido
-\item consistencia eventual
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Estrategia correcta}
-No buscar primero:
-\begin{itemize}
-\item “la línea exacta”
-\end{itemize}
-
-Buscar primero:
-\begin{itemize}
-\item request afectada
-\item servicio degradado
-\item patrón de fallo
-\item dependencia crítica
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Cascadas de falla}
-\begin{itemize}
-\item timeout en servicio A
-\item retry en servicio B
-\item saturación en DB
-\item explosión de errores en borde
-\end{itemize}
-
-\pause
-
-\begin{alertblock}{Lección}
-Muchas fallas visibles son síntomas tardíos de otra falla upstream.
-\end{alertblock}
-\end{frame}
-
-\UASectionSlide{Diseño para observabilidad}
-
-\begin{frame}{Observabilidad no es parche}
-Debe diseñarse desde el inicio:
-\begin{itemize}
-\item logs estructurados
-\item métricas por servicio
-\item tracing distribuido
-\item propagación de contexto
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Cierre}
+\begin{frame}{Cierre y Frase de Cátedra}
 \begin{block}{Idea central}
-Si no podés observar el sistema distribuido, no podés operarlo con criterio.
+Observabilidad distribuida no es "mirar dashboards ni abrir tres pestañas". Es diseñar el software para que transporte contexto causal y pueda explicarse a sí mismo cuando falle.
 \end{block}
 \end{frame}
 
