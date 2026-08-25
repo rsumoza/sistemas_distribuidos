@@ -4,14 +4,12 @@
 
 \UASetClassNumber{07}
 \UASetClassTitle{Logs distribuidos y streaming}
-
 \title{\UACourse}
-\subtitle{Clase 07 --- Commit Log, Kafka, Offsets y Exactly-Once}
-
+\subtitle{Clase 07 --- Kafka, offsets, semánticas de entrega y estado en movimiento}
 \author{\UAProfessor}
 \date{\UADate}
-\begin{document}
 
+\begin{document}
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -19,201 +17,348 @@
 \end{frame}
 }
 
-\UASectionSlide{Motivación}
+\UASectionSlide{Del storage local al log como interfaz distribuida}
 
-\begin{frame}{Del estado al flujo}
+\begin{frame}{Puente desde clase 6}
 \begin{itemize}
-\item Antes: estado persistente (clase 6)
-\item Ahora: \textbf{flujo continuo de eventos}
+\item WAL conserva una historia para recuperar un nodo.
+\item Un log distribuido conserva una historia para desacoplar sistemas.
+\item En ambos casos, el orden y la posición permiten reconstruir progreso.
 \end{itemize}
-
-\pause
-\begin{block}{Problema}
-¿Cómo procesar datos en tiempo real sin perder orden ni consistencia?
+\begin{block}{Pregunta}
+¿Qué cambia cuando productores y consumidores independientes leen la historia a ritmos diferentes?
 \end{block}
 \end{frame}
 
-\begin{frame}{Idea central}
-\begin{block}{}
-El sistema es un \textbf{log inmutable de eventos}
-\end{block}
-
-\pause
+\begin{frame}{Caso conductor: pedidos durante una campaña masiva}
+\begin{uacase}
+A las 20:00 comienza una promoción. En diez minutos ingresan 600.000 eventos de pedido. Facturación, inventario, notificaciones y analytics deben avanzar sin bloquear al productor.
+\end{uacase}
 \begin{itemize}
-\item append-only
-\item ordenado
-\item reproducible
+\item Algunos consumidores pueden atrasarse.
+\item Un consumidor puede reiniciar.
+\item Un evento puede procesarse más de una vez.
+\item El orden importa por pedido, no necesariamente entre todos los pedidos.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Commit Log}
-
-\begin{frame}{Definición}
-\begin{block}{}
-Secuencia ordenada e inmutable: $L = (e_0, e_1, ..., e_n)$
-\end{block}
-
-\pause
-\begin{itemize}
-\item cada evento tiene \textbf{offset}
-\item lectura secuencial
-\end{itemize}
+\begin{frame}{Log, cola y base de datos: parecidos, no equivalentes}
+\small
+\begin{tabular}{p{0.18\textwidth}p{0.23\textwidth}p{0.23\textwidth}p{0.25\textwidth}}
+\toprule
+ & Cola clásica & Log distribuido & Base orientada a estado \\
+\midrule
+Consumo & suele retirar/ack & mantiene historia por retención & consulta estado actual \\
+Orden & por cola & por partición & depende del motor \\
+Replay & limitado & nativo mediante offset & requiere historial/CDC \\
+Escala & consumidores compiten & grupos y particiones & lectura/escritura de estado \\
+\bottomrule
+\end{tabular}
 \end{frame}
 
-\begin{frame}{Offsets}
+\UASectionSlide{Commit log, topics y particiones}
+
+\begin{frame}{Commit log: una secuencia que no se reescribe}
+\[
+P_j=(e_{j,0},e_{j,1},e_{j,2},\ldots)
+\]
 \begin{itemize}
-\item índice lógico del evento
-\item monotónico por partición
-\item controlado por el consumidor
+\item Cada partición es append-only y ordenada.
+\item El offset identifica posición, no identidad de negocio.
+\item La retención permite relectura y nuevos consumidores.
 \end{itemize}
+\begin{alertblock}{Error frecuente}
+Offset 42 de P0 y offset 42 de P1 no describen el mismo evento ni un orden global.
+\end{alertblock}
 \end{frame}
 
-\UASectionSlide{Kafka}
-
-\begin{frame}{Arquitectura}
-\begin{itemize}
-\item Topic = categoría lógica
-\item Partition = log ordenado
-\item Broker = nodo de almacenamiento
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Particiones y orden}
+\begin{frame}{Particionar compra paralelismo y vende orden global}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=1.5cm]
-\node[draw] (p0) {P0: e0,e1,e2};
-\node[draw,below of=p0] (p1) {P1: e0,e1};
-
+\begin{tikzpicture}[x=1.0cm,y=0.9cm,every node/.style={font=\scriptsize}]
+\foreach \y/\p in {2/P0,1/P1,0/P2}{
+  \node[left] at (0,\y){\p};
+  \foreach \x in {1,...,7}{\draw (\x-0.35,\y-0.25) rectangle (\x+0.35,\y+0.25); \node at (\x,\y){\x};}
+}
+\draw[->,very thick,UAIngOrange] (0.5,-0.6)--(7.6,-0.6) node[right]{orden local por partición};
 \end{tikzpicture}
 \end{center}
-
-\pause
-\begin{alertblock}{Clave}
-El orden es \textbf{local a la partición}, no global
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Replicación}
-\begin{itemize}
-\item líder (leader)
-\item seguidores (followers)
-\item ISR (in-sync replicas)
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{Semánticas de entrega}
-
-\begin{frame}{At-most-once}
-\begin{itemize}
-\item commit de offset antes de procesar
-\item puede perder mensajes
-\item nunca duplica
-\end{itemize}
-\end{frame}
-
-\begin{frame}{At-least-once}
-\begin{itemize}
-\item commit después de procesar
-\item puede duplicar
-\item no pierde mensajes
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Exactly-once}
-\begin{itemize}
-\item no duplicación
-\item no pérdida
-\end{itemize}
-
-\pause
-\begin{alertblock}{Realidad}
-Se logra combinando:
-\begin{itemize}
-\item idempotencia
-\item transacciones
-\item control de offsets
-\end{itemize}
-\end{alertblock}
-\end{frame}
-
-\UASectionSlide{Streaming}
-
-\begin{frame}{Pipeline}
-\begin{center}
-\begin{tikzpicture}[node distance=2.5cm]
-\node[draw] (p) {Producer};
-\node[draw,right of=p] (k) {Kafka};
-\node[draw,right of=k] (c) {Consumer};
-
-\draw[->] (p) -- (k);
-\draw[->] (k) -- (c);
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\begin{frame}{Procesamiento stateful}
-\begin{itemize}
-\item agregaciones
-\item joins
-\item ventanas (windowing)
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Fallas típicas}
-\begin{itemize}
-\item duplicación por reintentos
-\item pérdida por commit prematuro
-\item reorder entre particiones
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{Cierre}
-
-\begin{frame}{Idea central}
-\begin{block}{}
-El log es la fuente de verdad; el estado es una vista derivada
+\begin{block}{Decisión de clave}
+Si todos los eventos de un pedido usan \texttt{order\_id} como key, conservan orden relativo; una key caliente puede crear hotspot.
 \end{block}
 \end{frame}
 
-
-\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\begin{frame}{Caso real: Kafka y el paralelismo del consumidor}
 \small
-\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
-\begin{enumerate}
-\item ¿Cuál es el invariante o garantía que realmente importa?
-\item ¿Qué falla concreta amenaza esa garantía?
-\item ¿Qué mecanismo de Logs distribuidos y streaming es pertinente y cuál sería sobreingeniería?
-\item ¿Qué métrica permitiría comprobar el costo de la decisión?
-\end{enumerate}
-\end{frame}
-\begin{frame}{Checkpoint de comprensión}
-\small
-Al terminar esta clase deberías poder:
+Kafka divide un topic en particiones. La cantidad de particiones limita el paralelismo útil de un consumer group: dentro de un grupo, una partición activa se asigna a un consumidor a la vez.
 \begin{itemize}
-\item explicar el problema sin apoyarte en nombres de productos;
-\item identificar el supuesto de falla más importante;
-\item distinguir una propiedad de seguridad de una de progreso;
-\item construir un escenario donde la solución deja de ser suficiente;
-\item defender el trade-off ante una objeción técnica.
+\item Más particiones: más paralelismo potencial y más metadata.
+\item Pocas particiones: orden más amplio, menos capacidad.
+\item Reparto desigual de keys: una partición puede dominar la latencia.
+\end{itemize}
+{\scriptsize Fuente: documentación oficial de Apache Kafka sobre particiones y operaciones básicas.}
+\end{frame}
+
+\UASectionSlide{Offsets y consumer groups: el progreso también es estado}
+
+\begin{frame}{Dos posiciones distintas}
+\begin{itemize}
+\item \textbf{Position}: próximo offset que el consumidor leerá.
+\item \textbf{Committed offset}: punto durable desde el cual reiniciará.
+\end{itemize}
+\begin{block}{Consecuencia}
+Procesar un evento y confirmar progreso son dos operaciones diferentes. La falla entre ambas define pérdida o duplicación.
+\end{block}
+\end{frame}
+
+\begin{frame}{Timeline: commit antes de procesar}
+\begin{center}
+\begin{tikzpicture}[x=1.2cm,y=0.8cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->] (0,0)--(7.4,0) node[right]{tiempo};
+\foreach \x/\lab in {0.8/{poll 42},2.2/{commit 43},3.8/{CRASH},5.5/{restart 43}} {\draw (\x,0.12)--(\x,-0.12);\node[above] at (\x,0.15){\lab};}
+\node[below,text width=6cm,align=center] at (3.8,-0.45){El efecto de 42 no ocurrió, pero el grupo cree haber avanzado.};
+\end{tikzpicture}
+\end{center}
+\begin{alertblock}{Semántica}
+At-most-once: evita reprocesamiento, acepta pérdida.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Timeline: procesar antes de commit}
+\begin{center}
+\begin{tikzpicture}[x=1.2cm,y=0.8cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->] (0,0)--(7.4,0) node[right]{tiempo};
+\foreach \x/\lab in {0.8/{poll 42},2.3/{efecto aplicado},3.7/{CRASH},5.4/{restart 42},6.6/{reprocesa}} {\draw (\x,0.12)--(\x,-0.12);\node[above] at (\x,0.15){\lab};}
+\end{tikzpicture}
+\end{center}
+\begin{alertblock}{Semántica}
+At-least-once: evita pérdida lógica, acepta duplicación potencial.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Consumer groups y rebalance}
+\begin{itemize}
+\item Un grupo reparte particiones entre sus consumidores.
+\item Si entra o sale un miembro, puede ocurrir rebalance.
+\item Durante la transición, el trabajo se pausa o se reasigna.
+\item Si el estado local y el offset no están coordinados, aparecen duplicados o reconstrucción costosa.
+\end{itemize}
+\begin{block}{Caso realista}
+Durante una campaña, escalar consumidores reduce lag, pero rebalances frecuentes pueden empeorar temporalmente la latencia.
+\end{block}
+\end{frame}
+
+\begin{frame}{Consumer lag: la cola que no se ve en el producer}
+\[
+lag = log\_end\_offset - committed\_offset
+\]
+\begin{itemize}
+\item Lag creciente indica que el consumo sostenible es menor que el ingreso.
+\item Lag pequeño no garantiza que el efecto downstream esté correcto.
+\item Debe observarse por partición: el promedio puede ocultar una hot partition.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Semántica extremo a extremo}
-\begin{frame}{Timeline de pérdida y duplicación}
-\begin{enumerate}
-\item commit del offset antes del efecto + crash $\Rightarrow$ pérdida lógica;
-\item efecto antes del commit del offset + crash $\Rightarrow$ repetición;
-\item efecto y offset en una unidad atómica $\Rightarrow$ efecto lógico único dentro de ese límite.
-\end{enumerate}
+\UASectionSlide{Producción confiable: duplicados, orden y ACKs}
+
+\begin{frame}{ACK del broker: ¿qué significa “publicado”?}
+\small
+\begin{itemize}
+\item ACK rápido del líder reduce latencia, pero puede perderse ante failover si los followers no replicaron.
+\item Esperar réplicas in-sync aumenta durabilidad y costo.
+\item Un retry del producer después de timeout puede reenviar un batch ya aceptado.
+\end{itemize}
+\begin{block}{Conexión con clase 2}
+El producer también necesita identidad de intento e idempotencia.
+\end{block}
 \end{frame}
-\begin{frame}{Exactly-once tiene un alcance}
-Kafka puede coordinar escrituras y offsets dentro de su ecosistema, pero una llamada a un sistema externo exige idempotencia, deduplicación o una transacción adicional.
-\begin{alertblock}{Pregunta}
-¿Exactamente una vez en el broker, en el procesador o en el efecto de negocio?
+
+\begin{frame}{Producer idempotente}
+\begin{itemize}
+\item El broker reconoce secuencias del mismo producer y evita insertar de nuevo un batch reenviado.
+\item Protege duplicados causados por retry dentro del protocolo.
+\item No vuelve idempotente un efecto externo del consumidor.
+\end{itemize}
+\begin{alertblock}{Límite}
+Exactly-once en el log no implica exactly-once en una API bancaria, email o base externa.
 \end{alertblock}
 \end{frame}
-\begin{frame}{Rebalanceo y estado}
-Consumer groups escalan procesamiento, pero un rebalanceo mueve particiones. El diseño debe restaurar estado, preservar offsets y evitar dos consumidores activos sobre la misma responsabilidad lógica.
+
+\UASectionSlide{Exactly-once: definir el límite antes de prometerlo}
+
+\begin{frame}{Tres alcances diferentes}
+\small
+\begin{enumerate}
+\item \textbf{Entrega}: ¿cuántas veces recibe físicamente el consumidor el registro?
+\item \textbf{Procesamiento}: ¿cuántas veces actualiza su estado local?
+\item \textbf{Efecto de negocio}: ¿cuántas veces cobra, envía o descuenta inventario?
+\end{enumerate}
+\begin{uakeybox}
+Una promesa “exactly-once” es incompleta si no dice exactamente una vez \emph{qué}, entre qué sistemas y bajo qué fallas.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Kafka Streams: transacción entre input, estado y output}
+\small
+En un pipeline Kafka--Kafka, una transacción puede coordinar:
+\begin{itemize}
+\item offsets consumidos;
+\item actualizaciones del state store;
+\item eventos producidos al topic de salida.
+\end{itemize}
+Si la transacción aborta, el resultado y el avance no se hacen visibles juntos.
+\begin{block}{Límite}
+La propiedad termina donde comienza un sistema externo que no participa de la transacción.
+\end{block}
+{\scriptsize Fuente: documentación oficial de Apache Kafka sobre processing guarantees.}
+\end{frame}
+
+\begin{frame}{Dual write: base actualizada, evento ausente}
+\begin{uacase}
+Orders guarda el pedido en su base y luego publica \texttt{OrderCreated}. El proceso cae entre ambas operaciones.
+\end{uacase}
+\begin{itemize}
+\item El pedido existe, pero inventario nunca recibe el evento.
+\item Invertir el orden crea el problema opuesto: evento de un pedido que no existe.
+\end{itemize}
+\begin{alertblock}{Problema}
+Dos sistemas, una intención y ninguna transacción común.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Transactional outbox}
+\begin{center}
+\begin{tikzpicture}[node distance=0.8cm and 0.8cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
+\node[draw,rounded corners] (svc) {Servicio Orders};
+\node[draw,rounded corners,right=of svc] (db) {DB: pedido + outbox\\en una transacción};
+\node[draw,rounded corners,right=of db] (relay) {Relay / CDC};
+\node[draw,rounded corners,right=of relay] (k) {Kafka};
+\draw[->] (svc)--(db); \draw[->] (db)--(relay); \draw[->] (relay)--(k);
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item La transacción local hace atómicos estado y intención de publicar.
+\item El relay puede reenviar; consumidores deben tolerar duplicados.
+\item Se elimina la ventana de “DB sí / evento no”.
+\end{itemize}
+{\scriptsize Caso/patrón: AWS Prescriptive Guidance, Transactional Outbox.}
+\end{frame}
+
+\UASectionSlide{Streaming stateful: el tiempo y el estado vuelven a aparecer}
+
+\begin{frame}{Stateless vs stateful}
+\begin{columns}[T]
+\column{0.46\textwidth}
+\textbf{Stateless}
+\begin{itemize}
+\item mapear moneda;
+\item filtrar eventos;
+\item validar formato.
+\end{itemize}
+\column{0.50\textwidth}
+\textbf{Stateful}
+\begin{itemize}
+\item contar por ventana;
+\item join de pagos y pedidos;
+\item detectar fraude por historial;
+\item mantener sesión.
+\end{itemize}
+\end{columns}
+\begin{block}{Consecuencia}
+Recovery debe coordinar estado local y posición del log.
+\end{block}
+\end{frame}
+
+\begin{frame}{Event time y processing time}
+\small
+\begin{itemize}
+\item Event time: cuándo ocurrió el hecho en el dominio.
+\item Processing time: cuándo lo procesó el sistema.
+\item Network delay y reintentos separan ambos tiempos.
+\end{itemize}
+\begin{uacase}
+Un pago ocurrido a las 10:00 llega a las 10:04 después de un corte móvil. ¿Pertenece a la ventana 10:00--10:01 o a la ventana de llegada?
+\end{uacase}
+\end{frame}
+
+\begin{frame}{Ventanas y eventos tardíos}
+\begin{itemize}
+\item Ventanas tumbling: bloques no solapados.
+\item Sliding: ventanas solapadas que avanzan por paso.
+\item Session: agrupadas por actividad e inactividad.
+\item Watermark: estimación de cuánto event time ya fue observado.
+\end{itemize}
+\begin{block}{Trade-off}
+Esperar más mejora completitud, pero aumenta latencia; cerrar temprano exige correcciones tardías o pérdida.
+\end{block}
+\end{frame}
+
+\begin{frame}{Caso realista: fraude en pagos}
+\small
+Regla: alertar si una tarjeta registra cinco países en diez minutos.
+\begin{itemize}
+\item Necesita estado por tarjeta y ventana temporal.
+\item Eventos tardíos pueden cambiar una decisión ya emitida.
+\item Particionar por tarjeta preserva orden local y distribuye carga.
+\item Una tarjeta extremadamente activa puede ser una hot key.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Diseñar y operar el pipeline}
+
+\begin{frame}{Métricas que cuentan la historia}
+\begin{itemize}
+\item producer error/retry rate y latencia de ACK;
+\item bytes y registros por partición;
+\item under-replicated / in-sync replicas;
+\item consumer lag por partición;
+\item rebalances y tiempo sin consumo;
+\item tiempo de checkpoint, restore y estado local;
+\item eventos tardíos, descartados y corregidos.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Actividad: diseñar el flujo de pedidos}
+\small
+En equipos, definan:
+\begin{enumerate}
+\item topics y keys;
+\item cantidad inicial de particiones y supuesto de carga;
+\item semántica de entrega para inventario, email y analytics;
+\item estrategia ante dual write;
+\item métricas y SLO de lag;
+\item qué significa exactly-once en su límite.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Errores que una buena arquitectura evita nombrar tarde}
+\begin{itemize}
+\item “Kafka garantiza orden” sin decir por partición.
+\item “Commit del offset” confundido con efecto de negocio.
+\item “Exactly-once” sin frontera de transacción.
+\item Más particiones como solución automática al throughput.
+\item Ignorar rebalances, hot keys y estado de los consumidores.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cierre}
+\begin{block}{Idea final}
+El log desacopla el tiempo entre productores y consumidores, pero convierte progreso, partición, estado y semántica de efecto en decisiones explícitas.
+\end{block}
+\begin{itemize}
+\item El offset dice dónde continuar.
+\item La key decide qué orden conservar.
+\item La transacción define qué puede hacerse visible junto.
+\item La aplicación define qué significa “una sola vez”.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Exit ticket}
+\begin{enumerate}
+\item ¿Qué diferencia hay entre position y committed offset?
+\item ¿Por qué exactly-once termina en una frontera concreta?
+\item ¿Qué riesgo introduce elegir una key de partición incorrecta?
+\end{enumerate}
 \end{frame}
 
 \end{document}

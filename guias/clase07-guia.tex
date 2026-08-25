@@ -1,100 +1,76 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
+\UASetClassNumber{07}
+\UASetClassTitle{Logs distribuidos y streaming}
+\title{Clase 07 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
-
-\section{Indicaciones generales}
-Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
-
-\section{Nivel 1: fundamentos y reconocimiento}
+\maketitle
+\section{Propósito de la guía}
+Los ejercicios exigen definir la frontera de cada garantía. No se acepta “Kafka da exactly-once” sin especificar qué estado, efecto y sistema participan.
+\section{Ejercicios}
 \begin{uaexercise}
-Defina commit log y explique por qué append-only simplifica durabilidad y replay.
+\textbf{1. Log, cola y base orientada a estado.} Compare las tres abstracciones para un sistema de pedidos. Explique retención, replay, orden y ownership de progreso.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diferencie topic, partición, registro y offset.
+\textbf{2. Key de partición.} Para eventos de pedidos, pagos y cambios de estado, proponga una key que preserve el orden relevante. Analice hot keys y qué orden se pierde.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique por qué Kafka garantiza orden por partición y no orden global.
+\textbf{3. Número de particiones.} Un topic recibe 80.000 eventos/s y se estima que cada consumidor procesa 5.000 eventos/s. Proponga una cantidad inicial de particiones y discuta límites del cálculo.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diseñe una clave de particionado para preservar orden por entidad sin crear hotspots.
+\textbf{4. Consumer group.} Explique qué ocurre si un grupo tiene 12 consumidores y el topic 8 particiones. ¿Qué cambia si se agregan 16 particiones durante operación?
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique leader, followers e ISR para una partición replicada.
+\textbf{5. Position y committed offset.} Construya un ejemplo donde la posición en memoria avance, pero el committed offset quede atrasado. Analice el reinicio.
 \end{uaexercise}
-
-
-\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
-Analice qué significa un ack de productor y cómo cambia la durabilidad.
+\textbf{6. At-most-once.} Diseñe un timeline de pérdida por confirmar offset antes de aplicar el efecto. Indique cuándo este trade-off podría ser aceptable.
 \end{uaexercise}
-
 \begin{uaexercise}
-Construya una pérdida lógica causada por confirmar el offset antes del efecto.
+\textbf{7. At-least-once.} Diseñe un timeline de duplicación por procesar antes de confirmar. Proponga una estrategia de idempotencia para el efecto.
 \end{uaexercise}
-
 \begin{uaexercise}
-Construya una duplicación causada por aplicar el efecto antes de confirmar el offset.
+\textbf{8. Consumer lag.} Defina lag y explique por qué el promedio del grupo puede ocultar una partición caliente. Proponga métricas adicionales.
 \end{uaexercise}
-
 \begin{uaexercise}
-Defina at-most-once, at-least-once y efecto lógico único con timelines.
+\textbf{9. Rebalance.} Durante una campaña, el autoscaler crea consumidores y desencadena rebalances frecuentes. Explique cómo esto puede empeorar temporalmente el servicio y proponga mitigaciones.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique por qué exactly-once tiene un alcance y no es una propiedad universal del sistema.
+\textbf{10. ACK del producer.} Compare confirmar con el líder frente a esperar réplicas in-sync. Analice latencia, disponibilidad y pérdida ante failover.
 \end{uaexercise}
-
-
-\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
-Diseñe un consumidor idempotente con clave de deduplicación.
+\textbf{11. Producer idempotente.} Explique qué duplicados evita y construya un caso de duplicación de negocio que siga siendo posible.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué ocurre durante un rebalanceo de consumer group.
+\textbf{12. Exactly-once por frontera.} Defina exactamente una vez para entrega, procesamiento y efecto de negocio. Dé un sistema donde solo una de las tres se cumpla.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diseñe recuperación de un procesador stateful usando changelog o checkpoint.
+\textbf{13. Kafka Streams transaccional.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diferencie processing time, ingestion time y event time.
+\textbf{14. Dual write.} Un servicio persiste una factura y publica InvoiceCreated. Construya las ventanas de falla para ambos órdenes posibles.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique watermark y su relación con eventos tardíos.
+\textbf{15. Transactional outbox.} Diseñe tablas, estados y proceso relay para resolver el dual write. Explique por qué el consumidor aún debe ser idempotente.
 \end{uaexercise}
-
-
-\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
-Diseñe una ventana tumbling y una sliding para un mismo caso y compare resultados.
+\textbf{16. Event time.} Un evento ocurre a las 10:00 y llega a las 10:07. Compare el resultado en ventanas por event time y processing time.
 \end{uaexercise}
-
 \begin{uaexercise}
-Analice el join de dos streams cuando los eventos llegan fuera de orden.
+\textbf{17. Watermark.} Proponga una tolerancia de eventos tardíos para un tablero de ventas y otra para detección de fraude. Justifique la diferencia.
 \end{uaexercise}
-
 \begin{uaexercise}
-Defina lag de consumidor y proponga SLI/SLO para frescura.
+\textbf{18. Stateful streaming.} Diseñe un join entre pedidos y pagos. Defina key, retención de estado, timeout de join y comportamiento ante evento tardío.
 \end{uaexercise}
-
 \begin{uaexercise}
-Aplique P-F-G-S-T a un pipeline del Trabajo Final.
+\textbf{19. Caso de campaña.} Diseñe topics, keys, grupos, semánticas y SLOs para inventario, email y analytics durante una promoción masiva.
 \end{uaexercise}
-
 \begin{uaexercise}
-Defienda ante comité la elección de Kafka frente a RPC directo o una cola simple.
+\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a un pipeline de telemetría industrial y proponga una prueba de falla con consumer crash y rebalance.
 \end{uaexercise}
-
-
+\section{Criterios de entrega}
+Incluya timelines, keys, offsets y escenarios de falla cuando corresponda. Una solución sólida define orden, progreso, duplicación, efecto y métricas.
 \end{document}

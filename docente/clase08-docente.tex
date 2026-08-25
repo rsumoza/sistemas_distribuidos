@@ -1,256 +1,163 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
-\UASetDocKind{Guía docente}
-
-\title{Clase 08 --- Guía docente}
+\UASetClassTitle{Consistencia real}
+\title{Clase 08 --- Guía docente: CAP, Dynamo y Spanner}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
 
-La meta de esta clase es mover al estudiante desde modelos abstractos de consistencia hacia decisiones reales de arquitectura. El objetivo no es solo que sepa repetir qué es CAP o PACELC, sino que pueda usar esas ideas para interpretar sistemas concretos.
+El objetivo es desmontar etiquetas superficiales. El estudiante debe salir capaz de decidir por operación y dominio. CAP se aprende mediante una partición concreta; Dynamo mediante conflictos y repair; Spanner mediante el costo explícito de coordinación y tiempo.
 
-La afirmación que debe quedar instalada es:
-
-\begin{center}
-\textbf{La consistencia real siempre es una decisión de diseño situada.}
-\end{center}
-
-\section{Resultados de aprendizaje esperados}
-
-Al finalizar la clase, el estudiante debería poder:
+\section{Resultados de aprendizaje}
 
 \begin{itemize}
-\item explicar CAP correctamente, sin slogans;
-\item usar PACELC para discutir operación normal y no solo particiones;
-\item describir Dynamo y Spanner como respuestas distintas a dominios distintos;
-\item justificar una elección de arquitectura según costos de error del negocio.
+\item formular CAP correctamente;
+\item distinguir availability CAP de uptime;
+\item usar PACELC para operación normal;
+\item analizar $N,R,W$, versiones y reparación en Dynamo;
+\item explicar TrueTime, consenso localizado y commit wait en Spanner;
+\item diseñar una arquitectura híbrida por operación;
+\item proponer pruebas de partición y SLOs.
 \end{itemize}
 
-\section{Estructura sugerida para 90 minutos}
+\section{Arquitectura didáctica v9}
 
-\subsection*{Bloque 1 (15 min): corregir CAP}
-Abrir preguntando:
-\begin{quote}
-¿Qué significa realmente CAP?
-\end{quote}
+\begin{tabular}{p{0.14\textwidth}p{0.20\textwidth}p{0.57\textwidth}}
+\toprule
+Tiempo & Bloque & Propósito \\
+\midrule
+0--15 & Recuperación & Offset, partición y pérdida de orden global de clase 7. \\
+15--40 & CAP & Saldo 100 en dos regiones; dos decisiones y definiciones. \\
+40--60 & PACELC & Lectura local vs coordinada; costo normal. \\
+60--90 & Dynamo I & Caso carrito, hashing, N/R/W y versiones. \\
+90--100 & Pausa & Pregunta individual: qué garantiza $R+W>N$. \\
+100--125 & Dynamo II & Sloppy quorum, hints, repair y Merkle. \\
+125--150 & Spanner & TrueTime, consenso por shard y commit wait. \\
+150--160 & Pausa & Recuperación breve. \\
+160--175 & Taller & Cuatro dominios, cuatro políticas. \\
+175--180 & Exit ticket & CAP, quorum y commit wait. \\
+\bottomrule
+\end{tabular}
 
-Es muy probable que aparezca la formulación superficial “elegir dos de tres”. Aprovechar eso para corregirla.
-
-\paragraph{Objetivo didáctico}
-Romper una de las simplificaciones más persistentes del tema.
-
-\subsection*{Bloque 2 (15 min): introducir PACELC}
-Mostrar que CAP no alcanza para pensar la mayoría de los sistemas en funcionamiento normal.
-
-\paragraph{Objetivo didáctico}
-Que el alumno vea que la consistencia fuerte tiene costo incluso cuando la red no está partida.
-
-\subsection*{Bloque 3 (20 min): Dynamo}
-Explicar Dynamo no como “eventual consistency” en abstracto, sino como una arquitectura completa:
-\begin{itemize}
-\item quórums;
-\item versionado;
-\item repair;
-\item hinted handoff;
-\item disponibilidad como prioridad.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Hacer visible que la disponibilidad no sale gratis: se paga con reconciliación.
-
-\subsection*{Bloque 4 (20 min): Spanner}
-Explicar el objetivo de consistencia global y por qué eso exige:
-\begin{itemize}
-\item consenso;
-\item infraestructura temporal;
-\item commit wait.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Mostrar que la consistencia fuerte global es posible, pero no barata.
-
-\subsection*{Bloque 5 (20 min): comparación y diseño}
-Comparar Dynamo y Spanner en dominios concretos:
-\begin{itemize}
-\item red social;
-\item banca;
-\item catálogo global;
-\item inventario distribuido.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Que el estudiante deje de preguntar “cuál es mejor” y empiece a preguntar “qué error es más costoso aquí”.
-
-\section{Qué explicar y por qué}
-
-\subsection*{1. CAP}
-Porque es una referencia central, pero muy mal entendida. Debe corregirse temprano.
-
-\subsection*{2. PACELC}
-Porque agrega la dimensión de latencia y vuelve la discusión aplicable a sistemas reales.
-
-\subsection*{3. Dynamo}
-Porque representa una familia de sistemas que priorizan disponibilidad y reconciliación.
-
-\subsection*{4. Spanner}
-Porque representa una familia de sistemas que priorizan consistencia fuerte global.
-
-\subsection*{5. Comparación}
-Porque el valor de la clase no está en memorizar casos, sino en aprender a distinguir arquitecturas por el problema que resuelven.
-
-\section{Preguntas disparadoras recomendadas}
+\section{Preparación previa}
 
 \begin{itemize}
-\item ¿Qué error le duele más al dominio: inconsistencia o indisponibilidad?
-\item ¿Qué costo de latencia es aceptable?
-\item ¿Quién resuelve conflictos: el sistema o la aplicación?
-\item ¿Cuándo una reconciliación posterior es aceptable?
-\item ¿Cuándo una espera extra por commit vale la pena?
+\item Dibujar dos regiones y una línea de partición.
+\item Preparar fichas A,B,C para quórums $N=3$.
+\item Llevar tres version vectors para ejercicio de dominación.
+\item Preparar un ejemplo de carrito fusionable y asiento no fusionable.
+\item Revisar los papers oficiales de Dynamo y Spanner para narrar decisiones, no mitos.
 \end{itemize}
 
-\section{Errores frecuentes del alumnado}
+\section{Conducción paso a paso}
 
-\begin{itemize}
-\item repetir “elegir dos de tres” sin entender el caso de partición;
-\item pensar que PACELC es solo una variante menor de CAP;
-\item tratar Dynamo como “menos correcto” y Spanner como “mejor”, sin contexto;
-\item no distinguir entre consistencia fuerte global y simple durabilidad;
-\item ignorar que la latencia también es una restricción de sistema.
-\end{itemize}
+\subsection{CAP desde un invariante}
 
-\section{Ejercicio en vivo sugerido}
+No comenzar con el triángulo. Comenzar con dos retiros durante partición. Preguntar qué respondería cada región. Después nombrar la elección. Esto evita que los alumnos memoricen C/A/P sin entender el conflicto.
 
-Proponer dos dominios:
-\begin{itemize}
-\item feed global de red social;
-\item sistema de transferencias internacionales.
-\end{itemize}
+Aclare que P no se “elige” en una red real; se decide qué garantía mantener cuando ocurre.
 
-Pedir al curso que elija entre una arquitectura “tipo Dynamo” y una “tipo Spanner” y que justifique:
-\begin{itemize}
-\item el error más grave;
-\item el costo de la latencia;
-\item si la reconciliación es aceptable o no.
-\end{itemize}
+\subsection{PACELC}
 
-\paragraph{Objetivo}
-Que el alumno use CAP/PACELC como herramientas de diseño, no como slogans.
+Use latencias concretas. Pregunte: “si la red está sana, ¿igual esperamos 180 ms?”. Muestre que el costo de consistencia existe también sin incidente.
 
-\section{Momento crítico de la clase}
+\subsection{Dynamo}
 
-El momento importante aparece cuando el estudiante comprende que:
+Use el carrito porque el merge tiene significado intuitivo. Después contraste con asiento y saldo para mostrar límites. Haga físicamente quórums con tarjetas. Pregunte primero qué garantiza la intersección; corrija la conclusión “garantiza último valor”.
 
-\begin{center}
-\textbf{la discusión sobre consistencia no es ideológica, sino económica y semántica}
-\end{center}
+\subsection{Spanner}
 
-Es decir: depende de qué error el dominio tolera peor y de qué costo el sistema está dispuesto a pagar.
+No entrar primero en infraestructura GPS. Explique el problema: external consistency global. Luego TrueTime como intervalo y commit wait como costo. Cierre con consenso localizado para evitar la imagen de un consenso planetario único.
 
-\section{Criterio de éxito docente}
+\section{Casos reales y narrativa}
 
-La clase salió bien si el estudiante puede:
+\subsection{Dynamo}
 
-\begin{itemize}
-\item explicar CAP correctamente;
-\item justificar PACELC con un ejemplo real;
-\item describir Dynamo y Spanner sin caricaturas;
-\item defender una elección arquitectónica para un dominio concreto.
-\end{itemize}
+Narrativa: Amazon prioriza una experiencia always-on para ciertos servicios y hace visibles versiones/conflictos. No diga “Amazon eligió AP para todo”.
 
-\section{Conexión con la clase siguiente}
+\subsection{Spanner}
 
-Esta clase prepara naturalmente la discusión sobre servicios y arquitecturas distribuidas más amplias, porque ya dejó claro que:
-\begin{itemize}
-\item no todos los componentes necesitan la misma consistencia;
-\item no todos los dominios toleran los mismos errores;
-\item las decisiones locales de consistencia afectan todo el diseño del sistema.
-\end{itemize}
+Narrativa: Google necesitaba transacciones globales fuertes y construyó infraestructura de consenso y tiempo acotado. No diga “Spanner viola CAP”; durante pérdida de quorum sacrifica disponibilidad.
 
-\begin{uakeybox}
-Pregunta puente: si distintos componentes del sistema pueden necesitar garantías distintas, ¿cómo organizamos una arquitectura distribuida completa sin perder control sobre consistencia, latencia y coordinación?
-\end{uakeybox}
+\section{Demostraciones sugeridas}
 
+\begin{uademo}
+\textbf{Quórums humanos.} A,B,C; escritura A,B y lectura B,C. Luego escritura A y lectura C. Preguntar qué sabe cada lectura.
+\end{uademo}
 
-\section{Plan de conducción ampliado}
-La clase debe alternar explicación, predicción y contraste. Antes de revelar cada mecanismo, pedir al grupo que anticipe qué puede salir mal; después, volver al mismo escenario y preguntar qué propiedad mejora y qué costo aparece. Cada bloque conceptual debe cerrar con una decisión de diseño observable.
-\subsection*{Secuencia recomendada}
-\begin{enumerate}
-\item Recuperar el prerequisito de la clase anterior.
-\item Presentar un caso mínimo que falle y solicitar hipótesis.
-\item Formalizar el concepto central de Consistencia real, distinguiendo seguridad, progreso y supuestos.
-\item Resolver un ejemplo completo en pizarra, incluyendo una falla intermedia.
-\item Comparar una alternativa de diseño y explicitar trade-offs.
-\item Cerrar con una pregunta del Trabajo Final y una pregunta de defensa oral.
-\end{enumerate}
-\section{Diagnóstico de comprensión durante la clase}
-No preguntar solamente ``¿se entendió?''. Usar preguntas discriminantes: ``¿qué cambia si el mensaje llega dos veces?'', ``¿qué propiedad sigue siendo cierta si cae un nodo?'', ``¿esto demuestra seguridad o progreso?'', ``¿qué observa un cliente externo?''. Si el estudiante responde solo con nombres de patrones, pedir una ejecución concreta.
-\section{Criterios para corregir ejercicios}
-Una respuesta excelente declara supuestos, construye una secuencia verificable, nombra la garantía con precisión, reconoce un costo y conecta la decisión con el dominio. Penalizar afirmaciones absolutas sin condiciones.
-\section{Vinculación con el Trabajo Final Integrador}
-Reservar entre 5 y 10 minutos para que cada grupo registre una decisión con: problema, alternativa elegida, alternativa descartada y razón. Esto crea trazabilidad entre las clases y las entregas acumulativas.
-\section{Lectura docente previa}
-Revisar la bibliografía indicada en los apuntes y preparar al menos un contraejemplo que no aparezca literalmente en las diapositivas. El objetivo es poder responder preguntas de frontera sin convertir la clase en una lectura del deck.
+\begin{uademo}
+\textbf{Version vectors.} Entregar tres vectores y pedir ordenar o declarar concurrencia.
+\end{uademo}
 
-\section{Arquitectura didáctica v9 para 180 minutos}
-\subsection*{Bloque 1 - desafío inicial (20 min)}
-Presentar una situación donde aparezca partición inter-región, réplica atrasada, conflicto concurrente e incertidumbre temporal. Pedir predicciones individuales antes de introducir vocabulario. El objetivo es hacer visibles los supuestos intuitivos y recuperar el prerequisito de la clase anterior.
-
-\subsection*{Bloque 2 - construcción conceptual (35 min)}
-Formalizar CAP, PACELC, quórums, Dynamo, vector clocks, Spanner, TrueTime y consistencia externa. Separar seguridad, progreso y experiencia del usuario. Explicar no solo \emph{qué} hace cada mecanismo, sino \emph{por qué} existe y qué supuesto permite que funcione.
-
-\subsection*{Bloque 3 - modelo y figura (35 min)}
-Construir en pizarra una línea temporal, grafo, log, máquina de estados o tabla de decisiones. Recorrer una ejecución nominal y una adversarial. La representación debe quedar como referencia para los apuntes y el ejercicio principal.
-
-\subsection*{Pausa (10 min)}
-Recoger una pregunta anónima o un punto de confusión. Elegir una pregunta que permita distinguir síntoma, causa y propiedad.
-
-\subsection*{Bloque 4 - caso trabajado con falla (40 min)}
-Aplicar el mecanismo al caso conductor. Introducir una falla a mitad de ejecución y detenerse en cada transición: quién sabe qué, qué se persiste, qué garantía sigue vigente y qué observa el cliente.
-
-\subsection*{Bloque 5 - taller de decisión (25 min)}
-Los grupos aplican P-F-G-S-T a su Trabajo Final. Deben producir un ADR breve con alternativa elegida, alternativa descartada y evidencia pendiente. La evidencia de esta clase es decisión CAP/PACELC por operación, versiones y latencia inter-región.
-
-\subsection*{Bloque 6 - cierre y exit ticket (15 min)}
-Cada estudiante responde: propiedad principal, supuesto decisivo, costo aceptado y condición bajo la cual cambiaría de diseño. Usar las respuestas para iniciar la clase siguiente.
-
-\section{Qué explicar, por qué y cómo verificarlo}
-\begin{itemize}
-\item Explicar el problema antes del producto, porque reconocer la familia de problema es el resultado cognitivo central.
-\item Explicar el invariante, porque permite evaluar configuraciones y no solo repetir un flujo nominal.
-\item Explicar el límite, porque partición inter-región, réplica atrasada, conflicto concurrente e incertidumbre temporal puede invalidar supuestos o reducir progreso.
-\item Verificar comprensión mediante decisión CAP/PACELC por operación, versiones y latencia inter-región, no mediante una definición aislada.
-\end{itemize}
+\begin{uademo}
+\textbf{TrueTime.} Dibujar intervalos solapados y no solapados; decidir cuándo puede afirmarse orden.
+\end{uademo}
 
 \section{Preguntas socráticas}
+
 \begin{itemize}
-\item ¿Qué sabe cada actor en este punto de la ejecución?
-\item ¿Qué propiedad sigue siendo cierta si la respuesta nunca llega?
-\item ¿Qué parte es safety y cuál es liveness?
-\item ¿Qué alternativa más simple resolvería el problema si relajamos una garantía?
-\item ¿Qué observación refutaría nuestra hipótesis de diseño?
+\item ¿Qué invariante se rompe si ambos lados responden?
+\item ¿Un error rápido cuenta como availability CAP?
+\item ¿Qué cuesta coordinar cuando no hay partición?
+\item ¿Qué garantiza intersección y qué no?
+\item ¿Cuándo dos versiones son concurrentes?
+\item ¿Quién paga por eventual consistency?
+\item ¿Qué representa la anchura de TrueTime?
+\item ¿Por qué no usar un consenso global único?
+\item ¿Qué dato de su TP tolera merge y cuál no?
 \end{itemize}
 
-\section{Errores previsibles y estrategia de corrección}
-\begin{itemize}
-\item Si el alumno responde con un nombre de tecnología, pedir actores, mensajes y estados.
-\item Si confunde timeout con falla, construir dos ejecuciones indistinguibles.
-\item Si promete todas las garantías, pedir comportamiento bajo partición o saturación.
-\item Si mide solo rendimiento, preguntar cómo evidencia la propiedad semántica.
-\item Si la solución es excesiva, pedir la alternativa mínima y el costo marginal de la garantía fuerte.
-\end{itemize}
+\section{Errores previsibles y corrección}
+
+\begin{tabular}{p{0.38\textwidth}p{0.52\textwidth}}
+\toprule
+Error & Intervención \\
+\midrule
+“CAP: elegir dos” & Volver a la partición y a las dos respuestas. \\
+“AP/CP para toda empresa” & Pedir garantía de una operación concreta. \\
+“R+W>N = linearizable” & Introducir escrituras concurrentes y sloppy quorum. \\
+“LWW resuelve conflicto” & Usar carrito y relojes desalineados. \\
+“eventual = esperar” & Preguntar por repair y capacidad de convergencia. \\
+“Spanner tiene reloj perfecto” & Dibujar intervalo TrueTime. \\
+“consenso global” & Particionar en grupos y transacción multi-shard. \\
+\bottomrule
+\end{tabular}
 
 \section{Criterios de evaluación formativa}
-Una respuesta excelente declara supuestos, recorre una ejecución, nombra con precisión la garantía, reconoce el costo y propone evidencia reproducible. Una respuesta suficiente identifica el mecanismo y el trade-off principal. Una respuesta insuficiente usa slogans, omite fallas o confunde producto con propiedad.
 
-\section{Preparación docente y bibliografía}
-Lectura previa recomendada: Gilbert y Lynch; Abadi sobre PACELC; Dynamo; Spanner. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
+Una respuesta lograda debe incluir:
+\begin{enumerate}
+\item dato/operación e invariante;
+\item comportamiento durante partición;
+\item costo latency/consistency normal;
+\item mecanismo de coordinación o reparación;
+\item SLO y prueba adversarial.
+\end{enumerate}
+
+\section{Cómo mejorar la experiencia del estudiante}
+
+\begin{itemize}
+\item Use casos contrastantes y no definiciones aisladas.
+\item Haga que los alumnos tomen una decisión antes de mostrar la solución real.
+\item Vuelva repetidamente al costo del error del negocio.
+\item Separe con claridad CAP, PACELC, quorum, causalidad y linearizabilidad.
+\item Entregue una matriz comparativa al cierre para facilitar estudio.
+\item Permita que cada grupo aplique el concepto a su TP durante la clase.
+\end{itemize}
+
+Esto aumenta percepción de claridad, relevancia y transferencia, y favorece una valoración docente alta de forma genuina.
+
+\section{Conexión con el Trabajo Final Integrador}
+
+Solicitar una matriz por subsistema con: invariante, comportamiento bajo partición, decisión PACELC, mecanismo, repair y SLO. Revisar al menos una decisión en vivo por grupo.
+
+\section{Cierre y puente}
+
+Cierre: “La próxima clase ya no pregunta solo qué consistencia ofrece un datastore, sino cómo distribuimos responsabilidades entre servicios y equipos sin convertir el sistema en una red de dependencias frágiles”.
 
 \end{document}

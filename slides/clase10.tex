@@ -5,12 +5,11 @@
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
 \title{\UACourse}
-\subtitle{Clase 10 --- Tracing, métricas, logs y debugging en producción}
-
+\subtitle{Clase 10 --- Logs, métricas, trazas y debugging causal en producción}
 \author{\UAProfessor}
 \date{\UADate}
-\begin{document}
 
+\begin{document}
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -18,252 +17,319 @@
 \end{frame}
 }
 
-\UASectionSlide{El problema operacional}
+\UASectionSlide{Cuando el sistema funciona, ¿podemos explicarlo?}
 
-\begin{frame}{Después de diseñar, hay que operar}
-Ya vimos:
+\begin{frame}{Puente desde clase 9}
 \begin{itemize}
-\item RPC, retries, consistencia
-\item transacciones, logs, arquitectura
+\item Más servicios implican más procesos, relojes y fallas parciales.
+\item Eventos desacoplan el flujo, pero fragmentan la causalidad.
+\item Ownership distribuido necesita evidencia compartida.
 \end{itemize}
-
-\pause
-
-\begin{block}{Problema}
-¿Cómo entendemos qué está pasando en un sistema distribuido real cuando algo sale mal?
+\begin{block}{Pregunta}
+¿Cómo investigamos una compra que tardó 12 segundos y terminó duplicada si atravesó seis servicios y dos topics?
 \end{block}
 \end{frame}
 
-\begin{frame}{La intuición equivocada}
-En un monolito local, debugging suele significar:
+\begin{frame}{Caso conductor: error 500 en checkout}
+\begin{uacase}
+A las 21:10 los errores 500 suben del 0.2\% al 8\%. La API parece sana, Payments tiene latencia irregular y la base reporta CPU normal. ¿Dónde empieza la investigación?
+\end{uacase}
 \begin{itemize}
-\item mirar stack trace
-\item revisar logs
-\item reproducir error
-\end{itemize}
-
-\pause
-
-En un sistema distribuido:
-\begin{itemize}
-\item no hay un único proceso
-\item no hay un único reloj
-\item no hay una única narrativa local
+\item Un dashboard muestra síntomas agregados.
+\item Un log muestra eventos locales.
+\item Una traza conecta la request.
+\item Ninguna señal aislada cuenta toda la historia.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Observabilidad}
-\begin{block}{Idea}
-Un sistema observable es uno cuyo estado interno puede inferirse a partir de sus salidas.
-\end{block}
-
-\pause
-
-En práctica:
+\begin{frame}{Monitoreo y observabilidad}
+\begin{columns}[T]
+\column{0.47\textwidth}
+\textbf{Monitoreo}
 \begin{itemize}
-\item logs
-\item métricas
-\item trazas
+\item preguntas conocidas;
+\item umbrales y alertas;
+\item ¿está cumpliendo el objetivo?
 \end{itemize}
-\end{frame}
-
-\UASectionSlide{Logs}
-
-\begin{frame}{Logs}
-Los logs responden principalmente:
-\begin{quote}
-¿Qué pasó?
-\end{quote}
-
-\pause
-
-Tipos:
+\column{0.49\textwidth}
+\textbf{Observabilidad}
 \begin{itemize}
-\item texto plano
-\item estructurados
-\item enriquecidos con contexto
+\item preguntas nuevas;
+\item inferir estado desde señales;
+\item ¿por qué ocurre este comportamiento?
 \end{itemize}
-\end{frame}
-
-\begin{frame}{Logs estructurados}
-Ejemplo:
-\begin{itemize}
-\item timestamp
-\item service\_name
-\item request\_id
-\item user\_id
-\item error\_code
-\end{itemize}
-
-\pause
-
-\begin{alertblock}{Clave}
-Un log sin contexto distribuido sirve poco.
+\end{columns}
+\begin{alertblock}{Cuidado}
+Recolectar mucha telemetría no garantiza poder explicar el sistema.
 \end{alertblock}
 \end{frame}
 
-\UASectionSlide{Métricas}
+\UASectionSlide{Logs: eventos con contexto, no frases sueltas}
 
-\begin{frame}{Métricas}
-Las métricas responden:
+\begin{frame}[fragile]{Texto libre vs log estructurado}
+\small
+\textbf{Texto libre:}
 \begin{quote}
-¿Qué tan bien o qué tan mal está funcionando el sistema?
+“Error procesando pedido”
 \end{quote}
-
-\pause
-
-Ejemplos:
-\begin{itemize}
-\item throughput
-\item error rate
-\item latency
-\item saturation
-\end{itemize}
+\textbf{Estructurado:}
+\begin{verbatim}
+{service:"payments", trace_id:"a9...",
+ order_id:"o-81", attempt:2,
+ latency_ms:1840, error:"TIMEOUT"}
+\end{verbatim}
+\begin{block}{Valor}
+Campos estables permiten correlación, consulta y agregación; el mensaje humano aporta detalle.
+\end{block}
 \end{frame}
+
+\begin{frame}{Qué contexto debe viajar}
+\begin{itemize}
+\item trace ID y span ID;
+\item request/event ID;
+\item aggregate ID: order, payment, user;
+\item intento y política de retry;
+\item servicio, versión y región;
+\item resultado, error y latencia;
+\item identidad segura, sin exponer secretos.
+\end{itemize}
+\begin{alertblock}{Privacidad}
+Más contexto no justifica loguear tokens, contraseñas, datos de tarjeta o PII innecesaria.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Caso real: perder los logs también es un incidente}
+\small
+Cloudflare informó en 2024 una interrupción donde aproximadamente 55\% de los logs que normalmente enviaba a clientes se perdieron durante unas 3.5 horas.
+\begin{itemize}
+\item El sistema de observación también tiene SLOs y fallas.
+\item “No vemos errores” puede significar ausencia de telemetría.
+\item Debe monitorearse la completitud del pipeline de logs.
+\end{itemize}
+{\scriptsize Fuente: postmortem oficial de Cloudflare sobre pérdida de logs, noviembre de 2024.}
+\end{frame}
+
+\UASectionSlide{Métricas: comprimir comportamiento sin perder la pregunta}
 
 \begin{frame}{Golden Signals}
+Según Google SRE, para un servicio orientado a usuarios conviene observar:
 \begin{itemize}
-\item Latency
-\item Traffic
-\item Errors
-\item Saturation
+\item \textbf{Latency}: cuánto tarda el trabajo exitoso y fallido;
+\item \textbf{Traffic}: cuánta demanda llega;
+\item \textbf{Errors}: qué proporción no cumple;
+\item \textbf{Saturation}: cuán cerca está un recurso de su límite.
 \end{itemize}
+{\scriptsize Fuente: Google SRE Book, “Monitoring Distributed Systems”.}
 \end{frame}
 
-\UASectionSlide{Tracing distribuido}
-
-\begin{frame}{Tracing}
-Tracing responde:
-\begin{quote}
-¿Cómo viajó esta request a través del sistema?
-\end{quote}
-\end{frame}
-
-\begin{frame}{Trazas y spans}
+\begin{frame}{Promedio: una cifra que puede esconder usuarios}
+\small
+Latencias de 100 requests:
 \begin{itemize}
-\item Trace = request completa
-\item Span = operación individual
+\item 95 requests: 100 ms;
+\item 5 requests: 8 s.
 \end{itemize}
-\end{frame}
-
-\begin{frame}{Ejemplo}
-\begin{center}
-\begin{tikzpicture}[node distance=2.8cm]
-\node[draw] (api) {API};
-\node[draw,right of=api] (auth) {Auth};
-\node[draw,right of=auth] (db) {DB};
-
-\draw[->] (api) -- node[above]{span 1} (auth);
-\draw[->] (auth) -- node[above]{span 2} (db);
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\begin{frame}{Correlation IDs}
-\begin{itemize}
-\item request-id
-\item trace-id
-\item span-id
-\end{itemize}
-
-\pause
-
-\begin{block}{}
-Sin correlación, cada log local queda aislado.
+Media aproximada: 495 ms. Pero p95/p99 muestra una cola problemática.
+\begin{block}{Lección}
+Los percentiles responden “qué experimenta una fracción de usuarios”; la media responde otra pregunta.
 \end{block}
 \end{frame}
 
-\UASectionSlide{Debugging en producción}
-
-\begin{frame}{Qué vuelve difícil el debugging}
+\begin{frame}{RED y USE: dos vistas complementarias}
+\begin{columns}[T]
+\column{0.47\textwidth}
+\textbf{RED para servicios}
 \begin{itemize}
-\item fallas parciales
-\item timing issues
-\item concurrencia
-\item estado distribuido
-\item consistencia eventual
+\item Rate;
+\item Errors;
+\item Duration.
 \end{itemize}
+\column{0.49\textwidth}
+\textbf{USE para recursos}
+\begin{itemize}
+\item Utilization;
+\item Saturation;
+\item Errors.
+\end{itemize}
+\end{columns}
+\begin{block}{Debugging}
+RED detecta el síntoma de servicio; USE ayuda a localizar presión en recursos.
+\end{block}
 \end{frame}
 
-\begin{frame}{Estrategia correcta}
-No buscar primero:
+\begin{frame}{Cardinalidad: la métrica que puede derribar el observability stack}
 \begin{itemize}
-\item “la línea exacta”
+\item Etiquetas como \texttt{status} o \texttt{region} tienen cardinalidad controlada.
+\item \texttt{user\_id} o \texttt{request\_id} crean millones de series.
+\item Alta cardinalidad aumenta memoria, costo y latencia de consulta.
 \end{itemize}
-
-Buscar primero:
-\begin{itemize}
-\item request afectada
-\item servicio degradado
-\item patrón de fallo
-\item dependencia crítica
-\end{itemize}
+\begin{uakeybox}
+Use métricas para agregados; use logs/traces para identidades individuales.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Cascadas de falla}
+\UASectionSlide{Tracing: reconstruir causalidad por request}
+
+\begin{frame}{Trace y span}
 \begin{itemize}
-\item timeout en servicio A
-\item retry en servicio B
-\item saturación en DB
-\item explosión de errores en borde
+\item Trace: recorrido causal completo de una operación.
+\item Span: unidad de trabajo con inicio, duración, atributos y resultado.
+\item Parent/child expresa dependencia causal, no solo orden temporal.
 \end{itemize}
+\begin{block}{Pregunta}
+¿La latencia del checkout está en Payments, en una espera de cola o en retries invisibles?
+\end{block}
+\end{frame}
 
-\pause
+\begin{frame}{Trace de checkout con retry}
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=0.65cm,every node/.style={font=\scriptsize}]
+\node[left] at (0,3){API}; \draw[very thick] (0.6,3)--(8.2,3);
+\node[left] at (0,2){Orders}; \draw[very thick,UAIngNavy] (1.4,2)--(3.1,2);
+\node[left] at (0,1){Payments}; \draw[very thick,UAIngOrange] (3.3,1)--(5.2,1); \draw[very thick,UAIngOrange] (5.6,1)--(7.5,1);
+\node[above] at (4.25,1){intento 1 timeout};
+\node[above] at (6.55,1){intento 2 éxito};
+\draw[dashed] (1.4,3)--(1.4,2); \draw[dashed] (3.3,3)--(3.3,1);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Valor}
+La traza muestra que la request no estuvo “12 s en la API”: pasó la mayor parte del tiempo esperando Payments y reintentando.
+\end{block}
+\end{frame}
 
+\begin{frame}{Context propagation}
+\small
+OpenTelemetry define propagación de contexto para correlacionar spans a través de procesos y límites de red.
+\begin{itemize}
+\item HTTP/gRPC: headers como \texttt{traceparent}.
+\item Mensajería: metadata del evento.
+\item Background jobs: copiar explícitamente el contexto relevante.
+\end{itemize}
+\begin{alertblock}{Falla común}
+Un servicio que no propaga contexto corta la traza y vuelve “huérfana” la causalidad downstream.
+\end{alertblock}
+{\scriptsize Fuente: documentación oficial de OpenTelemetry.}
+\end{frame}
+
+\begin{frame}{Sampling: observar todo no siempre es viable}
+\begin{itemize}
+\item Head sampling decide al comienzo: barato, puede perder errores raros.
+\item Tail sampling decide después de ver la traza: retiene errores/colas, requiere buffering.
+\item Sampling adaptativo puede priorizar rutas críticas.
+\end{itemize}
+\begin{block}{Principio}
+La estrategia debe preservar evidencia de incidentes, no solo reducir costo promedio.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Correlacionar señales: del síntoma a una hipótesis}
+
+\begin{frame}{Un método de debugging causal}
+\begin{enumerate}
+\item Confirmar impacto con SLI/SLO.
+\item Delimitar tiempo, región, versión y endpoint.
+\item Comparar golden signals y cambios recientes.
+\item Seleccionar trazas representativas de éxito y fallo.
+\item Localizar el primer span degradado.
+\item Consultar logs/contexto del componente.
+\item Formular hipótesis y buscar evidencia que podría refutarla.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Síntoma, causa próxima y causa sistémica}
+\begin{uacase}
+Síntoma: API devuelve 500.\newline
+Causa próxima: pool de conexiones agotado.\newline
+Cadena sistémica: query lenta $\rightarrow$ timeouts $\rightarrow$ retries $\rightarrow$ más conexiones $\rightarrow$ saturación.
+\end{uacase}
 \begin{alertblock}{Lección}
-Muchas fallas visibles son síntomas tardíos de otra falla upstream.
+Arreglar el último error visible puede dejar intacta la dinámica que lo produjo.
 \end{alertblock}
 \end{frame}
 
-\UASectionSlide{Diseño para observabilidad}
-
-\begin{frame}{Observabilidad no es parche}
-Debe diseñarse desde el inicio:
+\begin{frame}{Caso real: una configuración propagada a toda la red}
+\small
+Cloudflare describió en noviembre de 2025 un outage disparado por un cambio de permisos que produjo un archivo de features mucho mayor, luego distribuido a máquinas de la red.
 \begin{itemize}
-\item logs estructurados
-\item métricas por servicio
-\item tracing distribuido
-\item propagación de contexto
+\item El disparador local se volvió sistémico por propagación global.
+\item Tamaño, rollout y validación eran señales críticas.
+\item Un buen postmortem conecta trigger, blast radius y defensas faltantes.
+\end{itemize}
+{\scriptsize Fuente: postmortem oficial de Cloudflare, 18 de noviembre de 2025.}
+\end{frame}
+
+\begin{frame}{Observabilidad del pipeline asincrónico}
+\begin{itemize}
+\item Trace ID/correlation ID viaja en eventos.
+\item Lag y edad del evento muestran frescura.
+\item DLQ, retries y redrive necesitan métricas.
+\item Una saga requiere estado y timeline por saga ID.
+\item La causalidad puede ser grafo, no una única cadena.
+\end{itemize}
+\end{frame}
+
+\UASectionSlide{Diseñar señales útiles y sostenibles}
+
+\begin{frame}{Telemetría con propósito}
+Para cada señal, responder:
+\begin{itemize}
+\item ¿qué pregunta permite contestar?;
+\item ¿qué decisión activa?;
+\item ¿qué cardinalidad y volumen produce?;
+\item ¿cuánto se retiene?;
+\item ¿qué ocurre si la señal se pierde?;
+\item ¿contiene datos sensibles?
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Alertar por síntomas de usuario}
+\begin{itemize}
+\item Mejor: burn rate del SLO de checkout.
+\item Complementario: saturación de pool o lag de consumidor.
+\item Peor: “CPU >70\%” sin contexto de servicio.
+\end{itemize}
+\begin{block}{Principio SRE}
+Pagear por condiciones que requieren acción humana urgente; usar dashboards/tickets para el resto.
+\end{block}
+\end{frame}
+
+\begin{frame}{Actividad: investigar el checkout}
+\small
+Datos entregados:
+\begin{itemize}
+\item error rate 8\%, p99 12s;
+\item CPU de DB 45\%, pool de conexiones 100\%;
+\item Payments p95 1.8s, retries 2.4 por request;
+\item trazas muestran dos intentos;
+\item deploy de timeout hace 20 minutos.
+\end{itemize}
+En grupos: formule hipótesis, evidencia adicional, mitigación inmediata y fix sistémico.
+\end{frame}
+
+\begin{frame}{Antipatrones}
+\begin{itemize}
+\item Logging sin estructura ni niveles coherentes.
+\item Dashboards con cientos de gráficos y ninguna pregunta.
+\item IDs de usuario como labels de métricas.
+\item Traces sin propagación o con sampling ciego.
+\item Alertas por infraestructura sin impacto de usuario.
+\item Investigar una sola request y generalizar.
+\item Confundir ausencia de datos con salud.
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Cierre}
-\begin{block}{Idea central}
-Si no podés observar el sistema distribuido, no podés operarlo con criterio.
+\begin{block}{Idea final}
+La observabilidad devuelve inteligibilidad a un sistema distribuido: métricas detectan patrones, trazas reconstruyen causalidad y logs aportan contexto. La calidad está en la correlación y en las decisiones que habilita.
 \end{block}
 \end{frame}
 
-
-\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
-\small
-\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
+\begin{frame}{Exit ticket}
 \begin{enumerate}
-\item ¿Cuál es el invariante o garantía que realmente importa?
-\item ¿Qué falla concreta amenaza esa garantía?
-\item ¿Qué mecanismo de Observabilidad distribuida es pertinente y cuál sería sobreingeniería?
-\item ¿Qué métrica permitiría comprobar el costo de la decisión?
+\item ¿Qué pregunta responde mejor una métrica y cuál una traza?
+\item ¿Por qué request ID no debería ser label de una métrica?
+\item ¿Cuál es el primer paso de un debugging guiado por SLO?
 \end{enumerate}
-\end{frame}
-\begin{frame}{Checkpoint de comprensión}
-\small
-Al terminar esta clase deberías poder:
-\begin{itemize}
-\item explicar el problema sin apoyarte en nombres de productos;
-\item identificar el supuesto de falla más importante;
-\item distinguir una propiedad de seguridad de una de progreso;
-\item construir un escenario donde la solución deja de ser suficiente;
-\item defender el trade-off ante una objeción técnica.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Telemetría no es observabilidad}
-Recolectar muchos datos no garantiza poder responder preguntas nuevas. La observabilidad exige contexto, correlación y señales que permitan inferir causalidad.
-\end{frame}
-\begin{frame}{Incidente guiado por evidencia}
-Métrica: sube p99. Traza: Payments concentra 80\% del tiempo. Logs correlacionados: timeouts hacia un proveedor. La combinación reduce el espacio de hipótesis.
-\end{frame}
-\begin{frame}{Checkpoint}
-Diseñe una pregunta operativa que el sistema deba responder y recién después elija logs, métricas y spans necesarios. Instrumentar sin pregunta genera costo y ruido.
 \end{frame}
 
 \end{document}

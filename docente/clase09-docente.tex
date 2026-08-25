@@ -1,250 +1,175 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
-\UASetDocKind{Guía docente}
-
-\title{Clase 09 --- Guía docente}
+\title{Clase 09 --- Guía docente: fronteras, eventos, outbox y sagas}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
 
-La meta de esta clase es evitar una de las patologías más comunes en cursos de sistemas distribuidos: que el estudiante salga creyendo que la “arquitectura moderna” consiste simplemente en cortar un sistema en servicios.
+La clase debe corregir el sesgo “más distribuido = más avanzado”. El estudiante debe aprender a defender una frontera porque compra autonomía, escalado o aislamiento real, y a reconocer la prima distribuida que paga.
 
-Esta clase debe instalar una idea más madura:
-
-\begin{center}
-\textbf{la arquitectura distribuida es la organización explícita de trade-offs sobre consistencia, coordinación, despliegue y ownership}
-\end{center}
-
-\section{Resultados de aprendizaje esperados}
-
-Al finalizar, el estudiante debería poder:
+\section{Resultados de aprendizaje}
 
 \begin{itemize}
-\item comparar monolito modular y microservicios sin caricaturas;
-\item explicar qué gana y qué pierde una arquitectura event-driven;
-\item distinguir coreografía y orquestación;
-\item diseñar una saga simple con compensaciones razonables;
-\item justificar una frontera de dominio y ownership de datos.
+\item distinguir monolito modular de bola de barro;
+\item identificar señales reales para extraer un servicio;
+\item detectar monolitos distribuidos;
+\item modelar bounded contexts y ownership;
+\item elegir RPC, evento, comando o consulta;
+\item resolver dual write con outbox;
+\item diseñar sagas y compensaciones;
+\item proponer migración incremental y capacidad operativa.
 \end{itemize}
 
-\section{Estructura sugerida para 90 minutos}
+\section{Arquitectura didáctica v9}
 
-\subsection*{Bloque 1 (15 min): abrir con una falsa intuición}
-Abrir preguntando:
-\begin{quote}
-¿La solución natural a todo sistema que crece es “pasarlo a microservicios”?
-\end{quote}
+\begin{tabular}{p{0.14\textwidth}p{0.20\textwidth}p{0.57\textwidth}}
+\toprule
+Tiempo & Bloque & Propósito \\
+\midrule
+0--15 & Apertura & Plataforma de cursos: qué separar y por qué. \\
+15--35 & Monolito modular & Baseline y modularidad antes de distribución. \\
+35--60 & Microservicios & Prima distribuida, señales y caso Netflix. \\
+60--80 & Dominios/datos & Bounded contexts, ownership y Conway. \\
+80--90 & Pausa activa & Clasificar interacciones RPC/evento. \\
+90--115 & Eventos/outbox & Comandos, contratos y dual write. \\
+115--145 & Sagas & Compensaciones, coreografía y orquestación. \\
+145--155 & Pausa & Recuperación breve. \\
+155--170 & Migración/operación & Strangler y capacidades previas. \\
+170--178 & Taller & Diseñar frontera de la plataforma de cursos. \\
+178--180 & Exit ticket & Prima, outbox, compensación. \\
+\bottomrule
+\end{tabular}
 
-Buscar que aparezcan respuestas rápidas y luego desmontarlas.
-
-\paragraph{Objetivo didáctico}
-Romper la idea de que la arquitectura es una moda.
-
-\subsection*{Bloque 2 (20 min): monolito modular vs microservicios}
-Comparar explícitamente:
-\begin{itemize}
-\item despliegue;
-\item consistencia;
-\item ownership;
-\item debugging;
-\item fallas parciales.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Que el alumno vea que el monolito resuelve muchos problemas correctamente y que los microservicios introducen complejidad distribuida real.
-
-\subsection*{Bloque 3 (15 min): arquitectura orientada a eventos}
-Explicar por qué un diseño event-driven desacopla en tiempo, pero complica trazabilidad y consistencia global.
-
-\paragraph{Objetivo didáctico}
-Conectar con la clase de logs y evitar que “evento” se entienda como sinónimo de “simple”.
-
-\subsection*{Bloque 4 (20 min): sagas}
-Trabajar un ejemplo de compra online completo:
-\begin{itemize}
-\item stock;
-\item pago;
-\item despacho;
-\item compensaciones.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Hacer visible que la corrección distribuida de negocio no es igual a rollback técnico.
-
-\subsection*{Bloque 5 (20 min): coreografía, orquestación y ownership}
-Comparar ambos estilos y discutir la propiedad de datos.
-
-\paragraph{Objetivo didáctico}
-Mostrar que la arquitectura no se decide solo por latencia o por preferencia de patrones, sino por gobernanza del sistema.
-
-\section{Qué explicar y por qué}
-
-\subsection*{1. Monolito modular}
-Porque es el baseline correcto. Sin eso, los microservicios aparecen como progreso inevitable, y eso empobrece el criterio del estudiante.
-
-\subsection*{2. Microservicios}
-Porque son el caso más visible de complejidad distribuida a nivel organizacional y técnico.
-
-\subsection*{3. Event-driven}
-Porque introduce desacoplamiento temporal, pero también nuevas dificultades conceptuales.
-
-\subsection*{4. Sagas}
-Porque son una de las respuestas más usadas cuando la atomicidad global fuerte ya no es razonable.
-
-\subsection*{5. Ownership de datos}
-Porque sin eso la discusión arquitectónica se vuelve puramente cosmética.
-
-\section{Preguntas disparadoras recomendadas}
+\section{Preparación previa}
 
 \begin{itemize}
-\item ¿Qué problema real resuelve separar este componente en otro servicio?
-\item ¿Qué nueva falla parcial aparece si lo hacemos?
-\item ¿Qué consistencia necesitamos entre estos bounded contexts?
-\item ¿Qué pasa si un paso del flujo ya produjo efectos visibles y el siguiente falla?
-\item ¿Quién es dueño del dato y quién solo lo consume?
+\item Llevar un diagrama de monolito modular y el mismo sistema como microservicios.
+\item Preparar la cadena de disponibilidad 0.999 elevada a cuatro dependencias.
+\item Tener un ejemplo de outbox y una saga con pasos críticos/secundarios.
+\item Revisar casos oficiales de Netflix y patrones AWS.
+\item Identificar una decisión real del Trabajo Final de cada grupo para discutir.
 \end{itemize}
 
-\section{Errores frecuentes del alumnado}
+\section{Conducción paso a paso}
 
-\begin{itemize}
-\item creer que microservicios siempre escalan mejor en sentido amplio;
-\item pensar que coreografía es “más elegante” por definición;
-\item confundir compensación con rollback;
-\item ignorar observabilidad y debugging como parte del diseño;
-\item separar servicios sin separar ownership real.
-\end{itemize}
+\subsection{Apertura}
 
-\section{Ejercicio en vivo sugerido}
+Pregunte “¿qué separarían primero?” antes de presentar teoría. Registre razones en columnas: dominio, carga, equipo, falla, tecnología. Luego clasifique: solo las primeras cuatro pueden justificar arquitectura; la tecnología por sí sola no.
 
-Tomar un caso simple, por ejemplo una plataforma de cursos online, y pedir al curso que decida:
+\subsection{Monolito modular}
 
-\begin{itemize}
-\item qué dejaría en monolito modular;
-\item qué separaría;
-\item si integraría por RPC o eventos;
-\item si una operación compuesta se resolvería con saga;
-\item quién poseería los datos de alumnos, pagos y certificaciones.
-\end{itemize}
+Use un baseline fuerte. Si se presenta como opción inferior, los estudiantes no aprenden a medir la prima. Muestre reglas de modularidad y cómo pruebas de arquitectura pueden limitar dependencias.
 
-\paragraph{Objetivo}
-Que el alumno vea que diseñar arquitectura es elegir fronteras y asumir sus consecuencias.
+\subsection{Microservicios}
 
-\section{Momento crítico de la clase}
+No enumere ventajas sin costos. Para cada ventaja, pida “¿qué nuevo problema aparece?”. Con Netflix, enfatice escala y ownership, no imitación.
 
-El punto importante aparece cuando el estudiante comprende que:
+\subsection{Bounded contexts}
 
-\begin{center}
-\textbf{una arquitectura distribuida no es mejor por ser más distribuida}
-\end{center}
+Use una palabra ambigua del dominio. Haga que grupos definan modelos distintos y luego contrato de traducción. Esto vuelve concreta la frontera semántica.
 
-Ese momento debe subrayarse. Es una corrección muy importante frente al sesgo tecnológico habitual.
+\subsection{RPC/eventos}
 
-\section{Criterio de éxito docente}
+Entregue cuatro interacciones. Los estudiantes deben elegir y decir qué pasa si el receptor tarda o no existe. Introduzca comando/evento/consulta para mejorar precisión.
 
-La clase salió bien si el estudiante puede:
+\subsection{Dual write y sagas}
 
-\begin{itemize}
-\item defender un monolito modular sin vergüenza teórica;
-\item justificar cuándo sí valen la pena microservicios;
-\item diseñar una saga con pasos y compensaciones razonables;
-\item explicar quién es dueño de qué dato y por qué.
-\end{itemize}
+Deje que intenten cambiar el orden DB/evento. Cuando vean que no resuelve, introduzca outbox. Para saga, distinga pasos cuyo fallo debe compensar negocio de pasos secundarios que solo se reintentan.
 
-\section{Conexión con la clase siguiente}
+\section{Casos reales y narrativa}
 
-Esta clase prepara el terreno para temas de:
-\begin{itemize}
-\item observabilidad distribuida;
-\item confiabilidad operativa;
-\item debugging y tracing;
-\item resiliencia a nivel sistema completo.
-\end{itemize}
+\subsection{Monolith First}
 
-\begin{uakeybox}
-Pregunta puente: una vez que distribuimos componentes, datos y flujos, ¿cómo observamos, diagnosticamos y gobernamos el sistema real en producción?
-\end{uakeybox}
+Narrativa: cuando el dominio es incierto, una frontera de proceso hace costoso refactorizar. No convertirlo en dogma; existen sistemas que necesitan separación temprana.
 
+\subsection{Netflix}
 
-\section{Plan de conducción ampliado}
-La clase debe alternar explicación, predicción y contraste. Antes de revelar cada mecanismo, pedir al grupo que anticipe qué puede salir mal; después, volver al mismo escenario y preguntar qué propiedad mejora y qué costo aparece. Cada bloque conceptual debe cerrar con una decisión de diseño observable.
-\subsection*{Secuencia recomendada}
-\begin{enumerate}
-\item Recuperar el prerequisito de la clase anterior.
-\item Presentar un caso mínimo que falle y solicitar hipótesis.
-\item Formalizar el concepto central de Arquitecturas distribuidas reales, distinguiendo seguridad, progreso y supuestos.
-\item Resolver un ejemplo completo en pizarra, incluyendo una falla intermedia.
-\item Comparar una alternativa de diseño y explicitar trade-offs.
-\item Cerrar con una pregunta del Trabajo Final y una pregunta de defensa oral.
-\end{enumerate}
-\section{Diagnóstico de comprensión durante la clase}
-No preguntar solamente ``¿se entendió?''. Usar preguntas discriminantes: ``¿qué cambia si el mensaje llega dos veces?'', ``¿qué propiedad sigue siendo cierta si cae un nodo?'', ``¿esto demuestra seguridad o progreso?'', ``¿qué observa un cliente externo?''. Si el estudiante responde solo con nombres de patrones, pedir una ejecución concreta.
-\section{Criterios para corregir ejercicios}
-Una respuesta excelente declara supuestos, construye una secuencia verificable, nombra la garantía con precisión, reconoce un costo y conecta la decisión con el dominio. Penalizar afirmaciones absolutas sin condiciones.
-\section{Vinculación con el Trabajo Final Integrador}
-Reservar entre 5 y 10 minutos para que cada grupo registre una decisión con: problema, alternativa elegida, alternativa descartada y razón. Esto crea trazabilidad entre las clases y las entregas acumulativas.
-\section{Lectura docente previa}
-Revisar la bibliografía indicada en los apuntes y preparar al menos un contraejemplo que no aparezca literalmente en las diapositivas. El objetivo es poder responder preguntas de frontera sin convertir la clase en una lectura del deck.
+Narrativa: microservicios compran independencia real de escala y despliegue en una organización preparada. El costo es plataforma y observabilidad.
 
-\section{Arquitectura didáctica v9 para 180 minutos}
-\subsection*{Bloque 1 - desafío inicial (20 min)}
-Presentar una situación donde aparezca falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. Pedir predicciones individuales antes de introducir vocabulario. El objetivo es hacer visibles los supuestos intuitivos y recuperar el prerequisito de la clase anterior.
+\subsection{AWS Saga/Outbox}
 
-\subsection*{Bloque 2 - construcción conceptual (35 min)}
-Formalizar monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Separar seguridad, progreso y experiencia del usuario. Explicar no solo \emph{qué} hace cada mecanismo, sino \emph{por qué} existe y qué supuesto permite que funcione.
+Narrativa: los patrones organizan consistency gaps; no los hacen desaparecer. Leer también limitaciones oficiales.
 
-\subsection*{Bloque 3 - modelo y figura (35 min)}
-Construir en pizarra una línea temporal, grafo, log, máquina de estados o tabla de decisiones. Recorrer una ejecución nominal y una adversarial. La representación debe quedar como referencia para los apuntes y el ejercicio principal.
+\section{Demostraciones sugeridas}
 
-\subsection*{Pausa (10 min)}
-Recoger una pregunta anónima o un punto de confusión. Elegir una pregunta que permita distinguir síntoma, causa y propiedad.
+\begin{uademo}
+\textbf{Disponibilidad compuesta.} Calcular $0.999^4$ y luego agregar retries/latencia. Mostrar que cadena sincrónica cambia el sistema.
+\end{uademo}
 
-\subsection*{Bloque 4 - caso trabajado con falla (40 min)}
-Aplicar el mecanismo al caso conductor. Introducir una falla a mitad de ejecución y detenerse en cada transición: quién sabe qué, qué se persiste, qué garantía sigue vigente y qué observa el cliente.
+\begin{uademo}
+\textbf{Dual write.} Dos estudiantes sostienen DB y broker; mover CRASH entre acciones.
+\end{uademo}
 
-\subsection*{Bloque 5 - taller de decisión (25 min)}
-Los grupos aplican P-F-G-S-T a su Trabajo Final. Deben producir un ADR breve con alternativa elegida, alternativa descartada y evidencia pendiente. La evidencia de esta clase es ADRs, mapa de bounded contexts, flujo de saga y ownership de datos.
-
-\subsection*{Bloque 6 - cierre y exit ticket (15 min)}
-Cada estudiante responde: propiedad principal, supuesto decisivo, costo aceptado y condición bajo la cual cambiaría de diseño. Usar las respuestas para iniciar la clase siguiente.
-
-\section{Qué explicar, por qué y cómo verificarlo}
-\begin{itemize}
-\item Explicar el problema antes del producto, porque reconocer la familia de problema es el resultado cognitivo central.
-\item Explicar el invariante, porque permite evaluar configuraciones y no solo repetir un flujo nominal.
-\item Explicar el límite, porque falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo puede invalidar supuestos o reducir progreso.
-\item Verificar comprensión mediante ADRs, mapa de bounded contexts, flujo de saga y ownership de datos, no mediante una definición aislada.
-\end{itemize}
+\begin{uademo}
+\textbf{Saga.} Tarjetas de pasos; el grupo decide retry, compensación o intervención manual para cada falla.
+\end{uademo}
 
 \section{Preguntas socráticas}
+
 \begin{itemize}
-\item ¿Qué sabe cada actor en este punto de la ejecución?
-\item ¿Qué propiedad sigue siendo cierta si la respuesta nunca llega?
-\item ¿Qué parte es safety y cuál es liveness?
-\item ¿Qué alternativa más simple resolvería el problema si relajamos una garantía?
-\item ¿Qué observación refutaría nuestra hipótesis de diseño?
+\item ¿Qué autonomía compra esta frontera?
+\item ¿Qué invariante deja de ser local?
+\item ¿Quién es dueño del dato?
+\item ¿La interacción necesita respuesta ahora?
+\item ¿Qué pasa si el evento no se publica?
+\item ¿La compensación puede deshacer realmente el efecto?
+\item ¿Qué equipo recibe el pager a las 3 a.m.?
+\item ¿Qué métrica demostraría que la extracción funcionó?
 \end{itemize}
 
-\section{Errores previsibles y estrategia de corrección}
-\begin{itemize}
-\item Si el alumno responde con un nombre de tecnología, pedir actores, mensajes y estados.
-\item Si confunde timeout con falla, construir dos ejecuciones indistinguibles.
-\item Si promete todas las garantías, pedir comportamiento bajo partición o saturación.
-\item Si mide solo rendimiento, preguntar cómo evidencia la propiedad semántica.
-\item Si la solución es excesiva, pedir la alternativa mínima y el costo marginal de la garantía fuerte.
-\end{itemize}
+\section{Errores previsibles y corrección}
+
+\begin{tabular}{p{0.38\textwidth}p{0.52\textwidth}}
+\toprule
+Error & Intervención \\
+\midrule
+“microservicios escalan” & Preguntar qué componente y qué carga. \\
+“monolito = malo” & Mostrar monolito modular y transacción local. \\
+“database per service = servidor por servicio” & Volver a ownership lógico. \\
+“eventos desacoplan todo” & Preguntar por schema, orden y efecto. \\
+“outbox da exactly-once” & Introducir relay duplicado. \\
+“compensación = rollback” & Usar email o envío físico. \\
+“orquestador = single point automáticamente” & Discutir persistencia/replicación y centralización lógica. \\
+\bottomrule
+\end{tabular}
 
 \section{Criterios de evaluación formativa}
-Una respuesta excelente declara supuestos, recorre una ejecución, nombra con precisión la garantía, reconoce el costo y propone evidencia reproducible. Una respuesta suficiente identifica el mecanismo y el trade-off principal. Una respuesta insuficiente usa slogans, omite fallas o confunde producto con propiedad.
 
-\section{Preparación docente y bibliografía}
-Lectura previa recomendada: Richardson, Microservices Patterns; Fowler sobre bounded contexts; Nygard, Release It!. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
+Una respuesta lograda incluye:
+\begin{enumerate}
+\item presión concreta para separar;
+\item ownership e invariante;
+\item comunicación y semántica;
+\item nueva falla y resiliencia;
+\item capacidad operativa;
+\item métrica/condición de revisión.
+\end{enumerate}
+
+\section{Cómo mejorar la experiencia del estudiante}
+
+\begin{itemize}
+\item Use un caso cercano y manténgalo toda la clase.
+\item Presente alternativas plausibles, no una respuesta “correcta” única.
+\item Dé lenguaje para debatir sin slogans.
+\item Incluya mini decisiones cada 15 minutos.
+\item Reconozca explícitamente cuando un monolito es mejor.
+\item Termine con una plantilla que puedan usar en el TP.
+\end{itemize}
+
+Esto aumenta percepción de respeto intelectual, aplicabilidad y claridad, factores centrales en una buena encuesta docente.
+
+\section{Conexión con el Trabajo Final Integrador}
+
+Cada grupo debe presentar una decisión de frontera con: capacidad, owner, dato, interacción, falla, operación y métrica. Retroalimente si la separación compra autonomía o solo cambia llamadas locales por red.
+
+\section{Cierre y puente}
+
+Cierre: “Al distribuir la arquitectura, también distribuimos la evidencia. La próxima clase estudia cómo reconstruir una request, una degradación y una causa a través de muchos servicios”.
 
 \end{document}

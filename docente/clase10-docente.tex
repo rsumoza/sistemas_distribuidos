@@ -6,7 +6,7 @@
 \UASetClassTitle{Observabilidad distribuida}
 \UASetDocKind{Guía docente}
 
-\title{Clase 10 --- Guía docente}
+\title{Clase 10 --- Guía docente: observabilidad, tracing, métricas y debugging}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -14,245 +14,163 @@
 \maketitle
 
 \section{Objetivo pedagógico profundo}
-
-La meta de esta clase es que el estudiante comprenda que el problema de un sistema distribuido no termina cuando el sistema “funciona”. También debe poder \emph{ser entendido} cuando degrada o falla.
-
-La clase debe instalar esta idea:
-
-\begin{center}
-\textbf{la observabilidad distribuida es la condición de posibilidad de la operación seria}
-\end{center}
-
-\section{Resultados de aprendizaje esperados}
-
-Al finalizar, el estudiante debería poder:
-
-\begin{itemize}
-\item distinguir logs, métricas y trazas sin confundir sus roles;
-\item justificar por qué el contexto distribuido debe propagarse;
-\item explicar una estrategia razonable de debugging distribuido;
-\item diseñar instrumentación mínima para un sistema real.
-\end{itemize}
-
-\section{Estructura sugerida para 90 minutos}
-
-\subsection*{Bloque 1 (15 min): el problema operacional}
-Abrir con una pregunta:
-\begin{quote}
-¿Cómo depurás una request que pasó por cinco servicios y falló intermitentemente?
-\end{quote}
-
-Esto obliga a reconocer la insuficiencia del debugging local clásico.
-
-\paragraph{Objetivo didáctico}
-Mostrar que el problema ya no es solo programar, sino reconstruir causalidad distribuida.
-
-\subsection*{Bloque 2 (20 min): logs}
-Presentar logs estructurados y comparar con texto libre.
-
-Insistir en:
-\begin{itemize}
-\item request\_id;
-\item trace\_id;
-\item campos estructurados;
-\item contexto mínimo indispensable.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Que el alumno vea que “tener logs” no alcanza: tienen que ser diseñados.
-
-\subsection*{Bloque 3 (15 min): métricas}
-Introducir Golden Signals y diferenciar promedio vs percentiles.
-
-\paragraph{Objetivo didáctico}
-Que el alumno entienda por qué una media “aceptable” puede ocultar un sistema roto para una fracción importante de requests.
-
-\subsection*{Bloque 4 (20 min): tracing}
-Explicar trace y span, y mostrar una request distribuida simple.
-
-\paragraph{Objetivo didáctico}
-Que el estudiante comprenda que el tracing organiza causalidad por request, no solo eventos aislados.
-
-\subsection*{Bloque 5 (20 min): debugging distribuido}
-Trabajar una cascada de fallas:
-
-\begin{itemize}
-\item dependencia lenta;
-\item retries;
-\item saturación;
-\item error visible en borde.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Mostrar que la causa raíz rara vez coincide con el lugar donde explota el síntoma visible.
-
-\section{Qué explicar y por qué}
-
-\subsection*{1. Observabilidad}
-Porque pone el problema en términos de comprensión del sistema, no solo de recolección de señales.
-
-\subsection*{2. Logs}
-Porque son la base de toda narrativa causal y de auditoría local.
-
-\subsection*{3. Métricas}
-Porque permiten detectar degradación agregada y guiar el diagnóstico.
-
-\subsection*{4. Trazas}
-Porque permiten reconstruir recorrido y dependencia de una request individual.
-
-\subsection*{5. Debugging}
-Porque une todos los elementos en una práctica operativa real.
-
-\section{Preguntas disparadoras recomendadas}
-
-\begin{itemize}
-\item ¿Qué sabe cada herramienta que las otras no saben?
-\item ¿Qué pasa si una request no lleva trace\_id?
-\item ¿Cómo descubrís la diferencia entre síntoma y causa raíz?
-\item ¿Qué métrica mirarías primero si el sistema “anda lento”?
-\item ¿Cómo cambia el problema en una arquitectura event-driven?
-\end{itemize}
-
-\section{Errores frecuentes del alumnado}
-
-\begin{itemize}
-\item creer que observabilidad equivale a dashboards;
-\item pensar que logs libres son suficientes;
-\item no distinguir métricas agregadas de trazas individuales;
-\item asumir que el error visible coincide con la causa;
-\item olvidar que los retries también son parte de la dinámica observable.
-\end{itemize}
-
-\section{Ejercicio en vivo sugerido}
-
-Tomar un ejemplo de checkout distribuido y simular:
-
-\begin{itemize}
-\item request entra por API;
-\item Auth responde lento;
-\item Payments se reintenta;
-\item aparece timeout en frontend.
-\end{itemize}
-
-Preguntar al curso:
-\begin{itemize}
-\item qué mostrarían las métricas;
-\item qué mostrarían los logs;
-\item qué mostraría la traza;
-\item cuál parece ser la causa raíz.
-\end{itemize}
-
-\paragraph{Objetivo}
-Que el estudiante vea cómo cada capa de observabilidad aporta información distinta.
-
-\section{Momento crítico de la clase}
-
-El momento importante ocurre cuando el estudiante entiende que:
-
-\begin{center}
-\textbf{sin contexto propagado, el sistema distribuido pierde su inteligibilidad}
-\end{center}
-
-Ese punto debe remarcarse explícitamente.
-
-\section{Criterio de éxito docente}
-
-La clase salió bien si el estudiante puede:
-
-\begin{itemize}
-\item diseñar logs estructurados mínimos para un servicio;
-\item proponer métricas relevantes para una API distribuida;
-\item dibujar una traza simple correctamente;
-\item plantear una estrategia razonable de debugging en producción.
-\end{itemize}
-
-\section{Conexión con la clase siguiente}
-
-Esta clase deja planteada una pregunta natural:
-
-\begin{quote}
-Si ya sabemos observar un sistema distribuido, ¿cómo diseñamos para que resista fallas, se degrade con gracia y no colapse en cascada?
-\end{quote}
-
-Eso abre la puerta a resiliencia, fault tolerance y patrones de estabilidad operacional.
+La clase debe cambiar la forma en que el estudiante interpreta una falla. El objetivo no es que memorice tres ``pilares'', sino que aprenda a distinguir síntoma, evidencia e hipótesis causal. Al finalizar debería poder explicar por qué una gráfica detecta, una traza localiza y un log confirma detalles, y también por qué cualquiera de esas señales puede faltar, sesgarse o fallar.
 
 \begin{uakeybox}
-Pregunta puente: observar es necesario, pero no suficiente. ¿Qué patrones hacen que un sistema no solo sea entendible, sino también robusto bajo presión?
+Idea de cierre: observabilidad no significa acumular telemetría; significa conservar evidencia suficiente para formular y refutar hipótesis sobre el comportamiento del sistema.
 \end{uakeybox}
 
+\section{Resultados de aprendizaje esperados}
+El estudiante debería poder:
+\begin{itemize}
+\item diseñar logs estructurados con contexto y sin filtrar secretos;
+\item seleccionar Golden Signals, RED y USE según la pregunta;
+\item interpretar percentiles y detectar cardinalidad peligrosa;
+\item construir una traza sincrónica y otra asincrónica;
+\item proponer una investigación causal basada en hipótesis;
+\item reconocer que el pipeline de telemetría también necesita resiliencia y SLO propios.
+\end{itemize}
 
-\section{Plan de conducción ampliado}
-La clase debe alternar explicación, predicción y contraste. Antes de revelar cada mecanismo, pedir al grupo que anticipe qué puede salir mal; después, volver al mismo escenario y preguntar qué propiedad mejora y qué costo aparece. Cada bloque conceptual debe cerrar con una decisión de diseño observable.
-\subsection*{Secuencia recomendada}
-\begin{enumerate}
-\item Recuperar el prerequisito de la clase anterior.
-\item Presentar un caso mínimo que falle y solicitar hipótesis.
-\item Formalizar el concepto central de Observabilidad distribuida, distinguiendo seguridad, progreso y supuestos.
-\item Resolver un ejemplo completo en pizarra, incluyendo una falla intermedia.
-\item Comparar una alternativa de diseño y explicitar trade-offs.
-\item Cerrar con una pregunta del Trabajo Final y una pregunta de defensa oral.
-\end{enumerate}
-\section{Diagnóstico de comprensión durante la clase}
-No preguntar solamente ``¿se entendió?''. Usar preguntas discriminantes: ``¿qué cambia si el mensaje llega dos veces?'', ``¿qué propiedad sigue siendo cierta si cae un nodo?'', ``¿esto demuestra seguridad o progreso?'', ``¿qué observa un cliente externo?''. Si el estudiante responde solo con nombres de patrones, pedir una ejecución concreta.
-\section{Criterios para corregir ejercicios}
-Una respuesta excelente declara supuestos, construye una secuencia verificable, nombra la garantía con precisión, reconoce un costo y conecta la decisión con el dominio. Penalizar afirmaciones absolutas sin condiciones.
-\section{Vinculación con el Trabajo Final Integrador}
-Reservar entre 5 y 10 minutos para que cada grupo registre una decisión con: problema, alternativa elegida, alternativa descartada y razón. Esto crea trazabilidad entre las clases y las entregas acumulativas.
-\section{Lectura docente previa}
-Revisar la bibliografía indicada en los apuntes y preparar al menos un contraejemplo que no aparezca literalmente en las diapositivas. El objetivo es poder responder preguntas de frontera sin convertir la clase en una lectura del deck.
+\section{Preparación previa del docente}
+Preparar antes del encuentro:
+\begin{itemize}
+\item tres capturas o bocetos del mismo incidente: dashboard, traza y logs;
+\item un JSON de log bueno y otro deficiente;
+\item una traza de checkout con un span lento y un retry;
+\item una tabla pequeña con media, p50, p95 y p99;
+\item un caso donde el primer span rojo no sea la causa inicial;
+\item una mini-historia inspirada en incidentes reales de pérdida de logs o dependencia de configuración.
+\end{itemize}
+No conviene empezar con definiciones. La apertura debe presentar un misterio operacional que no pueda resolverse con una sola señal.
 
 \section{Arquitectura didáctica v9 para 180 minutos}
-\subsection*{Bloque 1 - desafío inicial (20 min)}
-Presentar una situación donde aparezca telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. Pedir predicciones individuales antes de introducir vocabulario. El objetivo es hacer visibles los supuestos intuitivos y recuperar el prerequisito de la clase anterior.
 
-\subsection*{Bloque 2 - construcción conceptual (35 min)}
-Formalizar logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Separar seguridad, progreso y experiencia del usuario. Explicar no solo \emph{qué} hace cada mecanismo, sino \emph{por qué} existe y qué supuesto permite que funcione.
+\subsection*{Bloque 1 --- El incidente misterioso (20 min)}
+Mostrar: error rate de checkout elevado, CPU normal y p99 alta. Entregar tres hipótesis posibles y pedir una predicción individual: ``¿qué mirarías después y qué resultado esperás?''.
 
-\subsection*{Bloque 3 - modelo y figura (35 min)}
-Construir en pizarra una línea temporal, grafo, log, máquina de estados o tabla de decisiones. Recorrer una ejecución nominal y una adversarial. La representación debe quedar como referencia para los apuntes y el ejercicio principal.
+\textbf{Propósito}: activar conocimientos de clases 1--9 y evidenciar la diferencia entre detectar e interpretar. No resolver todavía.
+
+\subsection*{Bloque 2 --- Logs como hechos contextualizados (30 min)}
+Comparar texto libre con un evento estructurado. Construir con el curso los campos mínimos: tiempo, servicio, operación, trace ID, entidad de negocio, resultado, duración e intento. Introducir privacidad, secretos, retención y el riesgo de usar los logs como base de datos accidental.
+
+\textbf{Microdemostración}: dar diez líneas de texto ambiguas y luego el mismo evento en JSON. Pedir que encuentren una operación duplicada.
+
+\subsection*{Bloque 3 --- Métricas y experiencia del usuario (35 min)}
+Presentar Golden Signals, RED y USE sobre el mismo checkout. Calcular qué oculta la media frente a p95/p99. Mostrar una explosión de cardinalidad causada por \texttt{user\_id} y pedir una corrección.
+
+\textbf{Pausa cognitiva}: cada pareja redacta una métrica útil y una etiqueta que nunca debería usarse.
 
 \subsection*{Pausa (10 min)}
-Recoger una pregunta anónima o un punto de confusión. Elegir una pregunta que permita distinguir síntoma, causa y propiedad.
+Recoger una pregunta anónima. Elegir una que permita aclarar diferencia entre métrica de servicio, de recurso y de negocio.
 
-\subsection*{Bloque 4 - caso trabajado con falla (40 min)}
-Aplicar el mecanismo al caso conductor. Introducir una falla a mitad de ejecución y detenerse en cada transición: quién sabe qué, qué se persiste, qué garantía sigue vigente y qué observa el cliente.
+\subsection*{Bloque 4 --- Tracing y causalidad distribuida (35 min)}
+Construir una traza de \texttt{POST /checkout}. Explicar contexto, spans, atributos, links y sampling. Después agregar un evento Kafka para mostrar que la causalidad asincrónica no equivale a una pila RPC.
 
-\subsection*{Bloque 5 - taller de decisión (25 min)}
-Los grupos aplican P-F-G-S-T a su Trabajo Final. Deben producir un ADR breve con alternativa elegida, alternativa descartada y evidencia pendiente. La evidencia de esta clase es traza extremo a extremo, logs correlacionados y métricas p50/p95/p99.
+\textbf{Error deliberado}: eliminar la propagación de contexto en Inventory y pedir al grupo que describa qué se vuelve imposible de reconstruir.
 
-\subsection*{Bloque 6 - cierre y exit ticket (15 min)}
-Cada estudiante responde: propiedad principal, supuesto decisivo, costo aceptado y condición bajo la cual cambiaría de diseño. Usar las respuestas para iniciar la clase siguiente.
+\subsection*{Bloque 5 --- Debugging guiado por hipótesis (30 min)}
+Volver al incidente inicial. Seguir el ciclo: síntoma, hipótesis, predicción observable, búsqueda de evidencia, refutación, intervención y verificación. Introducir la cadena DB lenta $\rightarrow$ pool saturado $\rightarrow$ retries $\rightarrow$ 500.
+
+\textbf{Caso realista}: pérdida parcial del pipeline de logs. Preguntar cómo se observa la pérdida de observabilidad.
+
+\subsection*{Bloque 6 --- Taller y cierre (20 min)}
+Cada grupo toma un flujo de su Trabajo Final y entrega:
+\begin{enumerate}
+\item un SLI de usuario;
+\item cuatro métricas RED/USE;
+\item un esquema de log;
+\item una traza con cinco spans;
+\item una falla de telemetría y su mitigación;
+\item una pregunta diagnóstica que podría responder con esa evidencia.
+\end{enumerate}
+Cerrar con un exit ticket: ``una señal que detecta, una que localiza y una que confirma''.
+
+\section{Caso conductor completo}
+Usar un checkout con API, Auth, Inventory, Payments, Orders y un evento asincrónico hacia Shipping. El incidente comienza con contención en una query de Orders, pero el primer error visible aparece en Payments porque recibe el deadline agotado. Este diseño obliga a distinguir causa inicial, amplificadores y síntoma visible.
+
+Progresión recomendada:
+\begin{enumerate}
+\item solo métricas agregadas: se detecta, pero no se localiza;
+\item se agrega tracing: aparece el camino lento;
+\item se agregan logs correlacionados: se confirma el lock y el retry;
+\item se interrumpe el collector: se discute resiliencia de la propia observabilidad.
+\end{enumerate}
 
 \section{Qué explicar, por qué y cómo verificarlo}
 \begin{itemize}
-\item Explicar el problema antes del producto, porque reconocer la familia de problema es el resultado cognitivo central.
-\item Explicar el invariante, porque permite evaluar configuraciones y no solo repetir un flujo nominal.
-\item Explicar el límite, porque telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta puede invalidar supuestos o reducir progreso.
-\item Verificar comprensión mediante traza extremo a extremo, logs correlacionados y métricas p50/p95/p99, no mediante una definición aislada.
+\item \textbf{Observabilidad vs monitoreo}: evita confundir dashboards con capacidad de investigación. Verificar pidiendo una pregunta no prevista.
+\item \textbf{Logs estructurados}: permiten correlación y consulta; verificar haciendo reconstruir una operación duplicada.
+\item \textbf{Percentiles}: representan colas que la media oculta; verificar con un conjunto de latencias pequeño.
+\item \textbf{Cardinalidad}: conecta diseño semántico con costo operacional; verificar pidiendo estimar series producidas por etiquetas.
+\item \textbf{Tracing}: reconstruye causalidad, no verdad absoluta; verificar rompiendo propagación de contexto.
+\item \textbf{Sampling}: introduce sesgo y costo; verificar comparando head y tail sampling para errores raros.
+\item \textbf{Debugging causal}: evita culpar al primer componente rojo; verificar exigiendo una hipótesis refutable.
 \end{itemize}
 
 \section{Preguntas socráticas}
 \begin{itemize}
-\item ¿Qué sabe cada actor en este punto de la ejecución?
-\item ¿Qué propiedad sigue siendo cierta si la respuesta nunca llega?
-\item ¿Qué parte es safety y cuál es liveness?
-\item ¿Qué alternativa más simple resolvería el problema si relajamos una garantía?
-\item ¿Qué observación refutaría nuestra hipótesis de diseño?
+\item ¿Qué hecho observamos y qué parte es todavía una inferencia?
+\item ¿Qué señal distinguiría entre espera por pool y cómputo lento?
+\item ¿Qué request real representa este percentil?
+\item ¿Dónde se pierde la causalidad si el contexto no cruza el broker?
+\item ¿Qué dato no registrarías aunque facilitara el debugging?
+\item ¿Cómo sabrías que el pipeline de logs está perdiendo eventos silenciosamente?
+\item ¿Qué observación refutaría nuestra explicación del incidente?
 \end{itemize}
 
 \section{Errores previsibles y estrategia de corrección}
 \begin{itemize}
-\item Si el alumno responde con un nombre de tecnología, pedir actores, mensajes y estados.
-\item Si confunde timeout con falla, construir dos ejecuciones indistinguibles.
-\item Si promete todas las garantías, pedir comportamiento bajo partición o saturación.
-\item Si mide solo rendimiento, preguntar cómo evidencia la propiedad semántica.
-\item Si la solución es excesiva, pedir la alternativa mínima y el costo marginal de la garantía fuerte.
+\item \textbf{``Más logs resuelven todo''}: pedir costo, privacidad y pregunta concreta que cada campo responde.
+\item \textbf{``CPU normal significa servicio sano''}: mostrar espera por I/O o pool saturado.
+\item \textbf{``Promedio bajo significa buena latencia''}: hacer visible p99 y su relación con timeouts.
+\item \textbf{``El primer span rojo es la causa''}: construir una dependencia upstream que agotó el deadline.
+\item \textbf{``Trace ID y request ID son lo mismo''}: distinguir unidad de transporte, operación lógica y saga.
+\item \textbf{``Kafka ordena toda la traza''}: recordar orden por partición y causalidad por identificadores.
+\item \textbf{``La observabilidad siempre está disponible''}: introducir pérdida de logs y buffering local.
 \end{itemize}
 
 \section{Criterios de evaluación formativa}
-Una respuesta excelente declara supuestos, recorre una ejecución, nombra con precisión la garantía, reconoce el costo y propone evidencia reproducible. Una respuesta suficiente identifica el mecanismo y el trade-off principal. Una respuesta insuficiente usa slogans, omite fallas o confunde producto con propiedad.
+Una respuesta excelente:
+\begin{itemize}
+\item separa hechos, hipótesis y evidencia;
+\item elige señales según una pregunta operacional;
+\item incluye dimensiones y unidades;
+\item reconoce sampling, cardinalidad, privacidad y costo;
+\item reconstruye una cadena causal completa;
+\item propone una forma de refutar su propia explicación.
+\end{itemize}
+Una respuesta suficiente identifica el papel de logs, métricas y trazas y propone correlación básica. Una respuesta insuficiente enumera herramientas o productos sin explicar qué pregunta resuelven.
 
-\section{Preparación docente y bibliografía}
-Lectura previa recomendada: Google SRE; OpenTelemetry; USE/RED methods y cardinalidad de métricas. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
+\section{Retroalimentación durante el encuentro}
+Dar feedback en tres capas: primero reconocer la hipótesis correcta, luego señalar la evidencia que falta y finalmente pedir una condición de refutación. Evitar corregir inmediatamente con la solución completa; la clase gana valor cuando el estudiante experimenta el pasaje desde una intuición plausible hacia una explicación comprobable.
+
+\section{Diseño de experiencia para una clase muy bien valorada}
+La percepción positiva debe surgir de aprendizaje visible, no de simplificar el contenido. Para ello:
+\begin{itemize}
+\item anunciar al comienzo la pregunta que podrán responder al final;
+\item reutilizar un único caso conductor, evitando ejemplos desconectados;
+\item alternar exposición con predicciones breves cada 10--15 minutos;
+\item mostrar una herramienta o salida real, no solo diagramas;
+\item cerrar cada bloque con ``qué problema resuelve / qué no resuelve'';
+\item reservar tiempo para preguntas anónimas y responder al menos una en profundidad;
+\item entregar una hoja-resumen con Golden Signals, RED, USE y flujo de debugging;
+\item devolver el exit ticket al inicio de la clase siguiente con dos aprendizajes y una confusión común.
+\end{itemize}
+Estas prácticas elevan claridad, participación y sensación de progreso sin sacrificar rigor.
+
+\section{Vinculación con el Trabajo Final Integrador}
+Cada grupo debe producir un ADR de observabilidad para un flujo crítico: SLI, señales, esquema de contexto, política de sampling, alerta y falla de la telemetría. En la revisión docente, preguntar: ``¿qué incidente concreto podrías diagnosticar con esto y cuál seguiría siendo invisible?''.
+
+\section{Bibliografía y fuentes para preparar la clase}
+\begin{itemize}
+\item Google, \emph{Site Reliability Engineering}: capítulos sobre monitoring y distributed systems monitoring.
+\item OpenTelemetry: modelo de trazas, propagación de contexto y semantic conventions.
+\item Brendan Gregg: USE Method; Tom Wilkie: RED Method.
+\item Postmortems públicos de proveedores de infraestructura para mostrar cadenas causales y fallas de telemetría.
+\item Kleppmann, \emph{Designing Data-Intensive Applications}: capítulos sobre sistemas distribuidos y procesamiento de streams como contexto conceptual.
+\end{itemize}
+
+\section{Cierre y puente}
+La clase siguiente puede comenzar con esta afirmación: observar una cascada de fallas no evita que ocurra. La pregunta pasa entonces a ser cómo contenerla mediante timeouts, retries correctos, circuit breakers, bulkheads, backpressure y degradación elegante.
 
 \end{document}

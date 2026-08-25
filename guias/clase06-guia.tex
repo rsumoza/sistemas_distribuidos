@@ -1,144 +1,78 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
-\UASetDocKind{Guía de ejercicios}
-
-\title{Clase 06 --- Guía de ejercicios completa}
+\title{Clase 06 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
+\maketitle
 
-\section{Indicaciones generales}
-Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
+\section{Propósito de la guía}
+La guía combina recuperación de las clases 1 a 5 con problemas de WAL, MVCC, índices y LSM. En todos los ejercicios debe declararse qué garantía se busca, qué falla amenaza esa garantía y qué evidencia permitiría validar la solución.
 
-\section{Nivel 1: fundamentos y reconocimiento}
+\section{Ejercicios}
 \begin{uaexercise}
-Explique formalmente por qué la regla WAL garantiza atomicidad en presencia de fallas.
-Modele el estado antes y después de un crash.
+\textbf{1. Repaso: de la incertidumbre a la durabilidad.} Un cliente envía una transferencia, recibe timeout y reintenta. Explique qué información debe persistir el servidor para impedir una segunda transferencia y en qué momento puede responder con seguridad.
 \end{uaexercise}
-
 \begin{uaexercise}
-Considere una secuencia:
-\[
-T: write(x=5), write(y=10), commit
-\]
-y un crash luego de escribir en disco pero antes del commit.
-Describa paso a paso qué hace el recovery.
+\textbf{2. Repaso: replicación frente a persistencia.} Compare tres políticas de confirmación: (a) dato en memoria local, (b) WAL local sincronizado, (c) WAL sincronizado en una mayoría. Analice latencia, disponibilidad y riesgo de pérdida.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué problema ocurriría si el sistema escribiera datos antes del log.
-Construya un contraejemplo concreto.
+\textbf{3. Repaso: consenso y almacenamiento.} Explique por qué un algoritmo de consenso puede perder seguridad si un nodo no persiste correctamente su término, voto o entradas de log antes de responder.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diferencie REDO logging vs UNDO logging con un ejemplo completo de ejecución.
+\textbf{4. Repaso: ACID físico.} Para cada propiedad ACID, identifique al menos un mecanismo físico o lógico del motor de almacenamiento que contribuye a implementarla.
 \end{uaexercise}
-
 \begin{uaexercise}
-Considere tres versiones de un objeto:
-\[
-(x, v_1, t=1), (x, v_2, t=5), (x, v_3, t=10)
-\]
-¿Qué valor devuelve una transacción con timestamp $t=6$? Justifique.
+\textbf{5. Frontera de durabilidad.} Un programa ejecuta write() y recibe éxito, pero el servidor pierde energía antes de fsync(). Construya dos resultados posibles y explique por qué write() no define por sí solo durabilidad.
 \end{uaexercise}
-
-
-\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
-Explique cómo MVCC permite eliminar bloqueos entre lectores y escritores.
-Modele dos transacciones concurrentes paso a paso.
+\textbf{6. WAL paso a paso.} Dada una transacción que modifica x e y, construya un timeline con BEGIN, registros WAL, modificación de buffers, COMMIT, ACK y crash. Analice recovery si el crash ocurre en tres puntos diferentes.
 \end{uaexercise}
-
 \begin{uaexercise}
-Construya un ejemplo donde MVCC produzca write skew.
-Explique por qué no hay conflicto directo.
+\textbf{7. Violación de la regla WAL.} Construya un contraejemplo donde una página de datos llega al disco antes que el registro WAL necesario. Explique qué inconsistencia puede quedar después de un crash.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique el problema de garbage collection en MVCC.
-¿Cuándo es seguro eliminar versiones antiguas?
+\textbf{8. Checkpoints.} Compare dos configuraciones: checkpoint cada 30 segundos y cada 20 minutos. Analice impacto sobre I/O normal, volumen de WAL, tiempo de recovery y variabilidad de latencia.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diseñe un algoritmo simple de garbage collection basado en timestamps activos.
+\textbf{9. Group commit.} Explique cómo group commit puede mejorar throughput sin debilitar durabilidad. Identifique en qué condición una implementación sí rompería la garantía.
 \end{uaexercise}
-
 \begin{uaexercise}
-Describa paso a paso qué ocurre cuando se inserta una clave en un sistema LSM.
-Incluya WAL, Memtable y SSTable.
+\textbf{10. MVCC y snapshots.} Considere versiones x=10@t1, x=20@t5 y x=30@t9. Una transacción inicia en t6 y termina en t12. ¿Qué valor debería ver bajo un snapshot estable y por qué?
 \end{uaexercise}
-
-
-\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
-Explique por qué LSM evita escrituras aleatorias.
-Relaciónelo con propiedades del disco.
+\textbf{11. MVCC y garbage collection.} Una transacción analítica permanece abierta 45 minutos. Explique cómo puede impedir eliminar versiones viejas y qué efectos produce sobre espacio, cache e índices.
 \end{uaexercise}
-
 \begin{uaexercise}
-Defina write amplification y explique por qué ocurre en LSM.
+\textbf{12. MVCC y write skew.} Construya un caso de write skew sobre dos filas diferentes bajo Snapshot Isolation. Proponga dos mecanismos para evitar la violación del invariante.
 \end{uaexercise}
-
 \begin{uaexercise}
-Describa un proceso completo de compaction.
-Incluya:
-\begin{itemize}
-\item merge
-\item eliminación de versiones viejas
-\item impacto en rendimiento
-\end{itemize}
+\textbf{13. Diseño de índice.} Para la consulta de los últimos 20 pedidos de un cliente ordenados por fecha, proponga un índice y explique por qué el orden de columnas importa.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique read amplification en LSM.
-¿Por qué leer puede ser más costoso que escribir?
+\textbf{14. Costo de sobreindexación.} Una tabla de alta escritura tiene ocho índices secundarios. Explique qué costos aparecen en insert, update, WAL, vacuum y cache. Proponga un método para decidir qué índices conservar.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique cómo funciona un B-Tree en inserciones y búsquedas.
+\textbf{15. Ruta de escritura LSM.} Describa con precisión qué ocurre desde que llega write(k,v) hasta que el dato se encuentra en un nivel compactado. Incluya WAL, memtable, flush, SSTables y manifest.
 \end{uaexercise}
-
-
-\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
-Compare B-Tree vs LSM para:
-\begin{itemize}
-\item latencia de lectura
-\item latencia de escritura
-\item uso de disco
-\end{itemize}
+\textbf{16. Lectura en una LSM.} Explique cómo se busca una clave que puede estar en memtable y en varias SSTables. Indique el papel de Bloom filters, índices de bloque y cache.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diseñe un sistema que requiera:
-\begin{itemize}
-\item 90\% lecturas
-\item 10\% escrituras
-\end{itemize}
-¿Qué estructura elegiría y por qué?
+\textbf{17. Compaction y amplificaciones.} Compare leveled y tiered/universal compaction en términos de write, read y space amplification. Indique una carga apropiada para cada estrategia.
 \end{uaexercise}
-
 \begin{uaexercise}
-Diseñe un sistema con:
-\begin{itemize}
-\item ingestión masiva de datos
-\item pocas lecturas
-\end{itemize}
-Justifique su elección.
+\textbf{18. Write stalls.} Diseñe un escenario donde la ingestión supera la capacidad de compaction. Explique por qué regular escrituras puede ser preferible a seguir aceptándolas sin límite.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique cómo WAL y MVCC interactúan en un sistema real.
+\textbf{19. Elección de motor.} Compare un ledger bancario y una plataforma de telemetría IoT. Para cada uno, elija B-tree, LSM o una combinación y defina cuatro métricas que validarían la decisión.
 \end{uaexercise}
-
 \begin{uaexercise}
-Describa cómo MVCC puede implementarse sobre LSM.
+\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco completo a un storage engine para marketplace: defina problema, fallas, garantías, solución y trade-offs. Incluya un plan de experimento antes de aprobar la arquitectura.
 \end{uaexercise}
-
-
+\section{Criterios de entrega}
+Una respuesta completa debe contener supuestos, timeline o estructura cuando corresponda, garantía, mecanismo, límite y una métrica verificable. No se evalúa la cantidad de productos mencionados.
 \end{document}

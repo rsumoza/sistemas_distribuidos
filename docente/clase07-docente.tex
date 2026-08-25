@@ -1,273 +1,191 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{07}
 \UASetClassTitle{Logs distribuidos y streaming}
-\UASetDocKind{Guía docente}
-
-\title{Clase 07 --- Guía docente}
+\title{Clase 07 --- Guía docente: Kafka, offsets y exactly-once}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
 \maketitle
 
 \section{Objetivo pedagógico profundo}
 
-La meta de esta clase es que el estudiante cambie de modelo mental: deje de pensar el sistema como un conjunto de servicios que “se llaman entre sí” y empiece a entenderlo como un sistema donde el \textbf{log} organiza la historia del cambio.
+La clase debe reemplazar la intuición “Kafka es una cola rápida” por un modelo más preciso: el log conserva historia, la partición define orden, el offset define progreso y la frontera transaccional define qué se hace visible junto. El estudiante debe poder razonar sobre crashes sin depender de slogans.
 
-La clase debe dejar instalada esta idea:
-
-\begin{center}
-\textbf{El log es la fuente de verdad; el estado es una proyección.}
-\end{center}
-
-Esto es clave porque prepara el terreno para arquitecturas event-driven, sistemas de streaming y análisis de consistencia en plataformas modernas.
-
-\section{Resultados de aprendizaje esperados}
-
-Al finalizar la clase, el estudiante debería poder:
+\section{Resultados de aprendizaje}
 
 \begin{itemize}
-\item definir commit log y explicar su rol sistémico;
-\item describir correctamente topics, particiones, brokers y offsets;
-\item explicar por qué el orden es local a la partición;
-\item distinguir at-most-once, at-least-once y exactly-once;
-\item explicar por qué exactly-once no es una “propiedad mágica” del broker;
-\item diseñar un pipeline simple de streaming con criterios explícitos de semántica.
+\item distinguir log, cola y base de estado;
+\item elegir key y particiones a partir de orden y carga;
+\item explicar position, committed offset, lag y rebalance;
+\item derivar pérdida y duplicación desde timelines;
+\item delimitar producer idempotence y exactly-once;
+\item diseñar outbox, ventanas y stateful streaming;
+\item proponer métricas y un SLO de extremo a extremo.
 \end{itemize}
 
-\section{Estructura sugerida para una clase de 90 minutos}
+\section{Arquitectura didáctica v9}
 
-\subsection*{Bloque 1 (15 min): motivación y commit log}
-Arrancar con una pregunta fuerte:
+\begin{tabular}{p{0.14\textwidth}p{0.20\textwidth}p{0.57\textwidth}}
+\toprule
+Tiempo & Bloque & Propósito \\
+\midrule
+0--15 & Recuperación & Volver al WAL: historia local vs historia compartida. \\
+15--35 & Caso realista & Campaña masiva de pedidos; identificar productores y consumidores. \\
+35--60 & Particiones & Orden, keys, paralelismo y hot partitions. \\
+60--80 & Offsets & Timelines at-most/at-least; estudiantes predicen resultado. \\
+80--90 & Pausa activa & Calcular lag y reasignar particiones en papel. \\
+90--115 & Producer y replicación & ACKs, retries, ISR e idempotencia. \\
+115--140 & Exactly-once / outbox & Fronteras y dual write. \\
+140--150 & Pausa & Recuperación breve. \\
+150--170 & Stateful streaming & Event time, ventanas, late events y restore. \\
+170--178 & Diseño grupal & Pipeline de pedidos con semánticas distintas. \\
+178--180 & Exit ticket & Tres preguntas de frontera. \\
+\bottomrule
+\end{tabular}
 
-\begin{quote}
-¿Qué pasa si, en vez de pensar en estado, pensamos en historia?
-\end{quote}
-
-Explicar el commit log como secuencia ordenada e inmutable de eventos. Conviene contrastarlo con una base tradicional orientada al estado actual.
-
-\paragraph{Objetivo didáctico}
-Mostrar que el log no es un detalle de implementación, sino una abstracción central.
-
-\subsection*{Bloque 2 (20 min): arquitectura de Kafka}
-Introducir:
-\begin{itemize}
-\item topics;
-\item particiones;
-\item brokers;
-\item producers;
-\item consumers;
-\item consumer groups.
-\end{itemize}
-
-Hacer especial énfasis en:
-\begin{quote}
-el orden es por partición, no global
-\end{quote}
-
-\paragraph{Objetivo didáctico}
-Corregir la intuición espontánea de que “Kafka ordena todo”.
-
-\subsection*{Bloque 3 (20 min): offsets y semánticas de entrega}
-Mostrar que el offset es una decisión de consistencia, no solo un contador.
-
-Construir dos timelines en pizarra:
-\begin{itemize}
-\item commit antes de procesar $\Rightarrow$ pérdida;
-\item commit después de procesar $\Rightarrow$ duplicación.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Que el estudiante vea que las semánticas no son slogans, sino consecuencias directas del lugar donde se confirma progreso.
-
-\subsection*{Bloque 4 (20 min): exactly-once}
-Explicar por qué exactly-once es difícil.
-
-Insistir en que requiere combinación de:
-\begin{itemize}
-\item idempotencia;
-\item coordinación;
-\item persistencia conjunta de offsets y efectos.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Romper la intuición de que “Kafka ya resuelve eso automáticamente”.
-
-\subsection*{Bloque 5 (15 min): streaming stateful}
-Dar ejemplos de:
-\begin{itemize}
-\item agregación por ventana;
-\item joins;
-\item estado derivado del log.
-\end{itemize}
-
-\paragraph{Objetivo didáctico}
-Conectar el log con aplicaciones reales y mostrar que el estado no desaparece: se vuelve una vista mantenida sobre un flujo.
-
-\section{Qué explicar y por qué}
-
-\subsection*{1. Commit log}
-Debe explicarse porque es la idea estructural de la clase y conecta con recuperación, auditoría y replay.
-
-\subsection*{2. Particiones}
-Debe explicarse porque ahí aparece el verdadero trade-off entre orden y escalabilidad.
-
-\subsection*{3. Offsets}
-Debe explicarse porque es donde se materializa la decisión entre pérdida y duplicación.
-
-\subsection*{4. Exactly-once}
-Debe explicarse porque es uno de los conceptos más malentendidos en la práctica profesional.
-
-\subsection*{5. Streaming stateful}
-Debe explicarse porque muestra que los sistemas modernos no “consumen mensajes” solamente: computan sobre historia.
-
-\section{Preguntas disparadoras recomendadas}
+\section{Preparación previa}
 
 \begin{itemize}
-\item ¿Qué gana el sistema al conservar historia en vez de solo estado actual?
-\item ¿Qué se pierde cuando se particiona un topic?
-\item ¿Dónde exactamente aparece la duplicación?
-\item ¿Quién garantiza really exactly-once: el broker, la aplicación o ambos?
-\item ¿Qué pasa con el estado si el consumidor falla en medio de una agregación?
+\item Llevar tarjetas de offsets 40--45 y dos tarjetas CRASH para una dinámica.
+\item Preparar un esquema de tres particiones y cuatro consumers.
+\item Tener un ejemplo de outbox con tabla de pedidos y tabla outbox.
+\item Definir un SLO sencillo: “99.9\% de pedidos visibles en inventario <5s”.
+\item Leer la documentación oficial de Kafka sobre offset tracking y processing guarantees.
 \end{itemize}
 
-\section{Errores frecuentes del alumnado}
+\section{Conducción paso a paso}
 
-\begin{itemize}
-\item creer que existe orden global entre particiones;
-\item pensar que el offset “es un detalle técnico menor”;
-\item asumir que at-least-once es siempre suficiente;
-\item creer que exactly-once significa “nunca puede pasar nada raro”;
-\item no distinguir claramente entre persistencia del mensaje y persistencia del efecto.
-\end{itemize}
+\subsection{Apertura}
 
-\section{Ejercicio en vivo sugerido}
+Presente la campaña de pedidos y pregunte: “¿por qué no llamar sincrónicamente a inventario, email y analytics?”. Recoja beneficios y costos. Use las respuestas para introducir desacoplamiento temporal.
 
-Simular en pizarra o con alumnos actuando roles:
+\subsection{Particiones}
 
-\begin{itemize}
-\item productor envía mensajes;
-\item consumidor procesa;
-\item se decide cuándo confirmar offset;
-\item ocurre una falla en un punto preciso;
-\item se analiza si hubo pérdida o duplicación.
-\end{itemize}
+Dibuje tres logs. Entregue eventos de dos pedidos y pida ubicarlos. Si los estudiantes mezclan keys, muestre cómo se pierde orden. Luego introduzca hot keys: una buena key semántica puede ser mala para distribución.
 
-\paragraph{Objetivo}
-Mostrar que la semántica de entrega no se memoriza: se deduce del protocolo.
+\subsection{Offsets}
 
-\section{Momento crítico de la clase}
+Haga que cinco estudiantes representen poll, efecto, commit y crash. Cambie el orden. El grupo debe nombrar pérdida o duplicación. Solo después introduzca at-most-once y at-least-once.
 
-El momento clave aparece cuando el estudiante comprende que:
+\subsection{Exactly-once}
 
-\begin{center}
-\textbf{exactly-once no es una propiedad automática del middleware, sino del diseño completo del sistema}
-\end{center}
+Escriba en el pizarrón tres columnas: entrega, estado, efecto externo. Pregunte en cuál vive cada garantía. Esta distinción evita la confusión más frecuente de la clase.
 
-Ese punto debe enfatizarse. Si no se consolida, el alumno sale con una idea peligrosa y superficial.
+\subsection{Outbox}
 
-\section{Criterio de éxito docente}
+Plantee el dual write sin nombrar el patrón. Pida a los grupos que intenten resolverlo cambiando el orden. Cuando descubran que ambas órdenes fallan, introduzca outbox como transformación de una transacción distribuida en una transacción local más entrega repetible.
 
-La clase salió bien si el estudiante puede:
+\subsection{Streaming temporal}
 
-\begin{itemize}
-\item explicar qué es un log distribuido sin reducirlo a “cola de mensajes”;
-\item justificar por qué el orden es local a la partición;
-\item construir un escenario de pérdida y otro de duplicación;
-\item explicar exactamente qué hace falta para aproximar exactly-once;
-\item diseñar un pipeline pequeño con semántica explícita.
-\end{itemize}
+Use un evento móvil tardío. Pregunte en qué minuto debe contarse. La discusión debe hacer emerger event time, processing time y watermarks.
 
-\section{Conexión con la clase siguiente}
+\section{Casos reales y narrativa}
 
-Esta clase prepara la discusión sobre consistencia en sistemas reales, porque muestra que:
+\subsection{Kafka en pipelines de actividad}
 
-\begin{itemize}
-\item el orden puede ser local y no global;
-\item la historia puede ser la abstracción central;
-\item la consistencia depende de cómo se derivan y materializan vistas desde el log.
-\end{itemize}
+Use Kafka como ejemplo de commit log que permite múltiples consumidores y replay. Evite presentar un caso empresarial como argumento de autoridad; conecte siempre con las propiedades.
 
-\begin{uakeybox}
-Pregunta puente para la clase siguiente: si el log permite desacoplar y reproducir historia, ¿qué tipo de consistencia real puede ofrecer un sistema distribuido grande bajo particiones, latencia y geo-replicación?
-\end{uakeybox}
+\subsection{Campaña de alto tráfico}
 
+El ejemplo es familiar: el producer sigue aceptando pedidos mientras un consumidor se atrasa. Esto permite explicar que disponibilidad del broker y frescura del negocio son métricas distintas.
 
-\section{Plan de conducción ampliado}
-La clase debe alternar explicación, predicción y contraste. Antes de revelar cada mecanismo, pedir al grupo que anticipe qué puede salir mal; después, volver al mismo escenario y preguntar qué propiedad mejora y qué costo aparece. Cada bloque conceptual debe cerrar con una decisión de diseño observable.
-\subsection*{Secuencia recomendada}
-\begin{enumerate}
-\item Recuperar el prerequisito de la clase anterior.
-\item Presentar un caso mínimo que falle y solicitar hipótesis.
-\item Formalizar el concepto central de Logs distribuidos y streaming, distinguiendo seguridad, progreso y supuestos.
-\item Resolver un ejemplo completo en pizarra, incluyendo una falla intermedia.
-\item Comparar una alternativa de diseño y explicitar trade-offs.
-\item Cerrar con una pregunta del Trabajo Final y una pregunta de defensa oral.
-\end{enumerate}
-\section{Diagnóstico de comprensión durante la clase}
-No preguntar solamente ``¿se entendió?''. Usar preguntas discriminantes: ``¿qué cambia si el mensaje llega dos veces?'', ``¿qué propiedad sigue siendo cierta si cae un nodo?'', ``¿esto demuestra seguridad o progreso?'', ``¿qué observa un cliente externo?''. Si el estudiante responde solo con nombres de patrones, pedir una ejecución concreta.
-\section{Criterios para corregir ejercicios}
-Una respuesta excelente declara supuestos, construye una secuencia verificable, nombra la garantía con precisión, reconoce un costo y conecta la decisión con el dominio. Penalizar afirmaciones absolutas sin condiciones.
-\section{Vinculación con el Trabajo Final Integrador}
-Reservar entre 5 y 10 minutos para que cada grupo registre una decisión con: problema, alternativa elegida, alternativa descartada y razón. Esto crea trazabilidad entre las clases y las entregas acumulativas.
-\section{Lectura docente previa}
-Revisar la bibliografía indicada en los apuntes y preparar al menos un contraejemplo que no aparezca literalmente en las diapositivas. El objetivo es poder responder preguntas de frontera sin convertir la clase en una lectura del deck.
+\subsection{Transactional outbox}
 
-\section{Arquitectura didáctica v9 para 180 minutos}
-\subsection*{Bloque 1 - desafío inicial (20 min)}
-Presentar una situación donde aparezca replay, rebalanceo, commit prematuro o tardío de offsets y evento fuera de orden. Pedir predicciones individuales antes de introducir vocabulario. El objetivo es hacer visibles los supuestos intuitivos y recuperar el prerequisito de la clase anterior.
+Use el caso pedido/evento. Enfatice que el relay puede duplicar y que la idempotencia no desaparece.
 
-\subsection*{Bloque 2 - construcción conceptual (35 min)}
-Formalizar commit logs, Kafka, particiones, consumer groups, offsets, exactly-once lógico, event time y estado. Separar seguridad, progreso y experiencia del usuario. Explicar no solo \emph{qué} hace cada mecanismo, sino \emph{por qué} existe y qué supuesto permite que funcione.
+\section{Demostraciones sugeridas}
 
-\subsection*{Bloque 3 - modelo y figura (35 min)}
-Construir en pizarra una línea temporal, grafo, log, máquina de estados o tabla de decisiones. Recorrer una ejecución nominal y una adversarial. La representación debe quedar como referencia para los apuntes y el ejercicio principal.
+\begin{uademo}
+\textbf{Offsets humanos.} Los estudiantes sostienen offsets. Mueva CRASH antes/después de commit y haga votar la semántica.
+\end{uademo}
 
-\subsection*{Pausa (10 min)}
-Recoger una pregunta anónima o un punto de confusión. Elegir una pregunta que permita distinguir síntoma, causa y propiedad.
+\begin{uademo}
+\textbf{Hot partition.} Reparta 20 tarjetas de keys; 12 pertenecen al mismo cliente. Use hash simple y observe skew.
+\end{uademo}
 
-\subsection*{Bloque 4 - caso trabajado con falla (40 min)}
-Aplicar el mecanismo al caso conductor. Introducir una falla a mitad de ejecución y detenerse en cada transición: quién sabe qué, qué se persiste, qué garantía sigue vigente y qué observa el cliente.
-
-\subsection*{Bloque 5 - taller de decisión (25 min)}
-Los grupos aplican P-F-G-S-T a su Trabajo Final. Deben producir un ADR breve con alternativa elegida, alternativa descartada y evidencia pendiente. La evidencia de esta clase es offsets, lag, replay, resultados idempotentes y checkpoints de estado.
-
-\subsection*{Bloque 6 - cierre y exit ticket (15 min)}
-Cada estudiante responde: propiedad principal, supuesto decisivo, costo aceptado y condición bajo la cual cambiaría de diseño. Usar las respuestas para iniciar la clase siguiente.
-
-\section{Qué explicar, por qué y cómo verificarlo}
-\begin{itemize}
-\item Explicar el problema antes del producto, porque reconocer la familia de problema es el resultado cognitivo central.
-\item Explicar el invariante, porque permite evaluar configuraciones y no solo repetir un flujo nominal.
-\item Explicar el límite, porque replay, rebalanceo, commit prematuro o tardío de offsets y evento fuera de orden puede invalidar supuestos o reducir progreso.
-\item Verificar comprensión mediante offsets, lag, replay, resultados idempotentes y checkpoints de estado, no mediante una definición aislada.
-\end{itemize}
+\begin{uademo}
+\textbf{Outbox.} Dibuje DB y Kafka. Marque con una X cada ventana de fallo; luego agregue la fila outbox.
+\end{uademo}
 
 \section{Preguntas socráticas}
+
 \begin{itemize}
-\item ¿Qué sabe cada actor en este punto de la ejecución?
-\item ¿Qué propiedad sigue siendo cierta si la respuesta nunca llega?
-\item ¿Qué parte es safety y cuál es liveness?
-\item ¿Qué alternativa más simple resolvería el problema si relajamos una garantía?
-\item ¿Qué observación refutaría nuestra hipótesis de diseño?
+\item ¿Qué orden necesita el negocio, exactamente?
+\item ¿Quién es dueño del progreso: broker o consumidor?
+\item ¿Qué ocurre si el efecto terminó pero el offset no?
+\item ¿Qué duplicado resuelve el producer idempotente?
+\item ¿Dónde termina la transacción de Kafka?
+\item ¿Por qué outbox no elimina la necesidad de deduplicar?
+\item ¿Qué latencia está midiendo el lag y cuál no?
+\item ¿Cuánto tiempo esperaría por un evento tardío y por qué?
 \end{itemize}
 
-\section{Errores previsibles y estrategia de corrección}
-\begin{itemize}
-\item Si el alumno responde con un nombre de tecnología, pedir actores, mensajes y estados.
-\item Si confunde timeout con falla, construir dos ejecuciones indistinguibles.
-\item Si promete todas las garantías, pedir comportamiento bajo partición o saturación.
-\item Si mide solo rendimiento, preguntar cómo evidencia la propiedad semántica.
-\item Si la solución es excesiva, pedir la alternativa mínima y el costo marginal de la garantía fuerte.
-\end{itemize}
+\section{Errores previsibles y corrección}
+
+\begin{tabular}{p{0.38\textwidth}p{0.52\textwidth}}
+\toprule
+Error & Intervención \\
+\midrule
+“Kafka garantiza orden” & Pedir ordenar eventos en dos particiones. \\
+“offset = ID del evento” & Mostrar offset 42 en P0 y P1. \\
+“commit = efecto durable” & Mover crash entre efecto y commit. \\
+“exactly-once global” & Dibujar la frontera con una API externa. \\
+“más consumers siempre ayuda” & Comparar consumers con particiones. \\
+“más particiones siempre ayuda” & Introducir overhead, rebalance y key semántica. \\
+“event time es timestamp del broker” & Usar evento móvil que llega tarde. \\
+\bottomrule
+\end{tabular}
 
 \section{Criterios de evaluación formativa}
-Una respuesta excelente declara supuestos, recorre una ejecución, nombra con precisión la garantía, reconoce el costo y propone evidencia reproducible. Una respuesta suficiente identifica el mecanismo y el trade-off principal. Una respuesta insuficiente usa slogans, omite fallas o confunde producto con propiedad.
 
-\section{Preparación docente y bibliografía}
-Lectura previa recomendada: Kleppmann, capítulo 11; documentación de Kafka sobre offsets, transactions y consumer groups. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
+Una respuesta lograda declara:
+\begin{enumerate}
+\item key y orden requerido;
+\item particiones y supuesto de carga;
+\item momento del commit de offset;
+\item comportamiento ante crash;
+\item efecto externo y estrategia idempotente;
+\item métrica de lag/latencia.
+\end{enumerate}
+
+Use un semáforo rápido:
+\begin{itemize}
+\item rojo: producto sin semántica;
+\item amarillo: semántica sin fallo;
+\item verde: fallo, mecanismo y métrica;
+\item azul: además identifica frontera y alternativa.
+\end{itemize}
+
+\section{Cómo mejorar la experiencia del estudiante}
+
+\begin{itemize}
+\item Mantenga un único caso conductor durante toda la clase.
+\item Haga visibles los cambios de nivel: broker, consumidor, aplicación y negocio.
+\item Use timelines antes que definiciones de semántica.
+\item Permita que los grupos se equivoquen con dual write y descubran el patrón.
+\item No use más de cinco siglas nuevas sin volver al diagrama.
+\item Cierre cada concepto con un ejemplo real y un límite.
+\item Recupere el exit ticket en la apertura de la clase 8.
+\end{itemize}
+
+Estas prácticas mejoran claridad, participación y percepción de utilidad, dimensiones que suelen pesar en encuestas docentes.
+
+\section{Conexión con el Trabajo Final Integrador}
+
+Cada grupo debe entregar una tabla con:
+\begin{itemize}
+\item evento y owner;
+\item key y orden;
+\item semántica por consumidor;
+\item dual write y solución;
+\item SLO de lag/efecto;
+\item falla ensayada.
+\end{itemize}
+
+\section{Cierre y puente}
+
+Cierre: “Hoy aceptamos que diferentes consumidores pueden ver la historia con retraso. La próxima clase pregunta qué consistencia global puede prometer un sistema cuando la red se parte o cuando coordinar cuesta latencia”.
 
 \end{document}

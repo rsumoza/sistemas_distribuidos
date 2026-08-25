@@ -1,227 +1,203 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
+\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
 
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
 \UASetDocKind{Guía resuelta}
 
-\title{Clase 10 --- Guía resuelta}
+\title{Clase 10 --- Guía resuelta: observabilidad, tracing, métricas y debugging}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
+\maketitle
 
 \section{Criterio de lectura}
-Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
+Las resoluciones son modelos de razonamiento, no recetas universales. Una buena respuesta separa hechos observados, hipótesis, evidencia confirmatoria o refutatoria y decisión. En producción, una explicación convincente debe poder ser contradicha por nueva evidencia.
 
-\section{Ejercicios y resoluciones completas}
+\section{Resoluciones completas}
+
 \begin{uaexercise}
-Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
+Un equipo afirma que su sistema es observable porque dispone de un dashboard con CPU, memoria y cantidad de requests. Explique por qué eso constituye monitoreo útil, pero no demuestra observabilidad. Proponga una pregunta nueva sobre el comportamiento interno que esas métricas no podrían responder por sí solas.
 \end{uaexercise}
 \begin{uaanswer}
-La observabilidad distribuida es la capacidad de inferir el estado interno de un sistema distribuido a partir de sus salidas: logs, métricas y trazas. Se diferencia del monitoreo básico en que no se limita a verificar si algo “está arriba o abajo”, sino que busca hacer inteligible la dinámica interna del sistema, especialmente bajo fallas parciales y ejecuciones complejas.
+CPU, memoria y tráfico permiten detectar saturación o cambios agregados, pero no reconstruyen por qué una operación concreta falló ni cómo se propagó la latencia entre servicios. El monitoreo responde preguntas previstas de antemano; la observabilidad permite formular preguntas nuevas utilizando señales suficientemente ricas.
+
+Una pregunta que ese dashboard no responde sería: ``¿qué dependencia y qué intento de retry explican que este usuario haya recibido dos cobros mientras la latencia global permanecía normal?''. Para responderla harían falta, como mínimo, un identificador de operación, logs estructurados correlacionados, la traza de la solicitud y evidencia del estado persistido.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué un sistema distribuido necesita algo más que logs locales para ser entendible en producción.
+Para un checkout distribuido que invoca Auth, Inventory, Payments y Orders, diseñe un esquema mínimo de log estructurado. Distinga campos obligatorios para correlación, campos de negocio y campos que deberían evitarse o protegerse por privacidad.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Campos de correlación: \texttt{timestamp}, \texttt{service.name}, \texttt{environment}, \texttt{trace\_id}, \texttt{span\_id}, \texttt{request\_id}, \texttt{operation}, \texttt{severity}, \texttt{status} y \texttt{duration\_ms}. Campos de negocio útiles: \texttt{order\_id}, \texttt{payment\_id}, \texttt{inventory\_reservation\_id}, tipo de operación e identificador seudonimizado del tenant.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+No deberían registrarse contraseñas, tokens, números completos de tarjeta, secretos ni datos personales innecesarios. Los identificadores de usuario deben minimizarse o seudonimizarse y la retención debe respetar el propósito declarado. El log debe permitir unir hechos sin transformarse en una segunda base de datos sensible.
 \end{uaanswer}
 
 \begin{uaexercise}
-Compare logs, métricas y trazas en términos de qué pregunta responde cada uno.
+Compare logs, métricas y trazas usando el mismo incidente: el 2\% de los checkouts comienza a tardar más de cuatro segundos. Indique qué pregunta responde mejor cada señal, qué no puede responder y cómo se combinan.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Las métricas muestran alcance y tendencia: cuándo comenzó, qué porcentaje está afectado, qué región o versión concentra el problema y cómo cambiaron p95/p99, errores y saturación. No explican por sí solas una solicitud individual.
 
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+Las trazas muestran el camino de una muestra de checkouts y permiten localizar qué spans concentran el tiempo, qué dependencias se invocan y dónde aparecen retries. Pueden omitir casos por sampling.
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Los logs aportan detalle discreto: códigos de error, decisiones, identificadores y cambios de estado. Sin correlación pueden convertirse en ruido. El flujo correcto es detectar con métricas, aislar patrones con trazas y confirmar detalles con logs, volviendo luego a las métricas para medir impacto.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde las métricas muestren degradación, pero no permitan identificar por sí solas la causa.
+Una plataforma centraliza todos sus logs en un único pipeline. Durante una falla del pipeline, los servicios siguen funcionando, pero la organización pierde temporalmente visibilidad operacional. Analice por qué la propia plataforma de observabilidad debe tratarse como un sistema distribuido crítico. Proponga dos mecanismos de resiliencia.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+La telemetría tiene productores, buffers, red, procesadores, almacenamiento e índices; puede perder, duplicar, retrasar o reordenar datos igual que cualquier pipeline distribuido. Si falla, el servicio principal puede seguir disponible pero queda operativamente ciego, lo que eleva tiempo de detección y recuperación.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Dos mecanismos apropiados son: (1) buffering local durable con límites, backpressure y reenvío posterior; (2) rutas redundantes o almacenamiento temporal alternativo que permita detectar divergencia entre eventos emitidos y recibidos. También convienen SLI propios: porcentaje de eventos aceptados, lag de ingestión, tasa de descarte y completitud por origen.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué los logs estructurados son preferibles a los logs de texto libre en sistemas distribuidos.
+Diseñe los cuatro Golden Signals para un servicio de pagos. Para cada señal, especifique una métrica concreta, su unidad, una segmentación útil y una interpretación operacional.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+\textbf{Latencia}: p50/p95/p99 de autorización en milisegundos, segmentada por proveedor y región; una cola larga puede anticipar timeouts. \textbf{Tráfico}: autorizaciones por segundo, segmentadas por operación y tenant; permite contextualizar saturación. \textbf{Errores}: proporción de operaciones fallidas por causa y código; deben separarse rechazos de negocio de fallas técnicas. \textbf{Saturación}: utilización del pool de conexiones, profundidad de cola y concurrencia en vuelo; indica cuán cerca está el sistema de perder estabilidad.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Las cuatro señales se interpretan juntas: una tasa de error alta con tráfico bajo sugiere una falla distinta de una p99 alta acompañada por pool al 100\%.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un esquema mínimo de campos para logs en un servicio HTTP distribuido.
+Un servicio reporta latencia media de 120 ms, p50 de 80 ms, p95 de 350 ms y p99 de 4.8 s. Explique qué historia cuenta esta distribución y por qué optimizar solo la media puede empeorar la experiencia de una minoría significativa.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+La mayoría de las solicitudes es rápida, pero existe una cola muy larga: al menos 1\% tarda cerca de segundos y 5\% supera ampliamente la experiencia típica. Esa minoría puede corresponder a una región, una dependencia, una clave caliente o un camino con retry.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Optimizar la media podría acelerar aún más el camino rápido sin tocar la cola. Para un sistema interactivo, el p99 de 4.8 s puede cruzar el timeout del cliente y generar retries, duplicación o abandono. Deben segmentarse percentiles y examinar trazas de la cola, no solo reducir el promedio.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué problema resuelve un correlation ID.
+Aplique el método RED a un servicio HTTP y el método USE a un pool de conexiones de base de datos. Explique por qué ambos marcos son complementarios y no sustitutos.
 \end{uaexercise}
 \begin{uaanswer}
-Resuelve el problema de unir eventos dispersos de una misma request. En un sistema distribuido, la ejecución se fragmenta entre servicios. El correlation ID permite reconstruir el recorrido lógico de esa request a través de logs y trazas. Sin él, cada servicio cuenta solo una historia local incompleta.
+Para el servicio HTTP, RED observa \emph{Rate} (requests/s), \emph{Errors} (proporción por tipo) y \emph{Duration} (percentiles). Describe la experiencia y el comportamiento del servicio.
+
+Para el pool, USE observa \emph{Utilization} (conexiones ocupadas/capacidad), \emph{Saturation} (espera o cola) y \emph{Errors} (timeouts, conexiones rotas). Describe el recurso que sostiene al servicio. RED puede mostrar p99 alta; USE ayuda a explicar si el pool está saturado. Uno mira demanda y resultado; el otro, capacidad del recurso.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde logs sin request\_id o trace\_id dificulten severamente el debugging.
+Un equipo agrega \texttt{user\_id}, \texttt{session\_id}, \texttt{order\_id} y la URL completa como etiquetas de cada métrica. Explique el problema de cardinalidad que aparece, sus costos y cómo rediseñaría la instrumentación sin perder capacidad diagnóstica.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Cada combinación de etiquetas genera una serie temporal. Identificadores casi únicos multiplican series, memoria, índices, costo de almacenamiento y tiempo de consulta hasta volver inestable la plataforma de métricas.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+La solución es reservar métricas para dimensiones acotadas: servicio, operación, región, status y versión. Los identificadores únicos deben ir en logs o trazas, donde pueden consultarse bajo demanda. La URL debe normalizarse por ruta lógica, por ejemplo \texttt{/orders/:id}. Exemplars pueden enlazar una observación métrica con una traza representativa sin convertir cada usuario en una serie.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué son las Golden Signals y por qué son útiles.
+Diseñe una traza distribuida para el flujo \texttt{POST /checkout}. Incluya un span raíz y spans para Auth, Inventory, Payments, Orders y persistencia. Para cada span indique nombre, atributos relevantes, estado y relación padre-hijo.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+El span raíz puede llamarse \texttt{HTTP POST /checkout} y contener región, versión, tenant y status, sin datos sensibles. Sus hijos directos: \texttt{Auth.ValidateToken}, \texttt{Inventory.Reserve}, \texttt{Payments.Authorize} y \texttt{Orders.Create}. Cada servicio puede tener hijos internos, por ejemplo \texttt{DB INSERT order}.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Los atributos deben usar claves estables: \texttt{rpc.system}, \texttt{db.system}, \texttt{messaging.destination}, resultado y número de intento. El estado del span indica éxito o error técnico; los rechazos de negocio deben representarse sin confundirlos con falla de infraestructura. La jerarquía permite identificar camino crítico y paralelismo.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un conjunto mínimo de métricas para una API distribuida de pagos.
+El checkout publica un evento \texttt{OrderCreated} en Kafka y un consumidor asincrónico inicia el envío. Explique cómo propagar el contexto de traza a través del broker sin confundir causalidad asincrónica con una llamada RPC bloqueante.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+El productor inyecta el contexto de traza en headers del mensaje junto con \texttt{event\_id} y \texttt{correlation\_id}. El span de publicación representa la producción y el consumidor crea un nuevo span enlazado al contexto recibido. Cuando hay fan-out o retraso largo, un \emph{span link} expresa causalidad sin fingir una pila síncrona continua.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+El offset no reemplaza al identificador causal: solo ubica el evento en una partición. El consumidor debe registrar topic, partición, offset, consumer group y edad del evento para diagnosticar lag, duplicación y replay.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué mirar promedios de latencia puede ocultar problemas serios.
+Compare head sampling, tail sampling y sampling adaptativo. Elija una política para un sistema con 100.000 requests por segundo donde interesa conservar todas las trazas con error y una muestra representativa de las exitosas.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Head sampling decide al inicio y es barato, pero puede descartar una traza que luego termina en error. Tail sampling decide tras observar el resultado y puede conservar errores y latencias extremas, a costa de buffering y complejidad. El adaptativo modifica tasas según servicio, tráfico o anomalías.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Para este caso usaría una tasa pequeña de head sampling para cobertura uniforme más tail sampling para conservar 100\% de errores y trazas por encima de un umbral de latencia, con límites de capacidad. Además, revisaría sesgo por región y operación para evitar que caminos de bajo tráfico desaparezcan.
 \end{uaanswer}
 
 \begin{uaexercise}
-Describa una situación donde la latencia p99 sea más importante que la media.
+Una traza muestra que Payments tarda 2.5 s. Los logs de Payments no contienen errores y sus métricas de CPU son normales. Formule al menos tres hipótesis alternativas y describa qué evidencia adicional buscaría para distinguirlas.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Hipótesis 1: dependencia externa lenta; buscar subspans de red, DNS, TLS y proveedor. Hipótesis 2: espera por pool de conexiones; revisar saturación, tiempo de adquisición y cola. Hipótesis 3: bloqueo o contención en base de datos; examinar locks, queries y wait events. También puede haber pausa de runtime, rate limiting o timeout/retry interno.
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+La ausencia de error y CPU normal no prueba salud. La investigación debe descomponer los 2.5 s en tiempos de espera y ejecución, comparar trazas rápidas/lentas y buscar una dimensión común.
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina trace y span.
+Construya una cadena causal completa donde una base de datos lenta provoque: acumulación de requests, timeouts, retries, agotamiento del pool de conexiones y errores 500 en el borde. Distinga causa inicial, amplificadores, síntomas intermedios y síntoma visible al usuario.
 \end{uaexercise}
 \begin{uaanswer}
-Una trace representa el recorrido completo de una request distribuida. Un span representa una unidad individual de trabajo dentro de esa trace. Por ejemplo:
-\begin{itemize}
-\item trace: checkout completo;
-\item spans: API, autenticación, validación de stock, cobro, persistencia.
-\end{itemize}
+Causa inicial: una operación de base aumenta su latencia por lock, plan regresivo o I/O. Síntoma intermedio: las conexiones permanecen ocupadas más tiempo y crece la espera. Amplificador 1: timeouts del servicio generan retries. Amplificador 2: varias capas reintentan, multiplicando tráfico. Amplificador 3: el pool se agota y operaciones sanas también esperan.
+
+Finalmente, la API supera su deadline y devuelve 500/504. El usuario ve checkout fallido; la primera alerta puede aparecer en el borde, aunque la causa original esté en una query. La evidencia debe unir p99, wait time del pool, número de intentos, spans de DB y cambios recientes.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué información aporta una traza que no aportan logs agregados.
+Durante un incidente, una persona afirma: ``la causa raíz es Payments porque ahí aparece el primer span rojo''. Explique por qué esa conclusión puede ser prematura. Proponga un procedimiento de hipótesis y refutación para investigar sin caer en correlación superficial.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+El span rojo indica dónde se observó un error, no necesariamente dónde se originó. Payments puede fallar porque recibió un deadline agotado, porque Inventory entregó datos inválidos o porque una dependencia externa no respondió.
 
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Procedimiento: fijar el síntoma y ventana; comparar trazas afectadas y sanas; formular hipótesis alternativas; identificar predicciones observables de cada una; buscar subspans, métricas y logs; intentar refutar primero; revisar cambios y segmentaciones; reproducir o inyectar la condición de manera controlada. La explicación final debe cubrir mecanismo causal y no solo coincidencia temporal.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una traza para una request que pasa por API, Auth, Orders y Payments.
+Una saga de compra contiene eventos \texttt{StockReserved}, \texttt{PaymentAuthorized}, \texttt{ShipmentRequested} y compensaciones. Diseñe la observabilidad necesaria para reconstruir una instancia completa de saga, aun cuando los eventos lleguen tarde, duplicados o fuera de orden.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Cada saga necesita \texttt{saga\_id}; cada evento, \texttt{event\_id}, tipo, versión, productor, tiempo de evento, tiempo de ingestión y causation ID. Los servicios registran transición anterior/nueva, intento e idempotency key. Las trazas usan links entre producción y consumo.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Una vista de auditoría ordena por causalidad y versión, no solo por timestamp. Debe mostrar duplicados descartados, compensaciones, lag y estado terminal. Así puede distinguirse ``evento tardío'' de ``paso nunca ejecutado'' y reconstruir qué supo cada servicio.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la propagación de contexto es indispensable en tracing distribuido.
+Analice el siguiente incidente inspirado en un caso real: un cambio de configuración en el sistema de logs provoca pérdida de una parte de la telemetría durante varias horas, mientras el servicio principal continúa atendiendo tráfico. ¿Qué SLI propios debería tener la plataforma de observabilidad? ¿Cómo detectaría pérdida silenciosa y cómo diseñaría retención local o buffering?
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+SLI: proporción de eventos recibidos respecto de emitidos por origen; lag de ingestión; tasa de descarte; cobertura de hosts; disponibilidad de consulta; completitud de campos. La pérdida silenciosa se detecta con contadores monotónicos o secuencias por productor, heartbeats de telemetría y reconciliación entre bytes/eventos emitidos y aceptados.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Los agentes mantienen spool local durable con límites, prioridad por severidad y backpressure. Al recuperar el backend reenvían preservando identificadores para deduplicar. Deben definirse políticas de descarte explícitas: preferir perder debug antes que auditoría, y alertar cuando el buffer se aproxima al límite.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas iniciada en una base de datos lenta.
+Diseñe una alerta para un SLO de 99.9\% de requests exitosas en 30 días. Compare una alerta por umbral instantáneo de error con una alerta basada en burn rate del error budget. Explique cuál reduce mejor ruido sin ocultar incidentes importantes.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+Un umbral como ``error rate >1\% durante cinco minutos'' ignora tamaño del budget, duración y ventana; puede alertar por picos irrelevantes o no alertar por una degradación lenta pero costosa.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+El burn rate mide cuántas veces más rápido se consume el budget respecto de lo sostenible. Una estrategia multiventana combina una señal rápida de burn muy alto con otra lenta de burn moderado. Reduce ruido porque vincula alerta con riesgo real de incumplir el SLO y permite diferenciar incidente urgente de tendencia que requiere intervención planificada.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué el síntoma visible puede no coincidir con la causa raíz en un sistema distribuido.
+La organización no puede conservar todos los logs y trazas indefinidamente. Diseñe una política de retención por niveles que considere: datos recientes de alta resolución, agregados históricos, trazas con error, privacidad y costo. Declare qué capacidad diagnóstica se pierde.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Ejemplo: 7 días de logs y trazas detalladas; 30 días de errores, seguridad y auditoría; 90 días de métricas agregadas; histórico más largo solo para SLI y capacidad. Las trazas exitosas se muestrean, mientras errores y p99 se retienen más. Datos sensibles se minimizan, cifran y eliminan según propósito.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Se pierde capacidad de reconstruir requests exitosas antiguas con detalle y de investigar incidentes detectados tarde. El trade-off debe documentarse y compensarse con agregados, snapshots de incidentes y exportación legal cuando corresponda.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una estrategia paso a paso para diagnosticar un aumento repentino de errores 500 en una API distribuida.
+Se observa el siguiente patrón: p99 de API aumenta, CPU permanece estable, longitud de cola de Orders crece y el lag del consumer group también aumenta. Diseñe un plan de investigación de diez pasos que combine métricas, trazas, logs, cambios recientes y experimentos controlados.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+1) fijar ventana y regiones; 2) verificar impacto en SLI; 3) segmentar por endpoint/versión; 4) revisar tasa de llegada y capacidad de consumo; 5) comparar lag por partición; 6) examinar saturación de pools, I/O y dependencias; 7) buscar trazas lentas representativas; 8) correlacionar logs por trace/event ID; 9) revisar despliegues, configuración y skew de claves; 10) validar la hipótesis con una reducción controlada de carga o réplica adicional.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+CPU estable descarta solo una clase de saturación. La cola y el lag sugieren que la capacidad efectiva de un consumidor o dependencia cayó. La intervención debe medir recuperación y evitar ``arreglar'' el síntoma sin confirmar el mecanismo.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué “buscar la línea exacta que falló” no suele ser el primer paso correcto en debugging distribuido.
+Aplique el marco $D=(P,F,G,S,T)$ al diseño de observabilidad para una plataforma de reservas global. Incluya fallas de la propia telemetría, garantía de correlación, estrategia de sampling, SLI/SLO, costo aceptado y un experimento de fault injection que valide la propuesta.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+$P$: explicar y operar reservas que atraviesan regiones, pagos y proveedores. $F$: pérdida/retraso de telemetría, relojes distintos, sampling, cardinalidad, duplicación y caída del backend. $G$: correlación extremo a extremo de operaciones críticas, detección de degradación y SLI confiables aun con fallas parciales.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería traza extremo a extremo, logs correlacionados y métricas p50/p95/p99. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+$S$: contexto W3C propagado por RPC y eventos; logs estructurados; RED/USE; tail sampling de errores/p99; spooling local; SLO de éxito y latencia; burn-rate alerts. $T$: costo de instrumentación, almacenamiento, privacidad y overhead. Experimento: cortar el collector de una región e introducir latencia en Payments; verificar que no se pierdan eventos críticos, que el buffer recupere y que la cadena causal siga reconstruible.
 \end{uaanswer}
 
 \end{document}

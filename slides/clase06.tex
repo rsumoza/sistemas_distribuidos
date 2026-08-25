@@ -4,14 +4,12 @@
 
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
-
 \title{\UACourse}
-\subtitle{Clase 06 --- WAL, MVCC, LSM e índices}
-
+\subtitle{Clase 06 --- De las garantías lógicas al almacenamiento real}
 \author{\UAProfessor}
 \date{\UADate}
-\begin{document}
 
+\begin{document}
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -19,185 +17,392 @@
 \end{frame}
 }
 
-\UASectionSlide{Motivación}
+\UASectionSlide{Repaso activo: qué traemos de las clases 1 a 5}
 
-\begin{frame}{Del modelo lógico al físico}
-Hasta ahora:
-\begin{itemize}
-\item transacciones
-\item serializabilidad
-\end{itemize}
-
-\pause
-\begin{block}{Problema}
-¿Cómo implementamos esto sobre disco real?
-\end{block}
-\end{frame}
-
-\begin{frame}{Restricciones físicas}
-\begin{itemize}
-\item escritura secuencial >> aleatoria
-\item fsync es costoso
-\item memoria limitada
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{Write-Ahead Logging}
-
-\begin{frame}{Regla WAL}
-\begin{block}{}
-Nunca escribir datos persistentes antes de loguear la operación
-\end{block}
-
-\pause
-\begin{itemize}
-\item asegura atomicidad
-\item permite recovery
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Ejemplo}
-\begin{itemize}
-\item T1: write(x=5)
-\item WAL: “write x=5”
-\item crash
-\end{itemize}
-
-\pause
-Recovery:
-\begin{itemize}
-\item REDO $\Rightarrow$ reaplicar
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{MVCC}
-
-\begin{frame}{Idea}
-\begin{itemize}
-\item múltiples versiones por registro
-\item cada transacción ve snapshot
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Lectura}
-\begin{itemize}
-\item seleccionar versión con timestamp $\leq$ snapshot
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Ventaja}
-\begin{itemize}
-\item lectores no bloquean escritores
-\item alto paralelismo
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{LSM Trees}
-
-\begin{frame}{Problema de discos}
-\begin{itemize}
-\item random write costoso
-\end{itemize}
-
-\pause
-Solución:
-\begin{block}{}
-convertir escrituras en secuenciales
-\end{block}
-\end{frame}
-
-\begin{frame}{Arquitectura}
-\begin{itemize}
-\item Memtable (RAM)
-\item WAL
-\item SSTables (disco)
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Flujo}
+\begin{frame}{Mapa del curso hasta hoy}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=2cm]
-\node[draw] (wal) {WAL};
-\node[draw, right of=wal] (mem) {Memtable};
-\node[draw, below of=mem] (sst) {SSTable};
+\begin{tikzpicture}[node distance=0.9cm and 0.65cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
+\node[draw,rounded corners,minimum width=2.2cm,minimum height=0.9cm] (c1) {1. Incertidumbre\\y fallas parciales};
+\node[draw,rounded corners,right=of c1,minimum width=2.2cm,minimum height=0.9cm] (c2) {2. RPC, timeout,\\retry, idempotencia};
+\node[draw,rounded corners,right=of c2,minimum width=2.2cm,minimum height=0.9cm] (c3) {3. Replicación\\y consistencia};
+\node[draw,rounded corners,below=of c2,minimum width=2.2cm,minimum height=0.9cm] (c4) {4. Consenso\\y orden común};
+\node[draw,rounded corners,right=of c4,minimum width=2.2cm,minimum height=0.9cm] (c5) {5. Transacciones\\y serializabilidad};
+\node[draw,rounded corners,left=of c4,minimum width=2.2cm,minimum height=0.9cm,fill=UAIngPaper] (c6) {6. ¿Cómo se materializa\\todo sobre almacenamiento?};
+\draw[->,thick] (c1)--(c2);
+\draw[->,thick] (c2)--(c3);
+\draw[->,thick] (c3)--(c5);
+\draw[->,thick] (c2)--(c4);
+\draw[->,thick] (c4)--(c5);
+\draw[->,thick] (c5)--(c6);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Pregunta puente}
+¿Qué tiene que ocurrir físicamente para que un \texttt{COMMIT} siga siendo verdadero después de una caída de energía?
+\end{block}
+\end{frame}
 
-\draw[->] (wal) -- (mem);
-\draw[->] (mem) -- (sst);
+\begin{frame}{Repaso 1: timeout no describe el estado remoto}
+\begin{columns}[T]
+\column{0.52\textwidth}
+\begin{itemize}
+\item Un timeout es una observación local.
+\item No prueba que la operación no ocurrió.
+\item Un retry puede repetir un efecto ya persistido.
+\end{itemize}
+\column{0.44\textwidth}
+\begin{uacheck}
+Un cliente recibe timeout después de una transferencia. ¿Qué dato debe persistir el servidor para que el retry sea seguro?
+\end{uacheck}
+\end{columns}
+\pause
+\begin{block}{Respuesta esperada}
+Una identidad estable de la operación y su resultado durable: la idempotencia depende también del almacenamiento.
+\end{block}
+\end{frame}
+
+\begin{frame}{Repaso 2: replicar no equivale a persistir}
+\small
+\begin{itemize}
+\item Una copia en RAM de otro nodo mejora disponibilidad, pero puede desaparecer con un corte simultáneo.
+\item Una escritura local persistente puede sobrevivir un crash, pero no la pérdida del dispositivo.
+\item Durabilidad, replicación y consistencia son garantías relacionadas, no sinónimos.
+\end{itemize}
+\begin{block}{Decisión}
+¿El sistema confirma cuando el dato llegó a RAM, al WAL local, a dos WAL remotos o a una mayoría? Cada opción cambia latencia y riesgo.
+\end{block}
+\end{frame}
+
+\begin{frame}{Repaso 3: consenso ordena; no escribe los bytes por nosotros}
+\begin{itemize}
+\item Raft o Paxos pueden acordar qué entrada pertenece al log lógico.
+\item El motor local debe volver esa entrada recuperable después de un crash.
+\item La seguridad global depende de la seguridad de cada almacenamiento local.
+\end{itemize}
+\begin{alertblock}{Error frecuente}
+“Está committed en Raft” no significa que cualquier implementación física sea segura.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Repaso 4: ACID necesita mecanismos físicos}
+\small
+\begin{tabular}{p{0.20\textwidth}p{0.69\textwidth}}
+\toprule
+Propiedad & Pregunta física que debe responder el motor \\
+\midrule
+Atomicidad & ¿Cómo evita dejar media transacción aplicada? \\
+Durabilidad & ¿Qué llegó a almacenamiento estable antes de responder? \\
+Aislamiento & ¿Qué versión puede leer cada transacción concurrente? \\
+Consistencia & ¿Qué invariantes valida antes de commit? \\
+\bottomrule
+\end{tabular}
+\begin{block}{Hoy}
+WAL, recovery, MVCC e índices son parte de la respuesta.
+\end{block}
+\end{frame}
+
+\begin{frame}{Mini diagnóstico: cinco afirmaciones}
+\small
+Decida individualmente si cada afirmación es verdadera o falsa y justifique una:
+\begin{enumerate}
+\item Si \texttt{COMMIT} respondió, la página de datos ya está necesariamente actualizada en disco.
+\item MVCC elimina todas las anomalías de concurrencia.
+\item Un índice acelera lecturas sin costo para escrituras.
+\item Una LSM-tree convierte escrituras aleatorias en trabajo secuencial diferido.
+\item Más replicación siempre implica mayor consistencia.
+\end{enumerate}
+\end{frame}
+
+\UASectionSlide{Problema real: sobrevivir un crash sin pagar un fsync por página}
+
+\begin{frame}{Caso conductor: checkout confirmado, energía cortada}
+\small
+\begin{uacase}
+A las 19:02:14 el backend confirma una compra. Un segundo después, el servidor pierde energía. Al reiniciar, el pedido debe existir exactamente una vez.
+\end{uacase}
+\begin{enumerate}
+\item ¿Qué debe haber llegado a almacenamiento estable antes de responder?
+\item ¿Cómo se reconstruye el estado si las páginas de la tabla estaban atrasadas?
+\item ¿Cómo se distingue una transacción confirmada de una incompleta?
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Jerarquía de almacenamiento: no todo “write” es durable}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
+\node[draw,rounded corners,minimum width=2.7cm] (app) {Aplicación};
+\node[draw,rounded corners,below=of app,minimum width=2.7cm] (buf) {Buffer del proceso};
+\node[draw,rounded corners,below=of buf,minimum width=2.7cm] (os) {Page cache del SO};
+\node[draw,rounded corners,below=of os,minimum width=2.7cm] (ctrl) {Controlador / cache};
+\node[draw,rounded corners,below=of ctrl,minimum width=2.7cm] (dev) {Medio persistente};
+\draw[->] (app)--(buf); \draw[->] (buf)--(os); \draw[->] (os)--(ctrl); \draw[->] (ctrl)--(dev);
+\node[right=1.0cm of os,text width=4.7cm,align=left] {Una llamada \texttt{write()} puede terminar antes de que los datos lleguen al medio. La frontera de durabilidad depende de \texttt{fsync}, hardware y configuración.};
 \end{tikzpicture}
 \end{center}
 \end{frame}
 
-\begin{frame}{Compaction}
+\begin{frame}{Write-Ahead Logging: la regla que ordena el riesgo}
+\begin{block}{Regla WAL}
+El registro que permite rehacer una modificación debe llegar a almacenamiento estable \textbf{antes} que la página de datos modificada; el registro de commit debe ser durable antes de confirmar al cliente.
+\end{block}
 \begin{itemize}
-\item merge de SSTables
-\item elimina versiones viejas
+\item Las páginas pueden escribirse después y en otro orden.
+\item El log es secuencial y económico de persistir.
+\item Recovery vuelve a aplicar cambios confirmados que aún no llegaron a las páginas.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Índices}
-
-\begin{frame}{B-Tree}
-\begin{itemize}
-\item balanceado
-\item acceso logarítmico
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Comparación}
-\begin{itemize}
-\item LSM: write-heavy
-\item B-Tree: read-heavy
-\end{itemize}
-\end{frame}
-
-\UASectionSlide{Cierre}
-
-\begin{frame}{Idea central}
-\begin{block}{}
-El almacenamiento no es implementación: es diseño del sistema
+\begin{frame}{Timeline de WAL y crash recovery}
+\begin{center}
+\begin{tikzpicture}[x=1.3cm,y=0.75cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->] (0,0)--(8.2,0) node[right]{tiempo};
+\foreach \x/\lab in {0.6/{BEGIN},1.7/{WAL x=5},2.9/{buffer x=5},4.1/{COMMIT WAL},5.0/{ACK},6.0/{CRASH},7.2/{REDO}} {
+  \draw (\x,0.12)--(\x,-0.12); \node[above] at (\x,0.15){\lab};
+}
+\draw[very thick,UAIngOrange] (0.6,-0.45)--(4.1,-0.45);
+\node[below] at (2.35,-0.45){historia durable};
+\draw[very thick,UAIngNavy,dashed] (2.9,-0.85)--(6.0,-0.85);
+\node[below] at (4.45,-0.85){página puede quedar pendiente};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Predicción}
+Si el crash ocurre después del ACK pero antes de escribir la página, ¿qué mecanismo recupera el valor?
 \end{block}
 \end{frame}
 
-
-\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
+\begin{frame}{Caso real: PostgreSQL y roll-forward recovery}
 \small
-\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
-\begin{enumerate}
-\item ¿Cuál es el invariante o garantía que realmente importa?
-\item ¿Qué falla concreta amenaza esa garantía?
-\item ¿Qué mecanismo de Sistemas de almacenamiento es pertinente y cuál sería sobreingeniería?
-\item ¿Qué métrica permitiría comprobar el costo de la decisión?
-\end{enumerate}
-\end{frame}
-\begin{frame}{Checkpoint de comprensión}
-\small
-Al terminar esta clase deberías poder:
+PostgreSQL documenta que no necesita escribir cada página de datos al disco en cada commit: si el WAL es durable, los cambios pendientes pueden rehacerse durante la recuperación.
 \begin{itemize}
-\item explicar el problema sin apoyarte en nombres de productos;
-\item identificar el supuesto de falla más importante;
-\item distinguir una propiedad de seguridad de una de progreso;
-\item construir un escenario donde la solución deja de ser suficiente;
-\item defender el trade-off ante una objeción técnica.
+\item Menos I/O aleatorio en el camino crítico.
+\item Commit agrupado puede amortizar \texttt{fsync}.
+\item Checkpoints limitan cuánto WAL debe reproducirse.
+\end{itemize}
+\begin{uakeybox}
+La promesa de durabilidad se apoya en una frontera física concreta, no en la palabra \texttt{COMMIT} por sí sola.
+\end{uakeybox}
+{\scriptsize Fuente: documentación oficial de PostgreSQL, “Write-Ahead Logging”.}
+\end{frame}
+
+\begin{frame}{Checkpoints: reducir recovery sin romper WAL}
+\begin{itemize}
+\item Un checkpoint fuerza un conjunto consistente de páginas y registra un punto de referencia.
+\item Recovery parte desde el último checkpoint válido y reproduce WAL posterior.
+\item Checkpoints muy frecuentes elevan I/O y pueden crear picos.
+\item Checkpoints muy espaciados alargan recovery y aumentan WAL retenido.
+\end{itemize}
+\begin{block}{Trade-off}
+Tiempo de recuperación frente a presión de escritura durante operación normal.
+\end{block}
+\end{frame}
+
+\UASectionSlide{MVCC: aislar lectores mediante historia, no mediante espera}
+
+\begin{frame}{Problema: una lectura larga no debería congelar todas las escrituras}
+\begin{uacase}
+Un reporte de ventas tarda 40 segundos mientras el checkout sigue insertando pedidos. ¿Bloqueamos todo o permitimos que el reporte lea una fotografía coherente?
+\end{uacase}
+\begin{block}{Idea MVCC}
+Cada escritura crea una nueva versión; cada transacción lee las versiones visibles para su snapshot.
+\end{block}
+\end{frame}
+
+\begin{frame}{Visibilidad de versiones}
+\begin{center}
+\begin{tikzpicture}[x=1.2cm,y=0.8cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->] (0,0)--(8.2,0) node[right]{tiempo};
+\foreach \x/\lab in {1/{v1=10},3/{$T_R$ inicia},4.5/{v2=20},6.3/{v3=30},7.4/{$T_R$ termina}} {
+  \draw (\x,0.12)--(\x,-0.12); \node[above] at (\x,0.15){\lab};
+}
+\draw[very thick,UAIngOrange] (3,-0.55)--(7.4,-0.55);
+\node[below] at (5.2,-0.55){snapshot de $T_R$: sigue viendo v1};
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item Los lectores no esperan a escritores.
+\item Los escritores conservan versiones anteriores mientras algún snapshot pueda necesitarlas.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Decidir un motor de almacenamiento}
-\begin{frame}{Caso conductor: telemetría de alta escritura}
-Un sistema recibe millones de eventos diarios y debe conservarlos, consultar rangos temporales y recuperarse después de un crash.
+\begin{frame}{Caso real: PostgreSQL, filas muertas y VACUUM}
+\small
+En PostgreSQL, una actualización crea una nueva versión de fila. La anterior no puede eliminarse mientras una transacción activa aún pueda verla.
+\begin{itemize}
+\item Una transacción muy larga retrasa la limpieza.
+\item Aumentan bloat, I/O y costo de índices.
+\item \texttt{VACUUM} recupera espacio reutilizable cuando las versiones dejan de ser visibles.
+\end{itemize}
+\begin{alertblock}{Lección}
+MVCC cambia bloqueo por administración de historia. La historia también cuesta.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{MVCC no equivale automáticamente a serializabilidad}
+\begin{itemize}
+\item Un snapshot coherente evita lecturas sucias y lecturas no repetibles.
+\item Dos transacciones pueden leer el mismo estado y escribir filas distintas.
+\item El write skew puede violar un invariante sin conflicto write--write directo.
+\end{itemize}
+\begin{block}{Conexión con clase 5}
+El motor físico habilita un nivel de aislamiento; la aplicación todavía debe saber qué anomalías acepta.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Índices: acelerar una pregunta encarece otras operaciones}
+
+\begin{frame}{B-tree: el índice generalista de OLTP}
+\begin{center}
+\begin{tikzpicture}[level distance=1.0cm,sibling distance=1.5cm,every node/.style={draw,rounded corners,font=\scriptsize,minimum width=1.0cm}]
+\node {40}
+ child {node {15,25}}
+ child {node {55,70}
+   child {node {45,50}}
+   child {node {60,65}}
+   child {node {80,90}}};
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item Altura pequeña y fan-out alto reducen I/O.
+\item Soporta igualdad, rangos y orden.
+\item Cada inserción puede exigir splits y escritura de páginas.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Ejemplo realista: índice correcto, índice inútil}
+\small
+Consulta: \texttt{pedidos WHERE cliente\_id=? ORDER BY fecha DESC LIMIT 20}
+\begin{itemize}
+\item Índice compuesto \texttt{(cliente\_id, fecha DESC)} puede resolver filtro y orden.
+\item Índice solo por \texttt{fecha} puede leer demasiadas filas.
+\item Cada índice adicional aumenta costo de insert, update, vacuum y almacenamiento.
+\end{itemize}
+\begin{block}{Pregunta}
+¿Qué evidencia pediría antes de agregar el índice: intuición o plan de ejecución y distribución real de datos?
+\end{block}
+\end{frame}
+
+\UASectionSlide{LSM-tree: escribir rápido ahora, ordenar y fusionar después}
+
+\begin{frame}{Ruta de escritura en una LSM}
+\begin{center}
+\begin{tikzpicture}[node distance=0.8cm and 0.8cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
+\node[draw,rounded corners] (client) {write(k,v)};
+\node[draw,rounded corners,right=of client] (wal) {WAL};
+\node[draw,rounded corners,right=of wal] (mem) {Memtable};
+\node[draw,rounded corners,below=of mem] (l0) {SSTable L0};
+\node[draw,rounded corners,left=of l0] (l1) {Nivel L1};
+\node[draw,rounded corners,left=of l1] (l2) {Nivel L2};
+\draw[->] (client)--(wal); \draw[->] (wal)--(mem); \draw[->] (mem)--node[right]{flush}(l0); \draw[->] (l0)--node[above]{compaction}(l1); \draw[->] (l1)--node[above]{compaction}(l2);
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item El camino de escritura es mayormente secuencial.
+\item Las SSTables son inmutables y ordenadas.
+\item La deuda de organización se paga en compaction.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Caso real: RocksDB y las tres amplificaciones}
+\small
+RocksDB ofrece estrategias de compaction diferentes porque no existe una configuración óptima universal.
+\begin{itemize}
+\item Menor write amplification puede aumentar read y space amplification.
+\item Leveled compaction favorece lectura y espacio, pero reescribe más datos.
+\item Universal/tiered reduce algunas reescrituras, a costa de más runs a consultar y espacio temporal.
+\end{itemize}
+\begin{uakeybox}
+Una política de compaction es una decisión de carga y hardware, no un valor cosmético.
+\end{uakeybox}
+{\scriptsize Fuente: documentación oficial de RocksDB sobre compaction y tuning.}
+\end{frame}
+
+\begin{frame}{Cuando compaction no alcanza: write stalls}
+\small
+Si el ingreso supera sostenidamente la capacidad de flush y compaction:
+\begin{itemize}
+\item crece L0;
+\item aumenta read amplification;
+\item crece el espacio temporal;
+\item el motor debe desacelerar o detener escrituras.
+\end{itemize}
+\begin{block}{Conexión futura}
+El storage engine también necesita backpressure: admitir trabajo infinito no crea capacidad infinita.
+\end{block}
+\end{frame}
+
+\begin{frame}{Bloom filters: menos I/O, más memoria y falsos positivos}
+\begin{itemize}
+\item Permiten descartar SSTables que seguramente no contienen una clave.
+\item Un falso positivo provoca una lectura innecesaria, pero nunca oculta un dato existente.
+\item Más bits por clave reducen falsos positivos y aumentan memoria/metadata.
+\end{itemize}
 \begin{block}{Decisión}
-¿B-tree o LSM? La respuesta depende de la mezcla de lecturas, escrituras, amplificación y objetivos de recovery.
+Útiles para point lookups; menos decisivos para grandes range scans.
 \end{block}
 \end{frame}
-\begin{frame}{Amplificaciones: la factura escondida}
-\begin{itemize}
-\item write amplification: bytes físicos por byte lógico escrito;
-\item read amplification: estructuras consultadas por lectura;
-\item space amplification: espacio físico respecto del estado lógico.
-\end{itemize}
-\begin{uakeybox}Optimizar una dimensión desplaza costo hacia otra. La compaction no es mantenimiento gratuito: es trabajo diferido.</\end{uakeybox}
+
+\UASectionSlide{Elegir con evidencia: B-tree, LSM o una combinación}
+
+\begin{frame}{Matriz de decisión}
+\scriptsize
+\begin{tabular}{p{0.24\textwidth}p{0.33\textwidth}p{0.33\textwidth}}
+\toprule
+Criterio & B-tree & LSM-tree \\
+\midrule
+Escritura & actualizaciones in-place; más I/O aleatorio & append/flush; alto throughput \\
+Lectura puntual & pocas páginas, predecible & puede consultar varios runs; Bloom ayuda \\
+Rangos & natural y ordenado & bueno si compaction mantiene pocos runs \\
+Mantenimiento & splits, vacuum, páginas & compaction, tombstones, stalls \\
+Carga típica & OLTP equilibrado/read-heavy & ingestión y write-heavy \\
+\bottomrule
+\end{tabular}
+\begin{alertblock}{No hay ganador universal}
+La elección debe incluir patrón de acceso, SLO, hardware, recovery y amplificaciones medidas.
+\end{alertblock}
 \end{frame}
-\begin{frame}{Checkpoint de diseño}
-Para el Trabajo Final, documente: carga esperada, objetivo de recovery, patrón de consulta, política de compaction y evidencia que permitiría revisar la elección.
+
+\begin{frame}{Actividad: dos sistemas, dos decisiones}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{uacase}
+\textbf{Ledger bancario}\newline
+Lecturas y escrituras puntuales, invariantes fuertes, baja latencia predecible, consultas por rango temporal.
+\end{uacase}
+\column{0.48\textwidth}
+\begin{uacase}
+\textbf{Telemetría IoT}\newline
+Cientos de miles de eventos/s, escrituras append, consultas por dispositivo y ventana, retención temporal.
+\end{uacase}
+\end{columns}
+\medskip
+En grupos: propongan motor, WAL, índice, compaction/checkpoint y dos métricas para validar la elección.
+\end{frame}
+
+\begin{frame}{Cierre: una cadena de garantías}
+\begin{center}
+\begin{tikzpicture}[node distance=0.7cm and 0.55cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
+\node[draw,rounded corners] (g) {Garantía lógica\\de la aplicación};
+\node[draw,rounded corners,right=of g] (tx) {Transacción\\y aislamiento};
+\node[draw,rounded corners,right=of tx] (wal) {WAL y\\recovery};
+\node[draw,rounded corners,right=of wal] (struct) {B-tree / LSM\\e índices};
+\node[draw,rounded corners,below=of wal,fill=UAIngPaper] (evid) {Métricas: latencia, throughput, amplificación, recovery};
+\draw[->] (g)--(tx); \draw[->] (tx)--(wal); \draw[->] (wal)--(struct); \draw[->] (struct)--(evid);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Idea final}
+El almacenamiento no es una caja debajo del sistema: es donde las garantías lógicas se vuelven bytes, esperas y riesgos medibles.
+\end{block}
+\end{frame}
+
+\begin{frame}{Exit ticket}
+Responda en tres líneas cada punto:
+\begin{enumerate}
+\item ¿Qué diferencia hay entre “escrito” y “durable”?
+\item ¿Qué costo oculto introduce MVCC?
+\item ¿Qué evidencia necesitaría para elegir B-tree o LSM?
+\end{enumerate}
 \end{frame}
 
 \end{document}

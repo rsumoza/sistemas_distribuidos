@@ -1,228 +1,136 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
+\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
-\UASetDocKind{Guía resuelta}
-
+\UASetClassTitle{Consistencia real}
 \title{Clase 08 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
-
-\section{Criterio de lectura}
-Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
-
-\section{Ejercicios y resoluciones completas}
+\maketitle
+\section{Cómo leer las soluciones}
+Las respuestas modelan decisiones; otras alternativas son válidas si preservan el invariante y hacen explícito el costo.
+\section{Ejercicios y soluciones}
 \begin{uaexercise}
-Explique con precisión qué significa CAP y por qué la interpretación “elegir dos de tres” es incompleta o engañosa.
+\textbf{1. CAP sin slogan.} Explique la condición exacta en la que aparece el trade-off CAP y por qué 'elegir dos de tres' es una formulación engañosa.
 \end{uaexercise}
 \begin{uaanswer}
-CAP no es un menú estático de tres propiedades intercambiables. Es una restricción sobre sistemas replicados \emph{cuando existe partición de red}. La afirmación correcta es que, bajo partición, no es posible mantener simultáneamente consistencia fuerte observable y disponibilidad total.
-
-La formulación “elegir dos de tres” es engañosa porque:
-\begin{itemize}
-\item sugiere una elección permanente e independiente del contexto;
-\item oculta que la tensión relevante aparece específicamente bajo partición;
-\item no distingue entre distintos niveles de consistencia.
-\end{itemize}
+CAP aparece cuando existe una partición que impide coordinar réplicas correctas. En ese escenario, responder en ambos lados puede violar consistencia fuerte; rechazar preserva consistencia y sacrifica disponibilidad. 'Dos de tres' es engañoso porque P no es una opción estética si el sistema debe tolerar red real y porque el trade-off relevante se activa durante la partición.
 \end{uaanswer}
-
 \begin{uaexercise}
-Defina qué significa consistencia en CAP y por qué no debe entenderse como una noción vaga de “datos correctos”.
+\textbf{2. Disponibilidad CAP.} Un nodo responde 'no puedo operar sin quorum'. ¿Es disponible en el sentido CAP? Justifique y distinga de uptime general.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+No. En disponibilidad CAP, una solicitud a un nodo no fallado debe obtener una respuesta no errónea. Rechazar por falta de quorum es una elección de consistencia. El servicio puede tener alto uptime anual y no ser disponible CAP durante esa partición; son métricas diferentes.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué significa disponibilidad en CAP y dé un ejemplo de sistema que, ante partición, decida sacrificarla.
+\textbf{3. Partición bancaria.} Dos regiones con saldo 100 reciben retiros de 80 durante una partición. Diseñe una respuesta CP y una AP y analice el resultado.
 \end{uaexercise}
 \begin{uaanswer}
-Disponibilidad en CAP significa que toda solicitud a un nodo no fallado recibe respuesta. Un sistema que sacrifica disponibilidad bajo partición es uno que rechaza temporalmente operaciones si no puede verificar coherencia global. Un ejemplo típico es una base orientada a transacciones financieras fuertes.
+CP: una región sin quorum rechaza o ambas esperan una autoridad; se evita doble retiro, pero hay indisponibilidad. AP: ambas aceptan, quedan saldos 20 en cada lado y al reconciliar aparece gasto total 160 sobre 100. Para un ledger, AP rompe un invariante; para otro dominio podría aceptarse merge.
 \end{uaanswer}
-
 \begin{uaexercise}
-Construya un ejemplo concreto de partición de red y explique qué decisión debe tomar un sistema que prioriza consistencia.
+\textbf{4. PACELC.} Compare una lectura local de 15 ms potencialmente atrasada con una lectura coordinada de 180 ms. Identifique la decisión PACELC.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Sin partición, elegir lectura local favorece latency y acepta menor consistency; coordinar favorece consistency y paga latency. Esa es la rama Else de PACELC. El requisito puede variar por usuario: el dueño puede exigir read-your-writes y otros usuarios aceptar stale.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique por qué PACELC es una mejora conceptual respecto de CAP.
+\textbf{5. Consistent hashing.} Explique qué remapeo evita consistent hashing al agregar un nodo y por qué no elimina hot keys.
 \end{uaexercise}
 \begin{uaanswer}
-Porque CAP solo analiza el caso de partición, mientras que PACELC agrega la tensión entre consistencia y latencia en operación normal. Esto lo hace más realista para describir sistemas actuales, donde el costo de coordinar globalmente existe incluso sin particiones activas.
+Con hash modulo N, cambiar N remapea gran parte de las claves. En el anillo, solo rangos vecinos cambian propietario. Sin embargo, una clave muy popular sigue concentrando tráfico en su owner; uniformidad del espacio de claves no garantiza uniformidad de acceso.
 \end{uaanswer}
-
 \begin{uaexercise}
-Dé un ejemplo donde no haya partición, pero igual exista un trade-off entre consistencia y latencia.
+\textbf{6. Quórum intersectante.} Para N=5, proponga dos pares R,W con intersección y compare latencia y disponibilidad.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Ejemplos: R=3,W=3 y R=2,W=4; ambos suman >5. El primero equilibra y tolera dos nodos caídos para cada operación si responde una mayoría; el segundo hace lecturas más rápidas, pero escrituras requieren cuatro y son menos disponibles. Debe analizarse además concurrencia y política de versiones.
 \end{uaanswer}
-
 \begin{uaexercise}
-Describa la motivación arquitectónica de Dynamo. ¿Qué tipo de aplicaciones justifican este diseño?
+\textbf{7. Quórum no intersectante.} Para N=3,R=1,W=1, construya un stale read después de una escritura exitosa.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+La escritura se acepta solo en A. La lectura posterior consulta C, que conserva la versión anterior. Como los conjuntos no intersectan, el cliente recibe stale aunque ambas operaciones fueron exitosas según la política.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique el significado de los parámetros $N$, $R$ y $W$.
+\textbf{8. Límite de R+W>N.} Explique por qué la intersección combinatoria no garantiza por sí sola linearizabilidad en un sistema Dynamo-like.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+La intersección solo asegura compartir al menos un nodo en conjuntos ideales. No ordena escrituras concurrentes, no define qué versión devuelve la lectura, puede alterarse con sloppy quorum y no resuelve relojes o failover. Linearizabilidad necesita un protocolo de orden/autoridad más fuerte.
 \end{uaanswer}
-
 \begin{uaexercise}
-Demuestre informalmente por qué la condición $R+W>N$ garantiza intersección de quórums.
+\textbf{9. Version vectors.} Dadas versiones [A:2,B:1], [A:2,B:3] y [A:4,B:1], determine dominación o concurrencia y proponga reconciliación.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+[A:2,B:3] domina [A:2,B:1]. [A:4,B:1] es concurrente con [A:2,B:3] porque cada una avanza un componente distinto. Debe aplicarse merge semántico o devolver siblings; no es correcto descartar una rama solo por timestamp sin justificarlo.
 \end{uaanswer}
-
 \begin{uaexercise}
-Construya un ejemplo donde, aun con $R+W>N$, un cliente pueda observar un estado atrasado.
+\textbf{10. Last-write-wins.} Construya un caso donde LWW pierda una actualización válida por relojes desalineados o concurrencia.
 \end{uaexercise}
 \begin{uaanswer}
-Supongamos que la escritura fue aceptada por el quorum, pero una de las réplicas intersectadas aún no aplicó visiblemente la última versión, o la lectura se resuelve usando una política que prioriza disponibilidad local con versiones concurrentes. La intersección aumenta la probabilidad de ver frescura, pero no elimina todos los casos de retraso o conflicto.
+A y B editan un perfil durante partición. B tiene reloj adelantado y su actualización recibe timestamp mayor aunque ocurrió antes. LWW descarta la edición posterior de A. También puede perder uno de dos productos agregados concurrentemente a un carrito. El problema es confundir tiempo físico con causalidad/semántica.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué problema resuelven los vector clocks en Dynamo.
+\textbf{11. Sloppy quorum.} Explique cómo una escritura aceptada en un nodo alternativo mejora disponibilidad y complica lecturas y reparación.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Si el nodo propietario está caído, otro acepta y evita rechazar. Pero el dato queda fuera del preference list, una lectura normal puede no encontrarlo y deben rastrearse hints. Se necesitan handoff, expiración, límites y observabilidad para evitar divergencia prolongada.
 \end{uaanswer}
-
 \begin{uaexercise}
-Describa sloppy quorum y hinted handoff. ¿Qué ganan y qué complican?
+\textbf{12. Hinted handoff.} Diseñe estados y métricas para controlar hints acumulados durante una falla prolongada.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Cada hint debe registrar key/rango, destino, versión, creación, reintentos y estado. Métricas: cantidad/bytes por destino, edad máxima, tasa de entrega, fallas y espacio. Si la falla es larga, aplicar límites, priorización y quizá reparación completa; aceptar hints ilimitados puede llenar disco.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué rol juega anti-entropy en Dynamo.
+\textbf{13. Read repair.} Construya una lectura que descubre una réplica atrasada. Explique cuándo reparar sin bloquear demasiado al cliente.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+El coordinador lee A,B,C y observa que C tiene v1 mientras A,B tienen v2. Puede responder usando v2 y reparar C en background para no sumar toda la latencia; si la garantía exige que la reparación sea durable antes de responder, paga más. La política depende del SLO y costo de stale.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
+\textbf{14. Merkle trees.} Explique cómo dos réplicas localizan un rango divergente sin intercambiar todas las claves.
 \end{uaexercise}
 \begin{uaanswer}
-Spanner intenta resolver el problema de ofrecer consistencia fuerte global y transacciones distribuidas correctas a escala planetaria. Dynamo, en cambio, no busca imponer orden fuerte global; acepta reconciliación posterior para preservar disponibilidad y latencia.
+Cada réplica calcula hashes por bloques en un árbol. Si las raíces coinciden, el rango coincide. Si difieren, se comparan hijos hasta localizar subrangos divergentes. Solo esos datos se transfieren. El árbol reduce ancho de banda, pero necesita mantenerse y sincronizarse.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué es TrueTime y por qué devuelve un intervalo en lugar de un instante exacto.
+\textbf{15. Dynamo y carrito.} Diseñe una regla de merge para carritos concurrentes. Identifique un caso donde la unión simple no sea suficiente.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+La unión de ítems con cantidades máximas puede conservar adiciones concurrentes. No basta si una rama elimina un producto y otra cambia cantidad, o si promociones/inventario dependen de orden. Puede requerirse CRDT específico, reglas de negocio o intervención del usuario.
 \end{uaanswer}
-
 \begin{uaexercise}
-Describa la idea de commit wait y explique su costo.
+\textbf{16. TrueTime.} Explique por qué un intervalo de tiempo puede ser más útil que un timestamp aparentemente exacto.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Un timestamp único oculta incertidumbre y puede inducir comparaciones falsas. Un intervalo garantizado permite saber cuándo dos eventos pueden ordenarse con seguridad y cuándo sus rangos se solapan. La API hace explícito lo que el sistema sabe sobre tiempo.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique qué significa external consistency y por qué es más fuerte que eventual consistency.
+\textbf{17. Commit wait.} Construya dos transacciones T1 y T2 y explique cómo commit wait preserva el orden externo observable.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en CAP, PACELC, quórums, Dynamo, vector clocks, Spanner, TrueTime y consistencia externa. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo partición inter-región, réplica atrasada, conflicto concurrente e incertidumbre temporal. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+T1 recibe timestamp s1 y antes de responder espera hasta que TT.after(s1) sea seguro. Si T2 comienza después de la respuesta de T1, su timestamp será mayor que s1 según la garantía. Así el orden de commit respeta el orden real observado externamente, al costo de espera.
 \end{uaanswer}
-
 \begin{uaexercise}
-Explique por qué Spanner sacrifica latencia incluso en ausencia de partición.
+\textbf{18. Consenso localizado.} Explique por qué Spanner no puede usar un consenso global único para cada operación y cómo particiona la coordinación.
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en CAP, PACELC, quórums, Dynamo, vector clocks, Spanner, TrueTime y consistencia externa. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo partición inter-región, réplica atrasada, conflicto concurrente e incertidumbre temporal. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Un consenso planetario haría que cada operación dependiera de todos los nodos y sería inviable en latencia y disponibilidad. Spanner particiona datos en grupos replicados con consenso local; transacciones multi-grupo coordinan solo los grupos involucrados.
 \end{uaanswer}
-
 \begin{uaexercise}
-Compare Dynamo y Spanner en términos de:
-\begin{itemize}
-\item modelo de consistencia
-\item latencia
-\item particiones
-\item conflictos
-\end{itemize}
+\textbf{19. Arquitectura híbrida.} Diseñe garantías distintas para perfil, feed, reserva de asiento, inventario y ledger en una misma plataforma.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
-
-La evidencia apropiada sería decisión CAP/PACELC por operación, versiones y latencia inter-región. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Perfil: local eventual con read-your-writes. Feed: eventual y cacheado. Asiento: transacción serializable/autoridad única. Inventario visible: eventual, reserva final fuerte. Ledger: consenso y auditoría fuerte. Cada operación recibe la garantía mínima suficiente.
 \end{uaanswer}
-
 \begin{uaexercise}
-Indique para qué tipo de aplicación elegiría Dynamo y para cuál elegiría Spanner.
+\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma global de entradas y proponga una prueba de partición interregional.
 \end{uaexercise}
 \begin{uaanswer}
-Elegiría Dynamo para aplicaciones donde:
-\begin{itemize}
-\item pequeñas inconsistencias temporales son aceptables;
-\item la disponibilidad continua es prioritaria;
-\item la reconciliación posterior tiene sentido.
-\end{itemize}
-
-Elegiría Spanner para aplicaciones donde:
-\begin{itemize}
-\item el dominio exige transacciones correctas globalmente;
-\item los errores de consistencia son extremadamente costosos;
-\item la latencia extra es aceptable.
-\end{itemize}
+P: vender un asiento único global. F: partición, failover, stale cache y retries. G: no doble venta y respuesta dentro de SLO. S: shard por evento, consenso por shard, cache eventual para consulta, fencing e idempotencia en compra. T: rechazo bajo falta de quorum y mayor latencia. Prueba: cortar regiones y verificar que solo una reserva confirma.
 \end{uaanswer}
-
+\section{Criterio docente de corrección}
+Se valora distinguir intersección de quórums de orden fuerte, y reparación eventual de ausencia de garantía. Una respuesta excelente elige por dominio y propone una prueba de partición.
 \end{document}

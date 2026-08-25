@@ -1,112 +1,76 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real: CAP, PACELC, Dynamo y Spanner}
-\UASetDocKind{Guía de ejercicios}
-
+\UASetClassTitle{Consistencia real}
 \title{Clase 08 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
-
 \begin{document}
-
-\section{Indicaciones generales}
-Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
-
-\section{Nivel 1: fundamentos y reconocimiento}
+\maketitle
+\section{Propósito de la guía}
+Cada ejercicio obliga a declarar el dato, operación, invariante, comportamiento bajo partición y costo en operación normal.
+\section{Ejercicios}
 \begin{uaexercise}
-Explique con precisión qué significa CAP y por qué la interpretación “elegir dos de tres” es incompleta o engañosa.
+\textbf{1. CAP sin slogan.} Explique la condición exacta en la que aparece el trade-off CAP y por qué 'elegir dos de tres' es una formulación engañosa.
 \end{uaexercise}
-
 \begin{uaexercise}
-Defina qué significa consistencia en CAP y por qué no debe entenderse como una noción vaga de “datos correctos”.
+\textbf{2. Disponibilidad CAP.} Un nodo responde 'no puedo operar sin quorum'. ¿Es disponible en el sentido CAP? Justifique y distinga de uptime general.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué significa disponibilidad en CAP y dé un ejemplo de sistema que, ante partición, decida sacrificarla.
+\textbf{3. Partición bancaria.} Dos regiones con saldo 100 reciben retiros de 80 durante una partición. Diseñe una respuesta CP y una AP y analice el resultado.
 \end{uaexercise}
-
 \begin{uaexercise}
-Construya un ejemplo concreto de partición de red y explique qué decisión debe tomar un sistema que prioriza consistencia.
+\textbf{4. PACELC.} Compare una lectura local de 15 ms potencialmente atrasada con una lectura coordinada de 180 ms. Identifique la decisión PACELC.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique por qué PACELC es una mejora conceptual respecto de CAP.
+\textbf{5. Consistent hashing.} Explique qué remapeo evita consistent hashing al agregar un nodo y por qué no elimina hot keys.
 \end{uaexercise}
-
-
-\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
-Dé un ejemplo donde no haya partición, pero igual exista un trade-off entre consistencia y latencia.
+\textbf{6. Quórum intersectante.} Para N=5, proponga dos pares R,W con intersección y compare latencia y disponibilidad.
 \end{uaexercise}
-
 \begin{uaexercise}
-Describa la motivación arquitectónica de Dynamo. ¿Qué tipo de aplicaciones justifican este diseño?
+\textbf{7. Quórum no intersectante.} Para N=3,R=1,W=1, construya un stale read después de una escritura exitosa.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique el significado de los parámetros $N$, $R$ y $W$.
+\textbf{8. Límite de R+W>N.} Explique por qué la intersección combinatoria no garantiza por sí sola linearizabilidad en un sistema Dynamo-like.
 \end{uaexercise}
-
 \begin{uaexercise}
-Demuestre informalmente por qué la condición $R+W>N$ garantiza intersección de quórums.
+\textbf{9. Version vectors.} Dadas versiones [A:2,B:1], [A:2,B:3] y [A:4,B:1], determine dominación o concurrencia y proponga reconciliación.
 \end{uaexercise}
-
 \begin{uaexercise}
-Construya un ejemplo donde, aun con $R+W>N$, un cliente pueda observar un estado atrasado.
+\textbf{10. Last-write-wins.} Construya un caso donde LWW pierda una actualización válida por relojes desalineados o concurrencia.
 \end{uaexercise}
-
-
-\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
-Explique qué problema resuelven los vector clocks en Dynamo.
+\textbf{11. Sloppy quorum.} Explique cómo una escritura aceptada en un nodo alternativo mejora disponibilidad y complica lecturas y reparación.
 \end{uaexercise}
-
 \begin{uaexercise}
-Describa sloppy quorum y hinted handoff. ¿Qué ganan y qué complican?
+\textbf{12. Hinted handoff.} Diseñe estados y métricas para controlar hints acumulados durante una falla prolongada.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué rol juega anti-entropy en Dynamo.
+\textbf{13. Read repair.} Construya una lectura que descubre una réplica atrasada. Explique cuándo reparar sin bloquear demasiado al cliente.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué problema intenta resolver Spanner que no intenta resolver Dynamo.
+\textbf{14. Merkle trees.} Explique cómo dos réplicas localizan un rango divergente sin intercambiar todas las claves.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué es TrueTime y por qué devuelve un intervalo en lugar de un instante exacto.
+\textbf{15. Dynamo y carrito.} Diseñe una regla de merge para carritos concurrentes. Identifique un caso donde la unión simple no sea suficiente.
 \end{uaexercise}
-
-
-\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
-Describa la idea de commit wait y explique su costo.
+\textbf{16. TrueTime.} Explique por qué un intervalo de tiempo puede ser más útil que un timestamp aparentemente exacto.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique qué significa external consistency y por qué es más fuerte que eventual consistency.
+\textbf{17. Commit wait.} Construya dos transacciones T1 y T2 y explique cómo commit wait preserva el orden externo observable.
 \end{uaexercise}
-
 \begin{uaexercise}
-Explique por qué Spanner sacrifica latencia incluso en ausencia de partición.
+\textbf{18. Consenso localizado.} Explique por qué Spanner no puede usar un consenso global único para cada operación y cómo particiona la coordinación.
 \end{uaexercise}
-
 \begin{uaexercise}
-Compare Dynamo y Spanner en términos de:
-\begin{itemize}
-\item modelo de consistencia
-\item latencia
-\item particiones
-\item conflictos
-\end{itemize}
+\textbf{19. Arquitectura híbrida.} Diseñe garantías distintas para perfil, feed, reserva de asiento, inventario y ledger en una misma plataforma.
 \end{uaexercise}
-
 \begin{uaexercise}
-Indique para qué tipo de aplicación elegiría Dynamo y para cuál elegiría Spanner.
+\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma global de entradas y proponga una prueba de partición interregional.
 \end{uaexercise}
-
-
+\section{Criterios de entrega}
+No se aceptan clasificaciones AP/CP sin análisis por operación. Incluya timeline, quorum o versión cuando corresponda.
 \end{document}

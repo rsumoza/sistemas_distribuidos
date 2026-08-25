@@ -4,99 +4,136 @@
 
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
-\UASetDocKind{Apuntes}
-
-\title{Clase 10 --- Observabilidad distribuida, tracing, métricas, logs y debugging}
+\title{Clase 10 --- Logs, métricas, trazas y debugging causal en producción}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Introducción}
+\section{Propósito de la clase}
 
-Una vez que un sistema distribuido está desplegado, el problema central deja de ser solo diseñarlo correctamente y pasa a ser también \emph{entenderlo en producción}. Esto es mucho más difícil que en sistemas locales, porque:
+La arquitectura distribuida multiplica fronteras, procesos, relojes y modos de falla. Una request puede atravesar servicios sincrónicos, topics, consumers y bases diferentes. Cuando algo falla, ya no existe un stack trace único ni una memoria compartida que cuente toda la historia.
 
+Observabilidad es la capacidad de formular preguntas sobre el estado interno del sistema a partir de sus señales externas. No es sinónimo de recolectar datos. Un sistema puede emitir terabytes de telemetría y seguir siendo difícil de explicar si las señales carecen de contexto, correlación o relación con objetivos del usuario.
+
+\begin{uakeybox}
+La observabilidad útil convierte síntomas en hipótesis y las hipótesis en decisiones operativas verificables.
+\end{uakeybox}
+
+Los resultados esperados son:
 \begin{itemize}
-\item la ejecución se distribuye entre múltiples procesos;
-\item las fallas pueden ser parciales;
-\item no hay un reloj global confiable;
-\item la narrativa causal de una request se fragmenta entre servicios.
+\item distinguir monitoreo de observabilidad;
+\item diseñar logs estructurados con contexto seguro;
+\item elegir métricas orientadas a servicio y recursos;
+\item interpretar percentiles, cardinalidad y sampling;
+\item construir trazas y propagar contexto;
+\item correlacionar logs, métricas y trazas en un debugging causal;
+\item diseñar SLI, alertas y telemetría para sistemas sincrónicos y asincrónicos.
 \end{itemize}
 
-Por eso, la observabilidad no debe tratarse como un agregado cosmético. Es una capacidad estructural del sistema.
+\section{Caso conductor: checkout degradado}
 
-\section{Observabilidad}
+A las 21:10, los errores 500 suben del 0.2\% al 8\%. La latencia p99 alcanza 12 segundos. La API tiene CPU normal, Payments muestra latencia irregular y la base tiene CPU 45\%, pero su pool de conexiones está completo.
 
-Una formulación útil es:
-
-\begin{quote}
-Un sistema es observable si su estado interno puede inferirse razonablemente a partir de sus salidas.
-\end{quote}
-
-En sistemas distribuidos, las salidas principales son:
-
+Preguntas:
 \begin{itemize}
-\item logs;
-\item métricas;
-\item trazas distribuidas.
+\item ¿el problema comenzó en la API, Payments o la base?;
+\item ¿afecta todas las regiones o una versión?;
+\item ¿los retries son causa, consecuencia o ambas?;
+\item ¿qué señales permiten distinguir hipótesis?;
+\item ¿cuál es la mitigación inmediata y cuál el fix sistémico?
 \end{itemize}
 
-Estas tres dimensiones se complementan. Ninguna por sí sola alcanza.
+Este caso acompañará toda la clase.
 
-\section{Logs}
+\section{Monitoreo y observabilidad}
 
-\subsection{Qué responden}
+\subsection{Monitoreo}
 
-Los logs responden principalmente:
-\begin{quote}
-¿Qué ocurrió?
-\end{quote}
-
-\subsection{Logs tradicionales vs estructurados}
-
-Un log de texto libre puede ser útil para inspección humana rápida, pero escala mal para análisis distribuido. Por eso, en sistemas modernos se prefiere log estructurado con campos como:
-
+Responde preguntas conocidas mediante métricas, umbrales y alertas:
 \begin{itemize}
-\item timestamp;
-\item service\_name;
-\item request\_id;
-\item trace\_id;
-\item user\_id;
-\item endpoint;
-\item status;
-\item latency;
-\item error\_code.
+\item ¿se incumple el SLO?;
+\item ¿creció la tasa de errores?;
+\item ¿el consumer lag supera el objetivo?;
+\item ¿un recurso está saturado?
 \end{itemize}
 
-\subsection{Idea importante}
+\subsection{Observabilidad}
 
-En sistemas distribuidos, un log aislado casi nunca dice toda la verdad. El valor del log aparece cuando puede correlacionarse con otros eventos de la misma request o del mismo flujo.
+Permite investigar preguntas no predefinidas:
+\begin{itemize}
+\item ¿por qué solo fallan requests de una región y versión?;
+\item ¿qué dependencia introduce la cola larga?;
+\item ¿qué retry duplicó el efecto?;
+\item ¿qué cambio amplió el blast radius?
+\end{itemize}
+
+No son opuestos. El monitoreo detecta desviaciones; la observabilidad ayuda a explicarlas.
+
+\section{Tres señales complementarias}
+
+\begin{itemize}
+\item Métricas: comportamiento agregado, económico de consultar y alertar.
+\item Logs: eventos discretos con detalle local y contexto.
+\item Trazas: causalidad y latencia de una operación distribuida.
+\end{itemize}
+
+El valor aparece al correlacionarlas. Una métrica identifica el período; una traza selecciona un recorrido anómalo; los logs explican datos y decisiones internas.
+
+\section{Logs estructurados}
+
+\subsection{De frases a eventos consultables}
+
+Un mensaje “Error procesando pedido” no permite agrupar por servicio, versión, región o causa. Un log estructurado puede incluir:
+\begin{itemize}
+\item timestamp y nivel;
+\item servicio, versión, región e instancia;
+\item trace ID, span ID, request/event ID;
+\item order ID, payment ID u otro aggregate ID;
+\item intento, deadline y política de retry;
+\item latencia, resultado y error code;
+\item mensaje humano para detalle.
+\end{itemize}
+
+Los nombres y tipos de campos deben ser estables. Si cada equipo usa nombres distintos, la correlación y consulta se degradan.
+
+\subsection{Contexto y seguridad}
+
+No todo dato debe loguearse. Tokens, contraseñas, números de tarjeta, secretos y PII innecesaria deben excluirse, enmascararse o tratarse según política. La observabilidad también es una superficie de seguridad y cumplimiento.
+
+\subsection{Niveles}
+
+\begin{itemize}
+\item DEBUG: diagnóstico detallado, normalmente muestreado o temporal.
+\item INFO: eventos relevantes de operación normal.
+\item WARN: degradación o condición recuperable que merece atención.
+\item ERROR: operación fallida que afecta una garantía o requiere investigación.
+\end{itemize}
+
+Si todo es ERROR, nada es accionable. Si los errores esperables se registran con stack trace masivo, el costo y ruido crecen.
+
+\section{El pipeline de logs también falla}
+
+Cloudflare informó un incidente en noviembre de 2024 donde, durante aproximadamente 3.5 horas, cerca del 55\% de los logs que normalmente enviaba a clientes no se entregaron y se perdieron.
+
+Lecciones:
+\begin{itemize}
+\item ausencia de logs no demuestra ausencia de errores;
+\item la completitud del pipeline de observabilidad necesita métricas y SLOs;
+\item buffering, backpressure y retención deben diseñarse;
+\item el observability stack forma parte del sistema crítico.
+\end{itemize}
 
 \section{Métricas}
 
-\subsection{Qué responden}
+\subsection{Qué comprimen}
 
-Las métricas responden:
-\begin{quote}
-¿Cómo está funcionando el sistema en agregado?
-\end{quote}
-
-\subsection{Ejemplos típicos}
-
-\begin{itemize}
-\item throughput;
-\item tasa de error;
-\item latencia p50/p95/p99;
-\item uso de CPU;
-\item memoria;
-\item saturación de colas;
-\item conexiones activas.
-\end{itemize}
+Una métrica reduce muchos eventos a una serie temporal. Esa compresión la hace barata y útil, pero elimina detalle. Por eso debe responder una pregunta clara.
 
 \subsection{Golden Signals}
 
-Una guía clásica de operación distribuida es mirar:
+Google SRE propone cuatro señales para servicios orientados a usuarios:
 \begin{itemize}
 \item latency;
 \item traffic;
@@ -104,220 +141,271 @@ Una guía clásica de operación distribuida es mirar:
 \item saturation.
 \end{itemize}
 
-\subsection{Límite}
+Deben distinguirse solicitudes exitosas y fallidas: un error rápido no compensa una operación exitosa lenta.
 
-Las métricas muestran patrones agregados, pero no explican por sí solas una request individual. Por eso no reemplazan a logs ni trazas.
+\subsection{RED y USE}
+
+RED para servicios:
+\begin{itemize}
+\item Rate;
+\item Errors;
+\item Duration.
+\end{itemize}
+
+USE para recursos:
+\begin{itemize}
+\item Utilization;
+\item Saturation;
+\item Errors.
+\end{itemize}
+
+RED muestra impacto de servicio; USE ayuda a investigar capacidad física. La CPU normal no descarta saturación de conexiones, locks, I/O o colas.
+
+\section{Percentiles y cola larga}
+
+Supongamos 95 requests de 100 ms y 5 requests de 8 s. La media puede parecer moderada, pero el 5\% de usuarios experimenta una demora extrema. Los percentiles describen la distribución:
+\begin{itemize}
+\item p50: experiencia típica;
+\item p95: cola relevante;
+\item p99/p99.9: extremos, a menudo dominados por fan-out y retries.
+\end{itemize}
+
+En una request que llama a muchos servicios, la probabilidad de tocar al menos una cola lenta aumenta. Por eso, el p99 de una dependencia importa aunque su media sea baja.
+
+\section{Cardinalidad}
+
+Una serie temporal suele identificarse por nombre y etiquetas. Si una etiqueta toma millones de valores, se crean millones de series.
+
+Etiquetas razonables:
+\begin{itemize}
+\item endpoint normalizado;
+\item status class;
+\item region;
+\item service version;
+\item operation type.
+\end{itemize}
+
+Etiquetas peligrosas:
+\begin{itemize}
+\item request ID;
+\item user ID;
+\item raw URL con IDs;
+\item error message libre;
+\item stack trace.
+\end{itemize}
+
+Regla: identidades individuales viven mejor en logs y traces; las métricas agrupan dimensiones acotadas.
 
 \section{Tracing distribuido}
 
-\subsection{Qué responde}
+\subsection{Trace y span}
 
-El tracing distribuido responde:
-\begin{quote}
-¿Cómo atravesó esta request el sistema?
-\end{quote}
-
-\subsection{Conceptos}
-
+Una trace representa el recorrido causal de una operación. Un span registra una unidad de trabajo con:
 \begin{itemize}
-\item \textbf{Trace}: historia completa de una request distribuida.
-\item \textbf{Span}: unidad individual de trabajo dentro de esa traza.
+\item inicio y duración;
+\item parent span;
+\item atributos;
+\item eventos;
+\item estado/resultado;
+\item contexto de recursos.
 \end{itemize}
 
-Una request que pasa por API, Auth, Orders y Payments puede representarse como una traza con múltiples spans enlazados causalmente.
+La estructura no es solo cronológica. Parent/child explica causalidad y fan-out.
 
-\subsection{Valor}
+\subsection{Context propagation}
 
-El tracing permite:
+OpenTelemetry define propagación de contexto para conectar spans a través de procesos y redes. El contexto puede viajar en headers HTTP/gRPC o metadata de mensajes.
+
+Si un servicio no extrae o inyecta el contexto, la traza se corta. Un consumidor asincrónico debe decidir si continúa la trace original, crea un vínculo o inicia una nueva trace correlacionada, según semántica y duración.
+
+\subsection{Atributos}
+
+Atributos útiles:
 \begin{itemize}
-\item ver dependencia crítica;
-\item detectar dónde se concentra la latencia;
-\item localizar fallas upstream;
-\item entender el árbol causal de una ejecución.
+\item operación y ruta normalizada;
+\item peer service;
+\item status code;
+\item messaging destination;
+\item retry attempt;
+\item DB system y operation;
+\item aggregate ID si la política lo permite.
 \end{itemize}
 
-\section{Propagación de contexto}
+Evitar payloads enormes y datos sensibles.
 
-\subsection{Correlation IDs}
+\section{Sampling}
 
-Para correlacionar logs y spans, el sistema debe propagar contexto explícito:
+Capturar todas las trazas puede ser costoso.
 
-\begin{itemize}
-\item request\_id;
-\item trace\_id;
-\item span\_id;
-\item eventualmente tenant\_id o user\_id.
-\end{itemize}
+\subsection{Head sampling}
+Decide al inicio. Es barato y distribuible, pero puede descartar incidentes raros antes de saber que fallarán.
 
-\subsection{Punto clave}
+\subsection{Tail sampling}
+Decide después de observar la trace. Puede conservar errores, alta latencia o rutas específicas, pero necesita buffering y una infraestructura de decisión.
 
-Sin propagación de contexto, cada servicio genera una historia local desconectada. El resultado es que el sistema se vuelve opaco justo cuando más necesita ser entendible.
+\subsection{Estrategia}
 
-\section{Debugging en producción}
+Una política razonable combina muestra base, retención total de errores/rutas críticas y adaptación durante incidentes. Debe evaluarse si permite responder preguntas reales.
 
-\subsection{Por qué es difícil}
+\section{Correlación de señales}
 
-El debugging distribuido es difícil porque los síntomas visibles suelen ser tardíos y desplazados respecto de la causa real.
-
-Ejemplo típico:
-\begin{itemize}
-\item una base de datos empieza a responder lentamente;
-\item los servicios intermedios activan retries;
-\item aumenta la presión sobre la base;
-\item la API frontal empieza a devolver timeout;
-\item el error visible aparece en el borde, pero la causa está en otro sitio.
-\end{itemize}
-
-\subsection{Lección}
-
-La observabilidad debe permitir reconstruir causalidad, no solo enumerar síntomas.
-
-\section{Estrategia de diagnóstico}
-
-Una estrategia razonable para investigar fallas distribuidas es:
-
+Un workflow de investigación:
 \begin{enumerate}
-\item identificar el síntoma observable principal;
-\item encontrar la request o conjunto de requests afectadas;
-\item ubicar el servicio donde comienza la degradación;
-\item revisar dependencias downstream y upstream;
-\item correlacionar métricas, logs y trazas.
+\item confirmar impacto mediante SLI/SLO;
+\item delimitar período, región, versión, endpoint o tenant;
+\item revisar cambios recientes;
+\item observar RED/Golden Signals;
+\item comparar recursos con USE;
+\item seleccionar traces lentas/fallidas y normales;
+\item localizar el primer span degradado;
+\item consultar logs con trace ID;
+\item formular hipótesis y buscar evidencia que podría refutarla;
+\item mitigar, medir y documentar.
 \end{enumerate}
 
-\subsection{Error común}
+Este método evita saltar directamente a una explicación favorita.
 
-Un error típico es empezar buscando “la línea exacta de código” antes de reconstruir la topología de la falla. En sistemas distribuidos, el diagnóstico suele requerir primero mapear causalidad y dependencia.
+\section{Síntoma y causa sistémica}
 
-\section{Diseño para observabilidad}
-
-La observabilidad debe ser una propiedad de diseño, no un parche posterior. Eso implica:
-
+En el caso conductor:
 \begin{itemize}
-\item logs estructurados desde el inicio;
-\item trazas distribuidas habilitadas;
-\item propagación de contexto entre servicios;
-\item métricas orientadas a capacidad, latencia y errores;
-\item alertas pensadas según objetivos del sistema.
+\item síntoma: API 500 y p99 12s;
+\item causa próxima: pool de conexiones agotado;
+\item cadena: query lenta o deadline largo $\rightarrow$ requests retenidas $\rightarrow$ timeouts $\rightarrow$ retries $\rightarrow$ más conexiones $\rightarrow$ saturación.
 \end{itemize}
 
-\section{Observabilidad y arquitectura}
+Mitigar puede significar reducir retries, abrir circuit breaker, aumentar capacidad temporal o revertir configuración. El fix sistémico puede requerir query, timeout budget, pool isolation y load shedding.
 
-Cada estilo arquitectónico cambia el problema observacional:
+\section{Caso real: propagación global de una configuración}
 
-\subsection{Monolito}
+Cloudflare publicó un postmortem del 18 de noviembre de 2025. Un cambio de permisos hizo que una consulta produjera múltiples entradas en un archivo usado por Bot Management; el archivo duplicó su tamaño y fue propagado a máquinas de la red, provocando un outage amplio.
+
+Lecciones para observabilidad:
 \begin{itemize}
-\item el tracing es menos crítico;
-\item los logs locales suelen ser más fáciles de correlacionar.
+\item tamaño y forma de un artefacto son métricas operativas;
+\item rollout global necesita canaries y límites;
+\item el disparador local no explica el blast radius por sí solo;
+\item postmortems conectan cambio, propagación, defensas y detección.
 \end{itemize}
 
-\subsection{Microservicios}
+\section{Sistemas asincrónicos y sagas}
+
+La causalidad no siempre es una cadena. Un evento puede activar varios consumidores y una saga puede durar minutos.
+
+Señales útiles:
 \begin{itemize}
-\item aumenta la necesidad de tracing;
-\item las dependencias se multiplican;
-\item la causalidad se fragmenta.
+\item event ID, correlation ID y saga ID;
+\item lag y edad del mensaje;
+\item estado de saga y paso actual;
+\item retries, DLQ y redrive;
+\item tiempo desde evento inicial hasta efecto final;
+\item cantidad de compensaciones.
 \end{itemize}
 
-\subsection{Event-driven}
+Una trace tradicional puede usar links entre producer y consumers en vez de un parent único.
+
+\section{Alertas y SLOs}
+
+Las alertas útiles se orientan a síntomas de usuario o consumo rápido del error budget. Ejemplos:
 \begin{itemize}
-\item el orden puede ser parcial;
-\item el tracing extremo a extremo es más difícil;
-\item la correlación por event\_id o trace\_id se vuelve crítica.
+\item checkout success rate bajo objetivo;
+\item p99 por encima del SLO;
+\item pipeline con edad de evento mayor a límite;
+\item disponibilidad de una capacidad crítica.
 \end{itemize}
 
-\section{Modelo del curso}
+Alertas de CPU o disco pueden apoyar diagnóstico, pero no deberían pagear sin una relación accionable con el servicio, salvo riesgo inmediato de agotamiento.
 
-Podemos formular el problema observacional con:
+\section{Telemetría como producto interno}
 
-\[
-D = (P, F, G, S, T)
-\]
-
-Por ejemplo:
-
+Para cada señal:
 \begin{itemize}
-\item $P$: diagnosticar fallas en un sistema distribuido;
-\item $F$: fallas parciales, latencia variable, cascadas de retries;
-\item $G$: capacidad de reconstruir causalidad y localizar degradación;
-\item $S$: logs estructurados + métricas + trazas + propagación de contexto;
-\item $T$: más sobrecarga, más complejidad de instrumentación, más costo operacional.
+\item definir pregunta y usuario;
+\item schema y ownership;
+\item volumen, cardinalidad y costo;
+\item retención;
+\item privacidad;
+\item completitud y calidad;
+\item dependencia de operación;
+\item política de degradación si el pipeline falla.
 \end{itemize}
 
-\section{Conclusión}
+La observabilidad tiene presupuesto. Debe priorizar caminos críticos y preguntas valiosas.
 
-No se puede operar seriamente un sistema distribuido si no puede observarse con claridad. Logs, métricas y trazas no son herramientas accesorias, sino mecanismos para recuperar inteligibilidad en un entorno donde la ejecución real está fragmentada.
+\section{Método de diseño}
 
-\begin{uakeybox}
-Observabilidad distribuida no es “mirar dashboards”. Es diseñar el sistema para que pueda explicarse a sí mismo cuando falle.
-\end{uakeybox}
+\begin{enumerate}
+\item definir journeys críticos y SLOs;
+\item instrumentar límites de servicio y dependencias;
+\item estandarizar contexto y campos;
+\item diseñar métricas con cardinalidad acotada;
+\item propagar traces en sync y async;
+\item definir sampling y retención;
+\item diseñar dashboards por preguntas;
+\item alertar por impacto y burn rate;
+\item ensayar fallas para comprobar evidencia;
+\item revisar costo y utilidad periódicamente.
+\end{enumerate}
 
+\section{Errores frecuentes}
 
-\section{Síntesis razonada de la clase}
-Esta unidad debe leerse como parte de una cadena de decisiones de diseño y no como un catálogo de mecanismos. Para estudiar el tema con profundidad conviene reconstruir cuatro preguntas: \emph{qué problema aparece}, \emph{qué garantía se desea}, \emph{qué mecanismo la aproxima} y \emph{qué costo introduce}. En cada ejemplo debe identificarse además el modelo de falla implícito.
+\begin{itemize}
+\item confundir telemetría con observabilidad;
+\item logs de texto sin contexto;
+\item datos sensibles en logs;
+\item métricas con cardinalidad explosiva;
+\item promedios sin percentiles;
+\item traces cortadas;
+\item sampling que descarta errores raros;
+\item dashboards sin pregunta;
+\item alertas por todo;
+\item investigar sin hipótesis refutable;
+\item asumir que ausencia de señal equivale a salud.
+\end{itemize}
 
-\begin{uakeybox}
-Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón: declara sus supuestos, la propiedad que preserva y el escenario en el que deja de ser suficiente.
-\end{uakeybox}
+\section{Bibliografía guiada y casos reales}
 
-\section{Bibliografía guiada y ruta de profundización}
-Para profundizar esta clase se recomienda: Google SRE Book; OpenTelemetry conceptual model; Kleppmann para causalidad y fallas parciales.
-
-La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
+\begin{itemize}
+\item Google SRE Book, \href{https://sre.google/sre-book/monitoring-distributed-systems/}{Monitoring Distributed Systems}: Golden Signals y principios de monitoreo.
+\item OpenTelemetry, \href{https://opentelemetry.io/docs/concepts/signals/traces/}{Traces} y \href{https://opentelemetry.io/docs/concepts/context-propagation/}{Context Propagation}.
+\item Kleppmann, capítulos sobre fallas, logs y sistemas derivados.
+\item Cloudflare, \href{https://blog.cloudflare.com/cloudflare-incident-on-november-14-2024-resulting-in-lost-logs/}{incidente de pérdida de logs de noviembre de 2024}.
+\item Cloudflare, \href{https://blog.cloudflare.com/18-november-2025-outage/}{postmortem del outage del 18 de noviembre de 2025}.
+\end{itemize}
 
 \section{Conexión con el Trabajo Final Integrador}
-El grupo debe señalar qué parte de su sistema utiliza los conceptos de esta unidad, justificar por qué son necesarios y documentar una alternativa descartada. Cuando el contenido todavía no corresponda a la etapa vigente, debe registrarse como hipótesis o decisión pendiente.
 
-\section{Autoevaluación conceptual}
-\begin{enumerate}
-\item ¿Cuál es el problema distribuido concreto que motiva esta clase?
-\item ¿Qué propiedad de seguridad y qué propiedad de progreso están en juego?
-\item ¿Qué supuesto de red, tiempo o falla resulta decisivo?
-\item ¿Qué trade-off aceptaría en un sistema real y cuál no aceptaría en un dominio crítico?
-\item ¿Cómo observaría experimentalmente que la solución se comporta como espera?
-\end{enumerate}
-
-\section{Profundización autocontenida v9}
-\subsection{Problema, límite e invariante}
-El núcleo de esta clase es logs estructurados, métricas, tracing, propagación de contexto, percentiles y debugging causal. Para estudiarlo de manera autónoma conviene separar tres planos. Primero, el \emph{problema observable}: qué comportamiento incorrecto puede ver un cliente o un operador. Segundo, el \emph{límite del modelo}: qué información, sincronía o coordinación no está disponible. Tercero, el \emph{invariante}: qué propiedad no debe violarse aunque el sistema pierda progreso temporalmente.
-
-El modelo de fallas relevante incluye telemetría incompleta, cardinalidad, sampling, relojes distintos y causa upstream oculta. Una solución debe describirse como protocolo y no solo como nombre de tecnología: actores, estados, mensajes, condición de éxito, condición de aborto y estado visible después de una interrupción. La evidencia esperada es traza extremo a extremo, logs correlacionados y métricas p50/p95/p99.
-
-\subsection{Método de análisis}
-Ante un caso nuevo, siga esta secuencia:
-\begin{enumerate}
-\item Identifique actores, dato o recurso compartido y frontera de confianza.
-\item Escriba una ejecución nominal y una ejecución adversarial.
-\item Distinga seguridad (lo malo no ocurre) de progreso (algo bueno finalmente ocurre).
-\item Declare qué supuesto permite avanzar: mayoría, deadline, sincronía parcial, operación idempotente, almacenamiento durable u otro.
-\item Compare una alternativa más simple y una más fuerte; registre qué métrica o experimento haría cambiar la decisión.
-\end{enumerate}
-
-\subsection{Caso transferible}
-Considere una plataforma de reservas que recibe operaciones duplicadas, pierde conectividad entre regiones y debe sostener un camino crítico sin ocultar el estado real al usuario. Aplique el mecanismo de esta clase a una única decisión concreta. Una respuesta madura no intenta resolver todo: delimita la operación, formula la garantía y explica la degradación esperada cuando el supuesto central deja de cumplirse.
-
-\subsection{Errores de razonamiento frecuentes}
+Cada grupo debe definir:
 \begin{itemize}
-\item confundir una propiedad con el producto que suele implementarla;
-\item describir el camino feliz sin recorrer una falla intermedia;
-\item afirmar ``exactly-once'', ``alta disponibilidad'' o ``consistencia'' sin definir alcance observable;
-\item medir solo throughput aunque la hipótesis trate sobre semántica o recuperación;
-\item presentar la complejidad añadida como beneficio sin compararla con la alternativa más simple.
+\item tres journeys críticos;
+\item SLI/SLO;
+\item logs estructurados y campos prohibidos;
+\item métricas RED/USE;
+\item propagación de trace en RPC y eventos;
+\item dashboard y alertas;
+\item una investigación de falla simulada;
+\item costo/retención de telemetría.
 \end{itemize}
 
-\section{Lectura guiada}
-Google SRE; OpenTelemetry; USE/RED methods y cardinalidad de métricas.
+\section{Autoevaluación}
 
-Durante la lectura, registre: modelo de sistema, propiedad perseguida, contraejemplo que motiva el mecanismo, costo principal y una condición bajo la cual no lo elegiría. Estas cinco anotaciones convierten la bibliografía en una herramienta de diseño y no en una lista para memorizar.
-
-\section{Aplicación al Trabajo Final Integrador}
-El equipo debe producir un ADR breve con la decisión asociada a esta clase. Debe contener: contexto, dos alternativas, supuesto decisivo, garantía elegida, trade-off, evidencia pendiente y fecha de revisión. La evidencia mínima esperada para esta unidad es: traza extremo a extremo, logs correlacionados y métricas p50/p95/p99.
-
-\section{Autoevaluación avanzada}
 \begin{enumerate}
-\item ¿Puedo explicar la clase sin nombrar primero una tecnología?
-\item ¿Puedo construir una ejecución que viole la garantía si el mecanismo se configura mal?
-\item ¿Puedo distinguir seguridad, progreso y experiencia del usuario?
-\item ¿Puedo proponer una medición que valide la propiedad, no solo el rendimiento?
-\item ¿Puedo defender cuándo una solución más simple sería suficiente?
+\item ¿Qué diferencia monitoreo de observabilidad?
+\item ¿Qué campo conecta logs de una misma request?
+\item ¿Por qué un error message es mala etiqueta de métrica?
+\item ¿Qué muestran p95/p99 que la media oculta?
+\item ¿Qué diferencia RED y USE?
+\item ¿Qué es un span huérfano?
+\item ¿Cuándo tail sampling es valioso?
+\item ¿Cómo se observa una saga asincrónica?
+\item ¿Por qué el pipeline de logs necesita SLO?
+\item ¿Qué evidencia refutaría su hipótesis de causa raíz?
 \end{enumerate}
+
+\section{Síntesis final}
+
+\begin{uakeybox}
+Las métricas encuentran el patrón, las trazas reconstruyen el recorrido y los logs explican el detalle. La observabilidad aparece cuando esas señales comparten contexto, se orientan a objetivos y permiten formular y refutar hipótesis sobre el sistema real.
+\end{uakeybox}
 
 \end{document}

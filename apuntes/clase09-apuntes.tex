@@ -4,337 +4,410 @@
 
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
-\UASetDocKind{Apuntes}
-
-\title{Clase 09 --- Monolito, microservicios, event-driven y sagas}
+\title{Clase 09 --- Monolito modular, microservicios, eventos, outbox y sagas}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Introducción}
+\section{Propósito de la clase}
 
-Luego de estudiar RPC, replicación, consistencia, consenso, transacciones, almacenamiento y logs, aparece una pregunta más amplia: \emph{cómo organizar todo eso en una arquitectura real}. Esta clase busca responder esa pregunta.
+Esta clase cambia el nivel de análisis. Las clases anteriores estudiaron mecanismos de almacenamiento, logs y consistencia. Ahora debemos decidir cómo agrupar responsabilidades, datos y equipos en una arquitectura completa.
 
-La tesis principal es la siguiente:
+El objetivo no es defender una moda arquitectónica. Es aprender a responder:
+\begin{itemize}
+\item qué frontera de dominio justifica una frontera de despliegue;
+\item qué invariantes conviene mantener locales;
+\item qué interacciones requieren respuesta inmediata;
+\item qué procesos pueden evolucionar mediante eventos;
+\item cómo se conserva integridad de negocio cuando no existe una única transacción;
+\item si la organización puede operar lo que diseña.
+\end{itemize}
 
-\begin{quote}
-La arquitectura distribuida no es una cuestión de estilo ni de moda; es una decisión sobre acoplamiento, visibilidad, consistencia, fallas y costo operativo.
-\end{quote}
+\begin{uakeybox}
+Una arquitectura distribuida no mejora por contener más procesos. Mejora cuando sus fronteras reducen acoplamiento relevante sin ocultar los nuevos costos de red, datos y operación.
+\end{uakeybox}
 
-Por eso, una buena arquitectura no se define por “usar microservicios” o “usar eventos”, sino por hacer explícitas las tensiones que cada elección introduce.
+\section{Caso conductor: plataforma global de cursos}
+
+La plataforma ofrece catálogo, inscripción, pagos, reproducción, progreso, recomendaciones y certificados. Existen cinco equipos con ritmos de cambio distintos. Algunas propiedades:
+\begin{itemize}
+\item inscripción, cupo, pago y certificado tienen invariantes fuertes;
+\item recomendaciones y analytics aceptan atraso;
+\item video tiene una carga y SLO diferentes;
+\item el dominio de aprendizaje todavía cambia;
+\item el negocio quiere despliegues más independientes.
+\end{itemize}
+
+Una mala respuesta sería “microservicios para escalar”. Una respuesta madura analiza qué capacidades extraer, qué mantener juntas y qué mecanismos sostienen la separación.
+
+\section{Arquitectura como sistema de decisiones}
+
+Una arquitectura define:
+\begin{itemize}
+\item responsabilidades y límites;
+\item ownership de datos;
+\item contratos sincrónicos y asincrónicos;
+\item consistencia e invariantes;
+\item despliegue y escalado;
+\item modos de falla y degradación;
+\item observabilidad y operación;
+\item evolución y migración.
+\end{itemize}
+
+El diagrama es evidencia visual de esas decisiones, no la arquitectura en sí.
 
 \section{Monolito modular}
 
 \subsection{Definición}
 
-Un monolito modular es una aplicación desplegada como una unidad, pero organizada internamente en módulos con responsabilidades diferenciadas.
+Una aplicación se despliega como unidad, pero internamente separa módulos con APIs, dependencias y ownership claros. El mismo proceso no implica modelo global desordenado.
 
 \subsection{Ventajas}
 
 \begin{itemize}
-\item simplicidad operacional;
-\item despliegue unificado;
-\item transacciones locales sencillas;
-\item debugging relativamente directo;
-\item menor costo de coordinación distribuida.
+\item llamadas locales simples y rápidas;
+\item transacciones sobre una base común;
+\item debugging y testing end-to-end más accesibles;
+\item despliegue y rollback unificados;
+\item menor superficie de red y operación;
+\item facilidad para refactorizar fronteras mientras el dominio se aprende.
 \end{itemize}
 
-\subsection{Límites}
+\subsection{Riesgos}
 
 \begin{itemize}
-\item acoplamiento creciente si los módulos no se respetan;
-\item dificultad para desplegar partes por separado;
-\item escalado menos granular;
-\item riesgo de que toda la aplicación evolucione como una sola masa.
+\item dependencias internas sin control;
+\item cambios que atraviesan módulos;
+\item acoplamiento por modelo de datos compartido;
+\item despliegues cada vez más grandes;
+\item dificultad de ownership si todos modifican todo.
 \end{itemize}
 
-\subsection{Lectura correcta}
+El problema no es la unidad de despliegue, sino perder modularidad.
 
-El monolito no es un antipatrón por definición. De hecho, para muchos sistemas y equipos, es la opción correcta durante bastante tiempo. La cuestión no es “si es moderno”, sino si permite evolucionar el dominio sin introducir complejidad distribuida prematura.
+\section{Monolith First y prima de microservicios}
+
+Martin Fowler y otros autores han señalado que comenzar con un monolito modular puede ser razonable cuando las fronteras del dominio aún no están claras. Extraer demasiado pronto congela hipótesis equivocadas en contratos de red y pipelines operativos.
+
+La “prima de microservicios” incluye:
+\begin{itemize}
+\item timeouts, retries e idempotencia;
+\item compatibilidad de contratos;
+\item datos distribuidos y sagas;
+\item tracing y correlación;
+\item service discovery, secretos y configuración;
+\item despliegue, rollback y capacidad de plataforma;
+\item incidentes que atraviesan equipos.
+\end{itemize}
+
+La separación es racional cuando sus beneficios superan esa prima.
 
 \section{Microservicios}
 
-\subsection{Definición}
+\subsection{Definición operacional}
 
-Una arquitectura de microservicios organiza el sistema como un conjunto de servicios autónomos, con ownership propio sobre una parte del dominio y, en muchos casos, también sobre sus datos.
+Un microservicio útil posee una capacidad de negocio coherente, datos y comportamiento bajo un ownership claro, y puede evolucionar con una independencia razonable.
 
-\subsection{Promesas}
+No debe definirse por cantidad de líneas, tamaño de equipo o uso de HTTP.
 
-\begin{itemize}
-\item despliegue independiente;
-\item escalado por componente;
-\item autonomía de equipos;
-\item aislamiento de dominios;
-\item evolución desacoplada.
-\end{itemize}
-
-\subsection{Costos reales}
+\subsection{Señales que justifican separación}
 
 \begin{itemize}
-\item fallas parciales;
-\item latencia de red;
-\item retries, timeouts e idempotencia en todos lados;
-\item datos distribuidos;
-\item dificultad de observabilidad;
-\item necesidad de coordinar semántica entre servicios.
+\item carga y escalado muy diferentes;
+\item ciclos de cambio independientes;
+\item equipos con ownership estable;
+\item necesidad de aislar fallas;
+\item requerimientos de seguridad o cumplimiento distintos;
+\item tecnología especializada con beneficio real;
+\item frontera de dominio relativamente madura.
 \end{itemize}
 
-\begin{uawarn}
-Una arquitectura de microservicios cambia parte de la complejidad del código por complejidad de red, operaciones y consistencia.
-\end{uawarn}
+\subsection{Caso real: Netflix}
 
-\subsection{Conclusión intermedia}
+Netflix ha documentado plataformas donde componentes separados requieren escalado y despliegue independientes. El ejemplo es valioso si se entiende la causa: la escala y organización justifican la separación. Copiar la forma sin la presión original produce complejidad sin beneficio.
 
-No se debe migrar a microservicios porque “así se hace a escala”, sino cuando el dominio y la organización ya justifican pagar ese costo.
+\section{Monolito distribuido}
 
-\section{Arquitecturas orientadas a eventos}
+Un sistema tiene muchos servicios, pero conserva acoplamiento de monolito:
+\begin{itemize}
+\item despliegues coordinados siempre;
+\item base compartida;
+\item cadenas sincrónicas largas;
+\item modelos y librerías compartidos rígidamente;
+\item cambios que requieren múltiples equipos;
+\item fallas locales que detienen el flujo completo.
+\end{itemize}
 
-\subsection{Idea}
+Se paga la latencia, observabilidad y operación distribuida sin obtener autonomía.
 
-En vez de acoplarse con llamadas sincrónicas, los servicios publican eventos y otros servicios reaccionan a ellos.
+\section{Bounded contexts}
 
-\subsection{Ventajas}
+Un bounded context define una frontera donde términos y reglas tienen significado coherente. La palabra “curso” puede representar catálogo, experiencia de aprendizaje o producto facturable.
 
+Intentar un modelo canónico universal aumenta acoplamiento. Traducir entre contextos mediante contratos hace explícitas las diferencias y reduce el riesgo de que una semántica local invada a otra.
+
+\section{Ownership de datos}
+
+Database per service no significa necesariamente un servidor físico por servicio. Significa que un servicio es el único que modifica directamente su modelo. Otros acceden mediante contratos.
+
+Beneficios:
+\begin{itemize}
+\item autonomía de esquema;
+\item invariantes locales claras;
+\item menor acoplamiento accidental;
+\item accountability operacional.
+\end{itemize}
+
+Costos:
+\begin{itemize}
+\item joins globales requieren proyecciones o composición;
+\item transacciones atraviesan servicios;
+\item consistencia se vuelve explícita;
+\item reporting necesita pipelines y modelos derivados.
+\end{itemize}
+
+\section{Conway y organización}
+
+La arquitectura tiende a reflejar las rutas de comunicación. Si dos equipos deben coordinar cada cambio, una frontera técnica no produce autonomía. Un servicio sin equipo dueño acumula incidentes y deuda.
+
+La pregunta no es solo “¿podemos desplegarlo aparte?”, sino “¿existe un equipo con contexto, on-call y autoridad para operarlo?”.
+
+\section{RPC y eventos}
+
+\subsection{RPC}
+
+Ventajas:
+\begin{itemize}
+\item control de flujo explícito;
+\item respuesta inmediata;
+\item errores visibles en el request;
+\item adecuado para queries y comandos críticos sincrónicos.
+\end{itemize}
+
+Costos:
+\begin{itemize}
+\item acoplamiento temporal;
+\item latencia agregada;
+\item cascadas de timeout/retry;
+\item disponibilidad compuesta;
+\item necesidad de versionado y compatibilidad.
+\end{itemize}
+
+\subsection{Eventos}
+
+Ventajas:
 \begin{itemize}
 \item desacoplamiento temporal;
-\item posibilidad de replay;
-\item múltiples consumidores sobre la misma historia;
-\item integración más flexible;
-\item mejor soporte para pipelines de procesamiento.
+\item múltiples consumidores;
+\item replay y auditoría;
+\item extensión sin modificar productor.
 \end{itemize}
 
-\subsection{Problemas nuevos}
+Costos:
+\begin{itemize}
+\item consistencia eventual;
+\item causalidad y orden parcial;
+\item duplicados;
+\item trazabilidad más difícil;
+\item contratos durables;
+\item estados intermedios visibles.
+\end{itemize}
+
+No se debe elegir eventos por moda. Una consulta de disponibilidad que necesita respuesta inmediata puede ser mejor por RPC; una notificación o proyección puede ser evento.
+
+\section{Comandos, eventos y consultas}
 
 \begin{itemize}
-\item trazabilidad más difícil;
-\item orden generalmente parcial;
-\item duplicación de eventos;
-\item consistencia eventual entre proyecciones;
-\item debugging menos intuitivo.
+\item Un comando expresa intención a un owner: \texttt{ReserveSeat}.
+\item Un evento expresa un hecho: \texttt{SeatReserved}.
+\item Una consulta solicita información sin mutar: \texttt{GetSeatAvailability}.
 \end{itemize}
 
-\subsection{Cambio conceptual}
+Confundirlos produce contratos ambiguos. Un evento no debería ser una solicitud escondida que depende de un consumidor específico para que el sistema siga correcto.
 
-Cuando el sistema pasa a ser event-driven, el estado deja de ser el único centro del diseño y la historia del cambio gana protagonismo. Esto conecta con la clase anterior sobre logs distribuidos.
+\section{Dual write y transactional outbox}
+
+El dual write aparece cuando un servicio actualiza su base y publica un evento. Ningún orden elimina todas las ventanas de falla.
+
+Transactional outbox guarda estado de negocio y evento pendiente en una transacción local. Un relay o CDC publica. Esto evita “base sí / evento no”, pero introduce entrega potencialmente repetida y exige deduplicación downstream.
+
+Un evento debería incluir:
+\begin{itemize}
+\item event ID;
+\item aggregate ID;
+\item tipo y versión de esquema;
+\item timestamp del dominio/producción;
+\item datos mínimos necesarios;
+\item metadata de tracing y causalidad cuando corresponda.
+\end{itemize}
+
+\section{Contratos y evolución}
+
+Los eventos almacenados duran más que un despliegue. Cambiar significado rompe consumidores actuales, futuros y replay histórico.
+
+Prácticas:
+\begin{itemize}
+\item cambios aditivos compatibles;
+\item campos opcionales y defaults;
+\item validación de schemas;
+\item ownership y documentación;
+\item pruebas de contrato;
+\item deprecación planificada;
+\item consumidores tolerantes a datos desconocidos.
+\end{itemize}
+
+\section{Sagas}
+
+Una saga modela un workflow como transacciones locales. Si un paso falla, el sistema puede reintentar, continuar con una alternativa o compensar pasos previos.
+
+\subsection{Compensación}
+
+No es rollback físico. Una devolución no borra el cobro histórico; un email de cancelación no desenvía el original; liberar un cupo puede no recuperar una oportunidad perdida.
+
+Las compensaciones deben diseñarse con semántica de negocio y ser idempotentes.
+
+\subsection{Ejemplo: inscripción paga}
+
+\begin{enumerate}
+\item crear inscripción pendiente;
+\item reservar cupo;
+\item autorizar pago;
+\item activar acceso;
+\item emitir comprobante.
+\end{enumerate}
+
+Si falla pago, liberar cupo y cancelar. Si falla email, no cancelar acceso: reintentar un paso secundario. Esto muestra que el flujo no tiene una única política de rollback.
 
 \section{Coreografía y orquestación}
 
 \subsection{Coreografía}
 
-Cada servicio responde a eventos relevantes y decide localmente qué hacer después. No hay un coordinador central explícito.
-
-\paragraph{Ventajas}
-\begin{itemize}
-\item menor acoplamiento central;
-\item alta autonomía local.
-\end{itemize}
-
-\paragraph{Problemas}
-\begin{itemize}
-\item flujo global más difícil de entender;
-\item trazabilidad y debugging más complejos;
-\item lógica distribuida implícita en múltiples servicios.
-\end{itemize}
+Cada servicio reacciona a eventos. Adecuada para pocos participantes y flujos simples. El riesgo aumenta con ciclos, dependencias implícitas y dificultad de visualizar el estado global.
 
 \subsection{Orquestación}
 
-Un componente explícito coordina el flujo, decide el siguiente paso y supervisa el progreso de la operación compuesta.
+Un coordinador durable mantiene el estado del workflow, envía comandos y decide compensaciones. Mejora visibilidad y control, pero puede concentrar lógica y criticidad.
 
-\paragraph{Ventajas}
+AWS Prescriptive Guidance documenta ambas variantes y advierte sobre dual writes, ciclos, timeouts y complejidad de compensación. El patrón no elimina estos problemas; los organiza.
+
+\section{Strangler Fig y migración incremental}
+
+Una migración big-bang concentra riesgo y congela entrega. Strangler Fig permite interceptar una capacidad, implementarla fuera del monolito, migrar tráfico y retirar gradualmente la versión antigua.
+
+Una extracción debería tener hipótesis:
 \begin{itemize}
-\item visibilidad del flujo;
-\item mejor control del proceso;
-\item razonamiento más directo sobre el orden de pasos.
+\item qué problema de escalado/cambio resuelve;
+\item qué SLO mejora;
+\item qué blast radius reduce;
+\item qué costo operativo agrega;
+\item cómo se revierte si la hipótesis falla.
 \end{itemize}
 
-\paragraph{Problemas}
+\section{Operabilidad como requisito previo}
+
+Antes de multiplicar servicios, la organización necesita:
 \begin{itemize}
-\item mayor acoplamiento al orquestador;
-\item riesgo de centralización excesiva;
-\item el orquestador mismo se vuelve crítico.
+\item CI/CD y rollback;
+\item observabilidad y tracing;
+\item gestión de configuración y secretos;
+\item estándares de resiliencia;
+\item on-call y ownership;
+\item catálogo de servicios y documentación;
+\item mecanismos de compatibilidad de contratos.
 \end{itemize}
 
-\section{Sagas}
+Sin estas capacidades, cada servicio multiplica toil y variabilidad.
 
-\subsection{Motivación}
+\section{Matriz de decisión}
 
-En arquitecturas distribuidas con múltiples servicios y datos descentralizados, no siempre es razonable usar transacciones distribuidas fuertes como 2PC. En su lugar aparecen las sagas.
+\begin{tabular}{p{0.24\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\toprule
+Dimensión & Mantener junto & Separar \\
+\midrule
+Invariantes & transacción local frecuente & consistencia eventual/contrato estable \\
+Carga & similar & escalado/costo muy distinto \\
+Equipos & ownership compartido & equipos autónomos y maduros \\
+Falla & debe caer como unidad & conviene aislar blast radius \\
+Cambio & mismo ritmo & ciclos de despliegue distintos \\
+Datos & modelo común coherente & bounded contexts distintos \\
+\bottomrule
+\end{tabular}
 
-\subsection{Definición}
+\section{Método de diseño}
 
-Una saga es una secuencia de transacciones locales, donde cada paso exitoso puede requerir una compensación si un paso posterior falla.
+\begin{enumerate}
+\item modelar dominio e invariantes;
+\item identificar capacidades y owners;
+\item trazar flujos críticos;
+\item elegir comunicación por interacción;
+\item localizar dual writes y sagas;
+\item diseñar fallas y degradación;
+\item verificar capacidad organizacional;
+\item definir métricas y criterio de extracción;
+\item migrar incrementalmente;
+\item revisar fronteras con evidencia.
+\end{enumerate}
 
-\subsection{Compensación}
-
-La compensación no equivale a un rollback físico perfecto. Es una nueva acción de negocio que intenta neutralizar el efecto previo.
-
-Ejemplos:
-\begin{itemize}
-\item cancelar una reserva;
-\item emitir una devolución;
-\item revertir un estado visible.
-\end{itemize}
-
-\subsection{Límite importante}
-
-La compensación puede:
-\begin{itemize}
-\item no ser instantánea;
-\item no ser perfecta;
-\item generar nuevos efectos observables.
-\end{itemize}
-
-Por eso, diseñar sagas exige pensar no solo en el camino feliz, sino también en las trayectorias de falla y en su semántica.
-
-\section{Propiedad de datos y límites de dominio}
-
-Una de las decisiones más delicadas en microservicios es quién es dueño de qué dato. Si dos servicios comparten y actualizan libremente el mismo dato, la separación de servicios pierde sentido.
-
-La recomendación general es:
-
-\begin{quote}
-cada servicio debería ser dueño de su modelo y exponer contratos, no tablas ajenas.
-\end{quote}
-
-Esto obliga a tratar la consistencia entre servicios como un problema explícito de integración y no como una ilusión de base de datos compartida.
-
-\section{Criterios para elegir arquitectura}
-
-\subsection{Cuándo evitar microservicios}
+\section{Errores frecuentes}
 
 \begin{itemize}
-\item equipo pequeño;
-\item dominio todavía inestable;
-\item necesidad fuerte de transacciones locales;
-\item baja presión de despliegue independiente;
-\item poca madurez operativa.
+\item servicio por entidad o tabla;
+\item usar microservicios como objetivo;
+\item database sharing sin ownership;
+\item cadenas RPC profundas;
+\item event-driven sin contratos;
+\item outbox sin deduplicación;
+\item saga sin compensación idempotente;
+\item big-bang rewrite;
+\item ignorar organización y on-call;
+\item medir cantidad de servicios en vez de autonomía o SLO.
 \end{itemize}
 
-\subsection{Cuándo considerarlos}
+\section{Bibliografía guiada y casos reales}
 
 \begin{itemize}
-\item bounded contexts relativamente claros;
-\item equipos autónomos;
-\item diferencias grandes en carga o ciclo de cambio;
-\item capacidad de observabilidad y operación distribuida.
+\item Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 11 y 12.
+\item Fowler y Lewis, \href{https://martinfowler.com/articles/microservices.html}{Microservices} y Fowler, \href{https://martinfowler.com/bliki/MonolithFirst.html}{Monolith First}.
+\item Fowler, \href{https://martinfowler.com/articles/microservice-trade-offs.html}{Microservice Trade-Offs}.
+\item Netflix TechBlog, \href{https://netflixtechblog.com/scaling-event-sourcing-for-netflix-downloads-episode-1-6bc1595c5595}{Scaling Event Sourcing for Netflix Downloads}.
+\item AWS Prescriptive Guidance: \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html}{Transactional Outbox}, \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/saga-patterns.html}{Saga Patterns} y \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/strangler-fig.html}{Strangler Fig}.
 \end{itemize}
-
-\subsection{Pregunta correcta}
-
-La pregunta no es:
-\begin{quote}
-“¿Monolito o microservicios?”
-\end{quote}
-
-La pregunta correcta es:
-\begin{quote}
-“¿Qué complejidad necesito introducir hoy y cuál puedo postergar sin hipotecar el futuro?”
-\end{quote}
-
-\section{Modelo del curso}
-
-Podemos aplicar el esquema:
-
-\[
-D = (P, F, G, S, T)
-\]
-
-Por ejemplo, para una arquitectura event-driven de pedidos:
-
-\begin{itemize}
-\item $P$: coordinar pedido, pago y envío;
-\item $F$: fallas parciales, duplicación de eventos, retrasos;
-\item $G$: completar el flujo con consistencia razonable de negocio;
-\item $S$: eventos + saga + compensaciones;
-\item $T$: consistencia eventual, trazabilidad más compleja, debugging más difícil.
-\end{itemize}
-
-\section{Conclusión}
-
-La arquitectura distribuida correcta no es la que maximiza independencia, ni la que reduce al mínimo la latencia, ni la que usa más componentes. Es la que hace explícitos sus trade-offs y los alinea con:
-
-\begin{itemize}
-\item el dominio;
-\item la organización;
-\item el equipo;
-\item la semántica requerida;
-\item los modos de falla aceptables.
-\end{itemize}
-
-\begin{uakeybox}
-Arquitectura distribuida no es “partir el sistema en servicios”. Es decidir, con rigor, dónde poner las fronteras y qué costo semántico y operacional aceptar en cada una.
-\end{uakeybox}
-
-
-\section{Síntesis razonada de la clase}
-Esta unidad debe leerse como parte de una cadena de decisiones de diseño y no como un catálogo de mecanismos. Para estudiar el tema con profundidad conviene reconstruir cuatro preguntas: \emph{qué problema aparece}, \emph{qué garantía se desea}, \emph{qué mecanismo la aproxima} y \emph{qué costo introduce}. En cada ejemplo debe identificarse además el modelo de falla implícito.
-
-\begin{uakeybox}
-Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón: declara sus supuestos, la propiedad que preserva y el escenario en el que deja de ser suficiente.
-\end{uakeybox}
-
-\section{Bibliografía guiada y ruta de profundización}
-Para profundizar esta clase se recomienda: Kleppmann, caps. 4 y 11; Fowler sobre microservicios; Richardson sobre sagas.
-
-La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
 
 \section{Conexión con el Trabajo Final Integrador}
-El grupo debe señalar qué parte de su sistema utiliza los conceptos de esta unidad, justificar por qué son necesarios y documentar una alternativa descartada. Cuando el contenido todavía no corresponda a la etapa vigente, debe registrarse como hipótesis o decisión pendiente.
 
-\section{Autoevaluación conceptual}
-\begin{enumerate}
-\item ¿Cuál es el problema distribuido concreto que motiva esta clase?
-\item ¿Qué propiedad de seguridad y qué propiedad de progreso están en juego?
-\item ¿Qué supuesto de red, tiempo o falla resulta decisivo?
-\item ¿Qué trade-off aceptaría en un sistema real y cuál no aceptaría en un dominio crítico?
-\item ¿Cómo observaría experimentalmente que la solución se comporta como espera?
-\end{enumerate}
-
-\section{Profundización autocontenida v9}
-\subsection{Problema, límite e invariante}
-El núcleo de esta clase es monolito modular, microservicios, event-driven, bounded contexts, ownership, sagas y compensaciones. Para estudiarlo de manera autónoma conviene separar tres planos. Primero, el \emph{problema observable}: qué comportamiento incorrecto puede ver un cliente o un operador. Segundo, el \emph{límite del modelo}: qué información, sincronía o coordinación no está disponible. Tercero, el \emph{invariante}: qué propiedad no debe violarse aunque el sistema pierda progreso temporalmente.
-
-El modelo de fallas relevante incluye falla parcial entre servicios, duplicación de eventos, saga incompleta y ownership ambiguo. Una solución debe describirse como protocolo y no solo como nombre de tecnología: actores, estados, mensajes, condición de éxito, condición de aborto y estado visible después de una interrupción. La evidencia esperada es ADRs, mapa de bounded contexts, flujo de saga y ownership de datos.
-
-\subsection{Método de análisis}
-Ante un caso nuevo, siga esta secuencia:
-\begin{enumerate}
-\item Identifique actores, dato o recurso compartido y frontera de confianza.
-\item Escriba una ejecución nominal y una ejecución adversarial.
-\item Distinga seguridad (lo malo no ocurre) de progreso (algo bueno finalmente ocurre).
-\item Declare qué supuesto permite avanzar: mayoría, deadline, sincronía parcial, operación idempotente, almacenamiento durable u otro.
-\item Compare una alternativa más simple y una más fuerte; registre qué métrica o experimento haría cambiar la decisión.
-\end{enumerate}
-
-\subsection{Caso transferible}
-Considere una plataforma de reservas que recibe operaciones duplicadas, pierde conectividad entre regiones y debe sostener un camino crítico sin ocultar el estado real al usuario. Aplique el mecanismo de esta clase a una única decisión concreta. Una respuesta madura no intenta resolver todo: delimita la operación, formula la garantía y explica la degradación esperada cuando el supuesto central deja de cumplirse.
-
-\subsection{Errores de razonamiento frecuentes}
+Cada grupo debe justificar:
 \begin{itemize}
-\item confundir una propiedad con el producto que suele implementarla;
-\item describir el camino feliz sin recorrer una falla intermedia;
-\item afirmar ``exactly-once'', ``alta disponibilidad'' o ``consistencia'' sin definir alcance observable;
-\item medir solo throughput aunque la hipótesis trate sobre semántica o recuperación;
-\item presentar la complejidad añadida como beneficio sin compararla con la alternativa más simple.
+\item qué queda unido y por qué;
+\item qué capacidad se separa y qué presión lo exige;
+\item ownership de datos;
+\item interacciones RPC/evento;
+\item dual writes y outbox;
+\item saga y compensaciones;
+\item capacidades operativas necesarias;
+\item criterio para revisar la frontera.
 \end{itemize}
 
-\section{Lectura guiada}
-Richardson, Microservices Patterns; Fowler sobre bounded contexts; Nygard, Release It!.
+\section{Autoevaluación}
 
-Durante la lectura, registre: modelo de sistema, propiedad perseguida, contraejemplo que motiva el mecanismo, costo principal y una condición bajo la cual no lo elegiría. Estas cinco anotaciones convierten la bibliografía en una herramienta de diseño y no en una lista para memorizar.
-
-\section{Aplicación al Trabajo Final Integrador}
-El equipo debe producir un ADR breve con la decisión asociada a esta clase. Debe contener: contexto, dos alternativas, supuesto decisivo, garantía elegida, trade-off, evidencia pendiente y fecha de revisión. La evidencia mínima esperada para esta unidad es: ADRs, mapa de bounded contexts, flujo de saga y ownership de datos.
-
-\section{Autoevaluación avanzada}
 \begin{enumerate}
-\item ¿Puedo explicar la clase sin nombrar primero una tecnología?
-\item ¿Puedo construir una ejecución que viole la garantía si el mecanismo se configura mal?
-\item ¿Puedo distinguir seguridad, progreso y experiencia del usuario?
-\item ¿Puedo proponer una medición que valide la propiedad, no solo el rendimiento?
-\item ¿Puedo defender cuándo una solución más simple sería suficiente?
+\item ¿Qué distingue monolito de bola de barro?
+\item ¿Qué es la prima de microservicios?
+\item ¿Qué señales justifican una frontera de despliegue?
+\item ¿Qué caracteriza al monolito distribuido?
+\item ¿Por qué database per service complica joins?
+\item ¿Qué diferencia comando, evento y consulta?
+\item ¿Qué problema exacto resuelve outbox?
+\item ¿Por qué la compensación no borra historia?
+\item ¿Cuándo elegir coreografía y cuándo orquestación?
+\item ¿Qué capacidad organizacional necesita su arquitectura?
 \end{enumerate}
+
+\section{Síntesis final}
+
+\begin{uakeybox}
+La arquitectura correcta no es la más distribuida. Es la que alinea fronteras de dominio, ownership, datos, despliegue y falla. Cada servicio debe comprar una autonomía real que justifique la prima distribuida que introduce.
+\end{uakeybox}
 
 \end{document}
