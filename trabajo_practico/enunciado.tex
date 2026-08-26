@@ -113,6 +113,7 @@
     Para entrar a una instancia de zona de combate, un jugador debe pagar una cantidad de oro definida por la zona; sin ese oro, no puede entrar.
     Si el jefe es derrotado, reparte una recompensa (oro, o algún objeto, algunos de ellos únicos) entre los jugadores que participaron.
     Si el jefe no es derrotado, no hay recompensa.
+    Además, el jugador que asesta el golpe final al jefe recibe un premio adicional.
 
     Dentro del juego existe una única moneda interna, el oro, que se usa para cualquier acción que requiera pago (por ejemplo, entrar a una instancia de zona, o comprar un objeto de otro jugador en el mercado).
     El oro también se compra con dinero real: esta es la única operación del juego que involucra dinero real.
@@ -143,6 +144,8 @@
 
     Las instancias normales (por ejemplo, una mazmorra) nacen en el datacenter hogar del jugador que las crea, salvo que se una a una instancia ya creada por otro jugador en otro datacenter.
     Las instancias de evento global son un caso especial: corren de forma distribuida, de forma simultánea entre los tres datacenters.
+
+    La comunicación entre los clientes y los datacenters, y también la comunicación entre datacenters, debe utilizar el protocolo gRPC para hacer más eficiente el intercambio de información.
 
     \subsection{Datacenter}\label{subsec:datacenter}
 
@@ -177,7 +180,7 @@
     \end{itemize}
 
     Se espera que en caso de fallas catastróficas de un datacenter o de la infraestructura de comunicación entre datacenters, los jugadores puedan continuar con la mayor cantidad de acciones posible dentro del juego.
-
+  
     Puede haber fallas parciales de infraestructura (caída del mapa de zonas, combates o pagos).
 
     \section{Contexto de negocio}\label{sec:contexto-negocio}
