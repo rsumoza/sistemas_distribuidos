@@ -143,3 +143,49 @@ Una respuesta excelente declara supuestos, recorre una ejecución, nombra con pr
 Lectura previa recomendada: Kleppmann, capítulo 5; lecturas sobre consistencia causal y quórums. Preparar un contraejemplo adicional y una variante del caso en la que cambie el costo del error; esto evita convertir la clase en una lectura de diapositivas.
 
 \end{document}
+\iffalse
+\section{Taller aplicado: P--F--G--S--T en Asteria Online}
+Reservar el taller para que los estudiantes pasen de conceptos de consistencia
+a decisiones defendibles del Trabajo Práctico. La secuencia sugerida es:
+
+\begin{enumerate}
+\item Entregar el escenario de compra de oro con pérdida de señal. Exigir que
+      separen el interés protegido (G) del mecanismo de deduplicación (S).
+\item Dividir el curso en dos grupos para el particionamiento del directorio:
+      uno defiende consistencia y otro disponibilidad. Ambos deben declarar
+      qué observa el jugador y qué operación se bloquea o puede quedar stale.
+\item Usar el evento global para introducir idempotencia, ataques por reintento
+      y validación server-side. Preguntar qué evidencia distingue un reintento
+      genuino de un replay malicioso.
+\item Cerrar con la caída de datacenter. Pedir que marquen explícitamente el
+      estado confirmado, el estado en vuelo y la brecha temporal de la garantía.
+\end{enumerate}
+
+\subsection*{Criterio de corrección del taller}
+Una respuesta completa identifica actores y estado, formula una G como interés
+de negocio o de juego, sin ``nunca'', ``siempre'' ni tiempos concretos, vincula cada F con una S, explicita CAP cuando hay
+partición y reconoce al menos un costo o pérdida parcial en T. No aceptar como
+solución ``usar una base distribuida'' sin explicar protocolo, evidencia y
+comportamiento bajo reintento, réplica atrasada o failover.
+
+\subsection*{Las tres fallas y la garantía fija}
+Hacer que cada grupo tome una misma garantía y la pruebe contra las tres
+categorías del enunciado: falla de cliente (pérdida de señal, cambio de red,
+latencia variable o desconexión), falla de infraestructura (caída completa de
+un datacenter o particionamiento entre datacenters) y falla de seguridad (un
+cliente que repite, falsifica o manipula deliberadamente una operación).
+
+La garantía no se reescribe al cambiar la falla. Si el grupo propone ``el
+jugador no pierde el oro pagado por una operación no resuelta'', debe conservar
+esa formulación en las tres entregas. Lo que cambia es la solución y el grado
+en que logra sostenerla. Si una caída deja una ventana con estado en vuelo, esa
+brecha se registra en el trade-off; no se convierte en un ``nunca'' o ``siempre''
+nuevo.
+
+\subsection*{Producto esperado}
+Cada grupo debe salir con una tabla de tres filas PFGST y una alternativa
+descartada. Esa tabla puede reutilizarse en la Entrega 1 como borrador de P--G--F
+y extenderse en las entregas 2 y 3 agregando S, fallas de infraestructura,
+fallas de seguridad y trade-offs.
+
+\fi

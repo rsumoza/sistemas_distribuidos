@@ -106,5 +106,40 @@ Definir formalmente qué significa que un valor sea elegido.
 Explicar por qué dos valores distintos no pueden ser elegidos.
 \end{uaexercise}
 
+\section{Nivel 5: taller P--F--G--S--T sobre Asteria Online}
+Use las tres fallas del enunciado: cliente, infraestructura y seguridad. La
+garantía debe ser un interés de negocio o de juego, no una promesa absoluta.
+No use ``nunca'', ``siempre'' ni tiempos concretos: la solución y el trade-off
+explican el grado de certeza alcanzable.
+
+\begin{uaexercise}
+Construya un PFGST para una compra de oro con pérdida de señal. Incluya un
+reintento genuino del cliente y un replay malicioso, y reformule ``el jugador
+nunca paga dos veces'' como garantía válida.
+\end{uaexercise}
+\begin{uaexercise}
+Durante una partición entre datacenters, compare una solución consistente y
+una disponible para el directorio de zonas. Indique qué prioriza CAP y qué
+observa el jugador.
+\end{uaexercise}
+\begin{uaexercise}
+Para el evento global, diseñe una solución idempotente para ataques reintentados
+y explique qué validación server-side distingue una falla de cliente de una
+falla de seguridad.
+\end{uaexercise}
+\begin{uaexercise}
+Compare replicación síncrona, asíncrona y leaderless para una recompensa única
+vendida en el mercado. Incluya garantía, solución y trade-off.
+\end{uaexercise}
+\begin{uaexercise}
+Una mazmorra cae con estado en vuelo. Construya un PFGST separando estado
+confirmado, migración y brecha de garantía.
+\end{uaexercise}
+\begin{uaexercise}
+Clasifique y reformule: ``siempre recibe la recompensa'', ``nunca se duplica
+el oro'', ``no pierde una compra confirmada'' y ``responde en menos de dos
+segundos''. Pruebe una garantía frente a las tres fallas sin cambiarla.
+\end{uaexercise}
+
 
 \end{document}

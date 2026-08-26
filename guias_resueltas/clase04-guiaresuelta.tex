@@ -210,4 +210,17 @@ El argumento debe identificar la hipótesis, construir la cadena lógica o el co
 La evidencia apropiada sería términos, votos, logs, commitIndex y un invariante de seguridad. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
+\section{Taller P--F--G--S--T sobre Asteria Online}
+\begin{uaexercise}Compra de oro con pérdida de señal y replay malicioso.\end{uaexercise}
+\begin{uaanswer}\(P\): cobro y acreditación pueden divergir. \(F\): desconexión y replay. \(G\): la compra confirmada se refleja correctamente. \(S\): clave idempotente, registro durable y autenticación. ``Nunca'' es absoluta; la no duplicación es una propiedad de la solución. \(T\): metadata y reconciliación.\end{uaanswer}
+\begin{uaexercise}Directorio durante partición: comparar consistencia y disponibilidad.\end{uaexercise}
+\begin{uaanswer}La opción consistente bloquea o demora ingresos sin quórum y prioriza consistencia; la disponible acepta decisiones locales y reconcilia después, con riesgo de vistas incompatibles.\end{uaanswer}
+\begin{uaexercise}Evento global: idempotencia y validación server-side.\end{uaexercise}
+\begin{uaanswer}Persistir un identificador de ataque junto con la transición evita duplicados. El servidor debe autenticar sesión, versión del jefe y ventana válida para distinguir replay malicioso de reintento genuino.\end{uaanswer}
+\begin{uaexercise}Comparar replicación síncrona, asíncrona y leaderless para una recompensa única.\end{uaexercise}
+\begin{uaanswer}La síncrona protege mejor la unicidad pero bloquea sin quórum; la asíncrona ofrece disponibilidad y requiere reconciliación; leaderless exige versionado, quórums y resolución de conflictos.\end{uaanswer}
+\begin{uaexercise}Caída de mazmorra con estado confirmado y en vuelo.\end{uaexercise}
+\begin{uaanswer}Replicar checkpoints y registrar eventos permite recuperar solo lo confirmado. El daño en vuelo puede perderse durante la migración; esa brecha y su costo se documentan en \(T\).\end{uaanswer}
+\begin{uaexercise}Reformular garantías con ``siempre'', ``nunca'' y tiempos concretos.\end{uaexercise}
+\begin{uaanswer}``No pierde una compra confirmada'' es una garantía de negocio. Las otras frases son absolutas o de rendimiento y deben reformularse. La misma garantía se prueba frente a cliente, infraestructura y seguridad; no cambia, cambia la solución y su trade-off.\end{uaanswer}
 \end{document}

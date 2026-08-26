@@ -102,5 +102,76 @@ Explicar LWW y sus riesgos.
 Explicar vector clocks y cómo detectan concurrencia.
 \end{uaexercise}
 
-
 \end{document}
+
+% Material trasladado a la clase 4.
+\iffalse
+\section{Nivel 5: taller P--F--G--S--T sobre Asteria Online}
+
+En los ejercicios siguientes use la notación del trabajo práctico:
+\(P\)roblema, \(F\)alla, \(G\)arantía, \(S\)olución y \(T\)rade-off.
+Mantenga la garantía formulada como un interés de negocio o de juego, sin
+promesas absolutas ni números de implementación. En cada respuesta indique
+qué observa el jugador y qué evidencia permitiría verificar la decisión.
+
+\begin{uaexercise}
+\textbf{Compra de oro con pérdida de señal.} Un jugador confirma una compra
+de oro con dinero real y pierde la conexión antes de recibir la respuesta.
+Construya un par \(P,G,F\): identifique el problema distribuido, formule una
+garantía adecuada y describa al menos dos fallas de cliente relacionadas.
+Explique por qué ``el jugador nunca paga dos veces'' está mal formulada como
+garantía y cómo podría aparecer luego como propiedad de la solución.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Directorio de zonas.} Durante un particionamiento entre Brasil, US y
+Zurich, dos datacenters reciben jugadores que intentan entrar a la misma
+instancia. Proponga dos soluciones: una que priorice consistencia y otra que
+priorice disponibilidad. Para cada una complete \(P,F,G,S,T\), describa una
+ejecución posible y señale qué aspecto de CAP se prioriza.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Evento global.} El jefe tiene puntos de vida compartidos entre los
+tres datacenters y recibe ataques concurrentes. Diseñe una solución para
+evitar que el mismo ataque lógico se aplique dos veces cuando el cliente
+reintenta. Luego describa una falla de seguridad que explote ese mecanismo y
+la validación adicional necesaria del lado del servidor.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Recompensa única y mercado.} Dos jugadores obtienen o compran el
+mismo objeto único durante una ventana de replicación atrasada. Compare
+leader-based síncrono, leader-based asíncrono y leaderless con quórums.
+Complete una tabla breve con la garantía protegida, el costo principal y la
+condición bajo la cual cada alternativa deja de ser conveniente.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Caída de datacenter y migración.} Una mazmorra corre en Brasil y el
+datacenter cae mientras el jefe está a punto de ser derrotado. Construya un
+PFGST que diferencie el estado confirmado del estado en vuelo. Explique qué
+parte de la garantía puede sostenerse, qué brecha queda durante la migración
+y cómo se documenta esa brecha en el trade-off de la Entrega 3.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{PFGST acumulativo.} Elija uno de los tres casos de uso de referencia
+y produzca una tabla con al menos tres filas PFGST. Las filas deben incluir
+una falla de cliente, una de infraestructura y una de seguridad; las
+garantías deben permanecer iguales cuando sea razonable y las soluciones
+deben evolucionar. Incluya una alternativa descartada en al menos una fila.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Garantía o promesa absoluta.} Clasifique y reformule estas frases
+como garantías de negocio válidas: (a) ``el jugador siempre recibe la
+recompensa'', (b) ``nunca se duplica el oro'', (c) ``el jugador no pierde una
+compra de oro confirmada'', (d) ``el directorio responde en menos de dos
+segundos''. Para una frase reformulada, indique cómo podría ser amenazada por
+una falla de cliente, una de infraestructura y una de seguridad, sin cambiar
+la garantía.
+\end{uaexercise}
+
+
+\fi

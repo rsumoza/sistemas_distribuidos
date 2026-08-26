@@ -203,3 +203,113 @@ La evidencia apropiada sería historia de lecturas/escrituras, staleness y compa
 \end{uaanswer}
 
 \end{document}
+\iffalse
+\section{Resoluciones del taller P--F--G--S--T sobre Asteria Online}
+
+\begin{uaexercise}
+\textbf{Compra de oro con pérdida de señal.} Construya un par \(P,G,F\),
+incluyendo dos fallas de cliente, y explique por qué ``nunca paga dos veces''
+no es una buena garantía.
+\end{uaexercise}
+\begin{uaanswer}
+\(P\): cobro y acreditación pueden quedar en estados distintos tras una
+desconexión. \(G\): el resultado reconocido por el jugador y el oro
+acreditado corresponden a una operación de cobro válida. \(F\): pérdida de
+señal después del cobro y reintento al recuperar la red; también timeout por
+cambio de red. \(S\) puede usar una clave idempotente estable y persistir
+cobro, acreditación y resultado. ``Nunca'' es una promesa absoluta; que los
+reintentos no dupliquen el efecto es una propiedad de esa solución. El costo
+es metadata y reconciliación con el procesador de pagos.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Directorio de zonas.} Compare una solución consistente y una
+disponible durante un particionamiento entre datacenters.
+\end{uaexercise}
+\begin{uaanswer}
+\(P\): coordinar altas y ocupación del directorio global. \(F\): los
+datacenters siguen vivos, pero no se comunican. \(G\): el jugador recibe una
+asignación válida. Una solución consistente exige quórum o bloquea el ingreso
+sin confirmación; una disponible acepta decisiones locales y reconcilia luego.
+La primera prioriza consistencia y pierde progreso; la segunda disponibilidad
+y arriesga vistas incompatibles o asignaciones duplicadas. La evidencia es la
+historia de altas, lecturas y respuestas durante la partición.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Evento global.} Evite aplicar dos veces un ataque reintentado y
+describa un ataque de seguridad contra el mecanismo.
+\end{uaexercise}
+\begin{uaanswer}
+\(P\): actualizar los puntos de vida compartidos y el premio final. \(F\):
+respuesta perdida y reintento, o mensajes duplicados. \(G\): cada ataque
+lógico válido afecta una sola vez. \(S\): identificador de ataque por sesión,
+registro durable del identificador junto con la transición y validación de
+versión del jefe. Un atacante puede reenviar identificadores o fabricar
+ataques; el servidor debe autenticar la sesión, vincular el ataque a una
+versión y ventana válidas, y aplicar límites de ritmo. El costo es coordinación
+y menor disponibilidad durante una partición.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Recompensa única y mercado.} Compare replicación síncrona, asíncrona y
+leaderless con quórums para un objeto único.
+\end{uaexercise}
+\begin{uaanswer}
+La garantía es que una recompensa o venta confirmada no produzca dos objetos
+disponibles. El líder síncrono ofrece una decisión clara, con latencia y
+bloqueo sin quórum. El asíncrono ofrece disponibilidad, pero puede mostrar
+estado atrasado y necesita reconciliación. Leaderless con \(R+W>N\) fuerza
+intersección, aunque aún requiere versionado y resolución de conflictos. La
+condición de conveniencia depende de si se acepta bloquear, reconciliar o
+arriesgar lecturas stale; la evidencia son versiones y lecturas/escrituras.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Caída de datacenter y migración.} Construya un PFGST distinguiendo
+estado confirmado y estado en vuelo.
+\end{uaexercise}
+\begin{uaanswer}
+\(P\): recuperar una mazmorra cuyo datacenter cayó durante el golpe final.
+\(F\): caída completa con eventos en vuelo. \(G\): no perder recompensa
+confirmada ni otorgar una no confirmada. \(S\): checkpoints replicados,
+registro de eventos, promoción de una copia y reconciliación solo de eventos
+confirmados. \(T\): el daño en vuelo puede perderse o el combate reiniciarse
+durante la migración; esa brecha, más el costo de replicación, debe declararse
+en la Entrega 3.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{PFGST acumulativo.} Produzca tres filas sobre los casos de uso de
+Asteria, incluyendo fallas de cliente, infraestructura y seguridad.
+\end{uaexercise}
+\begin{uaanswer}
+Una respuesta válida usa Compra de Oro (reintento e idempotencia), Directorio
+(partición y elección de CAP) y Evento Global (replay y validación del
+servidor). Las garantías se mantienen como intereses del jugador y las
+soluciones evolucionan al agregar fallas. Debe incluirse una alternativa
+descartada y su costo; por ejemplo, aceptar ingresos locales durante una
+partición se descarta para objetos únicos si la reconciliación posterior no
+puede preservar la garantía.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Garantía o promesa absoluta.} Clasifique y reformule las frases del
+ejercicio sobre ``siempre'', ``nunca'' y tiempos concretos.
+\end{uaexercise}
+\begin{uaanswer}
+(a) y (b) son promesas absolutas y deben reformularse, por ejemplo: ``una
+recompensa se acredita solo cuando el combate fue resuelto según las reglas''
+y ``una operación lógica de oro no produce más de un efecto confirmado''. (c)
+ya expresa un interés de negocio y puede ser una garantía, siempre que se
+aclare qué significa ``confirmada''. (d) es un objetivo de rendimiento, no una
+garantía de negocio.
+
+La misma garantía puede ser amenazada por una falla de cliente (reintento tras
+desconexión), de infraestructura (caída o partición con réplicas divergentes)
+y de seguridad (replay deliberado). La garantía permanece fija; evolucionan la
+solución y el trade-off. La respuesta debe evitar convertir la garantía en
+``siempre'' o ``nunca'' para ocultar los límites de la solución.
+\end{uaanswer}
+
+\fi

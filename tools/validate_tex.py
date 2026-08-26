@@ -8,6 +8,7 @@ for folder in folders:
     if len(files)!=16: errors.append(f'{folder}: se esperaban 16 archivos y hay {len(files)}')
     for p in files:
         s=p.read_text(errors='replace')
+        visible=s.split(r'\end{document}',1)[0]
         rel=p.relative_to(root)
         for token in (r'\documentclass',r'\begin{document}',r'\end{document}'):
             if token not in s: errors.append(f'{rel}: falta {token}')
@@ -16,11 +17,11 @@ for folder in folders:
             if b!=e: errors.append(f'{rel}: {env} desbalanceado ({b}/{e})')
         if folder=='apuntes' and len(s)<8000: errors.append(f'{rel}: apuntes demasiado breves ({len(s)} caracteres)')
         if folder=='guias':
-            n=len(re.findall(r'\\begin\{uaexercise\}',s))
-            if n!=20: errors.append(f'{rel}: se esperaban 20 ejercicios y hay {n}')
+            n=len(re.findall(r'\\begin\{uaexercise\}',visible))
+            if n<20: errors.append(f'{rel}: se esperaban al menos 20 ejercicios y hay {n}')
         if folder=='guias_resueltas':
-            q=len(re.findall(r'\\begin\{uaexercise\}',s)); a=len(re.findall(r'\\begin\{uaanswer\}',s))
-            if q!=20 or a!=20: errors.append(f'{rel}: se esperaban 20 ejercicios/20 respuestas y hay {q}/{a}')
+            q=len(re.findall(r'\\begin\{uaexercise\}',visible)); a=len(re.findall(r'\\begin\{uaanswer\}',visible))
+            if q<20 or a!=q: errors.append(f'{rel}: se esperaban al menos 20 ejercicios y una respuesta por ejercicio; hay {q}/{a}')
         if folder=='docente':
             for marker in ('Arquitectura didáctica v9','Preguntas socráticas','Criterios de evaluación formativa'):
                 if marker not in s: errors.append(f'{rel}: falta sección {marker}')
