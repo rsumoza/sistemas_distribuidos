@@ -1,0 +1,50 @@
+[
+  {
+    "class": "06",
+    "slides": 73,
+    "notes": 26,
+    "guide": 7,
+    "solved": 10,
+    "teacher": 28,
+    "worksheet": 7,
+    "slide_tags": 49,
+    "exercise_count": 20,
+    "answer_count": 20
+  },
+  {
+    "class": "07",
+    "slides": 53,
+    "notes": 16,
+    "guide": 5,
+    "solved": 9,
+    "teacher": 20,
+    "worksheet": 8,
+    "slide_tags": 45,
+    "exercise_count": 20,
+    "answer_count": 20
+  },
+  {
+    "class": "08",
+    "slides": 49,
+    "notes": 14,
+    "guide": 5,
+    "solved": 9,
+    "teacher": 19,
+    "worksheet": 8,
+    "slide_tags": 42,
+    "exercise_count": 20,
+    "answer_count": 20
+  },
+  {
+    "class": "09",
+    "slides": 52,
+    "notes": 16,
+    "guide": 5,
+    "solved": 9,
+    "teacher": 19,
+    "worksheet": 8,
+    "slide_tags": 45,
+    "exercise_count": 20,
+    "answer_count": 20
+  }
+]

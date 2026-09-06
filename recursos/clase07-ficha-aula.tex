@@ -1,0 +1,163 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=institutional,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\UASetClassNumber{07}
+\UASetClassTitle{Logs distribuidos y streaming}
+\title{Clase 07 --- Ficha de aula: historia, offsets y tiempo}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+\section{Cómo usar esta ficha}
+Complete durante la clase. No busque definiciones perfectas al inicio: escriba una intuición, revísela después del timeline y cierre con una formulación técnica.
+
+\section{1. Intuiciones que luego formalizaremos}
+\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+\toprule
+Concepto & Mi intuición inicial & Definición corregida al final \\
+\midrule
+Log & \rule{0pt}{1.1cm} & \\
+Partición & \rule{0pt}{1.1cm} & \\
+Offset & \rule{0pt}{1.1cm} & \\
+Consumer group & \rule{0pt}{1.1cm} & \\
+Exactly-once & \rule{0pt}{1.1cm} & \\
+Event time & \rule{0pt}{1.1cm} & \\
+\bottomrule
+\end{tabular}
+
+\newpage
+\section{2. Particiones y keys}
+Eventos: \texttt{OrderCreated}, \texttt{PaymentAuthorized}, \texttt{OrderCancelled} para pedidos 9F2A y 1C7B.
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+\foreach \y/\p in {2/P0,1/P1,0/P2}{
+  \node[left,font=\bfseries] at (0,\y){\p};
+  \draw[UAIngRule,thick] (0.4,\y)--(12.5,\y);
+}
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+\item Key elegida: \hrulefill
+\item Orden que preserva: \hrulefill
+\item Orden que no preserva: \hrulefill
+\item Hot key posible: \hrulefill
+\item Métrica para detectarla: \hrulefill
+\end{enumerate}
+
+\newpage
+\section{3. Timeline de offset y crash}
+Complete dos veces: primero commit antes del efecto; luego efecto antes del commit.
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+\foreach \y/\lab in {3/Broker,2/Consumer,1/Efecto,0/Offset}{
+  \node[left,font=\bfseries] at (0,\y){\lab};
+  \draw[UAIngRule,thick] (0.4,\y)--(12.5,\y);
+}
+\draw[->,thick] (0.4,-0.7)--(12.8,-0.7) node[right]{tiempo};
+\end{tikzpicture}
+\end{center}
+
+\textbf{Política A:} ¿qué se pierde? \hrulefill\\[0.6cm]
+\textbf{Política B:} ¿qué se duplica? \hrulefill\\[0.6cm]
+\textbf{Dato durable para idempotencia:} \hrulefill
+
+\newpage
+\section{4. Frontera de exactly-once}
+Marque con un rectángulo qué componentes participan en su garantía.
+
+\begin{center}
+\begin{tikzpicture}[node distance=1cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=2.5cm] (in) {Topic input};
+\node[draw=UAIngNavy,rounded corners,thick,right=of in,text width=2.5cm] (state) {State store};
+\node[draw=UAIngOrange,rounded corners,thick,right=of state,text width=2.5cm] (out) {Topic output};
+\node[draw=UAIngNavy,rounded corners,thick,right=of out,text width=2.5cm] (mail) {Proveedor email};
+\draw[->,thick] (in)--(state)--(out)--(mail);
+\end{tikzpicture}
+\end{center}
+
+Complete:
+\begin{itemize}
+\item Objeto garantizado: \hrulefill
+\item Falla cubierta: \hrulefill
+\item Efecto fuera de frontera: \hrulefill
+\item Mecanismo adicional: \hrulefill
+\end{itemize}
+
+\newpage
+\section{5. Dual write y outbox}
+Dibuje las dos ventanas de falla y luego la solución outbox.
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+\node[draw=UAIngOrange,rounded corners,thick] at (1.5,2){Servicio};
+\node[draw=UAIngNavy,rounded corners,thick] at (6,2){Base};
+\node[draw=UAIngOrange,rounded corners,thick] at (10.5,2){Broker};
+\draw[UAIngRule,thick] (0,0.8)--(12,0.8);
+\node[left] at (0,0.8){Orden 1};
+\draw[UAIngRule,thick] (0,-0.2)--(12,-0.2);
+\node[left] at (0,-0.2){Orden 2};
+\end{tikzpicture}
+\end{center}
+
+Campos mínimos de outbox: \hrulefill\\[0.5cm]
+¿Por qué el relay puede duplicar? \hrulefill\\[0.5cm]
+¿Cómo deduplica el consumidor? \hrulefill
+
+\newpage
+\section{6. Event time, watermark y late data}
+Eventos:
+\begin{center}
+\begin{tabular}{cccc}
+\toprule
+Evento & Event time & Arrival time & Valor \\
+\midrule
+E1 & 10:00:40 & 10:00:43 & 10 \\
+E2 & 10:02:15 & 10:02:16 & 20 \\
+E3 & 10:04:50 & 10:07:10 & 30 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Para ventanas de cinco minutos:
+\begin{enumerate}
+\item Resultado por processing time: \hrulefill
+\item Resultado por event time: \hrulefill
+\item Con watermark de 2 min, tratamiento de E3: \hrulefill
+\item Para fraude, ¿esperaría más o menos? ¿Por qué? \vspace{1cm}
+\end{enumerate}
+
+\newpage
+
+\begin{uainfo}
+\textbf{Precisión para la ficha:} el identificador del evento y la marca de deduplicación deben persistirse atómicamente con el efecto local. Registrar primero el efecto y después el ID deja una ventana de duplicación.
+\end{uainfo}
+
+\section{7. Diseño y exit ticket}
+Caso: ranking de Asteria Online.
+
+\begin{tabular}{p{0.27\textwidth}p{0.60\textwidth}}
+\toprule
+Decisión & Propuesta \\
+\midrule
+Hecho e ID & \rule{0pt}{0.9cm} \\
+Key y orden & \rule{0pt}{0.9cm} \\
+Semántica & \rule{0pt}{0.9cm} \\
+Late data & \rule{0pt}{0.9cm} \\
+SLO & \rule{0pt}{0.9cm} \\
+Prueba de falla & \rule{0pt}{0.9cm} \\
+\bottomrule
+\end{tabular}
+
+\subsection*{Exit ticket}
+\begin{enumerate}
+\item Diferencia entre event ID y offset.
+\item Timeline mínimo que produce duplicación.
+\item Frontera concreta de exactly-once.
+\item Métrica para detectar una hot partition.
+\end{enumerate}
+\end{document}

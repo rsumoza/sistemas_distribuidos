@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{07}
 \UASetClassTitle{Logs distribuidos y streaming}
 \title{Clase 07 --- Guía de ejercicios}
@@ -10,66 +12,182 @@
 \maketitle
 \section{Propósito de la guía}
 Los ejercicios exigen definir la frontera de cada garantía. No se acepta “Kafka da exactly-once” sin especificar qué estado, efecto y sistema participan.
+
+\section{Caso base y datos de trabajo}
+
+La mayoría de los ejercicios utiliza \textbf{CampusShop}, una plataforma universitaria que procesa una venta relámpago:
+
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.55\textwidth}}
+\toprule
+Dato & Valor de referencia \\
+\midrule
+Ingreso medio / pico & 80.000 / 120.000 eventos por segundo \\
+Capacidad sostenible por consumer & 5.000 eventos/s \\
+Topic inicial & 24 particiones, RF=3 \\
+Consumers principales & inventario, facturación, email y analítica \\
+SLO inventario & 99,9\% de pedidos reflejados en menos de 5 s \\
+Fallas a considerar & timeout de producer, crash de consumer, rebalance, hot key y evento tardío \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Método esperado de resolución}
+
+Para cada ejercicio:
+\begin{enumerate}
+\item describa el hecho y su identidad de negocio;
+\item declare el orden requerido y la key;
+\item dibuje el timeline de éxito y el de falla;
+\item ubique el commit del offset y la frontera del efecto;
+\item indique pérdida, duplicación o atraso permitido;
+\item proponga métrica, SLO o experimento que validaría la decisión.
+\end{enumerate}
+
+\begin{uawarn}
+No se considera completa una respuesta que diga únicamente ``at-least-once'', ``exactly-once'' o ``usar Kafka''. Debe declararse el alcance de la garantía.
+\end{uawarn}
+
+
+\section{Ruta recomendada de uso}
+
+Para una clase de 180 minutos, resolver en profundidad una selección y utilizar el resto como consolidación:
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.23\textwidth}p{0.46\textwidth}}
+\toprule
+Momento & Ejercicios & Evidencia \\
+\midrule
+En clase & 2, 5, 6, 7, 14, 16, 19 & key, timeline, dual write, tiempo y diseño \\
+Postclase & 1, 3, 4, 8, 9, 10, 11, 15, 17 & formalización y operación \\
+Desafío & 12, 13, 18, 20 & frontera exactly-once, estado y prueba de falla \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto de negocio}. Si esos cuatro niveles aparecen mezclados, la semántica propuesta no está todavía defendida.
+
+
 \section{Ejercicios}
 \begin{uaexercise}
+
 \textbf{1. Log, cola y base orientada a estado.} Compare las tres abstracciones para un sistema de pedidos. Explique retención, replay, orden y ownership de progreso.
+
+\textit{Entregable mínimo:} una matriz comparativa de tres abstracciones y un ejemplo de replay.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{2. Key de partición.} Para eventos de pedidos, pagos y cambios de estado, proponga una key que preserve el orden relevante. Analice hot keys y qué orden se pierde.
+
+\textit{Entregable mínimo:} un diagrama de particiones con al menos seis eventos, orden preservado y hot key.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{3. Número de particiones.} Un topic recibe 80.000 eventos/s y se estima que cada consumidor procesa 5.000 eventos/s. Proponga una cantidad inicial de particiones y discuta límites del cálculo.
+
+\textit{Entregable mínimo:} un cálculo base, 30\% de margen y dos razones por las que el resultado puede fallar.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{4. Consumer group.} Explique qué ocurre si un grupo tiene 12 consumidores y el topic 8 particiones. ¿Qué cambia si se agregan 16 particiones durante operación?
+
+\textit{Entregable mínimo:} una asignación antes/después y un timeline breve de rebalance.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{5. Position y committed offset.} Construya un ejemplo donde la posición en memoria avance, pero el committed offset quede atrasado. Analice el reinicio.
+
+\textit{Entregable mínimo:} un timeline con position, committed offset, crash y cantidad de registros repetidos.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{6. At-most-once.} Diseñe un timeline de pérdida por confirmar offset antes de aplicar el efecto. Indique cuándo este trade-off podría ser aceptable.
+
+\textit{Entregable mínimo:} un timeline de cuatro carriles y una justificación de dominio.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{7. At-least-once.} Diseñe un timeline de duplicación por procesar antes de confirmar. Proponga una estrategia de idempotencia para el efecto.
+
+\textit{Entregable mínimo:} un timeline de duplicación, schema de deduplicación e invariante.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{8. Consumer lag.} Defina lag y explique por qué el promedio del grupo puede ocultar una partición caliente. Proponga métricas adicionales.
+
+\textit{Entregable mínimo:} un dashboard mínimo con lag por partición, edad y tasas de entrada/salida.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{9. Rebalance.} Durante una campaña, el autoscaler crea consumidores y desencadena rebalances frecuentes. Explique cómo esto puede empeorar temporalmente el servicio y proponga mitigaciones.
+
+\textit{Entregable mínimo:} una cadena causal y una política de autoscaling que evite oscilación.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{10. ACK del producer.} Compare confirmar con el líder frente a esperar réplicas in-sync. Analice latencia, disponibilidad y pérdida ante failover.
+
+\textit{Entregable mínimo:} una tabla de ACK, falla cubierta, latencia y condición de indisponibilidad.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{11. Producer idempotente.} Explique qué duplicados evita y construya un caso de duplicación de negocio que siga siendo posible.
+
+\textit{Entregable mínimo:} dos historias: duplicado técnico evitado y duplicado de negocio todavía posible.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{12. Exactly-once por frontera.} Defina exactamente una vez para entrega, procesamiento y efecto de negocio. Dé un sistema donde solo una de las tres se cumpla.
+
+\textit{Entregable mínimo:} una tabla de entrega, estado y efecto con frontera y observador.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{13. Kafka Streams transaccional.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
+
+\textit{Entregable mínimo:} un diagrama de transacción con abort/replay y límite externo.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{14. Dual write.} Un servicio persiste una factura y publica InvoiceCreated. Construya las ventanas de falla para ambos órdenes posibles.
+
+\textit{Entregable mínimo:} dos timelines con crash, uno por cada orden de dual write.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{15. Transactional outbox.} Diseñe tablas, estados y proceso relay para resolver el dual write. Explique por qué el consumidor aún debe ser idempotente.
+
+\textit{Entregable mínimo:} un schema de outbox/inbox, relay, retención y prueba de repetición.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{16. Event time.} Un evento ocurre a las 10:00 y llega a las 10:07. Compare el resultado en ventanas por event time y processing time.
+
+\textit{Entregable mínimo:} dos ventanas con asignación distinta y explicación del resultado.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{17. Watermark.} Proponga una tolerancia de eventos tardíos para un tablero de ventas y otra para detección de fraude. Justifique la diferencia.
+
+\textit{Entregable mínimo:} dos políticas numéricas de lateness y su costo de error.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{18. Stateful streaming.} Diseñe un join entre pedidos y pagos. Defina key, retención de estado, timeout de join y comportamiento ante evento tardío.
+
+\textit{Entregable mínimo:} un diagrama de join, estado retenido, timeout y late-data policy.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{19. Caso de campaña.} Diseñe topics, keys, grupos, semánticas y SLOs para inventario, email y analytics durante una promoción masiva.
+
+\textit{Entregable mínimo:} un diseño extremo a extremo con topics, keys, grupos, SLO y falla.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a un pipeline de telemetría industrial y proponga una prueba de falla con consumer crash y rebalance.
+
+\textit{Entregable mínimo:} el marco completo y un protocolo experimental reproducible.
 \end{uaexercise}
 \section{Criterios de entrega}
 Incluya timelines, keys, offsets y escenarios de falla cuando corresponda. Una solución sólida define orden, progreso, duplicación, efecto y métricas.

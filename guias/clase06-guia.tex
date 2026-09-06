@@ -1,78 +1,189 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
-\title{Clase 06 --- Guía de ejercicios}
+\title{Clase 06 --- Guía de ejercicios: de la intuición a la evidencia}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
+\section{Ruta recomendada de uso}
+
+\begin{itemize}
+\item \textbf{Durante la clase:} ejercicios 3, 6, 11, 15 y 19, porque producen el vocabulario, los dos timelines, la lectura de evidencia y el diagnóstico de backlog.
+\item \textbf{Después de la clase:} ejercicios 4, 8, 10, 14, 17 y 20 para consolidar idempotencia durable, recovery, índices y diseño por workload.
+\item \textbf{Profundización:} ejercicios 7, 9, 12, 13, 16 y 18 para estudiantes que necesiten preparar defensa técnica o Trabajo Final.
+\end{itemize}
+
+En todos los casos, el entregable debe incluir: garantía, falla, mecanismo, trade-off y evidencia de validación.
+
 \maketitle
 
-\section{Propósito de la guía}
-La guía combina recuperación de las clases 1 a 5 con problemas de WAL, MVCC, índices y LSM. En todos los ejercicios debe declararse qué garantía se busca, qué falla amenaza esa garantía y qué evidencia permitiría validar la solución.
+\section{Propósito y forma de trabajo}
 
-\section{Ejercicios}
+Esta guía acompaña la secuencia de la clase: primero construir una intuición, luego formalizar el mecanismo, someterlo a fallas y finalmente defender una decisión con evidencia. No se evaluará la cantidad de productos mencionados, sino la calidad del razonamiento.
+
+En cada ejercicio se espera distinguir, cuando corresponda:
+
+\begin{enumerate}
+\item \textbf{problema}: qué comportamiento del sistema se intenta sostener;
+\item \textbf{falla}: qué evento amenaza ese comportamiento;
+\item \textbf{garantía}: qué afirmación debe seguir siendo verdadera;
+\item \textbf{mecanismo}: qué orden, versión, índice o política la implementa;
+\item \textbf{trade-off}: qué costo se desplaza;
+\item \textbf{evidencia}: qué métrica, plan o experimento permitiría validar o refutar la propuesta.
+\end{enumerate}
+
+\begin{uakeybox}
+Una respuesta como ``usaría PostgreSQL'', ``agregaría un índice'' o ``elegiría RocksDB'' es insuficiente. La elección debe estar conectada con carga, garantía, modelo de falla y evidencia.
+\end{uakeybox}
+
+\section{Nivel 1: intuiciones y conexiones con las clases 1 a 5}
+
 \begin{uaexercise}
-\textbf{1. Repaso: de la incertidumbre a la durabilidad.} Un cliente envía una transferencia, recibe timeout y reintenta. Explique qué información debe persistir el servidor para impedir una segunda transferencia y en qué momento puede responder con seguridad.
+\textbf{1. Cinco conceptos en lenguaje intuitivo y técnico.} Explique WAL, MVCC, índice, \texttt{EXPLAIN}, compaction y write stall en dos niveles: (a) una frase intuitiva destinada a un compañero que nunca estudió storage; y (b) una definición técnica breve. Para cada concepto indique además qué problema resuelve y qué problema \emph{no} resuelve por sí solo.
+
+\textbf{Producto esperado:} una tabla de seis filas y cuatro columnas: intuición, definición, problema resuelto y límite.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{2. Repaso: replicación frente a persistencia.} Compare tres políticas de confirmación: (a) dato en memoria local, (b) WAL local sincronizado, (c) WAL sincronizado en una mayoría. Analice latencia, disponibilidad y riesgo de pérdida.
+\textbf{2. Cinco puentes hacia storage.} Para cada una de las clases 1 a 5, redacte una frase que conecte su concepto central con una necesidad de almacenamiento. Deben aparecer explícitamente: incertidumbre, retry/idempotencia, replicación, consenso y transacciones. Después elija uno de los cinco puentes y desarrolle un ejemplo concreto de falla.
+
+\textbf{Producto esperado:} cinco frases de no más de 25 palabras y un ejemplo de 200 a 300 palabras.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{3. Repaso: consenso y almacenamiento.} Explique por qué un algoritmo de consenso puede perder seguridad si un nodo no persiste correctamente su término, voto o entradas de log antes de responder.
+\textbf{3. Vocabulario que no debe mezclarse.} Defina y ordene en un timeline posible los estados: aceptado, insertado en buffer, escrito al sistema operativo, flushed, durable, committed, aplicado, visible y replicado. Muestre al menos dos órdenes válidos distintos y explique por qué ninguna de esas palabras puede usarse como sinónimo universal de las otras.
+
+\textbf{Extensión:} identifique cuál de esos estados observa el cliente, cuál observa el motor y cuál depende del modelo de falla.
 \end{uaexercise}
+
+\section{Nivel 2: WAL, frontera durable y crash recovery}
+
 \begin{uaexercise}
-\textbf{4. Repaso: ACID físico.} Para cada propiedad ACID, identifique al menos un mecanismo físico o lógico del motor de almacenamiento que contribuye a implementarla.
+\textbf{4. CampusShop e idempotencia durable.} Una estudiante confirma una compra, recibe timeout y reintenta con la misma clave idempotente. Diseñe el esquema mínimo de datos y la transacción que deben persistir pedido, cobro, inventario y resultado. Señale exactamente en qué punto puede emitirse el ACK bajo: (a) durabilidad local; y (b) durabilidad en mayoría.
+
+\textbf{Debe justificar:} qué ocurre si el crash sucede antes y después de cada frontera y cómo se evita que el retry produzca un segundo efecto.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{5. Frontera de durabilidad.} Un programa ejecuta write() y recibe éxito, pero el servidor pierde energía antes de fsync(). Construya dos resultados posibles y explique por qué write() no define por sí solo durabilidad.
+\textbf{5. ¿Dónde está el byte?} Dibuje la ruta aplicación $\rightarrow$ buffer del proceso $\rightarrow$ page cache $\rightarrow$ cache/controlador $\rightarrow$ medio persistente. Para cada capa indique qué falla puede borrar todavía el dato. El motor informa \texttt{insert\_lsn}=1500, \texttt{write\_lsn}=1320 y \texttt{flush\_lsn}=980. Interprete los tres valores y calcule cuántas unidades de log están: (a) solo insertadas; (b) escritas pero no durables; y (c) durables.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{6. WAL paso a paso.} Dada una transacción que modifica x e y, construya un timeline con BEGIN, registros WAL, modificación de buffers, COMMIT, ACK y crash. Analice recovery si el crash ocurre en tres puntos diferentes.
+\textbf{6. Timeline WAL completo.} Complete cuatro carriles ---cliente, backend, WAL y páginas--- con los eventos: request, \texttt{BEGIN}, dos actualizaciones, dirty pages, registro de \texttt{COMMIT}, flush, ACK, checkpoint, escritura de páginas y crash. Analice cuatro posiciones del crash:
+\begin{enumerate}
+\item antes del registro de commit;
+\item después del commit en memoria, antes del flush;
+\item después del flush, antes del ACK;
+\item después del ACK, antes de las páginas.
+\end{enumerate}
+Para cada caso indique qué observa el cliente, qué encuentra recovery y si corresponde REDO, UNDO, ninguno o una política equivalente basada en visibilidad.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{7. Violación de la regla WAL.} Construya un contraejemplo donde una página de datos llega al disco antes que el registro WAL necesario. Explique qué inconsistencia puede quedar después de un crash.
+\textbf{7. Regla WAL y contraejemplo.} Construya una ejecución incorrecta en la que una página modificada por una transacción no confirmada alcance el disco antes que el registro de log que la explica. Suponga una política STEAL. Muestre por qué, después de un crash, el motor no puede reconstruir ni deshacer con seguridad. Reescriba luego el protocolo para restaurar la regla WAL.
+
+\textbf{Pregunta adicional:} ¿cómo cambiaría el problema bajo NO-STEAL o copy-on-write?
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{8. Checkpoints.} Compare dos configuraciones: checkpoint cada 30 segundos y cada 20 minutos. Analice impacto sobre I/O normal, volumen de WAL, tiempo de recovery y variabilidad de latencia.
+\textbf{8. REDO repetible e identidad de registros.} Compare los registros ``establecer saldo=1500'' y ``sumar 500''. Simule que recovery aplica el registro, se interrumpe y comienza nuevamente. Explique cuál es naturalmente repetible y proponga dos mecanismos para hacer seguro el segundo: uno basado en LSN/pageLSN y otro basado en identidad de operación.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{9. Group commit.} Explique cómo group commit puede mejorar throughput sin debilitar durabilidad. Identifique en qué condición una implementación sí rompería la garantía.
+\textbf{9. Group commit, latencia y throughput.} Ocho transacciones llegan en una ventana de 3 ms. Un \texttt{fsync} tarda 5 ms. Compare:
+\begin{enumerate}
+\item un flush por transacción;
+\item un único group commit;
+\item commit asincrónico con ACK antes del flush.
+\end{enumerate}
+Estime el costo físico dominante, describa el efecto esperado sobre throughput, p50 y p99, y declare cuál de las tres políticas usaría para una compra y cuál para telemetría reconstruible.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{10. MVCC y snapshots.} Considere versiones x=10@t1, x=20@t5 y x=30@t9. Una transacción inicia en t6 y termina en t12. ¿Qué valor debería ver bajo un snapshot estable y por qué?
+\textbf{10. Checkpoints, RTO y presión de I/O.} Un motor genera 180 MB de WAL por minuto y reproduce 300 MB/s en condiciones ideales. Compare checkpoints cada 3, 12 y 30 minutos. Calcule el máximo WAL posterior al checkpoint y el replay ideal. Después enumere al menos cinco razones por las que el RTO real será mayor. Proponga un experimento para elegir el intervalo sin deteriorar el p99 de escritura.
 \end{uaexercise}
+
+\section{Nivel 3: MVCC, snapshots y costo de conservar historia}
+
 \begin{uaexercise}
-\textbf{11. MVCC y garbage collection.} Una transacción analítica permanece abierta 45 minutos. Explique cómo puede impedir eliminar versiones viejas y qué efectos produce sobre espacio, cache e índices.
+\textbf{11. Timeline MVCC y visibilidad.} Existen $v_1=120$, $v_2=135$ y $v_3=140$. Una transacción de reporte $T_R$ toma snapshot antes del commit de $v_2$; una transacción $T_W$ crea $v_2$ y otra crea $v_3$. Dibuje los carriles de lector, escritores, versiones y lectura visible. Determine qué lee $T_R$ en tres consultas y qué lee una transacción que comienza después de $v_3$.
+
+Luego resuelva el modelo de intervalos $v_1=[2,8)$, $v_2=[8,15)$ y $v_3=[15,\infty)$ para snapshots en $t=5,8,14,15,20$.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{12. MVCC y write skew.} Construya un caso de write skew sobre dos filas diferentes bajo Snapshot Isolation. Proponga dos mecanismos para evitar la violación del invariante.
+\textbf{12. Una lectura larga hace más caro el presente.} Un dashboard mantiene un snapshot abierto durante 90 minutos mientras una tabla recibe cuatro millones de actualizaciones. Explique la cadena causal entre snapshot antiguo, versiones retenidas, bloat, tamaño de índices, cache misses, I/O y latencia. Proponga cuatro métricas de detección y tres intervenciones, indicando el costo o riesgo de cada una.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{13. Diseño de índice.} Para la consulta de los últimos 20 pedidos de un cliente ordenados por fecha, proponga un índice y explique por qué el orden de columnas importa.
+\textbf{13. MVCC no equivale a serializabilidad.} En un juego, al menos uno de dos servidores de matchmaking debe permanecer activo. Dos administradores leen $A=1,B=1$ y, bajo Snapshot Isolation, cada uno desactiva un servidor diferente. Construya la ejecución, identifique el write skew y compare cuatro respuestas: bloqueo explícito, fila centinela, Serializable y servicio autoritativo. Analice latencia, aborts y complejidad.
 \end{uaexercise}
+
+\section{Nivel 4: índices y lectura de \texttt{EXPLAIN}}
+
 \begin{uaexercise}
-\textbf{14. Costo de sobreindexación.} Una tabla de alta escritura tiene ocho índices secundarios. Explique qué costos aparecen en insert, update, WAL, vacuum y cache. Proponga un método para decidir qué índices conservar.
+\textbf{14. Diseñar el índice desde la pregunta.} Para obtener las últimas 20 compras confirmadas de un estudiante, compare estos índices:
+\begin{itemize}
+\item $(student\_id)$;
+\item $(confirmed\_at\ DESC)$;
+\item $(student\_id,status,confirmed\_at\ DESC)$;
+\item $(status,confirmed\_at\ DESC,student\_id)$.
+\end{itemize}
+Explique qué parte del filtro, orden y límite puede resolver cada uno. Proponga además un índice parcial o de cobertura cuando sea razonable y declare el costo de mantenimiento.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{15. Ruta de escritura LSM.} Describa con precisión qué ocurre desde que llega write(k,v) hasta que el dato se encuentra en un nivel compactado. Incluya WAL, memtable, flush, SSTables y manifest.
+\textbf{15. Leer el plan de abajo hacia arriba.} Un plan sin índice contiene \texttt{Seq Scan}, filtro, 998.000 filas descartadas, \texttt{Sort top-N}, 840 buffers y 13 ms. El plan con índice contiene \texttt{Index Scan}, 20 filas, 5 buffers y 0,3 ms. Explique nodo por nodo qué trabajo desapareció. Distinga estimaciones de observaciones y enumere seis razones por las que no debe convertir esos tiempos ilustrativos en una promesa universal.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{16. Lectura en una LSM.} Explique cómo se busca una clave que puede estar en memtable y en varias SSTables. Indique el papel de Bloom filters, índices de bloque y cache.
+\textbf{16. Cuándo un índice existe y no debe usarse.} El 92\% de una tabla tiene \texttt{status='ACTIVE'}. El planner elige un scan secuencial pese a existir un índice por \texttt{status}. Explique por qué puede ser correcto. Después diseñe un procedimiento seguro para retirar un índice aparentemente no usado, contemplando constraints, estacionalidad, query logs, prueba controlada, monitoreo y rollback.
 \end{uaexercise}
+
+\section{Nivel 5: LSM, compaction, amplificaciones y stalls}
+
 \begin{uaexercise}
-\textbf{17. Compaction y amplificaciones.} Compare leveled y tiered/universal compaction en términos de write, read y space amplification. Indique una carga apropiada para cada estrategia.
+\textbf{17. Ruta completa de una LSM.} Describa el recorrido de \texttt{put(k,v)} desde el WAL hasta L2: memtable, immutable memtable, flush, SSTable L0, manifest y compaction. Después describa el recorrido de un point lookup y de un range scan. Señale dónde ayudan índices por archivo, Bloom filters y block cache, y por qué un tombstone no puede desaparecer inmediatamente.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{18. Write stalls.} Diseñe un escenario donde la ingestión supera la capacidad de compaction. Explique por qué regular escrituras puede ser preferible a seguir aceptándolas sin límite.
+\textbf{18. Compaction como deuda física.} Se tienen dos runs: $A=(a,c,e,g)$ y $B=(b,c,f,h)$; el segundo contiene una versión más nueva de $c$ y existe un tombstone posterior para $e$. Ejecute el merge, indique qué salida es segura y qué información adicional necesitaría para eliminar definitivamente el tombstone. Cuente bytes lógicos nuevos y bytes físicos leídos/escritos para explicar write amplification.
 \end{uaexercise}
+
 \begin{uaexercise}
-\textbf{19. Elección de motor.} Compare un ledger bancario y una plataforma de telemetría IoT. Para cada uno, elija B-tree, LSM o una combinación y defina cuatro métricas que validarían la decisión.
+\textbf{19. Dashboard de compaction y write stall.} Una column family muestra: ingreso 145 MB/s, compaction 110 MB/s, pending bytes 18 GB creciendo 2,1 GB/min, L0=28 con stop trigger 36, write amplification $6,5\times$ y stall time 3,4 s/min. Construya una explicación causal y estime cuánto tardará en alcanzar el stop trigger si L0 crece 1,6 archivos/min. Proponga cuatro respuestas posibles y una métrica que permitiría evaluar cada una.
 \end{uaexercise}
+
+\section{Nivel 6: diseño integral y transferencia}
+
 \begin{uaexercise}
-\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco completo a un storage engine para marketplace: defina problema, fallas, garantías, solución y trade-offs. Incluya un plan de experimento antes de aprobar la arquitectura.
+\textbf{20. Dos sistemas, dos decisiones defendibles.} Diseñe el almacenamiento para:
+\begin{enumerate}
+\item \textbf{CampusShop:} 500 writes/s, consultas puntuales y por historial, compra exactamente una vez, RPO cercano a cero y p95 de historial menor a 100 ms;
+\item \textbf{Telemetría del campus:} 100.000 eventos/s, retención de 30 días, consultas por dispositivo/ventana y vistas con 10 s de frescura.
+\end{enumerate}
+Para cada sistema aplique $D=(P,F,G,S,T)$ y especifique WAL, motor B-tree/LSM o combinación, MVCC/aislamiento, índices, compaction/checkpoints, backpressure, replicación, recovery y al menos seis métricas. Termine con un experimento que podría refutar la arquitectura.
 \end{uaexercise}
-\section{Criterios de entrega}
-Una respuesta completa debe contener supuestos, timeline o estructura cuando corresponda, garantía, mecanismo, límite y una métrica verificable. No se evalúa la cantidad de productos mencionados.
+
+\section{Rúbrica de corrección}
+
+\begin{center}
+\begin{tabular}{p{0.17\textwidth}p{0.70\textwidth}}
+\toprule
+Nivel & Evidencia en la respuesta \\
+\midrule
+Inicial & Nombra componentes, pero no explicita garantía ni falla. \\
+En desarrollo & Relaciona mecanismo con una falla, pero omite costo o validación. \\
+Logrado & Justifica garantía, mecanismo, trade-off y evidencia. \\
+Avanzado & Compara alternativas y declara qué observación haría cambiar la decisión. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \end{document}

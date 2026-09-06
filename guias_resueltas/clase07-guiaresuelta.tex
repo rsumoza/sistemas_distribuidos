@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{07}
 \UASetClassTitle{Logs distribuidos y streaming}
 \title{Clase 07 --- Guía resuelta}
@@ -16,121 +18,164 @@ Son respuestas orientativas. Se valoran alternativas coherentes que declaren fro
 \end{uaexercise}
 \begin{uaanswer}
 Una cola clásica suele modelar trabajo pendiente y retirar/acknowledge mensajes; un log conserva historia durante una retención y cada consumidor mantiene progreso independiente; una base orientada a estado prioriza el valor actual. Para pedidos, el log facilita replay y consumidores nuevos, pero obliga a diseñar offsets y retención. La cola simplifica work sharing y la base simplifica consultas de estado. Ninguna reemplaza automáticamente a las otras.
+
+\paragraph{Profundización.} Para el mismo dominio pueden coexistir las tres abstracciones: el log conserva el hecho, una cola interna distribuye trabajo efímero y una base materializa la vista actual. La elección no es excluyente; cada componente debe declarar retención, ownership y recuperación.\paragraph{Evidencia.} Compare tiempo de replay, profundidad de cola, edad del evento más antiguo y latencia de consulta del estado materializado.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{2. Key de partición.} Para eventos de pedidos, pagos y cambios de estado, proponga una key que preserve el orden relevante. Analice hot keys y qué orden se pierde.
 \end{uaexercise}
 \begin{uaanswer}
 Usar \texttt{order\_id} como key conserva el orden de eventos del mismo pedido. No conserva un orden global entre pedidos. Si un único pedido o cliente genera volumen extraordinario, esa key puede crear hotspot; se puede separar flujos que no requieren orden o usar subkeys con una capa de agregación, aceptando complejidad adicional.
+
+\paragraph{Profundización.} La unidad de orden debe ser la menor entidad cuyo historial no puede permutarse. Usar \texttt{customer\_id} preservaría orden entre todos los pedidos de un cliente, pero concentra clientes institucionales; usar \texttt{order\_id} distribuye mejor y conserva el ciclo de vida del pedido.\paragraph{Trade-off.} Salting o subkeys alivian hotspots, pero exigen recomponer orden o agregación.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{3. Número de particiones.} Un topic recibe 80.000 eventos/s y se estima que cada consumidor procesa 5.000 eventos/s. Proponga una cantidad inicial de particiones y discuta límites del cálculo.
 \end{uaexercise}
 \begin{uaanswer}
 El cálculo mínimo sugiere 16 consumidores/particiones para igualar tasa nominal, pero falta margen, skew, rebalances, picos, tamaño de evento y costo de estado. Una propuesta razonable podría comenzar con 24 o 32 particiones y validar. El número no debe derivarse solo de promedio: se necesita capacidad sostenible por partición y crecimiento esperado.
+
+\paragraph{Cálculo.} Dieciséis particiones cubren exactamente la media y dejan cero capacidad para picos o mantenimiento. Con 30\% de margen se requieren al menos $\lceil 80.000\times1{,}3/5.000\rceil=21$; 24 es una hipótesis razonable, no una verdad.\paragraph{Validación.} Ensayar skew, p99 por evento, rebalance y falla de una instancia; medir capacidad sostenible, no un benchmark corto.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{4. Consumer group.} Explique qué ocurre si un grupo tiene 12 consumidores y el topic 8 particiones. ¿Qué cambia si se agregan 16 particiones durante operación?
 \end{uaexercise}
 \begin{uaanswer}
 Con 8 particiones, solo 8 consumidores procesan; 4 quedan ociosos. Al aumentar particiones, puede crecer paralelismo, pero las nuevas keys pueden mapear distinto y el grupo rebalancea. También aumentan archivos, conexiones, metadata y costo operacional. El cambio debe planificarse y observarse.
+
+\paragraph{Profundización.} Aumentar a 16 particiones permite ocupar los 12 consumidores, pero altera la distribución de keys futuras y dispara un rebalance. Los registros existentes no se redistribuyen automáticamente.\paragraph{Evidencia.} Medir duración de rebalance, tiempo de restore, lag por partición y porcentaje de miembros ociosos.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{5. Position y committed offset.} Construya un ejemplo donde la posición en memoria avance, pero el committed offset quede atrasado. Analice el reinicio.
 \end{uaexercise}
 \begin{uaanswer}
 El consumidor puede haber hecho poll hasta 100 y mantener position=101, pero solo committed=81. Si falla, reinicia en 81 y reprocesa 20 registros. La diferencia representa trabajo leído/no confirmado. Si el efecto ya ocurrió, habrá duplicación; si no, el replay es necesario.
+
+\paragraph{Profundización.} La posición 101 vive en la instancia; el committed 81 es el contrato durable del grupo. El intervalo $[81,100]$ es trabajo especulativo que reaparece tras crash.\paragraph{Decisión.} El tamaño de lote de commit controla overhead frente a volumen máximo de replay.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{6. At-most-once.} Diseñe un timeline de pérdida por confirmar offset antes de aplicar el efecto. Indique cuándo este trade-off podría ser aceptable.
 \end{uaexercise}
 \begin{uaanswer}
 Secuencia: poll 42, commit 43, crash, no efecto, restart 43. El registro 42 se pierde lógicamente. Puede ser aceptable para telemetría aproximada o métricas no críticas donde duplicar sería peor y una pérdida pequeña está presupuestada, pero debe declararse y medirse.
+
+\paragraph{Profundización.} Debe existir un presupuesto explícito de pérdida: por ejemplo, telemetría de interfaz donde perder hasta 0,01\% no altera decisiones. En pagos, inventario o auditoría, el mismo timeline es inaceptable.\paragraph{Evidencia.} Inyectar crash entre commit y efecto y comprobar que la pérdida observada coincide con la política declarada.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{7. At-least-once.} Diseñe un timeline de duplicación por procesar antes de confirmar. Proponga una estrategia de idempotencia para el efecto.
 \end{uaexercise}
 \begin{uaanswer}
 Secuencia: poll 42, aplicar débito, crash antes de commit, restart 42, segundo débito. La idempotencia usa \texttt{event\_id}/\texttt{payment\_id} único y una tabla de deduplicación en la misma transacción que el efecto. Un retry devuelve el resultado anterior o se omite la segunda aplicación.
+
+\paragraph{Profundización.} La tabla de deduplicación debe compartir transacción con el débito; guardarla después deja otra ventana de fallo. Una restricción única sobre \texttt{payment\_id} convierte replays físicos en un solo efecto lógico.\paragraph{Costo.} Retención de IDs, limpieza, índices y tratamiento de respuestas previas.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{8. Consumer lag.} Defina lag y explique por qué el promedio del grupo puede ocultar una partición caliente. Proponga métricas adicionales.
 \end{uaexercise}
 \begin{uaanswer}
 Lag es la distancia entre end offset y offset confirmado. El promedio puede ocultar P7 con millones de eventos mientras otras particiones están vacías. Medir lag y edad del evento más antiguo por partición, tasa de ingreso/consumo, p99 de procesamiento y skew de key.
+
+\paragraph{Profundización.} El lag en offsets no equivale directamente a segundos porque los registros tienen costo y tamaño distintos. La edad del evento más antiguo conecta progreso técnico con frescura de negocio.\paragraph{Evidencia.} Dashboard por partición: ingreso, consumo, lag, edad, p99 y distribución de keys.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{9. Rebalance.} Durante una campaña, el autoscaler crea consumidores y desencadena rebalances frecuentes. Explique cómo esto puede empeorar temporalmente el servicio y proponga mitigaciones.
 \end{uaexercise}
 \begin{uaanswer}
 Cada rebalance pausa o mueve particiones y puede obligar a restaurar estado. Escalar de forma oscilante crea más pausas y lag. Mitigaciones: sticky/cooperative assignment, estabilidad del autoscaler, sesiones bien configuradas, warm-up, particiones suficientes, estado restaurable y escalado basado en tendencia no en ruido instantáneo.
+
+\paragraph{Profundización.} El autoscaler debe considerar que agregar capacidad genera una pausa y puede restaurar gigabytes de estado. Una política con histéresis y asignación cooperativa reduce oscilación.\paragraph{Prueba.} Reproducir entrada/salida repetida de miembros y medir tiempo útil frente a tiempo en rebalance.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{10. ACK del producer.} Compare confirmar con el líder frente a esperar réplicas in-sync. Analice latencia, disponibilidad y pérdida ante failover.
 \end{uaexercise}
 \begin{uaanswer}
 ACK del líder reduce latencia, pero si el líder falla antes de replicar, el registro puede desaparecer tras elección. Esperar ISR mejora durabilidad, pero agrega espera y puede rechazar durante degradación. La elección debe alinearse con pérdida tolerable y min in-sync replicas.
+
+\paragraph{Profundización.} La garantía depende también de \texttt{min.insync.replicas}: esperar \texttt{acks=all} con un mínimo insuficiente puede confirmar con menos tolerancia de la esperada.\paragraph{Trade-off.} Más réplicas requeridas reducen ventana de pérdida, pero pueden rechazar producción durante degradación.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{11. Producer idempotente.} Explique qué duplicados evita y construya un caso de duplicación de negocio que siga siendo posible.
 \end{uaexercise}
 \begin{uaanswer}
 Evita duplicados de batches reenviados por el mismo producer dentro del protocolo de secuencias. No evita que un consumidor llame dos veces a un proveedor de pagos o que dos producers distintos publiquen la misma intención. La identidad de negocio sigue siendo responsabilidad de la aplicación.
+
+\paragraph{Profundización.} La identidad del producer y los números de secuencia viven dentro de una época/sesión. Una aplicación que recrea una intención de negocio necesita su propio \texttt{event\_id}.\paragraph{Regla.} Idempotencia de transporte y idempotencia de dominio son capas distintas.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{12. Exactly-once por frontera.} Defina exactamente una vez para entrega, procesamiento y efecto de negocio. Dé un sistema donde solo una de las tres se cumpla.
 \end{uaexercise}
 \begin{uaanswer}
 Entrega: cuántas veces recibe el registro. Procesamiento: cuántas veces cambia el estado interno. Efecto: cuántas veces ocurre la acción externa. Un pipeline puede actualizar exactamente una vez un state store transaccional, pero enviar dos emails si el proveedor externo no participa y el retry no es idempotente.
+
+\paragraph{Profundización.} Es útil escribir la garantía como una tupla: $(objeto, frontera, fallas)$. Ejemplo: ``una actualización del state store y su output Kafka se hacen visibles juntos ante crash de proceso''. Esto no afirma nada sobre el proveedor de email.\paragraph{Evaluación.} Rechazar expresiones de exactly-once sin objeto ni frontera.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{13. Kafka Streams transaccional.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
 \end{uaexercise}
 \begin{uaanswer}
 La transacción incluye offsets consumidos, cambios al state store/changelog y registros de salida. Si falla antes de commit, ninguno se hace visible a consumidores \texttt{read\_committed} y el input se reprocesa. Esto mantiene coherencia dentro del ecosistema Kafka, no necesariamente con sistemas externos.
+
+\paragraph{Profundización.} El consumidor configurado con \texttt{read\_committed} no observa registros de salida abortados. Al reiniciar, el input reaparece y el estado se restaura desde changelog coherente.\paragraph{Límite.} Side effects externos necesitan idempotencia, inbox u outbox adicional.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{14. Dual write.} Un servicio persiste una factura y publica InvoiceCreated. Construya las ventanas de falla para ambos órdenes posibles.
 \end{uaexercise}
 \begin{uaanswer}
 DB primero: crash antes de publicar deja factura sin evento. Evento primero: crash o rollback deja evento de una factura inexistente. Si ambos terminan pero la respuesta se pierde, el retry puede duplicar. Cambiar el orden no elimina el dual write.
+
+\paragraph{Profundización.} Hay además una tercera ventana: ambas operaciones terminan pero la respuesta al llamador se pierde; un retry puede repetir la intención. El análisis debe incluir identidad estable.\paragraph{Prueba.} Inyectar crash en cada corte y comprobar la invariantes: factura y evento no divergen silenciosamente.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{15. Transactional outbox.} Diseñe tablas, estados y proceso relay para resolver el dual write. Explique por qué el consumidor aún debe ser idempotente.
 \end{uaexercise}
 \begin{uaanswer}
 La transacción local inserta factura y fila outbox con \texttt{event\_id}, \texttt{aggregate\_id}, payload, estado y secuencia. El relay publica y marca/borra con retención; puede repetir ante timeout. El consumidor deduplica por \texttt{event\_id} porque el relay no puede saber con certeza si el broker aceptó antes de fallar.
+
+\paragraph{Profundización.} Conviene preservar secuencia por aggregate para que el relay no publique \texttt{InvoicePaid} antes de \texttt{InvoiceCreated}. La limpieza debe esperar publicación y ventana de auditoría.\paragraph{Métricas.} Edad máxima, filas pendientes, tasa de errores, reintentos y duplicados downstream.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{16. Event time.} Un evento ocurre a las 10:00 y llega a las 10:07. Compare el resultado en ventanas por event time y processing time.
 \end{uaexercise}
 \begin{uaanswer}
 Con event time, pertenece a la ventana de 10:00 aunque llegue tarde; puede corregir un resultado ya emitido. Con processing time, se cuenta en 10:07 y distorsiona el momento real. La elección depende de semántica y tolerancia a correcciones.
+
+\paragraph{Profundización.} Si la ventana ya emitió un resultado, el sistema debe definir si reabre, produce una corrección o descarta. Esa política afecta consumidores y contratos.\paragraph{Evidencia.} Medir porcentaje y edad de late events y costo de recomputación.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{17. Watermark.} Proponga una tolerancia de eventos tardíos para un tablero de ventas y otra para detección de fraude. Justifique la diferencia.
 \end{uaexercise}
 \begin{uaanswer}
 Un tablero puede aceptar 2--5 minutos de retraso y corregir cifras, priorizando latencia. Fraude puede necesitar alerta temprana y luego revisión; quizá use watermark corto con actualizaciones tardías. La tolerancia deriva del costo de esperar frente al costo de error.
+
+\paragraph{Profundización.} Fraude suele priorizar detección temprana: salida provisional rápida más corrección. Un cierre contable puede esperar más y exigir completitud.\paragraph{Trade-off.} Watermark largo aumenta estado y latencia; corto aumenta correcciones o pérdida semántica.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{18. Stateful streaming.} Diseñe un join entre pedidos y pagos. Defina key, retención de estado, timeout de join y comportamiento ante evento tardío.
 \end{uaexercise}
 \begin{uaanswer}
 Particionar ambos streams por \texttt{order\_id}. Mantener pedidos y pagos no emparejados durante un TTL superior al retraso esperado. Al hacer match, emitir resultado idempotente. Si vence, enviar a flujo de excepción; un evento tardío puede reabrir/corregir según política. Estado y offset deben checkpointarse juntos.
+
+\paragraph{Profundización.} El state store debe poder restaurarse después de rebalance y su snapshot/changelog debe corresponder al offset. Si se recuperan por separado, puede duplicar o omitir matches.\paragraph{Métricas.} Tamaño de estado, restore time, unmatched count, expiraciones y late matches.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{19. Caso de campaña.} Diseñe topics, keys, grupos, semánticas y SLOs para inventario, email y analytics durante una promoción masiva.
 \end{uaexercise}
 \begin{uaanswer}
 Orders por \texttt{order\_id}. Inventario at-least-once con deduplicación y SLO de efecto <3s; email at-least-once con idempotency key o tolerancia explícita; analytics puede aceptar pérdida o retraso mayor. Monitorear lag por partición, rebalances, producer retries y edad extrema. Outbox protege publicación desde Orders.
+
+\paragraph{Profundización.} Una solución completa separa semánticas: inventario at-least-once + inbox; email at-least-once tolerante o deduplicado; analytics con replay y lateness. Todos comparten event ID y tracing.\paragraph{Prueba.} Campaña con hot key, caída de consumer y latencia de broker; verificar SLO por efecto, no solo uptime.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a un pipeline de telemetría industrial y proponga una prueba de falla con consumer crash y rebalance.
 \end{uaexercise}
 \begin{uaanswer}
 P: ingerir telemetría y disparar alertas. F: crash, replay, hot key, rebalance y eventos tardíos. G: no perder alertas críticas y procesar 99.9% <10s. S: partición por dispositivo, at-least-once, state store, checkpoint y deduplicación. T: estado y latencia. Prueba: matar consumidor durante efecto, observar replay, restore y ausencia de alerta duplicada.
+
+\paragraph{Profundización.} Durante la prueba, matar el consumer después del efecto y antes del commit debe producir replay sin una segunda alerta. Luego agregar un miembro para provocar rebalance y medir restore.\paragraph{Criterio de éxito.} Cero pérdida de alertas críticas, duplicación lógica nula y 99,9\% dentro de 10 s.
 \end{uaanswer}
-\section{Criterio docente de corrección}
-La respuesta excelente distingue orden por partición, progreso del consumidor, estado interno y efecto externo. La respuesta insuficiente enumera componentes sin modelar fallas.
+
+\section{Criterio de autocorrección}
+
+Una solución está completa cuando explicita el problema, la falla, la garantía, el mecanismo, el costo y la evidencia que permitiría validar o refutar la respuesta. Las matrices de corrección y las preguntas de defensa se reservan para el material docente.
+
 \end{document}

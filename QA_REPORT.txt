@@ -1,0 +1,22 @@
+SISTEMAS DISTRIBUIDOS - QA VERSION 11.4
+=======================================
+
+VALIDATION_STATUS=PASS
+CLASSES=06,07,08,09
+PDF_COUNT=25
+BUILD_NONPDF=0
+GUIDES=20 exercises per class
+SOLVED=20 matched student answers per class
+TEACHER_GUIDES=3 parts: operational + technical + audit
+CUSTOM_ENV_CONTRACT=PASS
+STYLE_CHANGED=NO
+BEAMER_CLASS_CHANGED=NO
+ARTICLE_CLASS_CHANGED=NO
+MAKEFILE_CHANGED=NO
+SEMESTER=Segundo cuatrimestre 2026
+
+Correcciones de demos:
+- clase07_event_time: 2m10s después del cierre
+- clase07_offsets: inbox y efecto atómicos + contraejemplo no atómico
+- clase08_truetime: modelo didáctico explícito
+- clase09_outbox_saga: outbox/relay/redelivery/inbox ejecutables

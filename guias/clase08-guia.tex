@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{08}
 \UASetClassTitle{Consistencia real}
 \title{Clase 08 --- Guía de ejercicios}
@@ -10,66 +12,183 @@
 \maketitle
 \section{Propósito de la guía}
 Cada ejercicio obliga a declarar el dato, operación, invariante, comportamiento bajo partición y costo en operación normal.
+
+\section{Caso base y datos de trabajo}
+
+Se utilizarán dos dominios para evitar respuestas automáticas:
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\toprule
+Dimensión & GlobalTickets & Asteria Online \\
+\midrule
+Dato crítico & último asiento & castillo / inventario / ranking \\
+Regiones & Buenos Aires, Virginia, Frankfurt & tres regiones de juego \\
+Latencia interregional & 140--220 ms & 120--190 ms \\
+Partición de prueba & 90 s & 60 s \\
+Error intolerable & doble reserva & doble propiedad / objeto duplicado \\
+Error tolerable & feed de disponibilidad atrasado & ranking o presencia atrasados \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Método esperado de resolución}
+
+Para cada operación:
+\begin{enumerate}
+\item declare el invariante;
+\item especifique qué observa el cliente;
+\item describa la partición o latencia relevante;
+\item elija qué se rechaza, permite divergir o coordina;
+\item calcule quorum o compare versiones cuando corresponda;
+\item indique cómo se repara y qué métrica demuestra convergencia;
+\item explicite el costo durante operación normal mediante PACELC.
+\end{enumerate}
+
+\begin{uawarn}
+No se aceptan etiquetas ``AP'' o ``CP'' aplicadas a todo el producto sin analizar dato y operación.
+\end{uawarn}
+
+
+\section{Ruta recomendada de uso}
+
+La clase debe privilegiar decisiones por operación, no una cobertura apresurada de etiquetas:
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.23\textwidth}p{0.46\textwidth}}
+\toprule
+Momento & Ejercicios & Evidencia \\
+\midrule
+En clase & 1, 2, 3, 6, 9, 17, 19 & ejecución CAP, quorums, versiones y diseño híbrido \\
+Postclase & 4, 5, 7, 10--13, 15, 16 & mecanismos y reparación \\
+Desafío & 8, 14, 18, 20 & límites de intersección, Merkle, consenso y partición \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La unidad de análisis es siempre \textbf{dato + operación + invariante + partición}. No se considera suficiente clasificar una base completa como AP o CP.
+
+
 \section{Ejercicios}
 \begin{uaexercise}
+
 \textbf{1. CAP sin slogan.} Explique la condición exacta en la que aparece el trade-off CAP y por qué 'elegir dos de tres' es una formulación engañosa.
+
+\textit{Entregable mínimo:} una ejecución mínima con dos réplicas y una corrección del slogan.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{2. Disponibilidad CAP.} Un nodo responde 'no puedo operar sin quorum'. ¿Es disponible en el sentido CAP? Justifique y distinga de uptime general.
+
+\textit{Entregable mínimo:} una comparación explícita entre availability CAP, uptime y respuesta de error.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{3. Partición bancaria.} Dos regiones con saldo 100 reciben retiros de 80 durante una partición. Diseñe una respuesta CP y una AP y analice el resultado.
+
+\textit{Entregable mínimo:} dos timelines y el invariante final en cada política.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{4. PACELC.} Compare una lectura local de 15 ms potencialmente atrasada con una lectura coordinada de 180 ms. Identifique la decisión PACELC.
+
+\textit{Entregable mínimo:} una tabla latencia/garantía y una decisión por operación.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{5. Consistent hashing.} Explique qué remapeo evita consistent hashing al agregar un nodo y por qué no elimina hot keys.
+
+\textit{Entregable mínimo:} un anillo antes/después, porcentaje aproximado de remapeo y hot key.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{6. Quórum intersectante.} Para N=5, proponga dos pares R,W con intersección y compare latencia y disponibilidad.
+
+\textit{Entregable mínimo:} dos configuraciones numéricas, tolerancia a fallas y costo de latencia.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{7. Quórum no intersectante.} Para N=3,R=1,W=1, construya un stale read después de una escritura exitosa.
+
+\textit{Entregable mínimo:} una historia con conjuntos de réplicas y valor leído.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{8. Límite de R+W>N.} Explique por qué la intersección combinatoria no garantiza por sí sola linearizabilidad en un sistema Dynamo-like.
+
+\textit{Entregable mínimo:} una lista de supuestos adicionales necesarios para linearizabilidad.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{9. Version vectors.} Dadas versiones [A:2,B:1], [A:2,B:3] y [A:4,B:1], determine dominación o concurrencia y proponga reconciliación.
+
+\textit{Entregable mínimo:} comparaciones componente a componente y regla de merge.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{10. Last-write-wins.} Construya un caso donde LWW pierda una actualización válida por relojes desalineados o concurrencia.
+
+\textit{Entregable mínimo:} un timeline con relojes o concurrencia y actualización perdida.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{11. Sloppy quorum.} Explique cómo una escritura aceptada en un nodo alternativo mejora disponibilidad y complica lecturas y reparación.
+
+\textit{Entregable mínimo:} un diagrama de preferencias, nodo temporal, lectura y deuda de reparación.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{12. Hinted handoff.} Diseñe estados y métricas para controlar hints acumulados durante una falla prolongada.
+
+\textit{Entregable mínimo:} una máquina de estados de hints y cuatro métricas.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{13. Read repair.} Construya una lectura que descubre una réplica atrasada. Explique cuándo reparar sin bloquear demasiado al cliente.
+
+\textit{Entregable mínimo:} un timeline de lectura y decisión entre reparación síncrona o asíncrona.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{14. Merkle trees.} Explique cómo dos réplicas localizan un rango divergente sin intercambiar todas las claves.
+
+\textit{Entregable mínimo:} un árbol de hashes pequeño con el rango divergente identificado.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{15. Dynamo y carrito.} Diseñe una regla de merge para carritos concurrentes. Identifique un caso donde la unión simple no sea suficiente.
+
+\textit{Entregable mínimo:} una regla de merge, contraejemplo y prueba de propiedades.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{16. TrueTime.} Explique por qué un intervalo de tiempo puede ser más útil que un timestamp aparentemente exacto.
+
+\textit{Entregable mínimo:} un intervalo TrueTime con cálculo de incertidumbre y explicación.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{17. Commit wait.} Construya dos transacciones T1 y T2 y explique cómo commit wait preserva el orden externo observable.
+
+\textit{Entregable mínimo:} dos transacciones con tiempos, timestamps y espera necesaria.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{18. Consenso localizado.} Explique por qué Spanner no puede usar un consenso global único para cada operación y cómo particiona la coordinación.
+
+\textit{Entregable mínimo:} un diagrama de grupos de consenso y coordinación entre grupos.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{19. Arquitectura híbrida.} Diseñe garantías distintas para perfil, feed, reserva de asiento, inventario y ledger en una misma plataforma.
+
+\textit{Entregable mínimo:} una matriz por subsistema con invariante, política y métrica.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma global de entradas y proponga una prueba de partición interregional.
+
+\textit{Entregable mínimo:} D=(P,F,G,S,T), timeline de partición y criterios de éxito.
 \end{uaexercise}
 \section{Criterios de entrega}
 No se aceptan clasificaciones AP/CP sin análisis por operación. Incluya timeline, quorum o versión cuando corresponda.

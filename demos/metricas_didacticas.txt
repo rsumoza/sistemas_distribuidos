@@ -1,0 +1,25 @@
+CLASE 07 — Dashboard didáctico (valores sintéticos)
+Ingress: 80.000 eventos/s
+Consume total: 76.000 eventos/s
+Lag P0/P1/P2/P3: 120 / 95 / 1.800.000 / 140
+Edad máxima P2: 42 s
+Rebalances: 12/h
+Restore state p95: 18 s
+
+CLASE 08 — Partición interregional (valores sintéticos)
+Latencia local p95: 18 ms
+Latencia coordinada p95: 185 ms
+Rechazos sin quorum: 4,2%
+Versiones concurrentes: 840
+Hints pendientes: 2,8 GB; edad p99: 74 s
+Repair throughput: 95 MB/s
+TrueTime uncertainty p99: 6,4 ms
+
+CLASE 09 — Autonomía arquitectónica (valores sintéticos)
+Lead time monolito: 4,8 días
+Lead time servicio extraído: 1,6 días
+Deploys independientes: 72%
+Cambios que requieren coordinación cruzada: 38%
+Outbox age p99: 11 s
+Sagas abiertas > 10 min: 17
+Incidentes por contrato incompatible: 2/mes

@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
 \title{Clase 09 --- Guía resuelta}
@@ -16,121 +18,164 @@ Son modelos de argumentación arquitectónica. Otras fronteras son válidas si c
 \end{uaexercise}
 \begin{uaanswer}
 Un monolito puede imponer módulos con APIs internas, dependencias acíclicas, ownership, pruebas de arquitectura, esquemas o namespaces separados y prohibición de acceso lateral a internals. La bola de barro aparece cuando cualquier módulo modifica cualquier dato y las dependencias dejan de ser explícitas, no por compartir proceso.
+
+\paragraph{Profundización.} Las reglas pueden incluir módulos declarados, dependencias acíclicas, APIs internas, pruebas de arquitectura, ownership y prohibición de acceso directo a internals.\paragraph{Evidencia.} Grafo de dependencias, ciclos, cambios que cruzan módulos y tiempo de build/test por componente.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{2. Prima de microservicios.} Enumere los costos distribuidos que aparecen al extraer un módulo y diseñe un criterio para decidir si el beneficio compensa.
 \end{uaexercise}
 \begin{uaanswer}
 Aparecen red, timeouts, retries, observabilidad, contratos, despliegue, secretos, datos distribuidos, sagas y on-call. Separar solo si existe presión real: escalado/ciclo de cambio/aislamiento/ownership distinto, y si una métrica demostrará mejora. Si el beneficio es solo 'arquitectura moderna', no compensa.
+
+\paragraph{Profundización.} La prima incluye infraestructura, red, seguridad entre servicios, observabilidad, on-call, contratos, consistencia y costos de coordinación.\paragraph{Criterio.} Separar solo con hipótesis medible: menos lead time, escala independiente o menor blast radius.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{3. Señales de separación.} Dado un sistema con catálogo, pagos y recomendaciones, decida qué separar primero y qué mantener junto. Justifique por dominio, carga y equipo.
 \end{uaexercise}
 \begin{uaanswer}
 Pagos puede separarse si requiere seguridad, compliance, equipo y carga distintos. Recomendaciones puede separarse por escalado y consistencia eventual. Catálogo quizá permanezca con núcleo si el dominio cambia. La decisión depende de fronteras maduras y capacidad operativa; no hay orden universal.
+
+\paragraph{Profundización.} Recomendaciones suele tener carga/modelo distinto y tolera eventualidad; pagos puede justificar ownership por compliance. Catálogo puede permanecer junto si cambia con el núcleo.\paragraph{Evidencia.} Cadencia de cambio, QPS, incidentes, equipo dueño e invariantes.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{4. Monolito distribuido.} Construya una arquitectura con cinco servicios que conserve despliegue coordinado, base compartida y cadenas RPC. Explique por qué es peor que un monolito modular.
 \end{uaexercise}
 \begin{uaanswer}
 Cinco servicios comparten DB, deben desplegar misma versión y se llaman en cadena. Se agregan latencia, fallas parciales y tracing, pero ningún equipo puede cambiar de forma autónoma. Un monolito modular sería más simple y ofrecería la misma coordinación interna sin red.
+
+\paragraph{Profundización.} El anti-patrón paga todos los caminos de red sin obtener autonomía: despliegue, esquema y pruebas siguen coordinados.\paragraph{Métrica.} Porcentaje de releases coordinados y dependencias sincrónicas por request.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{5. Bounded contexts.} Defina tres significados distintos de 'curso' o 'pedido' en contextos de negocio y diseñe traducciones entre ellos.
 \end{uaexercise}
 \begin{uaanswer}
 Curso en catálogo: producto y descripción; en aprendizaje: módulos y progreso; en facturación: SKU, precio e impuesto. Los contratos traducen IDs y hechos relevantes; no se comparte un objeto universal. Esto permite que cada contexto evolucione sin imponer semántica ajena.
+
+\paragraph{Profundización.} Las traducciones actúan como anti-corruption layer. Un ID estable puede mapearse, pero los atributos y reglas no deben forzarse a un modelo universal.\paragraph{Trade-off.} Duplicación semántica controlada es preferible a acoplamiento global oculto.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{6. Ownership de datos.} Explique qué significa database per service y cómo resolvería una consulta global sin permitir acceso directo a tablas ajenas.
 \end{uaexercise}
 \begin{uaanswer}
 El servicio es el único writer de su modelo. Una consulta global se resuelve con composición de APIs, materialized view alimentada por eventos, data warehouse o servicio de búsqueda. Elegir según frescura y latencia; acceso directo a tablas rompe ownership y contratos.
+
+\paragraph{Profundización.} Una vista materializada por eventos compra consultas rápidas a costa de frescura; composición RPC compra frescura a costa de disponibilidad/latencia.\paragraph{Criterio.} Elegir por SLO y tolerancia a desactualización, no por conveniencia de SQL.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{7. Conway.} Analice una organización donde dos equipos deben aprobar cada cambio del otro. ¿Qué revela sobre la frontera de servicios?
 \end{uaexercise}
 \begin{uaanswer}
 La frontera técnica no coincide con autonomía organizacional. Si cada cambio requiere coordinación cruzada, los servicios forman una unidad de cambio. Puede convenir agrupar ownership, redefinir contratos o incluso mantener juntos los componentes hasta madurar la organización.
+
+\paragraph{Profundización.} La organización es parte de la arquitectura. Si la frontera cruza continuamente coordinación humana, probablemente el bounded context o el modelo de ownership está mal ubicado.\paragraph{Evidencia.} Revisiones cruzadas, tickets bloqueados y lead time por dependencia de equipo.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{8. RPC vs eventos.} Para validación de pago, notificación, actualización de ranking y consulta de perfil, elija RPC o evento y justifique.
 \end{uaexercise}
 \begin{uaanswer}
 Validación de pago suele requerir RPC sincrónico en checkout; notificación es evento; ranking es evento/proyección eventual; perfil puede ser RPC/cache según frescura. La elección se basa en necesidad de respuesta inmediata, tolerancia al atraso y ownership.
+
+\paragraph{Profundización.} Pago necesita respuesta inmediata para checkout; notificación y ranking pueden desacoplarse. Perfil puede ser query sincrónica con caché.\paragraph{Regla.} Elegir por necesidad de respuesta, tolerancia al atraso y semántica de error.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{9. Cadena sincrónica.} Diseñe una cadena API->A->B->C y calcule disponibilidad compuesta si cada servicio tiene 99.9%. Analice además latencia y timeouts.
 \end{uaexercise}
 \begin{uaanswer}
 Disponibilidad aproximada de la cadena es $0.999^4 \approx 99.6006\%$, sin contar red. Latencias se suman y colas multiplican p99. Timeouts/retries pueden amplificar carga. La cadena muestra que alta disponibilidad individual no garantiza flujo altamente disponible.
+
+\paragraph{Profundización.} $0{,}999^4$ es un límite optimista: las fallas no son independientes y la red agrega otra dependencia. La latencia p99 no se calcula sumando medias.\paragraph{Mitigación.} Reducir profundidad, usar fallbacks, paralelizar cuando sea seguro y definir presupuestos de timeout.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{10. Comando, evento y consulta.} Clasifique ReserveSeat, SeatReserved y GetSeatAvailability. Construya un ejemplo de evento mal modelado como comando oculto.
 \end{uaexercise}
 \begin{uaanswer}
 ReserveSeat es comando; SeatReserved evento; GetSeatAvailability consulta. Un 'PaymentRequested' publicado esperando que un único servicio obligatoriamente actúe y responda puede ser un comando disfrazado, con ownership y manejo de error ambiguos.
+
+\paragraph{Profundización.} Un comando tiene destinatario/owner y puede ser rechazado; un evento ya ocurrió y puede tener muchos consumidores.\paragraph{Riesgo.} Comandos disfrazados de eventos ocultan dependencia obligatoria y manejo de errores.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{11. Dual write.} Un servicio actualiza Enrollment y publica StudentEnrolled. Dibuje las ventanas de falla para ambos órdenes.
 \end{uaexercise}
 \begin{uaanswer}
 DB primero deja inscripción sin evento si crash; evento primero deja evento de inscripción que abortó. Si ambos ocurren pero ACK se pierde, retry puede duplicar. No existe orden que haga atómicas dos escrituras independientes.
+
+\paragraph{Profundización.} La ventana persiste incluso si ambas operaciones son idempotentes: puede faltar una de ellas. Además, un retry tras ACK perdido puede repetir publicación.\paragraph{Prueba.} Crash injection en cada corte y reconciliación posterior.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{12. Transactional outbox.} Diseñe schema mínimo, relay, deduplicación y política de retención para una outbox de inscripciones.
 \end{uaexercise}
 \begin{uaanswer}
 Campos: \texttt{event\_id}, \texttt{aggregate\_id}, type, version, payload, \texttt{created\_at}, sequence, status. La transacción local inserta negocio+outbox. Relay publica repetidamente y marca; consumidores deduplican \texttt{event\_id}. Retención hasta confirmación y ventana de auditoría; monitorear edad y backlog.
+
+\paragraph{Profundización.} La secuencia por aggregate evita reorder de eventos del mismo modelo. El relay requiere locking/claiming para trabajo concurrente y política de retry.\paragraph{Métricas.} Edad p99, filas pendientes, publicaciones duplicadas y poison events.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{13. Evolución de eventos.} Proponga una evolución compatible de StudentEnrolled v1 a v2 y una evolución que rompería consumidores.
 \end{uaexercise}
 \begin{uaanswer}
 Compatible: agregar optional \texttt{scholarship\_code} con default ausente. Rompe: renombrar \texttt{student\_id} sin compatibilidad o cambiar amount de centavos a unidades manteniendo nombre. Debe existir versionado, schema validation y período de transición.
+
+\paragraph{Profundización.} Los consumidores deben aceptar campos desconocidos y el productor no debe cambiar significado silenciosamente. Puede usarse dual publishing o upcasting durante transición.\paragraph{Evidencia.} Contract tests contra versiones soportadas y replay de eventos históricos.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{14. Saga de inscripción.} Diseñe pasos, timeouts, reintentos y compensaciones para inscripción, cupo, pago, acceso y comprobante.
 \end{uaexercise}
 \begin{uaanswer}
 Crear inscripción pending; reservar cupo; autorizar pago; activar acceso; emitir comprobante. Retries idempotentes por saga/step ID. Si pago falla, liberar cupo y cancelar. Si acceso falla tras cobro, reintentar o refund según timeout. Email no debe revertir negocio.
+
+\paragraph{Profundización.} Cada paso se modela como estado durable y comando idempotente. Los deadlines distinguen retry de compensación.\paragraph{Criterio.} No compensar un paso secundario como email deshaciendo todo el negocio.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{15. Compensación imperfecta.} Dé tres efectos que no pueden revertirse perfectamente y proponga una compensación de negocio razonable.
 \end{uaexercise}
 \begin{uaanswer}
 Email enviado: compensar con aclaración; envío físico: iniciar devolución; reserva aérea consumida: reembolso/credito, no borrar historia. La compensación es un nuevo efecto y debe modelar costo y observabilidad.
+
+\paragraph{Profundización.} La compensación conserva historia y puede tener costo económico/temporal. Debe admitir retry y, cuando falla, escalar a intervención manual.\paragraph{Métrica.} Sagas compensating, antigüedad y monto expuesto.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{16. Coreografía.} Diseñe una saga coreografiada con tres participantes y explique cómo evitar ciclos y pérdida de visibilidad.
 \end{uaexercise}
 \begin{uaanswer}
 Tres servicios reaccionan a eventos lineales y publican resultado. Evitar ciclos con contratos de workflow, ownership claro y pocos participantes; usar correlation/saga ID y una vista de seguimiento. Si crece, considerar orquestación.
+
+\paragraph{Profundización.} Correlation ID y una vista de seguimiento hacen visible el flujo. Reglas de dependencia evitan que eventos creen ciclos.\paragraph{Límite.} Al aumentar participantes, la lógica emergente se vuelve difícil de modificar y auditar.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{17. Orquestación.} Diseñe el mismo flujo con un orquestador durable. Defina estado, recuperación y riesgo de centralización.
 \end{uaexercise}
 \begin{uaanswer}
 El orquestador persiste estado por saga, paso, intentos, deadline y compensaciones. Al reiniciar continúa. Facilita timeout y visibilidad, pero se vuelve componente crítico y puede concentrar lógica de dominio; debe replicarse y versionarse.
+
+\paragraph{Profundización.} El orquestador es una máquina de estados replicada; no debe guardar progreso solo en memoria. Versionar workflows evita romper sagas en curso.\paragraph{Trade-off.} Mejora visibilidad a costa de un componente más crítico y conocimiento central del proceso.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{18. Strangler Fig.} Proponga una migración incremental desde un monolito de e-commerce. Defina primer servicio, routing, rollback y métricas.
 \end{uaexercise}
 \begin{uaanswer}
 Extraer primero una capacidad con frontera y presión real, por ejemplo recomendaciones. Gateway enruta porcentaje de tráfico. Comparar latencia/costo/error; rollback vuelve al monolito. Luego retirar código antiguo. No iniciar por el núcleo más acoplado.
+
+\paragraph{Profundización.} El primer servicio debe tener frontera observable y rollback. Durante coexistencia, un anti-corruption layer y una fuente de verdad clara evitan dual ownership.\paragraph{Métrica.} Comparar lead time, p99, error rate, costo y frecuencia de rollback antes de continuar.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{19. Capacidad operativa.} Construya una checklist de capacidades mínimas antes de operar 30 microservicios en producción.
 \end{uaexercise}
 \begin{uaanswer}
 CI/CD, rollback, infraestructura como código, service discovery, secretos, métricas/logs/traces, SLOs, alertas, on-call, catálogo/ownership, contratos, seguridad, resiliencia, costos, runbooks y pruebas de falla. Sin esto, 30 servicios multiplican toil.
+
+\paragraph{Profundización.} La checklist debe incluir también capacidad humana: equipo dueño, rotación on-call, runbooks y presupuesto de toil.\paragraph{Criterio.} Si cada incidente requiere al arquitecto original, la arquitectura no es operable.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma de cursos y defienda qué permanece monolítico, qué se extrae y qué trade-offs se aceptan.
 \end{uaexercise}
 \begin{uaanswer}
 P: inscribir y enseñar globalmente. F: fallas parciales, dual writes, picos, cambios de dominio. G: pago/cupo correctos, video disponible, recomendaciones frescas. S: monolito modular para aprendizaje cambiante, pagos/video separados, eventos para proyecciones, outbox y saga. T: más operación y consistencia eventual.
+
+\paragraph{Profundización.} La propuesta debe explicar por qué pagos/video compran autonomía real y por qué aprendizaje queda modular. Cada frontera incluye datos, contrato, SLO y falla.\paragraph{Prueba.} Medir despliegue independiente, blast radius, dual-write consistency y experiencia de inscripción bajo fallas.
 \end{uaanswer}
-\section{Criterio docente de corrección}
-La respuesta excelente identifica una presión concreta para separar, conserva invariantes locales y diseña operación. Es insuficiente responder con slogans de microservicios o eventos.
+
+\section{Criterio de autocorrección}
+
+Una solución está completa cuando explicita el problema, la falla, la garantía, el mecanismo, el costo y la evidencia que permitiría validar o refutar la respuesta. Las matrices de corrección y las preguntas de defensa se reservan para el material docente.
+
 \end{document}

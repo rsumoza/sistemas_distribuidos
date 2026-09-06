@@ -1,11 +1,34 @@
 % !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+
+\tikzset{
+  uaBox/.style={draw=UAIngNavy,rounded corners=1.5mm,thick,fill=white,
+    minimum height=0.75cm,align=center,font=\scriptsize,inner sep=4pt},
+  uaBoxO/.style={uaBox,draw=UAIngOrange,fill=UAIngPaper},
+  uaSoft/.style={uaBox,draw=UAIngRule,fill=UAIngPaper},
+  uaArrow/.style={->,very thick,>=Latex,draw=UAIngNavy},
+  uaArrowO/.style={->,very thick,>=Latex,draw=UAIngOrange},
+  uaLane/.style={draw=UAIngRule,line width=0.9pt}
+}
+
+
+% Etiqueta pedagógica visible. Se define localmente para no modificar el .sty
+% compartido ni el build de GitHub.
+\newcommand{\UASlideTag}[2]{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,rounded corners=1mm,inner xsep=3pt,inner ysep=1.5pt,
+      draw=#2,fill=#2!8,text=#2,font=\fontsize{5.8}{6.4}\selectfont\bfseries]
+      at ([xshift=-0.72cm,yshift=-1.08cm]current page.north east) {#1};
+  \end{tikzpicture}%
+}
 
 \UASetClassNumber{08}
 \UASetClassTitle{Consistencia real}
 \title{\UACourse}
-\subtitle{Clase 08 --- CAP, PACELC, Dynamo y Spanner}
+\subtitle{Clase 08 --- CAP, PACELC, Dynamo y Spanner: decidir qué error aceptar}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -17,358 +40,695 @@
 \end{frame}
 }
 
-\UASectionSlide{De la consistencia local a decisiones globales}
-
-\begin{frame}{Puente desde clase 7}
-\begin{itemize}
-\item Particionar un log mejora paralelismo y elimina un orden global gratuito.
-\item Replicar mejora disponibilidad, pero las copias pueden divergir.
-\item Coordinar reduce ambigüedad, pero cuesta latencia y disponibilidad.
-\end{itemize}
-\begin{block}{Pregunta}
-¿Qué errores acepta el negocio cuando una región deja de comunicarse con otra?
+\begin{frame}{Cómo vamos a trabajar hoy}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.45cm]
+\node[uaBoxO,text width=2.7cm] (a) {Intuición\\dos réplicas aisladas};
+\node[uaBox,text width=2.7cm,right=of a] (b) {CAP / PACELC\\decisiones distintas};
+\node[uaBoxO,text width=2.7cm,right=of b] (c) {Dynamo\\disponibilidad y repair};
+\node[uaBox,text width=2.7cm,right=of c] (d) {Spanner\\orden global y tiempo};
+\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Dos casos conductores}
+Una última entrada no puede venderse dos veces; un carrito de compras puede aceptar cambios en dos regiones y reconciliarlos después. El costo del error no es el mismo.
 \end{block}
 \end{frame}
 
-\begin{frame}{Tres casos, tres costos de error}
-\small
-\begin{tabular}{p{0.28\textwidth}p{0.29\textwidth}p{0.32\textwidth}}
-\toprule
-Sistema & Error más costoso & Posible prioridad \\
-\midrule
-Carrito de compras & perder disponibilidad y ventas & aceptar versiones y reconciliar \\
-Ledger financiero & doble gasto / saldo imposible & rechazar antes que divergir \\
-Feed social & latencia alta global & aceptar frescura eventual \\
-\bottomrule
-\end{tabular}
+\begin{frame}{Evidencias de aprendizaje que produciremos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Durante la clase}
+\begin{itemize}
+\item resolver una partición sin usar el slogan ``dos de tres'';
+\item construir quorums y explicar sus límites;
+\item ordenar versiones por causalidad o concurrencia.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Al cerrar}
+\begin{itemize}
+\item contrastar Dynamo y Spanner por requisito;
+\item explicar TrueTime y commit wait;
+\item definir una política distinta por subsistema.
+\end{itemize}
+\end{block}
+\end{columns}
 \begin{uakeybox}
-CAP no elige por nosotros. El dominio determina qué error es más caro.
+La evidencia esperada es una decisión por operación: invariante, respuesta bajo partición, costo normal y reparación.
 \end{uakeybox}
 \end{frame}
 
-\UASectionSlide{CAP: dos decisiones explícitas durante una partición}
 
-\begin{frame}{CAP sin slogan}
-\begin{block}{Condición}
-Existe una partición: dos subconjuntos correctos no pueden comunicarse.
-\end{block}
-\begin{columns}[T]
-\column{0.48\textwidth}
-\textbf{Preservar C}
+\UASectionSlide{De la partición del log\\a la partición de la red}
+
+\begin{frame}{Puente desde la clase 7}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{itemize}
-\item rechazar o bloquear ciertas operaciones;
-\item evitar historias incompatibles;
-\item sacrificar disponibilidad CAP.
+\item Particionar un log elimina un orden global gratuito.
+\item Replicar un dato crea copias que pueden avanzar a ritmos diferentes.
+\item Coordinar esas copias reduce ambigüedad, pero agrega comunicación y latencia.
 \end{itemize}
-\column{0.48\textwidth}
-\textbf{Preservar A}
-\begin{itemize}
-\item responder en ambos lados;
-\item aceptar divergencia potencial;
-\item reconciliar después.
-\end{itemize}
-\end{columns}
+\begin{uakeybox}
+La pregunta de hoy no es ``¿CAP o no CAP?'', sino ``¿qué responde cada operación cuando las réplicas no pueden comunicarse?''.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Timeline: dos clientes, una partición}
+\begin{frame}{Diagnóstico de entrada: vote antes de discutir}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{enumerate}
+\item CAP significa que un sistema debe elegir permanentemente dos de tres propiedades.
+\item Bajo partición, responder error rápidamente cuenta como disponibilidad CAP.
+\item Si $R+W>N$, toda lectura es automáticamente linearizable.
+\item Dynamo elimina conflictos mediante last-write-wins.
+\item TrueTime devuelve una hora exacta y sin incertidumbre.
+\end{enumerate}
+\begin{block}{Consigna}
+Vote V/F. Volveremos al final con una ejecución concreta para cada afirmación.
+\end{block}
+\end{frame}
+
+\begin{frame}{Caso A: queda una sola entrada}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=2.0cm,>=Latex,every node/.style={font=\scriptsize,align=center}]
-\node[draw,rounded corners] (a) {Réplica A\\saldo=100};
-\node[draw,rounded corners,right=5cm of a] (b) {Réplica B\\saldo=100};
-\draw[very thick,dashed,UAIngOrange] ($(a.east)+(0.4,1.0)$)--($(a.east)+(0.4,-1.0)$);
-\node[above] at ($(a.east)+(0.4,1.0)$){partición};
-\node[below=0.7cm of a] (ca) {Cliente A: retirar 80};
-\node[below=0.7cm of b] (cb) {Cliente B: retirar 80};
-\draw[->] (ca)--(a); \draw[->] (cb)--(b);
+\begin{tikzpicture}[node distance=0.7cm]
+\node[uaBoxO,text width=2.3cm] (ba) {Región Buenos Aires\\stock=1};
+\node[uaBox,text width=2.3cm,right=3.2cm of ba] (ma) {Región Madrid\\stock=1};
+\draw[very thick,dashed,UAIngOrange] ($(ba.east)!0.5!(ma.west)+(0,1.0)$)--($(ba.east)!0.5!(ma.west)+(0,-1.0)$) node[below]{PARTICIÓN};
+\node[uaSoft,below=0.75cm of ba,text width=2.4cm] (c1) {Cliente A\\``comprar''};
+\node[uaSoft,below=0.75cm of ma,text width=2.4cm] (c2) {Cliente B\\``comprar''};
+\draw[uaArrow] (c1)--(ba); \draw[uaArrowO] (c2)--(ma);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Decisión}
-Si ambos responden “éxito”, la disponibilidad se preserva y el invariante puede romperse. Si uno rechaza, se preserva corrección a costa de disponibilidad.
+\begin{block}{Invariante}
+Como máximo una venta puede confirmar. Si ambas regiones responden éxito, el sistema preserva disponibilidad local pero viola la propiedad de negocio.
 \end{block}
 \end{frame}
 
-\begin{frame}{Qué significa “availability” en CAP}
-\small
-En la formulación clásica, toda solicitud recibida por un nodo no fallado debe obtener una respuesta no errónea, sin esperar indefinidamente a la otra partición.
-\begin{itemize}
-\item “Tenemos réplicas” no garantiza disponibilidad CAP.
-\item “Respondemos error/retry” puede significar que elegimos C.
-\item Latencia alta y disponibilidad no son la misma propiedad, aunque se relacionan operacionalmente.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{CAP no describe la mayoría del tiempo}
-\begin{itemize}
-\item Las particiones son un escenario, no el estado permanente.
-\item Sin partición, coordinar entre regiones sigue costando.
-\item Un sistema puede elegir menor latencia aun cuando podría coordinar.
-\end{itemize}
-\begin{block}{Pregunta de operación normal}
-¿Esperamos a una región remota para cada lectura/escritura o respondemos localmente?
+\begin{frame}{Caso B: un carrito admite reconciliación}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.7cm]
+\node[uaBoxO,text width=2.6cm] (ba) {Región BA\\agrega libro};
+\node[uaBox,text width=2.6cm,right=3.0cm of ba] (ma) {Región Madrid\\agrega auriculares};
+\draw[very thick,dashed,UAIngOrange] ($(ba.east)!0.5!(ma.west)+(0,0.9)$)--($(ba.east)!0.5!(ma.west)+(0,-0.9)$) node[below]{PARTICIÓN};
+\node[uaBoxO,text width=3.3cm,below=1.2cm of $(ba)!0.5!(ma)$] (merge) {Al reconectar: unir ambos artículos};
+\draw[uaArrow] (ba)--(merge); \draw[uaArrowO] (ma)--(merge);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Idea}
+La misma decisión AP puede ser razonable para un carrito y peligrosa para una última entrada, un saldo o la propiedad de un castillo.
 \end{block}
 \end{frame}
 
-\UASectionSlide{PACELC: durante la partición y cuando todo parece sano}
+\begin{frame}{Predicción individual antes del formalismo}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\begin{uainfo}
+Durante 60 segundos, complete para cada caso: \textbf{qué responde cada región durante la partición}, \textbf{qué invariante puede romperse} y \textbf{qué costo acepta}.
+\end{uainfo}
+\vspace{0.25cm}
+No use todavía las etiquetas CP/AP. Primero describa comportamiento observable; luego pondremos nombre al modelo.
+\end{frame}
 
-\begin{frame}{PACELC}
-\begin{block}{Marco}
-Si hay \textbf{P}artición: elegir entre \textbf{A}vailability y \textbf{C}onsistency.\newline
-\textbf{E}lse: elegir entre \textbf{L}atency y \textbf{C}onsistency.
-\end{block}
+
+\begin{frame}{Cuatro preguntas antes de elegir tecnología}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.35cm]
+\node[uaBoxO,text width=2.7cm] (q1) {¿Qué invariante\\no puede romperse?};
+\node[uaBox,text width=2.7cm,right=of q1] (q2) {¿Qué debe responder\\durante partición?};
+\node[uaBoxO,text width=2.7cm,right=of q2] (q3) {¿Cuánta latencia cuesta\\coordinar normalmente?};
+\node[uaBox,text width=2.7cm,right=of q3] (q4) {¿Quién repara\\la divergencia?};
+\draw[uaArrow] (q1)--(q2); \draw[uaArrowO] (q2)--(q3); \draw[uaArrow] (q3)--(q4);
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+\UASectionSlide{Primero la intuición:\\un puente cortado}
+
+\begin{frame}{Consistencia CAP: una sola historia observable}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.7cm]
+\node[uaBoxO] (w) {write(x=1)};
+\node[uaBox,right=of w] (r) {read(x)};
+\node[uaBoxO,right=of r] (ans) {debe ver 1\\si el write terminó antes};
+\draw[uaArrow] (w)--(r); \draw[uaArrowO] (r)--(ans);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+En el modelo clásico, consistencia significa comportamiento equivalente a una copia única y compatible con el orden real de operaciones completadas.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Disponibilidad CAP: todo nodo no fallado debe responder}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{itemize}
-\item CAP obliga a decidir bajo partición.
-\item PACELC hace visible que la coordinación también cuesta en operación normal.
+\item Toda request recibida por un nodo no fallado debe terminar con una respuesta; en la formulación clásica, responder con un error que niega el servicio no preserva availability.
+\item No alcanza con responder rápido ``no sé'' o ``intente más tarde''.
+\item Es una definición teórica estricta, distinta de ``99.99\% uptime''.
+\end{itemize}
+\begin{uawarn}
+Bajo la definición CAP, rechazar una compra para proteger consistencia sacrifica disponibilidad aunque el proceso siga vivo.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Partición: mensajes entre grupos pueden no llegar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.7cm]
+\node[uaBoxO,text width=2.2cm] (a1) {Réplica A1};
+\node[uaBoxO,below=0.45cm of a1,text width=2.2cm] (a2) {Réplica A2};
+\node[uaBox,text width=2.2cm,right=4.0cm of a1] (b1) {Réplica B1};
+\node[uaBox,below=0.45cm of b1,text width=2.2cm] (b2) {Réplica B2};
+\draw[uaArrow,dashed] (a1)--(b1);
+\draw[uaArrowO,dashed] (a2)--(b2);
+\node[fill=white,font=\bfseries\small] at ($(a1)!0.5!(b2)$){mensajes perdidos o retrasados sin cota};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Intuición}
+Si cada lado debe responder sin hablar con el otro, no puede saber qué operación concurrente está aceptando el otro lado.
+\end{block}
+\end{frame}
+
+\begin{frame}{CAP: bajo partición, dos respuestas posibles}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaBoxO,text width=2.7cm] (p) {Partición activa};
+\node[uaBox,text width=3.0cm,below left=1.0cm and 1.0cm of p] (c) {Preservar consistencia\\rechazar o esperar};
+\node[uaBoxO,text width=3.0cm,below right=1.0cm and 1.0cm of p] (a) {Preservar disponibilidad\\responder con vista local};
+\draw[uaArrow] (p)--(c); \draw[uaArrowO] (p)--(a);
+\end{tikzpicture}
+\end{center}
+\begin{block}{No es una preferencia estética}
+La decisión depende del invariante: doble venta, saldo negativo, carrito fusionable, feed atrasado.
+\end{block}
+\end{frame}
+
+\begin{frame}{PACELC: incluso con el puente abierto hay un costo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.7cm]
+\node[uaBoxO,text width=2.1cm] (start) {¿Hay partición?};
+\node[uaBox,text width=2.4cm,above right=0.5cm and 1.0cm of start] (yes) {Sí: A vs C};
+\node[uaBoxO,text width=2.4cm,below right=0.5cm and 1.0cm of start] (no) {No: L vs C};
+\node[uaSoft,text width=2.8cm,right=1.0cm of yes] (pa) {Responder local\\o coordinar};
+\node[uaSoft,text width=2.8cm,right=1.0cm of no] (elc) {Baja latencia\\o confirmar remoto};
+\draw[uaArrow] (start)--node[above,font=\scriptsize]{P}(yes);
+\draw[uaArrowO] (start)--node[below,font=\scriptsize]{Else}(no);
+\draw[uaArrow] (yes)--(pa); \draw[uaArrowO] (no)--(elc);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+CAP describe el límite durante partición. PACELC recuerda que la coordinación también cuesta latencia en operación normal.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{PACELC es una taxonomía, no otro teorema CAP}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{itemize}
+\item CAP expresa una imposibilidad bajo un modelo y una partición concretos.
+\item PACELC organiza decisiones arquitectónicas también cuando no hay partición.
+\item No demuestra que toda base pertenezca para siempre a una sola casilla.
+\item Un mismo producto puede ofrecer modos o garantías diferentes por operación.
+\end{itemize}
+\begin{block}{Uso correcto}
+Emplear PACELC para formular preguntas sobre coordinación y latencia, no como etiqueta comercial definitiva.
+\end{block}
+\end{frame}
+
+
+\begin{frame}{Quorum: dos jurados que deben compartir al menos un miembro}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}
+\draw[fill=UAIngPaper,draw=UAIngOrange,thick] (0,0) circle (1.35cm);
+\draw[fill=white,draw=UAIngNavy,thick] (1.85,0) circle (1.35cm);
+\node at (-0.40,0.65){W};
+\node at (2.30,0.65){R};
+\node[font=\bfseries\scriptsize] at (0.93,0){intersección};
+\node[below,font=\small] at (0.93,-1.48){Si $R+W>N$, los conjuntos deben cruzarse.};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Intuición}
+La intersección crea una oportunidad de observar una escritura; no garantiza por sí sola orden total, frescura absoluta ni ausencia de versiones concurrentes.
+\end{block}
+\end{frame}
+
+\begin{frame}{Version vector: árbol genealógico de versiones}
+\UASlideTag{EXTENSIÓN}{UAIngMuted}
+\begin{center}
+\begin{tikzpicture}[node distance=0.8cm]
+\node[uaBoxO] (v0) {$v_0=[A:1,B:1]$};
+\node[uaBox,below left=0.8cm and 1.1cm of v0] (va) {$v_A=[A:2,B:1]$};
+\node[uaBoxO,below right=0.8cm and 1.1cm of v0] (vb) {$v_B=[A:1,B:2]$};
+\node[uaSoft,below=1.0cm of v0] (merge) {$v_M=[A:2,B:2]$};
+\draw[uaArrow] (v0)--(va); \draw[uaArrowO] (v0)--(vb);
+\draw[uaArrow] (va)--(merge); \draw[uaArrowO] (vb)--(merge);
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item $v_A$ y $v_B$ son concurrentes: ninguna domina a la otra.
+\item El sistema puede conservar ambas y pedir o aplicar un merge semántico.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ejemplo: lectura global de perfil}
-\small
+\begin{frame}{TrueTime: un reloj que admite lo que no sabe}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\[
+TT.now() = [earliest, latest], \qquad \epsilon = latest-earliest
+\]
+\begin{center}
+\begin{tikzpicture}[x=1.05cm,y=0.9cm]
+\draw[->,thick] (0,0)--(9.0,0) node[right]{tiempo real};
+\draw[line width=5pt,UAIngOrange] (2.2,0.5)--(4.4,0.5);
+\node[above] at (3.3,0.5){intervalo A};
+\draw[line width=5pt,UAIngNavy] (5.6,-0.5)--(7.5,-0.5);
+\node[below] at (6.55,-0.5){intervalo B};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Intuición}
+El sistema no finge conocer un instante perfecto: expone un intervalo de incertidumbre y espera cuando necesita demostrar orden externo.
+\end{block}
+\end{frame}
+
+\UASectionSlide{CAP formal: una ejecución\\adversarial mínima}
+
+\begin{frame}{Prueba intuitiva por indistinguibilidad}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.48\textwidth}
-\textbf{Lectura local}
-\begin{itemize}
-\item 15 ms;
-\item puede estar atrasada;
-\item excelente experiencia interactiva.
-\end{itemize}
+\begin{block}{Lado A}
+Recibe \texttt{write(x=1)}. No puede comunicarse con B. Para ser disponible debe responder.
+\end{block}
 \column{0.48\textwidth}
-\textbf{Lectura coordinada}
-\begin{itemize}
-\item 180 ms interregional;
-\item ve la última escritura confirmada;
-\item mayor costo y cola larga.
-\end{itemize}
+\begin{block}{Lado B}
+Recibe \texttt{read(x)}. No sabe si A recibió una escritura. Para ser disponible debe responder.
+\end{block}
 \end{columns}
-\begin{block}{Decisión}
-La consistencia no es una etiqueta general: puede variar por operación y dato.
+\vspace{0.35cm}
+\begin{uawarn}
+Si B devuelve 0 puede violar consistencia después de un write completado; si espera o devuelve error, viola disponibilidad CAP. La partición hace indistinguibles historias relevantes.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Qué no dice CAP}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{itemize}
+\item No dice que un sistema elija permanentemente dos letras.
+\item No dice que todas las operaciones deban tomar la misma decisión.
+\item No clasifica latencia normal: para eso PACELC es más útil.
+\item No afirma que consistencia eventual sea ``datos incorrectos''.
+\item No reemplaza el análisis de invariantes, repair, SLO o probabilidad de partición.
+\end{itemize}
+\begin{block}{Regla de uso}
+Aplicar CAP a una operación, un dato, un invariante y una falla concretos.
 \end{block}
 \end{frame}
 
-\UASectionSlide{Dynamo: diseñar para seguir escribiendo}
-
-\begin{frame}{Caso real: el carrito de Amazon}
-\small
-Dynamo fue diseñado para servicios de Amazon que requerían experiencia “always-on”. Bajo ciertas fallas, prioriza disponibilidad y acepta versiones que la aplicación puede reconciliar.
-\begin{itemize}
-\item No intenta ser una base relacional global.
-\item Versiona objetos en lugar de ocultar todos los conflictos.
-\item Distribuye responsabilidad entre infraestructura y aplicación.
-\end{itemize}
-{\scriptsize Fuente: DeCandia et al., “Dynamo: Amazon's Highly Available Key-value Store”.}
+\begin{frame}{PACELC cuantitativo: una lectura global}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[x=1.05cm,y=1cm]
+\node[uaBoxO,text width=2.5cm] at (1.4,0){Lectura local\\8 ms};
+\node[uaBox,text width=2.5cm] at (4.6,0){Confirmar región remota\\+90 ms};
+\node[uaBoxO,text width=2.5cm] at (7.8,0){Respuesta fuerte\\98+ ms};
+\draw[uaArrow] (2.7,0)--(3.3,0); \draw[uaArrowO] (5.9,0)--(6.5,0);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Decisión Else}
+Sin partición, la pregunta sigue siendo si el dato exige esperar coordinación remota o si puede responderse localmente con menor frescura.
+\end{block}
 \end{frame}
 
-\begin{frame}{Arquitectura Dynamo en una imagen}
+\UASectionSlide{Dynamo: disponibilidad y\\reconciliación explícita}
+
+\begin{frame}{Por qué nació Dynamo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+El paper de Amazon describe un key-value store para servicios que necesitaban una experiencia ``always-on''. Bajo ciertos escenarios, prioriza disponibilidad y acepta versiones que deben reconciliarse.
+\begin{itemize}
+\item Particionamiento mediante consistent hashing.
+\item Replicación configurable con $N$, $R$ y $W$.
+\item Versionado y resolución de conflictos asistida por la aplicación.
+\item Sloppy quorum, hinted handoff y anti-entropy.
+\end{itemize}
+{\scriptsize Referencia: DeCandia et al., \emph{Dynamo: Amazon's Highly Available Key-value Store}.}
+\end{frame}
+
+\begin{frame}{Consistent hashing: mover pocos rangos cuando cambia el cluster}
+\UASlideTag{EXTENSIÓN}{UAIngMuted}
 \begin{center}
-\begin{tikzpicture}[scale=0.95,every node/.style={font=\scriptsize,align=center},>=Latex]
-\foreach \a/\n in {90/A,18/B,-54/C,-126/D,162/E}{
-  \node[draw,circle,minimum size=0.75cm] (\n) at (\a:2.5cm){\n};
+\begin{tikzpicture}[scale=0.86]
+\draw[thick,UAIngNavy] (0,0) circle (1.9cm);
+\foreach \a/\lab in {20/A,95/B,165/C,235/D,305/E}{
+  \node[uaBoxO,minimum width=0.6cm] at ({1.9*cos(\a)},{1.9*sin(\a)}) {\lab};
 }
-\draw[thick] (0,0) circle (2.5cm);
-\node[draw,rounded corners,fill=UAIngPaper] (k) at (0,0){key $k$\\coordinator B};
-\draw[->] (k)--(B); \draw[->] (B)--(C); \draw[->] (B)--(D);
+\foreach \a/\lab in {50/k1,130/k2,210/k3,280/k4}{
+  \fill[UAIngNavy] ({1.28*cos(\a)},{1.28*sin(\a)}) circle (2pt);
+  \node[font=\scriptsize] at ({1.02*cos(\a)},{1.02*sin(\a)}) {\lab};
+}
+\node[align=center] at (0,0){hash ring\\rangos y réplicas};
 \end{tikzpicture}
 \end{center}
-\begin{itemize}
-\item Consistent hashing distribuye claves.
-\item Cada clave se replica en $N$ nodos sucesores/preferencia.
-\item Lecturas y escrituras esperan $R$ y $W$ respuestas.
-\end{itemize}
+\begin{block}{Intuición}
+Una clave se asigna al siguiente nodo del anillo y a una lista de preferencia. Nodos virtuales ayudan a distribuir carga y heterogeneidad.
+\end{block}
 \end{frame}
 
-\begin{frame}{Quórum con intersección: $N=3, W=2, R=2$}
+\begin{frame}{Quórums $N$, $R$ y $W$}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=1.3cm,every node/.style={font=\small,align=center}]
-\node[draw,circle] (a) {A}; \node[draw,circle,right=of a] (b) {B}; \node[draw,circle,right=of b] (c) {C};
-\node[below=0.7cm of b] {Escritura: A,B \qquad Lectura: B,C};
-\draw[very thick,UAIngOrange] (a.south)--(b.south);
-\draw[very thick,UAIngNavy] (b.north)--(c.north);
-\node[above=0.6cm of b,fill=white] {intersección};
+\begin{tikzpicture}[node distance=0.5cm]
+\foreach \x/\lab in {0/N1,1/N2,2/N3,3/N4,4/N5}{\node[uaSoft] (n\x) at (\x*1.6,0){\lab};}
+\draw[rounded corners,thick,UAIngOrange] (-0.55,-0.6) rectangle (3.75,0.6);
+\node[above,UAIngOrange] at (1.6,0.7){write quorum $W=3$};
+\draw[rounded corners,thick,UAIngNavy] (1.05,-0.9) rectangle (7.0,0.9);
+\node[below,UAIngNavy] at (4.0,-1.0){read quorum $R=4$};
 \end{tikzpicture}
 \end{center}
 \[
 R+W>N \Rightarrow \text{intersección de conjuntos}
 \]
-\begin{alertblock}{Límite}
-La intersección no garantiza por sí sola linearizabilidad: importan versiones, coordinación y qué réplica responde.
-\end{alertblock}
+\begin{uawarn}
+La intersección no convierte por sí sola una implementación Dynamo-style en linearizable: hay concurrencia, sloppy quorums, versiones y políticas de lectura.
+\end{uawarn}
 \end{frame}
 
-\begin{frame}{Sin intersección: $N=3, W=1, R=1$}
+\begin{frame}{Sloppy quorum: disponibilidad con nodos temporales}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=1.3cm,every node/.style={font=\small}]
-\node[draw,circle] (a) {A}; \node[draw,circle,right=of a] (b) {B}; \node[draw,circle,right=of b] (c) {C};
-\draw[very thick,UAIngOrange] (a.south west)--(a.south east) node[below=0.2cm]{write};
-\draw[very thick,UAIngNavy] (c.north west)--(c.north east) node[above=0.2cm]{read};
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaBoxO] (owner) {Owner N2\\no disponible};
+\node[uaBox,text width=2.3cm,right=1.5cm of owner] (temp) {Nodo N6\\guarda temporal};
+\node[uaBoxO,text width=2.3cm,right=1.5cm of temp] (back) {N2 vuelve\\recibe el dato};
+\draw[uaArrow] (owner)--node[above,font=\scriptsize]{fallback}(temp);
+\draw[uaArrowO] (temp)--node[above,font=\scriptsize]{hinted handoff}(back);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Trade-off}
+Se mantiene escritura disponible, pero el conjunto real que confirmó puede no coincidir con la preferencia normal; repair y seguimiento del hint se vuelven esenciales.
+\end{block}
+\end{frame}
+
+\begin{frame}{Conflicto concurrente: LWW puede perder intención}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.75cm]
+\node[uaBoxO] (v0) {carrito = \{\}};
+\node[uaBox,below left=0.8cm and 1.2cm of v0] (a) {A agrega libro};
+\node[uaBoxO,below right=0.8cm and 1.2cm of v0] (b) {B agrega auriculares};
+\node[uaSoft,below=1.0cm of v0,text width=3.5cm] (lww) {LWW conserva una versión\\y puede perder un artículo};
+\draw[uaArrow] (v0)--(a); \draw[uaArrowO] (v0)--(b); \draw[uaArrow] (a)--(lww); \draw[uaArrowO] (b)--(lww);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Alternativa semántica}
+Conservar siblings y unir conjuntos puede respetar la intención de ``agregar''. El merge depende del dominio, no solo de timestamps.
+\end{block}
+\end{frame}
+
+\begin{frame}{Read repair y anti-entropy: converger exige trabajo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaBoxO] (c) {Cliente};
+\node[uaBox,right=1.2cm of c] (r1) {R1 v5};
+\node[uaBox,above right=0.35cm and 1.1cm of r1] (r2) {R2 v5};
+\node[uaBox,below right=0.35cm and 1.1cm of r1] (r3) {R3 v3};
+\draw[uaArrow] (c)--(r1); \draw[uaArrow] (c)--(r2); \draw[uaArrow] (c)--(r3);
+\draw[uaArrowO,dashed] (r1)--node[below,font=\scriptsize]{repair v5}(r3);
 \end{tikzpicture}
 \end{center}
 \begin{itemize}
-\item Escritura rápida y disponible.
-\item Lectura rápida y disponible.
-\item Puede leer una versión anterior sin contactar la réplica actualizada.
+\item Read repair corrige réplicas observadas durante una lectura.
+\item Anti-entropy compara regiones periódicamente, incluso sin lecturas.
+\item Merkle trees permiten localizar diferencias por hashes jerárquicos.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Version vectors: distinguir “después” de “concurrente”}
-\small
-\begin{itemize}
-\item $v_2$ domina a $v_1$ si contiene al menos todo su conocimiento y algún avance.
-\item Si ninguna domina, son versiones concurrentes.
-\end{itemize}
-\begin{uacase}
-Dos clientes agregan productos distintos al carrito durante una partición. “Último timestamp gana” puede perder uno; merge de carrito puede conservar ambos.
-\end{uacase}
-\end{frame}
-
-\begin{frame}{Sloppy quorum y hinted handoff}
-\begin{itemize}
-\item Si un nodo preferido no responde, otro nodo temporal puede aceptar la escritura.
-\item Guarda un \emph{hint}: el dato pertenece a un nodo distinto.
-\item Cuando se recupera la conectividad, se hace handoff.
-\end{itemize}
-\begin{block}{Ganancia y costo}
-Más disponibilidad de escritura; más dispersión temporal, reparación y complejidad de lectura.
+\begin{frame}{Métricas de un diseño Dynamo-style}
+\UASlideTag{RESPALDO}{UAIngMuted}
+\begin{center}
+\begin{tikzpicture}[node distance=0.45cm]
+\node[uaBoxO,text width=2.25cm] (a) {p99 read\\18 ms};
+\node[uaBox,text width=2.25cm,right=of a] (b) {siblings\\0.8\%};
+\node[uaBoxO,text width=2.25cm,right=of b] (c) {hints pending\\42 k};
+\node[uaBox,text width=2.25cm,right=of c] (d) {repair lag\\11 min};
+\node[uaBoxO,text width=2.25cm,right=of d] (e) {stale reads\\1.4\%};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Lectura causal}
+Alta disponibilidad puede parecer saludable en uptime mientras crecen conflicto, hints y deuda de repair. La convergencia también necesita SLO.
 \end{block}
 \end{frame}
 
-\begin{frame}{Anti-entropy y Merkle trees}
-\begin{itemize}
-\item Réplicas comparan resúmenes de rangos, no todos los objetos.
-\item Un Merkle tree permite localizar rangos divergentes.
-\item Read repair corrige durante una lectura; anti-entropy repara en background.
-\end{itemize}
-\begin{alertblock}{Lección}
-Eventual consistency no significa “converge sola”: necesita mecanismos y capacidad de reparación.
-\end{alertblock}
-\end{frame}
+\UASectionSlide{Spanner: consistencia externa\\con coordinación localizada}
 
-\UASectionSlide{Spanner: pagar coordinación para una historia global fuerte}
-
-\begin{frame}{Caso real: transacciones globales en Google}
+\begin{frame}{Qué problema intenta resolver Spanner}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
-Spanner fue diseñado como una base multi-versión, globalmente distribuida y replicada sincrónicamente, con transacciones externamente consistentes.
+Spanner fue diseñado como una base global, multi-versión y sincrónicamente replicada, capaz de ofrecer transacciones distribuidas externamente consistentes.
 \begin{itemize}
-\item Particiona datos en grupos replicados.
-\item Usa consenso para el orden dentro de cada grupo.
-\item Usa TrueTime para exponer incertidumbre del reloj.
+\item Datos particionados en grupos de replicación.
+\item Consenso localizado dentro de cada grupo.
+\item Coordinación transaccional entre grupos cuando una operación cruza shards.
+\item TrueTime expone incertidumbre temporal.
 \end{itemize}
-{\scriptsize Fuente: Corbett et al., “Spanner: Google's Globally-Distributed Database”.}
+{\scriptsize Referencia: Corbett et al., \emph{Spanner: Google's Globally-Distributed Database}.}
 \end{frame}
 
-\begin{frame}{TrueTime no entrega un instante perfecto}
+\begin{frame}{No hay un consenso global único}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaBoxO,text width=2.5cm] (g1) {Grupo G1\\cuentas A--M};
+\node[uaBox,text width=2.5cm,right=1.2cm of g1] (g2) {Grupo G2\\cuentas N--Z};
+\node[uaBoxO,text width=2.5cm,right=1.2cm of g2] (g3) {Grupo G3\\histórico};
+\node[uaSoft,text width=3.2cm,below=0.9cm of g2] (tx) {Transacción multi-shard\\coordina solo grupos implicados};
+\draw[uaArrow] (g1)--(tx); \draw[uaArrowO] (g2)--(tx); \draw[uaArrow] (g3)--(tx);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Escalabilidad}
+Particionar limita el dominio de consenso. Las operaciones multi-shard pagan coordinación adicional solo cuando la semántica lo exige.
+\end{block}
+\end{frame}
+
+\begin{frame}{TrueTime formaliza incertidumbre}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \[
-TT.now()=[earliest, latest]
+TT.now()=[t_{earliest},t_{latest}], \qquad \epsilon=t_{latest}-t_{earliest}
 \]
 \begin{itemize}
-\item El intervalo contiene la hora real según la garantía del sistema.
-\item La anchura $\epsilon$ representa incertidumbre.
-\item GPS, relojes atómicos y monitoreo reducen y controlan $\epsilon$.
+\item El reloj real se encuentra dentro del intervalo declarado.
+\item Un intervalo más ancho implica mayor incertidumbre.
+\item La infraestructura reduce $\epsilon$, pero no lo reemplaza por cero.
 \end{itemize}
 \begin{uakeybox}
-Spanner no elimina la incertidumbre del tiempo: la convierte en una API explícita.
+El aporte conceptual es exponer la incertidumbre como dato del protocolo, no esconderla detrás de un timestamp aparentemente exacto.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Commit wait: esperar para preservar orden externo}
-\small
-Si $T_1$ termina antes de que $T_2$ empiece, external consistency exige que $T_1$ aparezca antes en la serialización.
-\begin{enumerate}
-\item Asignar timestamp de commit.
-\item Esperar hasta que TrueTime garantice que ese timestamp quedó en el pasado.
-\item Hacer visible el commit.
-\end{enumerate}
-\begin{block}{Trade-off PACELC}
-Incluso sin partición, más consistencia global implica latencia de coordinación y espera temporal.
+\begin{frame}{Commit wait: esperar hasta que el timestamp quede en el pasado}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[x=1.0cm,y=0.9cm]
+\draw[->,thick] (0,0)--(9.0,0) node[right]{tiempo real};
+\draw[line width=5pt,UAIngOrange] (2.0,0.55)--(4.2,0.55);
+\node[above] at (3.1,0.55){elige commit ts};
+\draw[very thick,UAIngNavy] (4.2,-0.3)--(4.2,1.2);
+\node[below] at (4.2,-0.35){commit ts};
+\draw[<->,very thick,UAIngOrange] (4.2,-0.8)--(6.1,-0.8) node[midway,below]{commit wait};
+\draw[very thick,UAIngNavy] (6.1,-0.3)--(6.1,1.2);
+\node[above] at (6.1,1.2){respuesta};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Garantía}
+Antes de responder, el sistema espera hasta poder asegurar que el timestamp de commit quedó definitivamente en el pasado del reloj real.
 \end{block}
 \end{frame}
 
-\begin{frame}{Spanner no es “un consenso global único”}
+\begin{frame}{External consistency: orden visible compatible con el mundo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaBoxO,text width=2.6cm] (t1) {$T_1$ termina\\antes de iniciar $T_2$};
+\node[uaBox,text width=2.6cm,right=of t1] (serial) {Orden serial\\debe poner $T_1<T_2$};
+\node[uaBoxO,text width=2.6cm,right=of serial] (obs) {Clientes observan\\un orden coherente};
+\draw[uaArrow] (t1)--(serial); \draw[uaArrowO] (serial)--(obs);
+\end{tikzpicture}
+\end{center}
 \begin{itemize}
-\item Los datos se particionan en grupos; cada grupo usa consenso.
-\item Transacciones multi-grupo coordinan varios participantes.
-\item El diseño evita que cada operación atraviese todos los nodos del planeta.
+\item Es más fuerte que convergencia eventual.
+\item Requiere consenso, control de concurrencia y un protocolo temporal apropiado.
+\item El costo aparece en latencia y disponibilidad bajo ciertas particiones.
 \end{itemize}
-\begin{alertblock}{Principio}
-Consenso localizado y particionamiento son necesarios para escalar una garantía fuerte.
-\end{alertblock}
 \end{frame}
 
-\UASectionSlide{Comparar sistemas por dominio y evidencia}
+\begin{frame}{Métricas de un diseño Spanner-style}
+\UASlideTag{RESPALDO}{UAIngMuted}
+\begin{center}
+\begin{tikzpicture}[node distance=0.45cm]
+\node[uaBoxO,text width=2.25cm] (a) {p99 commit\\145 ms};
+\node[uaBox,text width=2.25cm,right=of a] (b) {TrueTime $\epsilon$\\2.8 ms};
+\node[uaBoxO,text width=2.25cm,right=of b] (c) {multi-shard\\17\%};
+\node[uaBox,text width=2.25cm,right=of c] (d) {abort rate\\0.6\%};
+\node[uaBoxO,text width=2.25cm,right=of d] (e) {unavailable\\0.02\%};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Lectura}
+Consistencia externa no se evalúa solo con throughput: importa commit latency, incertidumbre temporal, proporción multi-shard, aborts y disponibilidad del quorum.
+\end{block}
+\end{frame}
 
-\begin{frame}{Dynamo y Spanner no intentan ganar el mismo juego}
-\scriptsize
-\begin{tabular}{p{0.22\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+\UASectionSlide{Comparar sistemas\\por el costo del error}
+
+\begin{frame}{Dynamo y Spanner no responden la misma pregunta}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.32\textwidth}p{0.32\textwidth}}
 \toprule
 Dimensión & Dynamo & Spanner \\
 \midrule
-Objetivo & always-on, baja latencia & transacciones globales fuertes \\
-Partición & sigue aceptando y reconcilia & rechaza si no puede preservar garantía \\
-Conflicto & versiona / merge aplicación & evita mediante orden y transacción \\
-Tiempo normal & favorece respuestas locales & paga coordinación / commit wait \\
-Complejidad & reconciliación y repair & infraestructura temporal y consenso \\
+Prioridad & disponibilidad y latencia & consistencia externa \\
+Conflicto & conservar/reconciliar & prevenir mediante orden \\
+Partición & responder más operaciones & rechazar si falta quorum \\
+Costo normal & repair y complejidad cliente & coordinación y commit wait \\
+Caso típico & carrito / preferencias & ledger / reserva única \\
 \bottomrule
 \end{tabular}
+\end{center}
 \end{frame}
 
-\begin{frame}{Actividad: cuatro dominios}
+\begin{frame}{Matriz por subsistema: Asteria Online}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
-Asigne a cada grupo uno:
-\begin{enumerate}
+\begin{center}
+\begin{tabular}{p{0.19\textwidth}p{0.23\textwidth}p{0.24\textwidth}p{0.22\textwidth}}
+\toprule
+Subsistema & Invariante & Durante partición & Modelo razonable \\
+\midrule
+Castillo & un propietario & rechazar captura ambigua & CP / consenso local \\
+Inventario & no duplicar ítem & limitar transferencias & fuerte por shard \\
+Ranking & atraso tolerable & seguir con vistas locales & eventual + repair \\
+Chat & orden por canal & continuar localmente & causal / eventual \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{block}{Lección}
+Una empresa no es AP o CP en bloque. Las decisiones se toman por dato, operación e invariante.
+\end{block}
+\end{frame}
+
+\begin{frame}{Pruebas adversariales que vuelven verificable la decisión}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{itemize}
+\item Cortar comunicación entre regiones durante una venta única.
+\item Inyectar escrituras concurrentes y observar siblings/merge.
+\item Acumular hints y medir tiempo de convergencia posterior.
+\item Aumentar latencia interregional y medir p99 de commit.
+\item Ampliar $\epsilon$ de reloj y observar commit wait.
+\item Forzar una transacción multi-shard y medir abort/retry.
+\end{itemize}
+\begin{uakeybox}
+Una clasificación CAP/PACELC sin comportamiento medido bajo falla es una descripción incompleta.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Actividad de 15 minutos: cuatro datos, cuatro decisiones}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Elegir comportamiento}
+\begin{itemize}
+\item última entrada;
 \item carrito de compras;
-\item reserva de un único asiento;
-\item feed social;
-\item ledger de dinero.
+\item ranking de juego;
+\item saldo de billetera.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Defender con evidencia}
+\begin{itemize}
+\item invariante;
+\item respuesta bajo partición;
+\item costo normal PACELC;
+\item repair/consenso;
+\item SLO y experimento.
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Método reusable para decidir consistencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.35cm]
+\node[uaBoxO,text width=2.1cm] (i) {1. Invariante\\y error};
+\node[uaBox,text width=2.1cm,right=of i] (p) {2. Partición\\y respuesta};
+\node[uaBoxO,text width=2.1cm,right=of p] (l) {3. Latencia\\normal};
+\node[uaBox,text width=2.1cm,right=of l] (m) {4. Mecanismo\\y repair};
+\node[uaBoxO,text width=2.1cm,right=of m] (e) {5. SLO y\\experimento};
+\draw[uaArrow] (i)--(p); \draw[uaArrowO] (p)--(l); \draw[uaArrow] (l)--(m); \draw[uaArrowO] (m)--(e);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Marco del curso}
+$D=(P,F,G,S,T)$ evita clasificar por marca: parte del problema, la falla y la garantía.
+\end{block}
+\end{frame}
+
+\begin{frame}{Volvemos al diagnóstico inicial}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{enumerate}
+\item \textbf{Falso:} CAP restringe el comportamiento durante partición; no es una elección permanente de dos letras.
+\item \textbf{Falso:} una respuesta errónea sacrifica availability en el modelo CAP estricto.
+\item \textbf{Falso:} la intersección no elimina concurrencia, sloppy quorum ni decisiones de lectura.
+\item \textbf{Falso:} Dynamo conserva versiones y puede requerir reconciliación; LWW no es su única semántica.
+\item \textbf{Falso:} TrueTime devuelve un intervalo que explicita incertidumbre.
 \end{enumerate}
-Debe definir por operación:
-\begin{itemize}
-\item decisión bajo partición;
-\item decisión latency/consistency sin partición;
-\item conflicto aceptable;
-\item mecanismo de reparación o coordinación;
-\item métrica/SLO.
-\end{itemize}
 \end{frame}
 
-\begin{frame}{Un sistema puede mezclar modelos}
-\begin{itemize}
-\item Perfil: lectura local eventualmente consistente.
-\item Inventario visible: cache eventual con advertencia.
-\item Reserva final: transacción fuerte.
-\item Analytics: log y materialized views.
-\end{itemize}
-\begin{block}{Arquitectura madura}
-Elige la garantía mínima suficiente por dato y operación, no una etiqueta única para toda la empresa.
-\end{block}
-\end{frame}
-
-\begin{frame}{Errores frecuentes}
-\begin{itemize}
-\item “CAP = elegir dos” sin condición de partición.
-\item Confundir baja latencia con disponibilidad CAP.
-\item Creer que $R+W>N$ produce automáticamente linearizabilidad.
-\item Usar last-write-wins para invariantes no fusionables.
-\item Tratar eventual consistency como ausencia de reparación.
-\item Diseñar un consenso global único para todos los datos.
-\item Comparar Dynamo y Spanner sin declarar dominio.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Cierre}
-\begin{block}{Idea final}
-La consistencia real es una política por operación que combina costo del error, particiones, latencia, coordinación y reparación.
-\end{block}
-\begin{itemize}
-\item Dynamo hace visible el costo de reconciliar.
-\item Spanner hace visible el costo de coordinar.
-\item El dominio decide qué costo es razonable.
-\end{itemize}
+\begin{frame}{Síntesis visual: decidir qué error aceptar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.35cm]
+\node[uaBoxO,text width=2.1cm] (a) {Dato e\\invariante};
+\node[uaBox,text width=2.1cm,right=of a] (b) {Partición y\\respuesta};
+\node[uaBoxO,text width=2.1cm,right=of b] (c) {Latencia de\\coordinación};
+\node[uaBox,text width=2.1cm,right=of c] (d) {Repair o\\consenso};
+\node[uaBoxO,text width=2.1cm,right=of d] (e) {Métricas y\\prueba};
+\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d); \draw[uaArrowO] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+La consistencia real no es una etiqueta de producto: es un contrato operativo sobre qué se responde, qué se espera y quién repara.
+\end{uakeybox}
 \end{frame}
 
 \begin{frame}{Exit ticket}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+Responda en cuatro líneas cada punto:
 \begin{enumerate}
-\item ¿Qué decisión obliga CAP durante una partición?
-\item ¿Por qué $R+W>N$ no basta para afirmar linearizabilidad?
-\item ¿Qué compra Spanner con commit wait y qué paga?
+\item ¿Por qué ``dos de tres'' es una explicación insuficiente de CAP?
+\item ¿Qué agrega PACELC cuando no hay partición?
+\item ¿Qué garantiza $R+W>N$ y qué no garantiza?
+\item ¿Por qué TrueTime expone un intervalo y cómo aparece su costo en commit?
 \end{enumerate}
+\end{frame}
+
+\begin{frame}{Fuentes para profundizar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{itemize}
+\item Gilbert y Lynch, \emph{Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services}.
+\item Abadi, \emph{Consistency Tradeoffs in Modern Distributed Database System Design}.
+\item DeCandia et al., \emph{Dynamo: Amazon's Highly Available Key-value Store}.
+\item Corbett et al., \emph{Spanner: Google's Globally-Distributed Database}.
+\item Kleppmann, \emph{Designing Data-Intensive Applications}: replicación, particiones y consistencia.
+\end{itemize}
 \end{frame}
 
 \end{document}

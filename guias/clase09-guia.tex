@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
 \title{Clase 09 --- Guía de ejercicios}
@@ -10,66 +12,184 @@
 \maketitle
 \section{Propósito de la guía}
 Los ejercicios se evalúan por la coherencia entre dominio, ownership, comunicación, datos y operación. No por cantidad de servicios.
+
+\section{Caso base y restricciones de trabajo}
+
+La guía utiliza \textbf{Asteria Online}, un mundo virtual medieval con 30.000 jugadores concurrentes. El sistema contiene cuentas, mundo, combate, inventario, mercado, pagos, ranking y chat.
+
+\begin{center}
+\begin{tabular}{p{0.28\textwidth}p{0.57\textwidth}}
+\toprule
+Restricción & Consecuencia arquitectónica a discutir \\
+\midrule
+Combate p95 menor a 120 ms & autoridad y datos cercanos a la zona \\
+Objeto indivisible con un dueño & invariante local de inventario \\
+Ranking tolera 30 s de atraso & proyección/eventos posibles \\
+Pagos auditables & identidad, outbox y saga \\
+Equipos actuales: 3 equipos de 6 & no existe capacidad ilimitada de ownership \\
+Deploy actual: 2 por semana & medir si una extracción mejora lead time \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Método esperado de resolución}
+
+Toda frontera propuesta debe responder:
+\begin{enumerate}
+\item ¿qué capacidad e invariante contiene?;
+\item ¿quién es owner técnico y operacional?;
+\item ¿qué dato puede modificar exclusivamente?;
+\item ¿qué interacción será RPC y cuál evento?;
+\item ¿qué falla nueva introduce la red?;
+\item ¿cómo se resuelve dual write o workflow distribuido?;
+\item ¿qué métrica demostrará autonomía, escala o aislamiento?;
+\item ¿qué alternativa más simple fue descartada y por qué?
+\end{enumerate}
+
+\begin{uawarn}
+La cantidad de servicios no forma parte de la nota. Sí se evalúan coherencia, ownership, fallas y evidencia.
+\end{uawarn}
+
+
+\section{Ruta recomendada de uso}
+
+La guía entrena decisiones de frontera. Para una clase de tres horas:
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.23\textwidth}p{0.46\textwidth}}
+\toprule
+Momento & Ejercicios & Evidencia \\
+\midrule
+En clase & 1, 2, 5, 8, 11, 12, 14, 20 & módulos, prima, lenguaje, timeline y saga \\
+Postclase & 3, 4, 6, 7, 9, 10, 13, 15--17 & comparación y formalización \\
+Desafío & 18, 19 & migración reversible y readiness operacional \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Cada frontera debe completar este canvas: \textbf{capacidad, invariante, owner, datos, contrato, falla nueva, SLO, alternativa simple y condición de revisión}.
+
+
 \section{Ejercicios}
 \begin{uaexercise}
+
 \textbf{1. Monolito modular.} Explique por qué una unidad de despliegue no implica ausencia de modularidad. Proponga reglas internas para evitar una bola de barro.
+
+\textit{Entregable mínimo:} un diagrama modular, reglas de dependencia y prueba de arquitectura.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{2. Prima de microservicios.} Enumere los costos distribuidos que aparecen al extraer un módulo y diseñe un criterio para decidir si el beneficio compensa.
+
+\textit{Entregable mínimo:} una tabla beneficio/costo, métrica y umbral de extracción.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{3. Señales de separación.} Dado un sistema con catálogo, pagos y recomendaciones, decida qué separar primero y qué mantener junto. Justifique por dominio, carga y equipo.
+
+\textit{Entregable mínimo:} una decisión por componente con owner, carga y alternativa simple.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{4. Monolito distribuido.} Construya una arquitectura con cinco servicios que conserve despliegue coordinado, base compartida y cadenas RPC. Explique por qué es peor que un monolito modular.
+
+\textit{Entregable mínimo:} un diagrama del monolito distribuido y una refactorización propuesta.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{5. Bounded contexts.} Defina tres significados distintos de 'curso' o 'pedido' en contextos de negocio y diseñe traducciones entre ellos.
+
+\textit{Entregable mínimo:} un glosario por contexto y contratos de traducción.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{6. Ownership de datos.} Explique qué significa database per service y cómo resolvería una consulta global sin permitir acceso directo a tablas ajenas.
+
+\textit{Entregable mínimo:} un modelo de ownership y dos opciones para consulta global.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{7. Conway.} Analice una organización donde dos equipos deben aprobar cada cambio del otro. ¿Qué revela sobre la frontera de servicios?
+
+\textit{Entregable mínimo:} un mapa equipo-servicio y una propuesta de reducción de coordinación.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{8. RPC vs eventos.} Para validación de pago, notificación, actualización de ranking y consulta de perfil, elija RPC o evento y justifique.
+
+\textit{Entregable mínimo:} una tabla de cuatro interacciones con timeout, atraso y falla.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{9. Cadena sincrónica.} Diseñe una cadena API->A->B->C y calcule disponibilidad compuesta si cada servicio tiene 99.9%. Analice además latencia y timeouts.
+
+\textit{Entregable mínimo:} el cálculo, sus supuestos y dos mecanismos para sacar dependencias del camino.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{10. Comando, evento y consulta.} Clasifique ReserveSeat, SeatReserved y GetSeatAvailability. Construya un ejemplo de evento mal modelado como comando oculto.
+
+\textit{Entregable mínimo:} una clasificación justificada y un ejemplo de comando oculto.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{11. Dual write.} Un servicio actualiza Enrollment y publica StudentEnrolled. Dibuje las ventanas de falla para ambos órdenes.
+
+\textit{Entregable mínimo:} dos timelines con crash y estados inconsistentes.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{12. Transactional outbox.} Diseñe schema mínimo, relay, deduplicación y política de retención para una outbox de inscripciones.
+
+\textit{Entregable mínimo:} un schema, relay, inbox, retención, métricas y replay.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{13. Evolución de eventos.} Proponga una evolución compatible de StudentEnrolled v1 a v2 y una evolución que rompería consumidores.
+
+\textit{Entregable mínimo:} esquemas v1/v2, matriz de compatibilidad y plan de transición.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{14. Saga de inscripción.} Diseñe pasos, timeouts, reintentos y compensaciones para inscripción, cupo, pago, acceso y comprobante.
+
+\textit{Entregable mínimo:} una máquina de estados durable con retries y compensaciones.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{15. Compensación imperfecta.} Dé tres efectos que no pueden revertirse perfectamente y proponga una compensación de negocio razonable.
+
+\textit{Entregable mínimo:} una tabla de efectos irreversibles y compensaciones honestas.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{16. Coreografía.} Diseñe una saga coreografiada con tres participantes y explique cómo evitar ciclos y pérdida de visibilidad.
+
+\textit{Entregable mínimo:} un diagrama de eventos, riesgo de ciclos y trazabilidad.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{17. Orquestación.} Diseñe el mismo flujo con un orquestador durable. Defina estado, recuperación y riesgo de centralización.
+
+\textit{Entregable mínimo:} un estado de orquestador, protocolo de recovery y SLO.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{18. Strangler Fig.} Proponga una migración incremental desde un monolito de e-commerce. Defina primer servicio, routing, rollback y métricas.
+
+\textit{Entregable mínimo:} un plan por etapas con baseline, routing, rollback y stop criteria.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{19. Capacidad operativa.} Construya una checklist de capacidades mínimas antes de operar 30 microservicios en producción.
+
+\textit{Entregable mínimo:} una checklist priorizada con owner y evidencia de cumplimiento.
 \end{uaexercise}
 \begin{uaexercise}
+
 \textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma de cursos y defienda qué permanece monolítico, qué se extrae y qué trade-offs se aceptan.
+
+\textit{Entregable mínimo:} un canvas completo de frontera y defensa de la alternativa descartada.
 \end{uaexercise}
 \section{Criterios de entrega}
 Toda respuesta debe indicar beneficio, prima distribuida, falla nueva, mecanismo de mitigación y condición para revisar la decisión.

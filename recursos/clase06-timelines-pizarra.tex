@@ -1,0 +1,81 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=none,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\usetikzlibrary{decorations.pathreplacing}
+
+\UASetClassNumber{06}
+\UASetClassTitle{Sistemas de almacenamiento}
+\UASetDocKind{Timelines para pizarra}
+\title{Clase 06 --- WAL y MVCC}
+\author{\UAProfessor}
+\date{\UADate}
+
+\begin{document}
+\maketitle
+
+\section*{Timeline 1 --- WAL y crash recovery}
+
+Complete los cuatro carriles. Ubique request, \texttt{BEGIN}, registros de actualización, dirty pages, \texttt{COMMIT}, flush, ACK, escritura de páginas, checkpoint, CRASH y REDO.
+
+\begin{center}
+\begin{tikzpicture}[x=1.18cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {3/Cliente,2/Backend,1/WAL,0/Página}{
+  \node[left] at (0,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(10.3,\y);
+}
+\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(10.5,-0.7) node[right]{tiempo};
+\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
+  \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
+}
+\end{tikzpicture}
+\end{center}
+
+\begin{uainfo}
+\textbf{Marque:} frontera durable, cuatro posiciones de crash y la porción que recovery debe rehacer.
+\end{uainfo}
+
+\vspace{0.4cm}
+\textbf{Preguntas de conducción}
+
+\begin{enumerate}
+\item ¿Qué sabe el cliente en cada punto?
+\item ¿Qué sabe recovery?
+\item ¿Qué debe existir después del reinicio?
+\item ¿Qué evento no puede ocurrir antes del flush durable?
+\end{enumerate}
+
+\newpage
+\section*{Timeline 2 --- MVCC, snapshots y visibilidad}
+
+Complete los carriles. Ubique $v_1$, inicio de $T_R$, snapshot, primera lectura, inicio de $T_W$, creación de $v_2$, commit, segunda lectura, lector nuevo, fin de $T_R$ y elegibilidad para \texttt{VACUUM}.
+
+\begin{center}
+\begin{tikzpicture}[x=1.18cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {3/Lector $T_R$,2/Escritor $T_W$,1/Versiones,0/Lectura visible}{
+  \node[left] at (0,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(10.3,\y);
+}
+\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(10.5,-0.7) node[right]{tiempo};
+\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
+  \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
+}
+\end{tikzpicture}
+\end{center}
+
+\begin{uainfo}
+\textbf{Marque:} intervalo del snapshot de $T_R$, versión visible para cada lector y momento en que $v_1$ puede reclamarse.
+\end{uainfo}
+
+\vspace{0.4cm}
+\textbf{Preguntas de conducción}
+
+\begin{enumerate}
+\item ¿Debe cambiar la segunda lectura de $T_R$?
+\item ¿Qué observa una transacción iniciada después del commit?
+\item ¿Qué impide limpiar $v_1$?
+\item ¿Qué ocurre si $T_R$ permanece abierto durante 90 minutos?
+\end{enumerate}
+
+\end{document}

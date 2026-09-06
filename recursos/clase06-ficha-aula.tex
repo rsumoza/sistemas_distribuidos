@@ -1,0 +1,209 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=institutional,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\usetikzlibrary{decorations.pathreplacing,matrix,backgrounds}
+
+\UASetClassNumber{06}
+\UASetClassTitle{Sistemas de almacenamiento}
+\UASetDocKind{Ficha de trabajo en aula}
+\title{Clase 06 --- WAL, MVCC, EXPLAIN, compaction y stalls}
+\author{\UAProfessor}
+\date{\UADate}
+
+\begin{document}
+\maketitle
+
+\section{Antes del detalle: seis conceptos en una frase}
+
+Complete primero de memoria y vuelva al final de la clase.
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.68\textwidth}}
+\toprule
+Concepto & En una frase \\
+\midrule
+WAL & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+MVCC & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+Índice & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+\texttt{EXPLAIN} & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+Compaction & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+Write stall & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{uainfo}
+Para cada concepto, anote al final: qué problema resuelve, qué no resuelve por sí solo y dónde paga el costo.
+\end{uainfo}
+
+\newpage
+\section{Timeline WAL: completar durante la clase}
+
+Ubique: request, \texttt{BEGIN}, registros de pedido e inventario, dirty pages, registro de \texttt{COMMIT}, flush, ACK, page write, checkpoint, crash y REDO.
+
+\begin{center}
+\begin{tikzpicture}[x=1.12cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {3/Cliente,2/Backend,1/WAL,0/Página}{
+  \node[left] at (0,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(9.7,\y);
+}
+\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(9.9,-0.7) node[right]{tiempo};
+\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
+  \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
+}
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.2cm}
+\textbf{Marque la frontera durable y responda:}
+
+\begin{enumerate}
+\item Crash antes del commit: \rule{0.71\textwidth}{0.4pt}
+\item Crash después del flush, antes del ACK: \rule{0.47\textwidth}{0.4pt}
+\item Crash después del ACK, antes de la página: \rule{0.42\textwidth}{0.4pt}
+\item ¿Qué debe ser repetible durante REDO? \rule{0.53\textwidth}{0.4pt}
+\end{enumerate}
+
+\newpage
+\section{Timeline MVCC: completar durante la clase}
+
+Ubique: $v_1$, inicio de $T_R$, snapshot, primera lectura, inicio de $T_W$, creación de $v_2$, commit de $T_W$, segunda lectura de $T_R$, inicio de un lector nuevo, fin de $T_R$ y elegibilidad para \texttt{VACUUM}.
+
+\begin{center}
+\begin{tikzpicture}[x=1.12cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {3/Lector $T_R$,2/Escritor $T_W$,1/Versiones,0/Lectura visible}{
+  \node[left] at (0,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(9.7,\y);
+}
+\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(9.9,-0.7) node[right]{tiempo};
+\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
+  \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
+}
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+\item ¿Qué versión lee $T_R$ antes y después del commit de $T_W$? \rule{0.35\textwidth}{0.4pt}
+\item ¿Qué puede leer una transacción nueva? \rule{0.51\textwidth}{0.4pt}
+\item ¿Cuándo puede reclamarse $v_1$? \rule{0.57\textwidth}{0.4pt}
+\item ¿Qué costo aparece si $T_R$ dura 90 minutos? \rule{0.42\textwidth}{0.4pt}
+\end{enumerate}
+
+\newpage
+\section{Leer EXPLAIN: evidencia, no decoración}
+
+Consulta:
+
+\begin{verbatim}
+SELECT id, total, confirmed_at
+FROM purchases
+WHERE student_id = 8421
+  AND status = 'CONFIRMED'
+ORDER BY confirmed_at DESC
+LIMIT 20;
+\end{verbatim}
+
+\subsection*{Plan A --- sin índice}
+
+\begin{verbatim}
+Limit
+  -> Sort  (Sort Key: confirmed_at DESC)
+       -> Seq Scan on purchases
+            Filter: student_id=8421 AND status='CONFIRMED'
+            Rows Removed by Filter: 998000
+Buffers: shared hit=840
+Execution Time: 13.0 ms
+\end{verbatim}
+
+\subsection*{Plan B --- con índice compuesto}
+
+\begin{verbatim}
+Limit
+  -> Index Scan using idx_purchase_student_status_date
+       Index Cond: student_id=8421 AND status='CONFIRMED'
+Buffers: shared hit=5
+Execution Time: 0.3 ms
+\end{verbatim}
+
+Complete:
+
+\begin{enumerate}
+\item El trabajo principal del Plan A fue: \rule{0.58\textwidth}{0.4pt}
+\item El índice evita: \rule{0.73\textwidth}{0.4pt}
+\item Tres evidencias a comparar: \rule{0.57\textwidth}{0.4pt}
+\item Dos costos nuevos sobre writes: \rule{0.51\textwidth}{0.4pt}
+\item Una razón por la que el tiempo puede cambiar mañana: \rule{0.35\textwidth}{0.4pt}
+\end{enumerate}
+
+\newpage
+\section{Compaction y stalls: leer una cadena causal}
+
+\begin{center}
+\begin{tabular}{p{0.39\textwidth}p{0.22\textwidth}p{0.25\textwidth}}
+\toprule
+Señal & Valor & Tendencia \\
+\midrule
+Ingreso lógico & 145 MB/s & estable \\
+Compaction & 110 MB/s & estable \\
+Pending compaction bytes & 18 GB & +2,1 GB/min \\
+L0 files & 28 / stop 36 & +1,6/min \\
+Write amplification & $6,5\times$ & creciente \\
+Stall time & 3,4 s/min & creciente \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{enumerate}
+\item Déficit sostenido de capacidad: \rule{0.55\textwidth}{0.4pt}
+\item Tiempo estimado hasta stop trigger: \rule{0.47\textwidth}{0.4pt}
+\item Cadena causal en cuatro pasos:
+\begin{enumerate}
+\item \rule{0.77\textwidth}{0.4pt}
+\item \rule{0.77\textwidth}{0.4pt}
+\item \rule{0.77\textwidth}{0.4pt}
+\item \rule{0.77\textwidth}{0.4pt}
+\end{enumerate}
+\item Una intervención y su costo: \rule{0.52\textwidth}{0.4pt}
+\item Métrica que demostraría mejora: \rule{0.52\textwidth}{0.4pt}
+\end{enumerate}
+
+\newpage
+\section{Decisión final: CampusShop o telemetría}
+
+Complete para uno de los dos casos.
+
+\begin{center}
+\begin{tabular}{p{0.24\textwidth}p{0.64\textwidth}}
+\toprule
+Elemento & Respuesta \\
+\midrule
+Problema y carga & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Fallas relevantes & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Garantía principal & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Motor / estructura & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+WAL / recovery & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+MVCC / aislamiento & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Índice / compaction & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Trade-off aceptado & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Dos métricas & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+Experimento refutador & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{Exit ticket}
+
+\begin{enumerate}
+\item Diferencia entre escrito, committed y durable:
+\vspace{1.0cm}
+\item Costo oculto de MVCC:
+\vspace{1.0cm}
+\item Tres elementos de \texttt{EXPLAIN} que miraría antes de crear un índice:
+\vspace{1.0cm}
+\item Señal de que una LSM acumula deuda de compaction:
+\vspace{1.0cm}
+\end{enumerate}
+
+\end{document}

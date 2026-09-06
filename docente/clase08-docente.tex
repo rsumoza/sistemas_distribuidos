@@ -1,163 +1,616 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \UASetClassNumber{08}
 \UASetClassTitle{Consistencia real}
-\title{Clase 08 --- Guía docente: CAP, Dynamo y Spanner}
+\title{Clase 08 --- Guía docente magistral: CAP, PACELC, Dynamo y Spanner}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
+\tableofcontents
+\clearpage
 
-\section{Objetivo pedagógico profundo}
+\section{Parte A: guion operativo para 180 minutos}
+\subsection{Objetivo pedagógico profundo}
 
-El objetivo es desmontar etiquetas superficiales. El estudiante debe salir capaz de decidir por operación y dominio. CAP se aprende mediante una partición concreta; Dynamo mediante conflictos y repair; Spanner mediante el costo explícito de coordinación y tiempo.
+La clase debe convertir CAP, PACELC, Dynamo y Spanner de etiquetas memorizadas en herramientas para decidir por dato y operación. El estudiante debe salir preguntando:
 
-\section{Resultados de aprendizaje}
+\begin{center}
+\textbf{¿qué error es más costoso para este dominio y qué latencia, indisponibilidad o reconciliación aceptamos para evitarlo?}
+\end{center}
 
+La secuencia será:
+\[
+\text{intuición}\rightarrow\text{invariante}\rightarrow\text{partición}\rightarrow\text{decisión}\rightarrow\text{mecanismo}\rightarrow\text{costo normal}\rightarrow\text{métrica}.
+\]
+
+\begin{uakeybox}
+La evidencia de aprendizaje no es clasificar un producto como AP o CP. Es diseñar respuestas distintas para asiento, carrito, ranking e inventario, y defenderlas bajo una partición concreta.
+\end{uakeybox}
+
+\subsection{Resultados de aprendizaje observables}
+
+El estudiante debe poder:
 \begin{itemize}
-\item formular CAP correctamente;
-\item distinguir availability CAP de uptime;
-\item usar PACELC para operación normal;
-\item analizar $N,R,W$, versiones y reparación en Dynamo;
-\item explicar TrueTime, consenso localizado y commit wait en Spanner;
-\item diseñar una arquitectura híbrida por operación;
-\item proponer pruebas de partición y SLOs.
+\item explicar intuitiva y formalmente consistencia, disponibilidad y partición;
+\item reconstruir el argumento CAP mediante dos réplicas incomunicadas;
+\item explicar qué agrega PACELC en operación normal;
+\item calcular y analizar $N$, $R$ y $W$;
+\item distinguir intersección de quorum de linearizabilidad;
+\item comparar version vectors y detectar concurrencia;
+\item explicar sloppy quorum, hinted handoff, read repair y anti-entropy;
+\item describir por qué TrueTime expone un intervalo;
+\item explicar commit wait y external consistency;
+\item diseñar una matriz de garantías por subsistema y una prueba de partición.
 \end{itemize}
 
-\section{Arquitectura didáctica v9}
+\subsection{Arquitectura didáctica v9 para 180 minutos}
 
-\begin{tabular}{p{0.14\textwidth}p{0.20\textwidth}p{0.57\textwidth}}
+\begin{center}
+\begin{tabular}{p{0.12\textwidth}p{0.22\textwidth}p{0.56\textwidth}}
 \toprule
 Tiempo & Bloque & Propósito \\
 \midrule
-0--15 & Recuperación & Offset, partición y pérdida de orden global de clase 7. \\
-15--40 & CAP & Saldo 100 en dos regiones; dos decisiones y definiciones. \\
-40--60 & PACELC & Lectura local vs coordinada; costo normal. \\
-60--90 & Dynamo I & Caso carrito, hashing, N/R/W y versiones. \\
-90--100 & Pausa & Pregunta individual: qué garantiza $R+W>N$. \\
-100--125 & Dynamo II & Sloppy quorum, hints, repair y Merkle. \\
-125--150 & Spanner & TrueTime, consenso por shard y commit wait. \\
-150--160 & Pausa & Recuperación breve. \\
-160--175 & Taller & Cuatro dominios, cuatro políticas. \\
-175--180 & Exit ticket & CAP, quorum y commit wait. \\
+0--10 & Apertura & Último asiento y dos regiones; votar qué haría el sistema. \\
+10--22 & Puente/diagnóstico & Recuperar particiones, logs y orden local de clase 7. \\
+22--45 & Intuiciones & Puente cortado, cajas registradoras, jurados, genealogía y reloj con intervalo. \\
+45--70 & CAP y PACELC & Derivación por indistinguibilidad y costo de coordinación normal. \\
+70--82 & Actividad & Dos equipos diseñan respuesta CP y AP para el asiento. \\
+82--92 & Pausa & Preguntas anónimas y recuperación. \\
+92--126 & Dynamo & Hashing, quorums, versiones, sloppy quorum, hints y repair. \\
+126--153 & Spanner & Consenso localizado, TrueTime, commit wait y external consistency. \\
+153--170 & Caso híbrido & Asteria: castillo, inventario, ranking, chat y telemetría. \\
+170--178 & Prueba de partición & Diseñar experimento y métricas. \\
+178--180 & Exit ticket & Cuatro respuestas para clase 9. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Preparación previa del docente}
+
+\subsubsection*{Cuarenta y ocho horas antes}
+\begin{itemize}
+\item Imprimir tarjetas A, B, C, D, E para quorums y tarjetas de versiones.
+\item Preparar el caso GlobalTickets con un solo asiento y latencias regionales.
+\item Ejecutar los scripts de quorum/version vectors y TrueTime.
+\item Revisar el paper de Dynamo y el paper/nota oficial de Spanner y TrueTime.
+\item Preparar una tabla con operaciones de Asteria y sus invariantes.
+\end{itemize}
+
+\subsubsection*{Treinta minutos antes}
+\begin{itemize}
+\item Dibujar dos regiones separadas por un puente.
+\item Escribir el invariante del asiento: confirmaciones $\leq1$.
+\item Reservar una zona del pizarrón para $N,R,W$ y otra para versiones.
+\item Dejar visible la pregunta: ``¿qué respuesta es menos dañina: rechazar o contradecir después?''.
+\end{itemize}
+
+\subsection{Plan de pizarrón}
+
+\begin{enumerate}
+\item \textbf{Izquierda: dominio.} Invariante y costo del error.
+\item \textbf{Centro: red.} Réplicas, partición y quorums.
+\item \textbf{Derecha: historia.} Version vectors o timeline TrueTime.
+\end{enumerate}
+
+Mantenga el asiento y el carrito simultáneamente visibles: el contraste evita que los estudiantes conviertan CAP en una preferencia ideológica.
+
+\subsection{Guion de apertura}
+
+Diga:
+\begin{quote}
+``Queda un asiento. Buenos Aires y Frankfurt pierden comunicación durante 90 segundos y cada región recibe una reserva. ¿Qué debe hacer el sistema? No quiero una sigla todavía: quiero el error que están dispuestos a aceptar.''
+\end{quote}
+
+Pida voto entre:
+\begin{itemize}
+\item aceptar en ambos lados;
+\item aceptar solo en uno;
+\item rechazar/esperar en ambos;
+\item aceptar intención y confirmar después.
+\end{itemize}
+
+Pregunte quién paga cada opción. Recién después introduzca CAP.
+
+\subsection{Secuencia de conducción}
+
+\subsubsection{Consistencia, disponibilidad y partición}
+
+Use intuiciones antes de definiciones:
+\begin{itemize}
+\item consistencia: cajas cuentan historia compatible;
+\item disponibilidad: toda caja alcanzable da respuesta válida;
+\item partición: cajas sanas no pueden comunicarse.
+\end{itemize}
+
+Aclare que un rechazo por falta de quorum preserva corrección, pero no disponibilidad CAP para la operación.
+
+\subsubsection{Derivación de CAP}
+
+Dibuje dos réplicas A y B. Durante la partición, A recibe $x=1$. B no sabe si la escritura ocurrió o está demorada. Si B debe responder, alguna historia lo obliga a dar una respuesta incompatible con linearizabilidad. Si espera A, renuncia a disponibilidad.
+
+No presente la demostración como un triángulo. El triángulo puede usarse después como recordatorio visual, no como argumento.
+
+\subsubsection{PACELC}
+
+Quite la partición. Compare lectura local de 15 ms con lectura coordinada de 180 ms. Pregunte cuándo el dominio pagaría 165 ms adicionales. Introduzca la parte ELSE: la coordinación cuesta aun con red sana.
+
+\subsubsection{Quorums}
+
+Use cinco estudiantes. Marque un write quorum y un read quorum. Muestre físicamente la intersección. Luego cambie a $R=1,W=1$ y construya un stale read.
+
+Insista: $R+W>N$ garantiza intersección de conjuntos, no una historia linearizable completa.
+
+\subsubsection{Dynamo}
+
+Narre sus mecanismos como respuestas a una prioridad de disponibilidad:
+\begin{itemize}
+\item consistent hashing: repartir rangos y mover pocos al cambiar nodos;
+\item versioning: no perder ramas concurrentes;
+\item sloppy quorum: aceptar en nodos alternativos;
+\item hinted handoff: devolver datos al propietario;
+\item anti-entropy/Merkle: reparar sin copiar todo.
+\end{itemize}
+
+Después muestre el costo operacional: hints, conflictos, repair y frescura.
+
+\subsubsection{Spanner}
+
+Comience con el problema, no con TrueTime: transacciones globales que respeten orden externo. Explique que consenso se localiza por grupo/rango; no existe una votación planetaria única por cada operación.
+
+Luego presente TrueTime como intervalo de incertidumbre. Haga un ejemplo numérico de commit wait. La idea esencial es que exponer incertidumbre permite esperar hasta que un timestamp sea seguro.
+
+\subsubsection{Diseño híbrido}
+
+Aplique a Asteria:
+\begin{itemize}
+\item castillo e inventario: autoridad fuerte;
+\item combate: orden autoritativo local;
+\item ranking: eventual, con cierre fuerte si entrega premios;
+\item chat/presencia: disponible y degradable;
+\item telemetría: replayable con pérdida/atraso presupuestados.
+\end{itemize}
+
+\subsection{Casos reales y narrativa}
+
+\subsubsection{Amazon Dynamo}
+
+Preséntelo como un diseño para experiencia always-on, no como sinónimo de DynamoDB actual ni como receta universal. El paper acepta consistencia más débil bajo ciertas fallas, usa versionado y resolución asistida por aplicación.
+
+\subsubsection{Google Spanner}
+
+Preséntelo como respuesta a transacciones globales externamente consistentes. Destaque infraestructura temporal, replicación sincrónica y coordinación. No afirme que ``viola CAP''; su comportamiento durante particiones sigue siendo compatible con el teorema.
+
+\subsubsection{GlobalTickets y Asteria}
+
+Los casos cercanos deben dominar la clase. Los papers explican mecanismos; el aprendizaje ocurre cuando el estudiante decide para una operación concreta.
+
+\subsection{Demostraciones guiadas}
+
+\begin{uainfo}
+\textbf{Demo 1 --- quorum humano.} Cinco estudiantes son réplicas. Forme conjuntos $R$ y $W$, simule dos nodos caídos y determine qué operación sigue disponible.
+\end{uainfo}
+
+\begin{uainfo}
+\textbf{Demo 2 --- genealogía.} Entregue versiones $[A:2,B:1]$, $[A:2,B:3]$ y $[A:4,B:1]$. Pida ordenar y descubrir la concurrencia.
+\end{uainfo}
+
+\begin{uainfo}
+\textbf{Demo 3 --- hints.} Un estudiante representa nodo propietario caído; otro guarda el dato con una tarjeta ``para B''. Al volver B, contabilice deuda acumulada.
+\end{uainfo}
+
+\begin{uainfo}
+\textbf{Demo 4 --- TrueTime.} Muestre intervalos sucesivos y pregunte cuándo $earliest>s$. Calcule el commit wait.
+\end{uainfo}
+
+\subsection{Preguntas socráticas y respuestas esperadas}
+
+\begin{tabular}{p{0.46\textwidth}p{0.44\textwidth}}
+\toprule
+Pregunta & Núcleo esperado \\
+\midrule
+¿Cuándo aparece CAP? & durante partición, para C fuerte y A CAP \\
+¿Un 503 rápido es disponibilidad CAP? & no para la operación solicitada \\
+¿Qué agrega PACELC? & latencia frente a consistencia sin partición \\
+¿Qué garantiza $R+W>N$? & intersección, no linearizabilidad \\
+¿Por qué conservar dos versiones? & son concurrentes; descartar puede perder intención \\
+¿Qué deuda crea sloppy quorum? & datos fuera de lugar, hints y repair \\
+¿Por qué intervalo TrueTime? & declara cota de incertidumbre \\
+¿Qué compra commit wait? & orden externo compatible con tiempo real \\
 \bottomrule
 \end{tabular}
 
-\section{Preparación previa}
+\subsection{Errores previsibles y corrección}
 
-\begin{itemize}
-\item Dibujar dos regiones y una línea de partición.
-\item Preparar fichas A,B,C para quórums $N=3$.
-\item Llevar tres version vectors para ejercicio de dominación.
-\item Preparar un ejemplo de carrito fusionable y asiento no fusionable.
-\item Revisar los papers oficiales de Dynamo y Spanner para narrar decisiones, no mitos.
-\end{itemize}
-
-\section{Conducción paso a paso}
-
-\subsection{CAP desde un invariante}
-
-No comenzar con el triángulo. Comenzar con dos retiros durante partición. Preguntar qué respondería cada región. Después nombrar la elección. Esto evita que los alumnos memoricen C/A/P sin entender el conflicto.
-
-Aclare que P no se “elige” en una red real; se decide qué garantía mantener cuando ocurre.
-
-\subsection{PACELC}
-
-Use latencias concretas. Pregunte: “si la red está sana, ¿igual esperamos 180 ms?”. Muestre que el costo de consistencia existe también sin incidente.
-
-\subsection{Dynamo}
-
-Use el carrito porque el merge tiene significado intuitivo. Después contraste con asiento y saldo para mostrar límites. Haga físicamente quórums con tarjetas. Pregunte primero qué garantiza la intersección; corrija la conclusión “garantiza último valor”.
-
-\subsection{Spanner}
-
-No entrar primero en infraestructura GPS. Explique el problema: external consistency global. Luego TrueTime como intervalo y commit wait como costo. Cierre con consenso localizado para evitar la imagen de un consenso planetario único.
-
-\section{Casos reales y narrativa}
-
-\subsection{Dynamo}
-
-Narrativa: Amazon prioriza una experiencia always-on para ciertos servicios y hace visibles versiones/conflictos. No diga “Amazon eligió AP para todo”.
-
-\subsection{Spanner}
-
-Narrativa: Google necesitaba transacciones globales fuertes y construyó infraestructura de consenso y tiempo acotado. No diga “Spanner viola CAP”; durante pérdida de quorum sacrifica disponibilidad.
-
-\section{Demostraciones sugeridas}
-
-\begin{uademo}
-\textbf{Quórums humanos.} A,B,C; escritura A,B y lectura B,C. Luego escritura A y lectura C. Preguntar qué sabe cada lectura.
-\end{uademo}
-
-\begin{uademo}
-\textbf{Version vectors.} Entregar tres vectores y pedir ordenar o declarar concurrencia.
-\end{uademo}
-
-\begin{uademo}
-\textbf{TrueTime.} Dibujar intervalos solapados y no solapados; decidir cuándo puede afirmarse orden.
-\end{uademo}
-
-\section{Preguntas socráticas}
-
-\begin{itemize}
-\item ¿Qué invariante se rompe si ambos lados responden?
-\item ¿Un error rápido cuenta como availability CAP?
-\item ¿Qué cuesta coordinar cuando no hay partición?
-\item ¿Qué garantiza intersección y qué no?
-\item ¿Cuándo dos versiones son concurrentes?
-\item ¿Quién paga por eventual consistency?
-\item ¿Qué representa la anchura de TrueTime?
-\item ¿Por qué no usar un consenso global único?
-\item ¿Qué dato de su TP tolera merge y cuál no?
-\end{itemize}
-
-\section{Errores previsibles y corrección}
-
-\begin{tabular}{p{0.38\textwidth}p{0.52\textwidth}}
+\begin{tabular}{p{0.37\textwidth}p{0.54\textwidth}}
 \toprule
 Error & Intervención \\
 \midrule
-“CAP: elegir dos” & Volver a la partición y a las dos respuestas. \\
-“AP/CP para toda empresa” & Pedir garantía de una operación concreta. \\
-“R+W>N = linearizable” & Introducir escrituras concurrentes y sloppy quorum. \\
-“LWW resuelve conflicto” & Usar carrito y relojes desalineados. \\
-“eventual = esperar” & Preguntar por repair y capacidad de convergencia. \\
-“Spanner tiene reloj perfecto” & Dibujar intervalo TrueTime. \\
-“consenso global” & Particionar en grupos y transacción multi-shard. \\
+``CAP: elegir dos de tres'' & Volver al asiento durante una partición concreta. \\
+``CP nunca está disponible'' & Diferenciar operación, región y tipo de falla. \\
+``R+W>N da consistencia fuerte'' & Introducir versiones concurrentes/sloppy quorum. \\
+``LWW elige la verdad'' & Mostrar reloj adelantado y pérdida de rama. \\
+``Eventual significa pronto'' & Preguntar por capacidad de repair y SLO. \\
+``TrueTime es reloj exacto'' & Dibujar intervalo y su anchura. \\
+``Spanner viola CAP'' & Preguntar qué hace bajo una partición que rompe quorum. \\
+``Todo el producto es AP/CP'' & Completar matriz por subsistema. \\
 \bottomrule
 \end{tabular}
 
-\section{Criterios de evaluación formativa}
+\subsection{Criterios de evaluación formativa}
 
-Una respuesta lograda debe incluir:
+Una respuesta lograda incluye:
 \begin{enumerate}
-\item dato/operación e invariante;
-\item comportamiento durante partición;
-\item costo latency/consistency normal;
-\item mecanismo de coordinación o reparación;
-\item SLO y prueba adversarial.
+\item dato y operación;
+\item invariante;
+\item partición/latencia;
+\item decisión de respuesta;
+\item mecanismo;
+\item costo normal y de reparación;
+\item métrica o experimento.
 \end{enumerate}
 
-\section{Cómo mejorar la experiencia del estudiante}
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.70\textwidth}}
+\toprule
+Nivel & Evidencia \\
+\midrule
+Inicial & repite AP/CP sin escenario \\
+En desarrollo & identifica trade-off, pero no invariante ni costo \\
+Logrado & diseña respuesta por operación con mecanismo y métrica \\
+Avanzado & compara alternativas y define prueba de partición/convergencia \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Contingencias}
+
+\subsubsection*{Si falta tiempo}
+Preserve CAP/PACELC, quorum/version vectors y TrueTime/commit wait. Reduzca detalles de Merkle trees.
+
+\subsubsection*{Si los estudiantes ya conocen el slogan}
+No lo repita. Pida contraejemplos por operación y diferencias entre intersección y linearizabilidad.
+
+\subsubsection*{Si la matemática bloquea}
+Use primero estudiantes como conjuntos; formalice después con cardinalidades.
+
+\subsection{Cómo favorecer una experiencia de clase excelente}
 
 \begin{itemize}
-\item Use casos contrastantes y no definiciones aisladas.
-\item Haga que los alumnos tomen una decisión antes de mostrar la solución real.
-\item Vuelva repetidamente al costo del error del negocio.
-\item Separe con claridad CAP, PACELC, quorum, causalidad y linearizabilidad.
-\item Entregue una matriz comparativa al cierre para facilitar estudio.
-\item Permita que cada grupo aplique el concepto a su TP durante la clase.
+\item Comience con una decisión moralmente incómoda: rechazar o confirmar y contradecir.
+\item Mantenga asiento y carrito como contraste estable.
+\item Haga que los estudiantes formen quorums físicamente.
+\item Use una sola definición formal por vez y vuelva al caso.
+\item No caricaturice Dynamo como incorrecto ni Spanner como universalmente superior.
+\item Reserve tiempo para que cada grupo diseñe una matriz híbrida.
+\item Cierre con condiciones: ``elegiría X si...; revisaría si...''.
+\item Recupere el exit ticket al abrir clase 9.
 \end{itemize}
 
-Esto aumenta percepción de claridad, relevancia y transferencia, y favorece una valoración docente alta de forma genuina.
+La percepción positiva surge de comprender una controversia difícil, poder aplicarla y sentirse autorizado a hacer preguntas, no de simplificar en exceso.
 
-\section{Conexión con el Trabajo Final Integrador}
+\subsection{Conexión con el Trabajo Final Integrador}
 
-Solicitar una matriz por subsistema con: invariante, comportamiento bajo partición, decisión PACELC, mecanismo, repair y SLO. Revisar al menos una decisión en vivo por grupo.
+Cada grupo debe entregar una matriz:
+\begin{itemize}
+\item dato/operación;
+\item invariante;
+\item respuesta durante partición;
+\item latencia normal aceptada;
+\item mecanismo de replicación/quorum;
+\item conflicto y reparación;
+\item SLO;
+\item experimento de partición.
+\end{itemize}
 
-\section{Cierre y puente}
+No acepte ``nuestra base es AP''. Deben describir comportamiento observable.
 
-Cierre: “La próxima clase ya no pregunta solo qué consistencia ofrece un datastore, sino cómo distribuimos responsabilidades entre servicios y equipos sin convertir el sistema en una red de dependencias frágiles”.
+\subsection{Cierre, exit ticket y puente}
+
+Exit ticket:
+\begin{enumerate}
+\item Condición exacta de CAP.
+\item Qué garantiza y qué no $R+W>N$.
+\item Dos versiones concurrentes y su tratamiento.
+\item Por qué TrueTime devuelve un intervalo.
+\end{enumerate}
+
+Cierre:
+\begin{quote}
+``Hoy vimos que cada garantía distribuye costo entre latencia, rechazo y reconciliación. La próxima clase llevará esa misma disciplina a las fronteras de arquitectura: cuándo conviene distribuir una capacidad y cuándo solo estamos comprando caminos y fallas.''
+\end{quote}
+
+
+
+
+\clearpage
+\section{Parte B: dossier técnico de preparación}
+\subsection{Dossier técnico de preparación del docente}
+La clase debe preservar una distinción metodológica: CAP es un resultado sobre garantías bajo partición; PACELC es una taxonomía útil para discutir también latencia en régimen normal; Dynamo y Spanner son sistemas que responden a objetivos distintos. No deben presentarse como una competencia con un ganador universal.
+
+\subsubsection{Definiciones precisas de CAP}
+
+Para una operación sobre datos replicados, use estas definiciones de trabajo:
+
+\begin{description}
+\item[Consistencia.] Las operaciones se comportan como una única copia linearizable: cada operación parece ocurrir en un punto entre invocación y respuesta y respeta precedencia de tiempo real.
+\item[Disponibilidad.] Toda solicitud recibida por un nodo no fallado obtiene una respuesta, sin garantía de que la respuesta refleje la versión más reciente. Un rechazo que niega el servicio para preservar consistencia constituye sacrificio de disponibilidad en la formulación clásica.
+\item[Partición.] La red pierde o retrasa indefinidamente mensajes entre subconjuntos de nodos mientras los nodos pueden seguir atendiendo clientes locales.
+\end{description}
+
+La intuición de la prueba es indistinguibilidad: durante una partición, cada lado no sabe si el otro lado está caído o solamente incomunicado. Si ambos responden escrituras, pueden divergir; si uno espera o rechaza para evitar divergencia, sacrifica disponibilidad.
+
+CAP no afirma que se elijan ``dos de tres'' en todo momento, que la latencia normal no importe, ni que consistencia sea un único interruptor para toda la aplicación. La elección puede variar por operación y dato.
+
+\subsubsection{PACELC}
+
+PACELC resume dos preguntas:
+\begin{itemize}
+\item si hay partición, ¿se prioriza disponibilidad o consistencia?;
+\item en ausencia de partición, ¿se prioriza latencia o consistencia coordinada?
+\end{itemize}
+
+No es un segundo teorema de imposibilidad ni reemplaza un análisis cuantitativo. Sirve para evitar que CAP oculte el costo cotidiano de coordinar entre regiones.
+
+\subsubsection{Quorums: intersección y supuestos}
+
+Con $N$ réplicas, un write quorum $W$ y un read quorum $R$, la condición
+\[
+R+W>N
+\]
+implica que todo conjunto de lectura intersecta todo conjunto de escritura. Sin embargo, la intersección por sí sola no garantiza linearizabilidad. También importan:
+
+\begin{itemize}
+\item qué versión devuelve la lectura cuando recibe respuestas distintas;
+\item si la escritura fue completamente visible en las réplicas que respondieron;
+\item relojes/versionado y resolución de concurrencia;
+\item sloppy quorums, nodos sustitutos y fallas;
+\item operaciones concurrentes y coordinación del write path.
+\end{itemize}
+
+\paragraph{Ejemplo.} Con $N=3$, $W=2$, $R=2$ hay intersección. Si una lectura devuelve arbitrariamente la primera respuesta o usa timestamps de pared no confiables, aún puede seleccionar una versión incorrecta. La garantía surge del protocolo completo, no de la desigualdad aislada.
+
+\subsubsection{Dynamo original}
+
+Dynamo fue diseñado para alta disponibilidad y latencias predecibles de cola en servicios internos de Amazon. Sus elementos principales incluyen:
+
+\begin{itemize}
+\item consistent hashing y virtual nodes para particionamiento incremental;
+\item preference list y replicación en $N$ nodos;
+\item quorums configurables $R/W$;
+\item version vectors para distinguir descendencia causal de concurrencia;
+\item sloppy quorum y hinted handoff para fallas temporales;
+\item read repair y anti-entropy con Merkle trees para convergencia;
+\item reconciliación de versiones, en ocasiones asistida por la aplicación.
+\end{itemize}
+
+Distinga el paper de Dynamo de Amazon DynamoDB, servicio posterior inspirado en algunas ideas pero con arquitectura y capacidades propias.
+
+\paragraph{Version vectors.}
+Una versión $v_a$ domina a $v_b$ si todos sus contadores son mayores o iguales y al menos uno es mayor. Si ninguno domina al otro, son concurrentes. Esta información permite evitar que ``último en llegar'' borre una intención concurrente sin detectarla.
+
+\paragraph{Sloppy quorum.}
+Durante una falla, el sistema puede escribir en nodos saludables fuera de la preference list original. Esto mejora disponibilidad, pero la intersección ya no debe razonarse como quorum estricto sobre los mismos propietarios; hinted handoff y reparación posterior son parte esencial del diseño.
+
+\subsubsection{Spanner}
+
+Spanner particiona datos en grupos replicados y usa consenso localizado para mantener cada grupo. Las transacciones que abarcan varios grupos requieren coordinación adicional, típicamente una forma de two-phase commit entre participantes cuyos estados están replicados.
+
+TrueTime devuelve un intervalo:
+\[
+TT.now()=[t_{earliest},t_{latest}],
+\]
+que contiene al tiempo real bajo los supuestos de la infraestructura. No elimina incertidumbre: la expone. El commit timestamp se elige respetando esa incertidumbre y el commit wait espera hasta que sea seguro afirmar que el timestamp está en el pasado.
+
+External consistency exige que si una transacción termina antes de que otra comience en tiempo real, el orden serial respete esa precedencia. TrueTime ayuda a relacionar timestamps con tiempo real; no sustituye consenso ni control de concurrencia.
+
+\paragraph{Pregunta previsible: ``¿Spanner contradice CAP?''}
+No. Bajo particiones que impiden alcanzar el quorum necesario, ciertas operaciones dejan de estar disponibles. Su infraestructura reduce frecuencia y duración de particiones, pero no elimina la restricción lógica.
+
+\paragraph{Pregunta previsible: ``¿TrueTime es un reloj perfecto?''}
+No. Es una API de tiempo con incertidumbre acotada. Precisamente por no fingir exactitud, permite que el protocolo espere cuando sea necesario.
+
+\subsubsection{Diseño por operación}
+
+Un sistema real puede combinar garantías:
+\begin{itemize}
+\item inventario único o propiedad de un castillo: coordinación fuerte;
+\item carrito: versiones concurrentes y merge;
+\item ranking: eventual con SLO de frescura;
+\item chat: alta disponibilidad con orden local por conversación;
+\item analítica: ingestión durable y resultados retrasados;
+\item configuración crítica: consenso y lecturas consistentes.
+\end{itemize}
+
+La etiqueta global ``CP'' o ``AP'' suele ocultar esta heterogeneidad. Pida siempre comportamiento por operación: qué responde cada lado, qué dato puede divergir y cómo se repara.
+
+\subsection{Cómo explicar los conceptos en tres profundidades}
+
+\subsubsection{CAP}
+\begin{description}
+\item[30 segundos.] ``Cuando el puente entre réplicas se corta, no puedo prometer al mismo tiempo una única historia y que ambos lados siempre respondan.''
+\item[2 minutos.] Use último asiento: si ambos venden, rompe unicidad; si uno espera, sacrifica disponibilidad.
+\item[5 minutos.] Formalice linearizabilidad, disponibilidad CAP, partición e indistinguibilidad.
+\end{description}
+
+\subsubsection{Quorum}
+\begin{description}
+\item[30 segundos.] ``Lectura y escritura consultan jurados que deben compartir al menos un miembro.''
+\item[2 minutos.] Forme conjuntos físicos con estudiantes y derive $R+W>N$.
+\item[5 minutos.] Explique por qué intersección no basta sin selección de versión y protocolo de concurrencia.
+\end{description}
+
+\subsubsection{Dynamo}
+\begin{description}
+\item[30 segundos.] ``Prefiere seguir aceptando intenciones y reparar después, porque para su dominio perder disponibilidad era más costoso.''
+\item[2 minutos.] Muestre anillo, $N/R/W$, dos versiones concurrentes y merge de carrito.
+\item[5 minutos.] Agregue virtual nodes, sloppy quorum, hinted handoff, read repair y anti-entropy.
+\end{description}
+
+\subsubsection{Spanner}
+\begin{description}
+\item[30 segundos.] ``Coordina réplicas y usa un reloj que declara su margen de error para ordenar transacciones globales.''
+\item[2 minutos.] Dibuje grupos de consenso, intervalo TrueTime y commit wait.
+\item[5 minutos.] Relacione 2PC entre grupos, external consistency y disponibilidad bajo partición.
+\end{description}
+
+\subsection{Banco de preguntas previsibles y respuestas}
+
+\begin{enumerate}
+\item \textbf{¿CAP obliga a elegir P?} En redes reales las particiones deben considerarse; ante una partición concreta la tensión es C/A. No se ``elige'' que la red nunca se parta.
+\item \textbf{¿Una respuesta de error cuenta como disponibilidad?} No si el error es el mecanismo para negar el servicio y preservar consistencia; disponibilidad CAP requiere respuesta no fallida según la especificación del servicio.
+\item \textbf{¿Eventual consistency significa sin garantías?} No. Puede incluir convergencia, read-your-writes, monotonic reads, causalidad o SLO de frescura; debe especificarse.
+\item \textbf{¿$R+W>N$ significa datos siempre frescos?} No sin protocolo completo, versionado, lectura de todas las respuestas y supuestos sobre propietarios/quorums.
+\item \textbf{¿LWW es correcto?} Es determinista, pero puede perder una actualización concurrente; solo es correcto si la semántica acepta esa pérdida y el reloj/orden es confiable para ese propósito.
+\item \textbf{¿Vector clock da un orden total?} No. Detecta causalidad parcial y concurrencia; versiones concurrentes requieren merge o una regla adicional.
+\item \textbf{¿Merkle tree resuelve conflicto semántico?} Detecta diferencias eficientemente; no decide qué intención de negocio conservar.
+\item \textbf{¿Dynamo es DynamoDB?} No. Use el paper original como sistema de referencia y aclare que DynamoDB es un servicio posterior.
+\item \textbf{¿Spanner tiene un único líder global?} No. Usa particionamiento y consenso por grupos; las transacciones multi-grupo coordinan participantes.
+\item \textbf{¿TrueTime elimina latencia?} No. Su incertidumbre puede requerir commit wait; coordinación interregional sigue costando.
+\item \textbf{¿External consistency es serializabilidad?} Es una forma fuerte que además respeta precedencia de tiempo real entre transacciones no solapadas.
+\item \textbf{¿Puede un mismo producto usar Dynamo-style y Spanner-style?} Sí, por subsistema u operación, si los contratos y flujos entre ellos están bien definidos.
+\end{enumerate}
+
+\subsection{Ruta esencial y profundización para 180 minutos}
+
+\begin{description}
+\item[Núcleo obligatorio.] Definiciones CAP, último asiento, carrito, derivación por partición, PACELC, quorum con límites, Dynamo y Spanner como respuestas distintas.
+\item[Profundización.] Version vectors, sloppy quorum, anti-entropy, TrueTime numérico y 2PC entre grupos.
+\item[Evidencia.] Decisión inicial, formación física de quorums, matriz por subsistema, experimento adversarial y exit ticket.
+\end{description}
+
+No intente usar todos los nombres propios como prueba de erudición. La auditoría será más favorable si el estudiante puede explicar por qué el carrito admite merge y el último asiento exige coordinación, y luego conecta esa decisión con mecanismos reales.
+
+\subsection{Checklist personal de estudio}
+
+\begin{itemize}
+\item ¿Puedo definir C, A y P sin el slogan ``dos de tres''?
+\item ¿Puedo derivar la tensión mediante dos ejecuciones indistinguibles?
+\item ¿Puedo explicar PACELC como taxonomía y no como teorema?
+\item ¿Puedo demostrar intersección y explicar por qué no basta?
+\item ¿Puedo distinguir Dynamo de DynamoDB?
+\item ¿Puedo dibujar version vectors concurrentes y un merge?
+\item ¿Puedo explicar sloppy quorum y hinted handoff sin llamarlos quorum estricto?
+\item ¿Puedo explicar que TrueTime expone incertidumbre?
+\item ¿Puedo relacionar commit wait con external consistency?
+\item ¿Puedo diseñar una matriz híbrida por subsistema?
+\end{itemize}
+
+\clearpage
+\section{Parte C: auditoría, evaluación y evidencias}
+\subsection{Preguntas que puede formular un auditor pedagógico}
+\subsubsection{¿Por qué comenzar con intuición y no con la definición formal?}
+
+Respuesta sugerida: la intuición activa conocimientos previos y crea una necesidad cognitiva. El caso no reemplaza la definición; la prepara. Inmediatamente después se explicitan modelo, supuestos, garantía y límites de la analogía. Esta secuencia reduce la cantidad de elementos nuevos que el estudiante debe coordinar al mismo tiempo y permite que la formalización responda a una pregunta que ya comprendió.
+
+\subsubsection{¿Cómo verifica que los estudiantes aprendieron y no solo siguieron la narración?}
+
+Respuesta sugerida: cada bloque contiene una predicción individual, una representación que el estudiante debe completar, una decisión con trade-off y una evidencia breve. El diagnóstico inicial reaparece al final, y el exit ticket exige explicar el mecanismo con palabras propias. Las guías alinean los mismos resultados mediante timelines, cálculos y diseños; por tanto, la clase produce artefactos observables, no solo exposición.
+
+\subsubsection{¿Por qué usa casos reales?}
+
+Respuesta sugerida: no se usan como argumento de autoridad ni como entrenamiento de producto. Se usan para mostrar que el mecanismo responde a una restricción real y que tiene métricas, fallas y costos observables. Después del caso se abstrae un método reusable para que el alumno pueda transferirlo a otro dominio.
+
+\subsubsection{¿Cómo evita que una clase de tres horas produzca sobrecarga cognitiva?}
+
+Respuesta sugerida: se divide en ciclos de 12--18 minutos con cambio de actividad; se mantiene un caso conductor y un vocabulario estable; se separa núcleo obligatorio de profundización; se introducen pausas de recuperación y se vuelve varias veces al mapa de la clase. No se intenta ``pasar todas las slides'': se protege la comprensión del núcleo y se deja el detalle avanzado como material de estudio.
+
+\subsubsection{¿Cómo se alinea la clase con la evaluación?}
+
+Respuesta sugerida: cada resultado de aprendizaje aparece en cuatro lugares: una actividad durante la clase, un ejercicio de la guía, una solución con criterio de corrección y una evidencia en el Trabajo Final. La evaluación privilegia la cadena problema--falla--garantía--mecanismo--trade-off--evidencia, coherente con el marco $D=(P,F,G,S,T)$.
+
+\subsubsection{¿Qué hace cuando aparece una concepción errónea?}
+
+Respuesta sugerida: no la corrige únicamente con una afirmación. Solicita una predicción, mueve el punto de falla en un timeline o construye un contraejemplo. Luego pide al estudiante reformular la regla. Las guías docentes identifican errores previsibles y una intervención concreta para cada uno.
+
+\subsubsection{¿Cómo favorece participación sin perder rigor?}
+
+Respuesta sugerida: primero solicita respuesta individual breve para evitar que participen siempre los mismos; después comparación en parejas y finalmente puesta en común. Las preguntas no buscan opinión libre, sino una decisión justificada por garantía, falla y evidencia. Se admiten soluciones distintas cuando preservan los invariantes y explicitan costos.
+
+\subsubsection{¿Qué evidencia conservaría para una auditoría posterior?}
+
+Conservar:
+\begin{itemize}
+\item resultados anónimos del diagnóstico inicial y final;
+\item una muestra de timelines o matrices completadas;
+\item respuestas del exit ticket y la devolución realizada en la clase siguiente;
+\item una rúbrica aplicada a una actividad;
+\item mejoras del Trabajo Final vinculadas con los conceptos de la clase;
+\item notas de ajuste docente: qué bloque tomó más tiempo y qué se modificará.
+\end{itemize}
+
+\subsubsection{Pregunta específica: ¿cómo evita enseñar CAP como slogan?}
+
+Respuesta sugerida: comienza con dos ejecuciones concretas y una partición, define cada término, deriva la tensión por indistinguibilidad y recién después nombra CAP. La evaluación exige describir qué responde cada réplica y qué invariante se pierde; una etiqueta CP/AP no alcanza.
+
+\subsubsection{Pregunta específica: ¿por qué comparar Dynamo y Spanner?}
+
+Respuesta sugerida: son contrastes de objetivos, no un ranking. Dynamo permite estudiar disponibilidad, versionado y reparación; Spanner permite estudiar coordinación localizada, tiempo incierto y consistencia externa. La matriz final muestra que un producto real combina decisiones por subsistema.
+
+\subsection{Matriz de corrección y preguntas de defensa de la guía}
+La corrección debe premiar comportamiento observable, no etiquetas. Una respuesta ``CP'' o ``AP'' sin describir qué responde cada lado durante una partición es incompleta.
+
+\begin{enumerate}
+\item \textbf{CAP.} Debe declarar partición, linearizabilidad y availability CAP. Pregunta oral: ¿qué cambia cuando no hay partición?
+\item \textbf{Availability.} Debe distinguir respuesta útil de rechazo para preservar consistencia. Pregunta oral: ¿un timeout satisface availability CAP?
+\item \textbf{Banco.} Debe mostrar doble retiro en AP y bloqueo/rechazo en CP. Pregunta oral: ¿qué error es más costoso para el dominio?
+\item \textbf{PACELC.} Debe identificar latencia frente a consistencia sin partición. Pregunta oral: ¿por qué no es un nuevo teorema?
+\item \textbf{Consistent hashing.} Debe mostrar remapeo parcial y hot key persistente. Pregunta oral: ¿qué aportan virtual nodes?
+\item \textbf{Quorum.} Debe comparar dos $R/W$ y tolerancia a fallas. Pregunta oral: ¿cuál optimiza lectura y cuál escritura?
+\item \textbf{No intersección.} Debe construir stale read concreto. Pregunta oral: ¿qué conjunto leyó y cuál escribió?
+\item \textbf{Límite de intersección.} Debe listar supuestos adicionales. Pregunta oral: ¿cómo selecciona la versión entre respuestas?
+\item \textbf{Version vectors.} Debe calcular dominación componente a componente. Pregunta oral: ¿qué versiones son concurrentes?
+\item \textbf{LWW.} Debe mostrar actualización perdida. Pregunta oral: ¿qué semántica haría aceptable LWW?
+\item \textbf{Sloppy quorum.} Debe distinguir nodos propietarios de temporales. Pregunta oral: ¿por qué cambia la intuición de intersección?
+\item \textbf{Hinted handoff.} Debe modelar acumulación, reenvío y expiración. Pregunta oral: ¿qué métrica indica riesgo de perder hints?
+\item \textbf{Read repair.} Debe decidir sincronía según SLO. Pregunta oral: ¿qué costo paga el cliente?
+\item \textbf{Merkle tree.} Debe localizar rango divergente sin resolver semántica. Pregunta oral: ¿quién decide qué versión gana?
+\item \textbf{Carrito.} Debe proponer merge y contraejemplo de unión. Pregunta oral: ¿cómo representa removals?
+\item \textbf{TrueTime.} Debe interpretar intervalo e incertidumbre. Pregunta oral: ¿por qué un timestamp puntual sería engañoso?
+\item \textbf{Commit wait.} Debe relacionar espera y precedencia real. Pregunta oral: ¿qué pasa si aumenta la incertidumbre?
+\item \textbf{Consenso localizado.} Debe dibujar grupos y coordinación multi-grupo. Pregunta oral: ¿por qué un consenso global no escala?
+\item \textbf{Híbrida.} Debe elegir por subsistema e invariante. Pregunta oral: ¿qué etiqueta global ocultaría esa matriz?
+\item \textbf{Integración.} Debe definir prueba de partición y criterios observables. Pregunta oral: ¿qué resultado refutaría su diseño?
+\end{enumerate}
+
+\subsection{Errores que deben penalizarse explícitamente}
+
+\begin{itemize}
+\item repetir ``dos de tres'' sin condición de partición;
+\item confundir availability CAP con uptime o éxito de negocio;
+\item tratar $R+W>N$ como prueba completa de linearizabilidad;
+\item confundir Dynamo original con DynamoDB;
+\item afirmar que TrueTime reemplaza consenso;
+\item clasificar todo el sistema con una sola etiqueta sin analizar operaciones;
+\item presentar reconciliación como gratuita.
+\end{itemize}
+
+\subsection{Criterio docente de corrección}
+Se valora distinguir intersección de quórums de orden fuerte, y reparación eventual de ausencia de garantía. Una respuesta excelente elige por dominio y propone una prueba de partición.
+
+\subsection{Evidencias que conviene conservar}
+
+\begin{itemize}
+\item una fotografía o exportación del timeline, matriz o diagrama construido por el curso;
+\item resultados anónimos del diagnóstico inicial y del exit ticket;
+\item una respuesta estudiantil con feedback que muestre revisión conceptual;
+\item la conexión entre la actividad del aula y una decisión del Trabajo Final;
+\item un registro breve del tiempo real utilizado por bloque y del ajuste realizado para la clase siguiente.
+\end{itemize}
+
+\subsection{Checklist del día de la auditoría}
+
+\begin{enumerate}
+\item escribir la pregunta central y el mapa de la clase antes de comenzar;
+\item pedir una predicción individual antes de abrir la discusión;
+\item hacer visible una representación producida por estudiantes;
+\item formalizar después de la intuición y explicitar el límite de la analogía;
+\item cerrar cada núcleo con problema, garantía, costo y evidencia;
+\item proteger al menos ocho minutos para síntesis y exit ticket;
+\item recuperar en la clase siguiente una duda real recogida al cierre.
+\end{enumerate}
 
 \end{document}

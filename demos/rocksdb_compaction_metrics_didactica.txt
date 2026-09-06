@@ -1,0 +1,42 @@
+CLASE 06 - METRICAS DIDACTICAS DE COMPACTION
+=============================================
+
+Estos valores son sintéticos y coherentes. No provienen de una instalación productiva.
+Se usan para aprender a construir una explicación causal y no para presentar un benchmark.
+
+ESCENARIO A - EL MISMO DE LAS DIAPOSITIVAS
+------------------------------------------
+Ventana:                              10 min
+Ingreso lógico sostenido:             90 MB/s
+Flush + compaction sostenidos:        60 MB/s
+Déficit:                              30 MB/s
+Pending compaction bytes:             18 GB y creciendo
+L0 files:                             28
+Slowdown trigger didáctico:           15 GB
+Stop trigger didáctico:               22 GB / 36 archivos L0
+Write latency p50:                     4 ms
+Write latency p99:                   430 ms
+Write stall time:                      2.8 s en la ventana
+
+Cadena de lectura:
+1. ingreso > capacidad de mantenimiento;
+2. pending bytes y L0 crecen;
+3. aumenta read/space amplification y competencia por I/O;
+4. sube p99;
+5. el motor aplica slowdown o stall como backpressure.
+
+ESCENARIO B - EXTENSION CUANTITATIVA DE LA GUIA
+------------------------------------------------
+Ingreso lógico sostenido:            145 MB/s
+Compaction sostenida:                110 MB/s
+Pending compaction bytes:             18 GB, +2.1 GB/min
+L0 files:                             28 de 36, +1.6 archivos/min
+Write amplification:                  6.5x
+Stall time:                            3.4 s/min
+
+Preguntas:
+1. ¿Cuánto déficit de capacidad existe?
+2. ¿Cuánto falta para el stop trigger si la tendencia no cambia?
+3. ¿Qué intervención propondría?
+4. ¿Qué métrica demostraría que esa intervención funcionó?
+5. ¿Qué recurso podría empeorar al hacer compaction más agresiva?

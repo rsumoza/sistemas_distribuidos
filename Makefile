@@ -2,158 +2,103 @@ SHELL := /bin/bash
 
 LATEXMK := latexmk
 LATEXFLAGS := -xelatex -cd -interaction=nonstopmode -halt-on-error -file-line-error
-
 BUILD_DIR := build
-SLIDES_DIR := slides
-APUNTES_DIR := apuntes
-GUIAS_DIR := guias
-GUIASR_DIR := guias_resueltas
-DOCENTE_DIR := docente
-RUBRICA_DIR := rubrica
-DEFENSA_DIR := defensa
-TRABAJO_PRACTICO_DIR := trabajo_practico
+CLASSES := 06 07 08 09
 
-SLIDES_SRC := $(wildcard $(SLIDES_DIR)/clase*.tex)
-APUNTES_SRC := $(wildcard $(APUNTES_DIR)/clase*-apuntes.tex)
-GUIAS_SRC := $(wildcard $(GUIAS_DIR)/clase*-guia.tex)
-GUIASR_SRC := $(wildcard $(GUIASR_DIR)/clase*-guiaresuelta.tex)
-DOCENTE_SRC := $(wildcard $(DOCENTE_DIR)/clase*-docente.tex)
-RUBRICA_SRC := $(wildcard $(RUBRICA_DIR)/*.tex)
-DEFENSA_SRC := $(wildcard $(DEFENSA_DIR)/*.tex)
-TRABAJO_PRACTICO_SRC := $(TRABAJO_PRACTICO_DIR)/enunciado.tex
+SLIDES_SRC := $(foreach c,$(CLASSES),slides/clase$(c).tex)
+NOTES_SRC := $(foreach c,$(CLASSES),apuntes/clase$(c)-apuntes.tex)
+GUIDES_SRC := $(foreach c,$(CLASSES),guias/clase$(c)-guia.tex)
+SOLVED_SRC := $(foreach c,$(CLASSES),guias_resueltas/clase$(c)-guiaresuelta.tex)
+TEACHER_SRC := $(foreach c,$(CLASSES),docente/clase$(c)-docente.tex)
+WORKSHEET_SRC := $(foreach c,$(CLASSES),recursos/clase$(c)-ficha-aula.tex)
+EXTRA_RESOURCE_SRC := recursos/clase06-timelines-pizarra.tex
 
-SLIDES_PDF := $(patsubst $(SLIDES_DIR)/%.tex,$(BUILD_DIR)/slides/%.pdf,$(SLIDES_SRC))
-APUNTES_PDF := $(patsubst $(APUNTES_DIR)/%.tex,$(BUILD_DIR)/apuntes/%.pdf,$(APUNTES_SRC))
-GUIAS_PDF := $(patsubst $(GUIAS_DIR)/%.tex,$(BUILD_DIR)/guias/%.pdf,$(GUIAS_SRC))
-GUIASR_PDF := $(patsubst $(GUIASR_DIR)/%.tex,$(BUILD_DIR)/guias_resueltas/%.pdf,$(GUIASR_SRC))
-DOCENTE_PDF := $(patsubst $(DOCENTE_DIR)/%.tex,$(BUILD_DIR)/docente/%.pdf,$(DOCENTE_SRC))
-RUBRICA_PDF := $(patsubst $(RUBRICA_DIR)/%.tex,$(BUILD_DIR)/rubrica/%.pdf,$(RUBRICA_SRC))
-DEFENSA_PDF := $(patsubst $(DEFENSA_DIR)/%.tex,$(BUILD_DIR)/defensa/%.pdf,$(DEFENSA_SRC))
-TRABAJO_PRACTICO_PDF := $(patsubst $(TRABAJO_PRACTICO_DIR)/%.tex,$(BUILD_DIR)/trabajo_practico/%.pdf,$(TRABAJO_PRACTICO_SRC))
+SLIDES_PDF := $(patsubst slides/%.tex,$(BUILD_DIR)/slides/%.pdf,$(SLIDES_SRC))
+NOTES_PDF := $(patsubst apuntes/%.tex,$(BUILD_DIR)/apuntes/%.pdf,$(NOTES_SRC))
+GUIDES_PDF := $(patsubst guias/%.tex,$(BUILD_DIR)/guias/%.pdf,$(GUIDES_SRC))
+SOLVED_PDF := $(patsubst guias_resueltas/%.tex,$(BUILD_DIR)/guias_resueltas/%.pdf,$(SOLVED_SRC))
+TEACHER_PDF := $(patsubst docente/%.tex,$(BUILD_DIR)/docente/%.pdf,$(TEACHER_SRC))
+WORKSHEET_PDF := $(patsubst recursos/%.tex,$(BUILD_DIR)/recursos/%.pdf,$(WORKSHEET_SRC))
+EXTRA_RESOURCE_PDF := $(patsubst recursos/%.tex,$(BUILD_DIR)/recursos/%.pdf,$(EXTRA_RESOURCE_SRC))
+ALL_PDF := $(SLIDES_PDF) $(NOTES_PDF) $(GUIDES_PDF) $(SOLVED_PDF) $(TEACHER_PDF) $(WORKSHEET_PDF) $(EXTRA_RESOURCE_PDF)
 
-ALL_PDF := $(SLIDES_PDF) $(APUNTES_PDF) $(GUIAS_PDF) $(GUIASR_PDF) \
-           $(DOCENTE_PDF) $(RUBRICA_PDF) $(DEFENSA_PDF) $(TRABAJO_PRACTICO_PDF)
-
-CLASES := 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16
-CLASS_TARGETS := $(addprefix clase,$(CLASES))
-
-.PHONY: all slides apuntes guias guias_resueltas docente rubrica defensa trabajo_practico \
-        validate dirs clean clean-aux distclean fix-times help $(CLASS_TARGETS)
+.PHONY: all validate slides apuntes guias guias_resueltas docente recursos \
+        clase06 clase07 clase08 clase09 clean clean-aux distclean fix-times help
 
 all: validate $(ALL_PDF)
 	@$(MAKE) --no-print-directory clean-aux
-	@echo "OK: curso completo; build/ conserva únicamente PDF."
-
-slides: validate $(SLIDES_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-apuntes: validate $(APUNTES_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-guias: validate $(GUIAS_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-guias_resueltas: validate $(GUIASR_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-docente: validate $(DOCENTE_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-rubrica: validate $(RUBRICA_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-defensa: validate $(DEFENSA_PDF)
-	@$(MAKE) --no-print-directory clean-aux
-
-trabajo_practico: validate $(TRABAJO_PRACTICO_PDF)
-	@$(MAKE) --no-print-directory clean-aux
+	@echo "OK: clases 06-09 compiladas; build/ conserva únicamente PDF."
 
 validate:
-	@python3 tools/validate_tex.py
+	@python3 tools/validate_clases06_09.py .
 
-dirs:
-	@mkdir -p \
-		"$(BUILD_DIR)/slides" \
-		"$(BUILD_DIR)/apuntes" \
-		"$(BUILD_DIR)/guias" \
-		"$(BUILD_DIR)/guias_resueltas" \
-		"$(BUILD_DIR)/docente" \
-		"$(BUILD_DIR)/rubrica" \
-		"$(BUILD_DIR)/defensa" \
-		"$(BUILD_DIR)/trabajo_practico"
-
-$(BUILD_DIR)/slides/%.pdf: $(SLIDES_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/slides" "$<"
-
-$(BUILD_DIR)/apuntes/%.pdf: $(APUNTES_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/apuntes" "$<"
-
-$(BUILD_DIR)/guias/%.pdf: $(GUIAS_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/guias" "$<"
-
-$(BUILD_DIR)/guias_resueltas/%.pdf: $(GUIASR_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/guias_resueltas" "$<"
-
-$(BUILD_DIR)/docente/%.pdf: $(DOCENTE_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/docente" "$<"
-
-$(BUILD_DIR)/rubrica/%.pdf: $(RUBRICA_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/rubrica" "$<"
-
-$(BUILD_DIR)/defensa/%.pdf: $(DEFENSA_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/defensa" "$<"
-
-$(BUILD_DIR)/trabajo_practico/%.pdf: $(TRABAJO_PRACTICO_DIR)/%.tex | dirs
-	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/trabajo_practico" "$<"
+slides: $(SLIDES_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+apuntes: $(NOTES_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+guias: $(GUIDES_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+guias_resueltas: $(SOLVED_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+docente: $(TEACHER_PDF)
+	@$(MAKE) --no-print-directory clean-aux
+recursos: $(WORKSHEET_PDF) $(EXTRA_RESOURCE_PDF)
+	@$(MAKE) --no-print-directory clean-aux
 
 define CLASS_TARGET
-clase$(1): validate
-	@$$(MAKE) --no-print-directory \
-		$$(BUILD_DIR)/slides/clase$(1).pdf \
-		$$(BUILD_DIR)/apuntes/clase$(1)-apuntes.pdf \
-		$$(BUILD_DIR)/guias/clase$(1)-guia.pdf \
-		$$(BUILD_DIR)/guias_resueltas/clase$(1)-guiaresuelta.pdf \
-		$$(BUILD_DIR)/docente/clase$(1)-docente.pdf
+clase$(1): validate \
+  $(BUILD_DIR)/slides/clase$(1).pdf \
+  $(BUILD_DIR)/apuntes/clase$(1)-apuntes.pdf \
+  $(BUILD_DIR)/guias/clase$(1)-guia.pdf \
+  $(BUILD_DIR)/guias_resueltas/clase$(1)-guiaresuelta.pdf \
+  $(BUILD_DIR)/docente/clase$(1)-docente.pdf \
+  $(BUILD_DIR)/recursos/clase$(1)-ficha-aula.pdf $(if $(filter 06,$(1)),$(BUILD_DIR)/recursos/clase06-timelines-pizarra.pdf,)
 	@$$(MAKE) --no-print-directory clean-aux
-	@echo "OK: clase$(1) compilada; se conservaron únicamente sus PDF."
+	@echo "OK: clase$(1) compilada."
 endef
+$(foreach c,$(CLASSES),$(eval $(call CLASS_TARGET,$(c))))
 
-$(foreach c,$(CLASES),$(eval $(call CLASS_TARGET,$(c))))
+$(BUILD_DIR)/slides/%.pdf: slides/%.tex | $(BUILD_DIR)/slides
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/slides" "$<"
+$(BUILD_DIR)/apuntes/%.pdf: apuntes/%.tex | $(BUILD_DIR)/apuntes
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/apuntes" "$<"
+$(BUILD_DIR)/guias/%.pdf: guias/%.tex | $(BUILD_DIR)/guias
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/guias" "$<"
+$(BUILD_DIR)/guias_resueltas/%.pdf: guias_resueltas/%.tex | $(BUILD_DIR)/guias_resueltas
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/guias_resueltas" "$<"
+$(BUILD_DIR)/docente/%.pdf: docente/%.tex | $(BUILD_DIR)/docente
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/docente" "$<"
+$(BUILD_DIR)/recursos/%.pdf: recursos/%.tex | $(BUILD_DIR)/recursos
+	$(LATEXMK) $(LATEXFLAGS) -outdir="../$(BUILD_DIR)/recursos" "$<"
+
+$(BUILD_DIR)/slides $(BUILD_DIR)/apuntes $(BUILD_DIR)/guias \
+$(BUILD_DIR)/guias_resueltas $(BUILD_DIR)/docente $(BUILD_DIR)/recursos:
+	@mkdir -p "$@"
 
 clean-aux:
-	@if [ -d "$(BUILD_DIR)" ]; then \
-		find "$(BUILD_DIR)" -type f ! -name '*.pdf' -delete; \
-		find "$(BUILD_DIR)" -type d -empty -delete 2>/dev/null || true; \
+	@if [[ -d "$(BUILD_DIR)" ]]; then \
+	  find "$(BUILD_DIR)" -type f ! -name '*.pdf' -delete; \
+	  find "$(BUILD_DIR)" -type d -empty -delete 2>/dev/null || true; \
 	fi
-	@find "$(SLIDES_DIR)" "$(APUNTES_DIR)" "$(GUIAS_DIR)" \
-		"$(GUIASR_DIR)" "$(DOCENTE_DIR)" "$(RUBRICA_DIR)" "$(DEFENSA_DIR)" \
-		"$(TRABAJO_PRACTICO_DIR)" \
-		-type f \( \
-		-name '*.aux' -o -name '*.log' -o -name '*.nav' -o -name '*.out' \
-		-o -name '*.toc' -o -name '*.snm' -o -name '*.fls' \
-		-o -name '*.fdb_latexmk' -o -name '*.vrb' -o -name '*.xdv' \
-		-o -name '*.synctex.gz' -o -name '*.bcf' -o -name '*.run.xml' \
-		-o -name '*.bbl' -o -name '*.blg' -o -name '*.lof' -o -name '*.lot' \
-		\) -delete
-
+	@find slides apuntes guias guias_resueltas docente recursos -maxdepth 1 -type f \
+	  \( -name '*.aux' -o -name '*.log' -o -name '*.nav' -o -name '*.snm' \
+	     -o -name '*.toc' -o -name '*.out' -o -name '*.fls' \
+	     -o -name '*.fdb_latexmk' -o -name '*.xdv' -o -name '*.synctex.gz' \) -delete 2>/dev/null || true
 clean: clean-aux
-	@echo "Auxiliares eliminados; los PDF fueron preservados."
-
+	@echo "Auxiliares eliminados; los PDF se conservaron."
 distclean:
 	@rm -rf "$(BUILD_DIR)"
-	@echo "Build completo eliminado."
-
-# Ejecutar una sola vez si los archivos del ZIP quedaron fechados en el futuro.
+	@echo "build/ eliminado, incluidos sus PDF."
 fix-times:
-	@find . -path './.git' -prune -o -path './build' -prune -o -type f -exec touch {} +
-	@find . -path './.git' -prune -o -path './build' -prune -o -type d -exec touch {} +
-	@echo "Marcas de tiempo normalizadas con el reloj actual del sistema."
-
+	@find . -path './.git' -prune -o -type f -exec touch {} +
+	@echo "Timestamps normalizados."
 help:
-	@echo "make all"
-	@echo "make slides | apuntes | guias | guias_resueltas | docente"
-	@echo "make rubrica | defensa | trabajo_practico"
-	@echo "make clase01 ... make clase16"
-	@echo "make clean       # conserva PDF"
-	@echo "make distclean   # elimina build completo"
-	@echo "make fix-times   # corrige clock skew tras descomprimir"
+	@printf '%s\n' \
+	  'make all               Compila todos los materiales auditados 06-09' \
+	  'make clase06           Compila clase 06 y timelines' \
+	  'make clase07           Compila los seis materiales de clase 07' \
+	  'make clase08           Compila los seis materiales de clase 08' \
+	  'make clase09           Compila los seis materiales de clase 09' \
+	  'make validate          Valida estructura, densidad y contrato con el .sty' \
+	  'make clean             Elimina auxiliares y conserva PDF' \
+	  'make distclean         Elimina build/ completo'

@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 
 \UASetClassNumber{08}
 \UASetClassTitle{Consistencia real}
@@ -27,6 +29,73 @@ Las clases previas ya mostraron que:
 \begin{uakeybox}
 La consistencia real no es una propiedad única del sistema. Es una política por dato y operación, condicionada por fallas, latencia y costo del error.
 \end{uakeybox}
+
+
+
+\section{Cómo estudiar este capítulo}
+
+Este capítulo está organizado en tres pasadas. La primera construye una intuición con un caso real; la segunda formaliza el mecanismo y sus supuestos; la tercera somete la solución a una falla o a una medición. Para estudiar de manera eficaz:
+
+\begin{enumerate}
+\item explique primero el problema sin mencionar una tecnología;
+\item dibuje la ejecución normal y mueva el punto de falla;
+\item identifique la garantía exacta y su frontera;
+\item anote qué costo se desplaza hacia latencia, almacenamiento, reparación u operación;
+\item cierre proponiendo una métrica o un experimento que podría refutar su diseño.
+\end{enumerate}
+
+\begin{uainfo}
+Las analogías del capítulo son puertas de entrada, no definiciones finales. Una respuesta completa debe poder abandonar la analogía y utilizar el vocabulario técnico correspondiente.
+\end{uainfo}
+
+\section{Mapa intuitivo antes del formalismo}
+
+CAP y PACELC suelen convertirse en siglas memorizadas. Para evitarlo, partimos de ocho imágenes mentales:
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.36\textwidth}}
+\toprule
+Concepto & Intuición & Pregunta técnica \\
+\midrule
+Consistencia & cajas registradoras cuentan una historia compatible & ¿qué observación se permite? \\
+Disponibilidad & toda caja alcanzable responde & ¿puede rechazar por falta de coordinación? \\
+Partición & el puente entre regiones está cortado & ¿se detiene o deja divergir? \\
+CAP & decisión obligada mientras el puente sigue cortado & ¿A o C para esta operación? \\
+PACELC & incluso con puente sano, coordinar demora & ¿latencia local o consistencia? \\
+Quorum & dos jurados que comparten al menos un miembro & ¿qué intersección se obtiene? \\
+Version vector & genealogía de una versión & ¿posterior o concurrente? \\
+TrueTime & reloj que declara un intervalo de incertidumbre & ¿cuánto esperar para ordenar externamente? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{uainfo}
+La pregunta central no es ``¿este sistema es AP o CP?'', sino ``para este dato y esta operación, ¿qué debe ocurrir cuando la coordinación es imposible o costosa?''.
+\end{uainfo}
+
+\section{Dos casos que obligan a decidir}
+
+\subsection{Último asiento de una defensa pública}
+
+Queda un asiento. Dos regiones, separadas por una partición, reciben reservas simultáneas. El invariante es:
+\[
+\text{reservas confirmadas para el asiento} \leq 1.
+\]
+Una respuesta CP exige quorum/autoridad y puede rechazar en una región. Una respuesta AP acepta ambas intenciones y necesita una resolución posterior que inevitablemente decepciona a un usuario. El dominio decide cuál error es más costoso.
+
+\subsection{Carrito de compras}
+
+Dos dispositivos agregan objetos durante una partición. Perder un objeto puede ser peor que mostrar la unión de versiones. Aquí un diseño Dynamo-style puede conservar ramas concurrentes y aplicar un merge semántico. El mismo mecanismo sería incorrecto para un asiento indivisible.
+
+\begin{center}
+\begin{tikzpicture}[node distance=12mm,>=Latex,every node/.style={font=\small,align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,fill=UAIngPaper,text width=3cm] (seat) {Asiento único\\conflicto no fusionable};
+\node[draw=UAIngNavy,rounded corners,thick,right=of seat,text width=3cm] (cart) {Carrito\\conflicto fusionable};
+\node[draw=UAIngOrange,rounded corners,thick,right=of cart,text width=3cm] (rank) {Ranking\\atraso tolerable};
+\draw[->,very thick] (seat)--node[above,font=\scriptsize]{garantía fuerte}(cart);
+\draw[->,very thick,UAIngOrange] (cart)--node[above,font=\scriptsize]{eventual}(rank);
+\end{tikzpicture}
+\end{center}
 
 \section{CAP: formulación correcta}
 
@@ -290,6 +359,33 @@ Para cada dato y operación:
 \item ensayar falla y recuperación.
 \end{enumerate}
 
+
+\section{Precisiones técnicas indispensables}
+
+\subsection{CAP se aplica a una operación y a un modelo de consistencia}
+
+No clasifica a una empresa ni obliga a usar una sola política para todos los datos. Debe declararse la operación, el invariante, la partición considerada y la semántica fuerte que se intenta preservar.
+
+\subsection{Un rechazo rápido no es disponibilidad CAP para esa operación}
+
+El proceso puede seguir vivo y responder un error, pero la solicitud no obtuvo una respuesta no errónea de la operación pedida. Esa elección puede ser correcta para proteger el negocio; simplemente sacrifica disponibilidad en el sentido estricto del teorema.
+
+\subsection{PACELC es una taxonomía de diseño}
+
+PACELC recuerda que, aun sin partición, la coordinación puede intercambiar latencia por consistencia. No es otro teorema de imposibilidad equivalente a CAP ni obliga a encerrar permanentemente un producto en una única casilla.
+
+\subsection{$R+W>N$ garantiza intersección, no linearizabilidad}
+
+La desigualdad no ordena escrituras concurrentes, no define qué versión gana, no corrige relojes y puede dejar de representar el conjunto real con sloppy quorums. Una garantía fuerte necesita reglas adicionales de autoridad, versiones y lectura.
+
+\subsection{Dynamo original no es sinónimo de DynamoDB}
+
+El paper de Dynamo describe un diseño y un conjunto de mecanismos para servicios internos de Amazon. Los productos actuales inspirados por esas ideas pueden ofrecer APIs y garantías diferentes. En clase se analiza el diseño del paper, no se atribuyen automáticamente esas propiedades a un servicio comercial actual.
+
+\subsection{TrueTime no sustituye al consenso}
+
+TrueTime expone una cota de incertidumbre temporal. Spanner combina esa información con replicación por consenso y protocolos transaccionales. El commit wait usa la cota para preservar orden externo; no convierte un reloj en un protocolo de acuerdo.
+
 \section{Errores frecuentes}
 
 \begin{itemize}
@@ -328,19 +424,128 @@ Cada grupo debe presentar una matriz por subsistema:
 
 No se acepta “nuestro sistema es CP” como análisis completo. Deben discutir operaciones concretas.
 
-\section{Autoevaluación}
+
+\section{Derivación intuitiva de CAP por indistinguibilidad}
+
+Suponga dos réplicas A y B. La red se parte. Un cliente escribe $x=1$ en A y otro lee desde B. B no puede distinguir entre estas historias:
 
 \begin{enumerate}
-\item ¿Qué condición activa el trade-off CAP?
-\item ¿Por qué una respuesta de error puede indicar elección de consistencia?
-\item ¿Qué agrega PACELC?
-\item ¿Qué garantiza exactamente $R+W>N$?
-\item ¿Cómo detecta un version vector concurrencia?
-\item ¿Qué problema resuelve hinted handoff?
-\item ¿Por qué eventual consistency necesita anti-entropy?
-\item ¿Qué representa $\epsilon$ en TrueTime?
-\item ¿Por qué commit wait mejora external consistency?
-\item ¿Qué operación de su Trabajo Final necesita una garantía distinta del resto?
+\item A recibió y confirmó la escritura, pero el mensaje de replicación no cruza la partición;
+\item A nunca recibió la escritura;
+\item el mensaje simplemente está muy demorado.
+\end{enumerate}
+
+Si B debe responder siempre, alguna ejecución lo obliga a devolver un valor incompatible con una historia linealizable. Si espera coordinación, deja de ser disponible en el sentido CAP. La imposibilidad no proviene de una base de datos concreta, sino de información que la partición vuelve inaccesible.
+
+\section{Ejemplos cuantitativos de quorum}
+
+Para $N=5$:
+
+\begin{center}
+\begin{tabular}{p{0.06\textwidth}p{0.06\textwidth}p{0.13\textwidth}p{0.25\textwidth}p{0.31\textwidth}}
+\toprule
+$R$ & $W$ & $R+W>N$ & Perfil & Lectura \\
+\midrule
+1 & 5 & sí & lecturas rápidas, escrituras frágiles & toda escritura requiere todos \\
+3 & 3 & sí & balanceado & ambas rutas esperan mayoría \\
+5 & 1 & sí & escrituras rápidas, lecturas costosas & lectura consulta todas \\
+1 & 1 & no & máxima respuesta local & stale read muy probable \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La intersección es una propiedad combinatoria, no una semántica completa. Para obtener una lectura fuerte hacen falta reglas adicionales sobre versiones, coordinación, orden y qué respuestas son válidas.
+
+\section{Ejemplo trabajado de version vectors}
+
+Sean:
+\[
+v_1=[A:2,B:1],\qquad v_2=[A:2,B:3],\qquad v_3=[A:4,B:1].
+\]
+$v_2$ domina a $v_1$ porque es mayor o igual en todos los componentes y mayor en B. $v_3$ también domina a $v_1$. En cambio, $v_2$ y $v_3$ son concurrentes: una avanzó en B y la otra en A.
+
+El sistema no puede declarar una ``última'' versión causal entre $v_2$ y $v_3$ sin una política adicional. Para carrito, puede fusionar; para saldo o asiento, debe impedir la concurrencia o escalar el conflicto.
+
+\section{TrueTime y commit wait con números}
+
+Suponga que al asignar timestamp de commit $s=12{:}00{:}00.010$, TrueTime devuelve:
+\[
+TT.now()=[12{:}00{:}00.004,\ 12{:}00{:}00.016].
+\]
+El sistema aún no puede asegurar que $s$ está definitivamente en el pasado, porque el límite superior es posterior. Espera hasta que una lectura de TrueTime tenga $earliest>s$. Si eso ocurre a 12:00:00.018, el commit wait agregó aproximadamente 8 ms desde $s$.
+
+Esta espera compra una propiedad: una transacción que comienza después de observar el commit no recibe un timestamp anterior. El costo depende de la incertidumbre temporal y de la coordinación, no de una afirmación abstracta de ``usar relojes precisos''.
+
+\section{Caso integrado: Asteria Online por subsistema}
+
+Un único juego puede combinar garantías:
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.28\textwidth}p{0.38\textwidth}}
+\toprule
+Subsistema & Garantía razonable & Razón \\
+\midrule
+Propiedad de castillo & fuerte / autoridad única & dos gremios no pueden poseerlo \\
+Inventario y oro & transaccional e idempotente & evitar duplicación y doble gasto \\
+Combate de zona & orden autoritativo local & baja latencia con historia coherente \\
+Ranking & eventual con cierre de premios & atraso visible tolerable \\
+Chat y presencia & disponible, causal/best effort & no debe detener el mundo \\
+Telemetría & AP y replayable & pérdida/retraso acotados por SLO \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La clasificación se hace por operación. Decir ``Asteria es CP'' o ``Asteria es AP'' oculta decisiones esenciales.
+
+\section{Métricas y pruebas que vuelven verificable la garantía}
+
+\begin{itemize}
+\item latencia local y coordinada p50/p95/p99;
+\item tasa de rechazos por falta de quorum;
+\item antigüedad máxima de una lectura;
+\item número y edad de versiones concurrentes;
+\item hints pendientes y tiempo de handoff;
+\item bytes/rangos reparados por anti-entropy;
+\item anchura de incertidumbre de reloj y commit wait;
+\item RPO/RTO frente a pérdida de réplica o región.
+\end{itemize}
+
+Una prueba de partición útil declara de antemano qué operaciones seguirán, cuáles fallarán y qué reconciliación se espera al sanar la red.
+
+\section{Glosario operativo}
+
+\begin{description}
+\item[Linearizabilidad.] Operaciones parecen ocurrir en un punto entre invocación y respuesta y respetan tiempo real.
+\item[Disponibilidad CAP.] Toda solicitud a un nodo no fallado obtiene respuesta no errónea.
+\item[Sloppy quorum.] Conjunto de nodos disponibles que puede no coincidir con réplicas preferidas.
+\item[Hint.] Registro temporal que debe entregarse al propietario recuperado.
+\item[Anti-entropy.] Reparación de divergencias en background.
+\item[External consistency.] Serialización compatible con el orden externo observable.
+\end{description}
+
+\section{Autoevaluación ampliada}
+
+\begin{enumerate}
+\item ¿En qué condición exacta aparece el trade-off CAP?
+\item ¿Por qué ``elegir dos de tres'' es engañoso?
+\item ¿Qué significa disponibilidad en CAP?
+\item ¿Qué debe hacer una operación CP durante partición?
+\item ¿Qué costo acepta una operación AP?
+\item ¿Qué agrega PACELC a la discusión?
+\item ¿Qué problema resuelve consistent hashing y cuál no?
+\item ¿Qué significan $N$, $R$ y $W$?
+\item ¿Qué garantiza $R+W>N$ y qué no garantiza?
+\item ¿Cómo se construye un stale read con $R=1,W=1$?
+\item ¿Cómo reconoce un version vector concurrencia?
+\item ¿Por qué LWW puede perder una actualización válida?
+\item ¿Qué gana sloppy quorum?
+\item ¿Qué deuda crea hinted handoff?
+\item ¿Qué diferencia hay entre read repair y anti-entropy?
+\item ¿Cómo reducen tráfico los Merkle trees?
+\item ¿Qué representa el intervalo de TrueTime?
+\item ¿Qué propiedad compra commit wait?
+\item ¿Por qué Spanner localiza consenso por grupo?
+\item ¿Cómo diseñaría garantías distintas dentro de una misma aplicación?
 \end{enumerate}
 
 \section{Síntesis final}

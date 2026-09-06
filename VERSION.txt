@@ -1,0 +1,6 @@
+Sistemas Distribuidos - clases 06, 07, 08 y 09
+Versión: 11.4 consolidada y audit-ready
+Fecha de generación: 2026-09-06
+Duración prevista: 180 minutos por clase
+Metodología: caso -> predicción -> intuición controlada -> formalización -> ejecución/falla -> evidencia -> decisión -> recuperación
+Estado: apuntes consolidados, guías docentes en tres partes, demos corregidas y build reproducible

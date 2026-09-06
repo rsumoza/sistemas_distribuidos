@@ -1,0 +1,159 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=institutional,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\UASetClassNumber{09}
+\UASetClassTitle{Arquitecturas distribuidas reales}
+\title{Clase 09 --- Ficha de aula: fronteras, ownership, outbox y sagas}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+\section{1. Intuiciones iniciales}
+\begin{tabular}{p{0.20\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\toprule
+Concepto & Imagen mental & Definición técnica al final \\
+\midrule
+Monolito modular & edificio/ habitaciones & \rule{0pt}{1cm} \\
+Microservicio & edificio/ caminos & \rule{0pt}{1cm} \\
+Bounded context & idioma local & \rule{0pt}{1cm} \\
+Ownership & escritura del dato & \rule{0pt}{1cm} \\
+RPC & llamada telefónica & \rule{0pt}{1cm} \\
+Evento & aviso durable & \rule{0pt}{1cm} \\
+Outbox & copia en mismo libro & \rule{0pt}{1cm} \\
+Saga & itinerario compensable & \rule{0pt}{1cm} \\
+\bottomrule
+\end{tabular}
+
+\newpage
+
+\begin{uainfo}
+\textbf{Precisión para la ficha:} un bounded context no obliga a crear un proceso. Primero se justifica la frontera semántica; después se decide si la autonomía ganada paga una frontera de red.
+\end{uainfo}
+
+\section{2. Canvas de frontera para Asteria}
+Elija una capacidad: combate, inventario, mercado, pagos, ranking o chat.
+
+\begin{tabular}{p{0.30\textwidth}p{0.56\textwidth}}
+\toprule
+Pregunta & Respuesta \\
+\midrule
+Capacidad y lenguaje & \rule{0pt}{1cm} \\
+Invariante local & \rule{0pt}{1cm} \\
+Owner/equipo & \rule{0pt}{1cm} \\
+Dato exclusivo & \rule{0pt}{1cm} \\
+Presión para separar & \rule{0pt}{1cm} \\
+Falla nueva & \rule{0pt}{1cm} \\
+SLO / métrica & \rule{0pt}{1cm} \\
+Alternativa simple & \rule{0pt}{1cm} \\
+\bottomrule
+\end{tabular}
+
+\newpage
+\section{3. Prima distribuida}
+Transforme una llamada local en RPC. Complete costos:
+
+\begin{center}
+\begin{tikzpicture}[node distance=3cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=3cm] (a) {Módulo A};
+\node[draw=UAIngNavy,rounded corners,thick,right=of a,text width=3cm] (b) {Servicio B};
+\draw[->,very thick] (a)--node[above]{red}(b);
+\end{tikzpicture}
+\end{center}
+
+
+\begin{itemize}
+\item latencia: \hrulefill
+\item timeout: \hrulefill
+\item retry: \hrulefill
+\item contrato: \hrulefill
+\item seguridad: \hrulefill
+\item tracing: \hrulefill
+\item despliegue: \hrulefill
+\item on-call: \hrulefill
+\end{itemize}
+
+
+Calcule $0{,}999^4$: \hrulefill. ¿Por qué es optimista? \vspace{1cm}
+
+\newpage
+\section{4. RPC, evento o consulta}
+
+\begin{tabular}{p{0.28\textwidth}p{0.18\textwidth}p{0.44\textwidth}}
+\toprule
+Interacción & Elección & Justificación y falla \\
+\midrule
+Validar pago & & \rule{0pt}{1.1cm} \\
+Enviar email & & \rule{0pt}{1.1cm} \\
+Actualizar ranking & & \rule{0pt}{1.1cm} \\
+Consultar perfil & & \rule{0pt}{1.1cm} \\
+Reservar objeto & & \rule{0pt}{1.1cm} \\
+\bottomrule
+\end{tabular}
+
+Clasifique:
+\begin{itemize}
+\item \texttt{ReserveSeat}: \hrulefill
+\item \texttt{SeatReserved}: \hrulefill
+\item \texttt{GetSeatAvailability}: \hrulefill
+\end{itemize}
+
+\newpage
+\section{5. Dual write y outbox}
+Dibuje los dos órdenes y marque la ventana de crash.
+\vspace{4cm}
+
+Diseñe outbox:
+\begin{itemize}
+\item event ID: \hrulefill
+\item aggregate ID y sequence: \hrulefill
+\item estado del relay: \hrulefill
+\item deduplicación: \hrulefill
+\item métricas: \hrulefill
+\end{itemize}
+
+\newpage
+\section{6. Saga de compra}
+Complete estados, retries y compensaciones.
+
+\begin{center}
+\begin{tikzpicture}[node distance=1cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick] (a) {Reservar};
+\node[draw=UAIngNavy,rounded corners,thick,right=of a] (b) {Pagar};
+\node[draw=UAIngOrange,rounded corners,thick,right=of b] (c) {Transferir};
+\node[draw=UAIngNavy,rounded corners,thick,right=of c] (d) {Notificar};
+\draw[->,thick] (a)--(b)--(c)--(d);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabular}{p{0.20\textwidth}p{0.20\textwidth}p{0.24\textwidth}p{0.18\textwidth}}
+\toprule
+Paso & Falla & Acción & ¿Rollback real? \\
+\midrule
+Reserva & \rule{0pt}{1cm} & & \\
+Pago & \rule{0pt}{1cm} & & \\
+Transferencia & \rule{0pt}{1cm} & & \\
+Email & \rule{0pt}{1cm} & & \\
+\bottomrule
+\end{tabular}
+
+\newpage
+\section{7. Migración, métricas y exit ticket}
+Proponga una ruta Strangler:
+\begin{enumerate}
+\item capacidad inicial: \hrulefill
+\item router/proxy: \hrulefill
+\item fuente de verdad durante coexistencia: \hrulefill
+\item rollback: \hrulefill
+\item métrica que justifica continuar: \hrulefill
+\end{enumerate}
+
+\subsection*{Exit ticket}
+\begin{enumerate}
+\item Diferencia entre monolito modular y monolito distribuido.
+\item Presión concreta que justifica una extracción.
+\item Qué resuelve outbox y qué deja abierto.
+\item Por qué una compensación no es rollback.
+\end{enumerate}
+\end{document}

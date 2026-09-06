@@ -1,0 +1,154 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=institutional,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\UASetClassNumber{08}
+\UASetClassTitle{Consistencia real}
+\title{Clase 08 --- Ficha de aula: CAP, quorums, versiones y TrueTime}
+\author{\UAProfessor}
+\date{\UADate}
+\begin{document}
+\maketitle
+\section{1. Intuiciones iniciales}
+\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+\toprule
+Concepto & Mi intuición & Formulación técnica final \\
+\midrule
+Consistencia & \rule{0pt}{1cm} & \\
+Disponibilidad & \rule{0pt}{1cm} & \\
+Partición & \rule{0pt}{1cm} & \\
+CAP & \rule{0pt}{1cm} & \\
+PACELC & \rule{0pt}{1cm} & \\
+Quorum & \rule{0pt}{1cm} & \\
+TrueTime & \rule{0pt}{1cm} & \\
+\bottomrule
+\end{tabular}
+
+\newpage
+\section{2. Último asiento durante una partición}
+Invariante: confirmaciones para asiento A-17 $\leq1$.
+
+\begin{center}
+\begin{tikzpicture}[node distance=4cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=3cm] (ba) {Buenos Aires\\reserva de Ana};
+\node[draw=UAIngNavy,rounded corners,thick,right=of ba,text width=3cm] (fra) {Frankfurt\\reserva de Bruno};
+\draw[<->,very thick,dashed,UAIngOrange] (ba)--node[above]{PARTICIÓN 90 s}(fra);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabular}{p{0.23\textwidth}p{0.30\textwidth}p{0.30\textwidth}}
+\toprule
+Política & Qué responde & Costo \\
+\midrule
+CP & \rule{0pt}{1.2cm} & \\
+AP & \rule{0pt}{1.2cm} & \\
+Intención pendiente & \rule{0pt}{1.2cm} & \\
+\bottomrule
+\end{tabular}
+
+\newpage
+\section{3. Quorums}
+Con $N=5$, coloree conjuntos de lectura y escritura para tres configuraciones.
+
+\begin{center}
+\begin{tikzpicture}[x=2cm,y=1.3cm]
+\foreach \r/\lab in {2/{R=3,W=3},1/{R=1,W=5},0/{R=1,W=1}}{
+  \node[left] at (0,\r){\lab};
+  \foreach \x in {1,...,5}{\node[draw=UAIngNavy,circle,minimum size=0.7cm] at (\x,\r){\x};}
+}
+\end{tikzpicture}
+\end{center}
+
+Para cada fila:
+\begin{itemize}
+\item ¿intersecta?: \hrulefill
+\item nodos que pueden fallar antes de bloquear lectura/escritura: \hrulefill
+\item stale read posible: \hrulefill
+\end{itemize}
+
+\newpage
+\section{4. Version vectors}
+Dados:
+\[
+v_1=[A:2,B:1],\quad v_2=[A:2,B:3],\quad v_3=[A:4,B:1].
+\]
+
+\begin{enumerate}
+\item Versiones que dominan a $v_1$: \hrulefill
+\item Relación entre $v_2$ y $v_3$: \hrulefill
+\item Merge para carrito: \vspace{1cm}
+\item Por qué el mismo merge no sirve para un asiento: \vspace{1cm}
+\end{enumerate}
+
+Dibuje la genealogía:
+\vspace{5cm}
+
+\newpage
+\section{5. Dynamo: deuda de disponibilidad}
+Complete el flujo:
+
+\begin{center}
+\begin{tikzpicture}[node distance=1cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=2.3cm] (w) {Write con nodo preferido caído};
+\node[draw=UAIngNavy,rounded corners,thick,right=of w,text width=2.3cm] (s) {Sloppy quorum};
+\node[draw=UAIngOrange,rounded corners,thick,right=of s,text width=2.3cm] (h) {Hint pendiente};
+\node[draw=UAIngNavy,rounded corners,thick,right=of h,text width=2.3cm] (r) {Handoff / repair};
+\draw[->,thick] (w)--(s)--(h)--(r);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item Beneficio: \hrulefill
+\item Riesgo: \hrulefill
+\item Métricas: \hrulefill
+\item ¿Cuándo ``eventual'' sería demasiado tarde?: \vspace{1cm}
+\end{itemize}
+
+\newpage
+\section{6. TrueTime y commit wait}
+Al asignar $s=12{:}00{:}00.010$, TrueTime devuelve:
+\[
+[12{:}00{:}00.004,\ 12{:}00{:}00.016].
+\]
+Luego devuelve:
+\[
+[12{:}00{:}00.011,\ 12{:}00{:}00.023].
+\]
+
+\begin{enumerate}
+\item ¿En cuál lectura puede afirmarse $earliest>s$? \hrulefill
+\item ¿Qué propiedad compra la espera? \vspace{0.8cm}
+\item ¿Qué ocurre si aumenta la incertidumbre? \vspace{0.8cm}
+\item ¿Por qué no basta un timestamp puntual? \vspace{0.8cm}
+\end{enumerate}
+
+\newpage
+
+\begin{uainfo}
+\textbf{Precisión para la ficha:} PACELC es una taxonomía para discutir el costo normal de latencia y consistencia; no es un segundo teorema de imposibilidad equivalente a CAP.
+\end{uainfo}
+
+\section{7. Matriz híbrida y exit ticket}
+Complete para Asteria Online:
+
+\begin{tabular}{p{0.20\textwidth}p{0.20\textwidth}p{0.23\textwidth}p{0.23\textwidth}}
+\toprule
+Subsistema & Invariante & Bajo partición & Costo normal \\
+\midrule
+Castillo & \rule{0pt}{1cm} & & \\
+Inventario & \rule{0pt}{1cm} & & \\
+Combate & \rule{0pt}{1cm} & & \\
+Ranking & \rule{0pt}{1cm} & & \\
+Chat & \rule{0pt}{1cm} & & \\
+\bottomrule
+\end{tabular}
+
+\subsection*{Exit ticket}
+\begin{enumerate}
+\item Condición exacta de CAP.
+\item Qué garantiza $R+W>N$ y qué no.
+\item Ejemplo de versiones concurrentes.
+\item Razón para que TrueTime entregue un intervalo.
+\end{enumerate}
+\end{document}

@@ -1,6 +1,8 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
@@ -28,6 +30,78 @@ El objetivo no es defender una moda arquitectónica. Es aprender a responder:
 \begin{uakeybox}
 Una arquitectura distribuida no mejora por contener más procesos. Mejora cuando sus fronteras reducen acoplamiento relevante sin ocultar los nuevos costos de red, datos y operación.
 \end{uakeybox}
+
+
+
+\section{Cómo estudiar este capítulo}
+
+Este capítulo está organizado en tres pasadas. La primera construye una intuición con un caso real; la segunda formaliza el mecanismo y sus supuestos; la tercera somete la solución a una falla o a una medición. Para estudiar de manera eficaz:
+
+\begin{enumerate}
+\item explique primero el problema sin mencionar una tecnología;
+\item dibuje la ejecución normal y mueva el punto de falla;
+\item identifique la garantía exacta y su frontera;
+\item anote qué costo se desplaza hacia latencia, almacenamiento, reparación u operación;
+\item cierre proponiendo una métrica o un experimento que podría refutar su diseño.
+\end{enumerate}
+
+\begin{uainfo}
+Las analogías del capítulo son puertas de entrada, no definiciones finales. Una respuesta completa debe poder abandonar la analogía y utilizar el vocabulario técnico correspondiente.
+\end{uainfo}
+
+\section{Mapa intuitivo antes del formalismo}
+
+La arquitectura se entiende mejor si primero se piensa en responsabilidades y no en productos:
+
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.36\textwidth}}
+\toprule
+Concepto & Intuición & Pregunta técnica \\
+\midrule
+Monolito modular & edificio único con habitaciones y puertas & ¿las paredes internas se respetan? \\
+Microservicio & edificio autónomo conectado por caminos & ¿qué autonomía compra la separación? \\
+Bounded context & idioma local de una parte del negocio & ¿qué significa aquí ``pedido''? \\
+Ownership & escritura registral del dato & ¿quién puede modificar el invariante? \\
+RPC & llamada telefónica que espera respuesta & ¿qué ocurre si tarda o no responde? \\
+Evento & aviso publicado en un tablero durable & ¿quién lo consume y con qué retraso? \\
+Outbox & copia del aviso en el mismo libro que el cambio & ¿cómo evitar estado sin evento? \\
+Saga & itinerario con acciones compensatorias & ¿cómo continuar o reparar sin rollback global? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{uainfo}
+Una arquitectura no es un dibujo de cajas. Es una distribución de autoridad, datos, fallas, comunicación y responsabilidad operacional.
+\end{uainfo}
+
+\section{Caso conductor: Asteria Online}
+
+Asteria es un mundo virtual medieval. Cuenta con cuentas, zonas de mundo, combate, inventario, mercado, pagos, ranking y chat. Las presiones son distintas:
+
+\begin{itemize}
+\item combate necesita baja latencia y autoridad local;
+\item inventario debe preservar propiedad única de objetos;
+\item pagos requieren auditabilidad e idempotencia;
+\item ranking tolera atraso;
+\item chat puede degradarse sin detener la partida;
+\item zonas populares necesitan escalar de forma distinta.
+\end{itemize}
+
+La primera pregunta no es cuántos servicios crear, sino qué capacidades poseen invariantes, ritmo de cambio, carga y equipo suficientemente distintos para justificar una frontera de despliegue.
+
+\begin{center}
+\begin{tikzpicture}[node distance=6mm,>=Latex,every node/.style={font=\small,align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,fill=UAIngPaper,text width=2cm] (acc) {Cuentas};
+\node[draw=UAIngNavy,rounded corners,thick,right=of acc,text width=2cm] (world) {Mundo};
+\node[draw=UAIngOrange,rounded corners,thick,right=of world,text width=2cm] (inv) {Inventario};
+\node[draw=UAIngNavy,rounded corners,thick,right=of inv,text width=2cm] (pay) {Pagos};
+\node[draw=UAIngOrange,rounded corners,thick,right=of pay,text width=2cm] (rank) {Ranking};
+\draw[->,very thick] (acc)--(world);
+\draw[->,very thick,UAIngOrange] (world)--(inv);
+\draw[->,very thick] (inv)--(pay);
+\draw[->,very thick,UAIngOrange] (pay)--(rank);
+\end{tikzpicture}
+\end{center}
 
 \section{Caso conductor: plataforma global de cursos}
 
@@ -350,6 +424,33 @@ Datos & modelo común coherente & bounded contexts distintos \\
 \item revisar fronteras con evidencia.
 \end{enumerate}
 
+
+\section{Precisiones técnicas indispensables}
+
+\subsection{Bounded context no implica proceso}
+
+Un bounded context es una frontera semántica dentro de la cual el modelo tiene significado coherente. Puede implementarse como módulo de un monolito. La frontera de despliegue se justifica después, cuando autonomía, escala, seguridad o aislamiento pagan la prima distribuida.
+
+\subsection{Database per service significa ownership, no una máquina por servicio}
+
+El principio esencial es que un único owner modifica el modelo. La separación puede realizarse mediante esquemas, bases o clusters distintos según el riesgo. Compartir el mismo servidor físico no invalida el patrón; permitir escrituras laterales a tablas ajenas sí destruye el ownership.
+
+\subsection{Outbox no ofrece exactly-once global}
+
+Outbox hace atómicos el cambio local y la intención de publicar. El relay puede reenviar y el broker puede entregar nuevamente. El consumidor necesita inbox o deduplicación atómica con el efecto. Para efectos físicos o proveedores externos todavía puede ser necesaria reconciliación.
+
+\subsection{Una saga es una máquina de estados durable}
+
+No basta con encadenar handlers. El estado del workflow, los IDs de paso, deadlines, intentos, resultados y compensaciones deben sobrevivir reinicios. Las transiciones deben ser idempotentes y algunas fallas requieren intervención manual, no un rollback automático.
+
+\subsection{Compensar no borra la historia}
+
+Un reembolso es otro movimiento; un email de corrección no desenvía el anterior; devolver stock no recupera el tiempo perdido. La compensación restaura una condición de negocio aceptable, puede tardar y también puede fallar.
+
+\subsection{La autonomía debe demostrarse}
+
+Una extracción se justifica con evidencia: mayor frecuencia de despliegue independiente, menor lead time, menor blast radius o escalado diferenciado. Si los equipos, esquemas y releases siguen coordinándose siempre, probablemente se creó un monolito distribuido.
+
 \section{Errores frecuentes}
 
 \begin{itemize}
@@ -389,19 +490,171 @@ Cada grupo debe justificar:
 \item criterio para revisar la frontera.
 \end{itemize}
 
-\section{Autoevaluación}
+
+\section{Ejemplos cuantitativos de la prima distribuida}
+
+\subsection{Disponibilidad de una cadena sincrónica}
+
+Si una request depende secuencialmente de API, A, B y C, y cada componente tiene disponibilidad independiente de 99,9\%, la disponibilidad idealizada del flujo es:
+\[
+A_{flujo}=0{,}999^4\approx0{,}996006=99{,}6006\%.
+\]
+La cuenta ignora red, timeouts y fallas correlacionadas, por lo que es optimista. Además, las latencias se suman y los percentiles de cola pueden dominar. La separación creó una cadena cuya confiabilidad debe evaluarse como flujo, no como componentes aislados.
+
+\subsection{Costo de coordinación entre equipos}
+
+Suponga que un cambio en Inventario requiere aprobación de tres equipos y cuatro repositorios. Aunque existan servicios separados, la unidad real de cambio sigue siendo conjunta. Métricas como lead time, porcentaje de despliegues independientes y cantidad de coordinaciones cruzadas revelan si la frontera compra autonomía o solo red.
+
+\section{Caso real: modularidad en Shopify}
+
+Shopify ha documentado la evolución de un gran monolito modular y herramientas para hacer explícitas dependencias entre componentes. La lección no es copiar una herramienta específica, sino observar que una única unidad de despliegue puede conservar fronteras mediante ownership, APIs internas, chequeos automatizados y reducción de dependencias cíclicas.
+
+Una organización puede elegir un monolito modular cuando:
+\begin{itemize}
+\item las transacciones locales son frecuentes;
+\item el dominio aún cambia;
+\item el equipo no tiene capacidad operacional para múltiples servicios;
+\item la separación no mejora escala, ownership o cadencia de despliegue.
+\end{itemize}
+
+\section{Dual write trabajado paso a paso}
+
+El servicio de inscripción actualiza \texttt{Enrollment} y publica \texttt{StudentEnrolled}.
+
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+Orden & Ventana de falla & Inconsistencia \\
+\midrule
+DB luego broker & evento publicado, DB aborta & consumidor ve inscripción inexistente \\
+DB antes broker & DB confirma, proceso cae & inscripción sin evento \\
+ambos terminan, ACK se pierde & retry completo & evento o efecto duplicado \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Transactional outbox convierte el primer paso en una sola transacción local: negocio y evento pendiente. El relay puede repetir, por lo que cada evento necesita identidad y el consumidor debe ser idempotente.
+
+\subsection{Schema orientativo}
+
+\begin{verbatim}
+outbox(
+  event_id UUID PRIMARY KEY,
+  aggregate_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  schema_version INT NOT NULL,
+  payload JSONB NOT NULL,
+  sequence_no BIGINT NOT NULL,
+  created_at TIMESTAMP NOT NULL,
+  published_at TIMESTAMP NULL
+)
+\end{verbatim}
+
+Debe monitorearse edad máxima, backlog, errores del relay y duplicados detectados.
+
+\section{Saga como máquina de estados durable}
+
+Una saga de compra puede modelarse con estados:
+\[
+NEW\rightarrow STOCK\_RESERVED\rightarrow PAYMENT\_AUTHORIZED\rightarrow COMPLETED.
+\]
+Ante falla después del pago:
+\[
+PAYMENT\_AUTHORIZED\rightarrow REFUND\_PENDING\rightarrow COMPENSATED.
+\]
+Cada transición debe tener:
+\begin{itemize}
+\item identificador de saga y de paso;
+\item deadline y política de retry;
+\item comando idempotente;
+\item resultado durable;
+\item compensación o intervención manual;
+\item trazabilidad.
+\end{itemize}
+
+No todas las fallas exigen volver atrás. Si solo falla el email, se reintenta la notificación sin cancelar el negocio ya confirmado.
+
+\section{Coreografía y orquestación con un criterio de decisión}
+
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\toprule
+Criterio & Coreografía & Orquestación \\
+\midrule
+Participantes & pocos y estables & muchos o workflow largo \\
+Visibilidad & reconstruida por eventos & estado explícito de proceso \\
+Cambio & local, pero contrato sensible & centraliza evolución del flujo \\
+Falla & ciclos y eventos perdidos & orquestador crítico \\
+Intervención & más difícil & natural con estados y comandos \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La elección depende de auditabilidad, duración, compensaciones, necesidad de intervención y frecuencia de cambio.
+
+\section{Migración incremental y evidencia}
+
+Strangler Fig usa un router/gateway para trasladar rutas gradualmente. Una extracción seria declara:
 
 \begin{enumerate}
-\item ¿Qué distingue monolito de bola de barro?
-\item ¿Qué es la prima de microservicios?
-\item ¿Qué señales justifican una frontera de despliegue?
-\item ¿Qué caracteriza al monolito distribuido?
-\item ¿Por qué database per service complica joins?
-\item ¿Qué diferencia comando, evento y consulta?
-\item ¿Qué problema exacto resuelve outbox?
-\item ¿Por qué la compensación no borra historia?
-\item ¿Cuándo elegir coreografía y cuándo orquestación?
-\item ¿Qué capacidad organizacional necesita su arquitectura?
+\item hipótesis: qué problema resolverá;
+\item baseline: latencia, lead time, costo e incidentes actuales;
+\item ruta inicial de bajo riesgo;
+\item coexistencia y sincronización de datos;
+\item rollback;
+\item criterio de éxito y condición para detener la migración.
+\end{enumerate}
+
+Un big-bang reemplaza demasiadas variables a la vez y dificulta aprender qué decisión produjo el resultado.
+
+\section{Métricas para demostrar que una frontera vale}
+
+\begin{itemize}
+\item lead time y frecuencia de despliegue por capacidad;
+\item porcentaje de despliegues realmente independientes;
+\item blast radius y tiempo de recuperación de incidentes;
+\item p95/p99 y disponibilidad del flujo extremo a extremo;
+\item cantidad de coordinaciones entre equipos por cambio;
+\item backlog y edad de outbox;
+\item sagas abiertas, compensadas y enviadas a intervención;
+\item cambios incompatibles de contrato;
+\item costo de infraestructura y toil por servicio.
+\end{itemize}
+
+\section{Glosario operativo}
+
+\begin{description}
+\item[Capacidad.] Responsabilidad de negocio con lenguaje e invariantes propios.
+\item[Bounded context.] Límite dentro del cual un modelo tiene significado consistente.
+\item[Ownership.] Autoridad exclusiva para modificar datos y operar una capacidad.
+\item[Monolito distribuido.] Servicios separados que conservan acoplamiento de despliegue, datos y cambio.
+\item[Outbox.] Registro transaccional de eventos pendientes junto con el cambio de negocio.
+\item[Saga.] Workflow durable compuesto por transacciones locales y acciones de continuación/compensación.
+\end{description}
+
+\section{Autoevaluación ampliada}
+
+\begin{enumerate}
+\item ¿Qué distingue un monolito modular de una bola de barro?
+\item ¿Qué significa que un servicio compre autonomía?
+\item ¿Qué costos forman la prima distribuida?
+\item ¿Qué presión concreta justificaría extraer Inventario?
+\item ¿Por qué un servicio por tabla suele ser una mala frontera?
+\item ¿Qué es un bounded context?
+\item ¿Qué implica ownership de datos?
+\item ¿Cómo se resuelve una consulta global sin compartir tablas?
+\item ¿Qué revela Conway sobre fronteras técnicas?
+\item ¿Cuándo conviene RPC?
+\item ¿Cuándo conviene publicar un evento?
+\item ¿Qué diferencia un comando, evento y consulta?
+\item ¿Por qué ninguna orden resuelve dual write?
+\item ¿Qué resuelve outbox y qué deja abierto?
+\item ¿Cómo evoluciona un contrato de evento de forma compatible?
+\item ¿Por qué una compensación no es rollback?
+\item ¿Cuándo elegir coreografía?
+\item ¿Cuándo elegir orquestación?
+\item ¿Qué reduce el riesgo de una migración Strangler?
+\item ¿Qué métrica demostraría autonomía real después de extraer un servicio?
 \end{enumerate}
 
 \section{Síntesis final}

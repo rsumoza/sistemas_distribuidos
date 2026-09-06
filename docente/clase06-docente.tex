@@ -1,162 +1,523 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\usetikzlibrary{decorations.pathreplacing,matrix,backgrounds}
+
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
-\title{Clase 06 --- Guía docente: repaso, WAL, MVCC, B-trees y LSM}
+\title{Clase 06 --- Guía docente magistral: de la intuición a la evidencia}
 \author{\UAProfessor}
 \date{\UADate}
+
 \begin{document}
 \maketitle
+\tableofcontents
+\clearpage
 
-\section{Objetivo pedagógico profundo}
+\section{Parte A: guion operativo para 180 minutos}
+\subsection{Objetivo pedagógico profundo y propósito}
 
-Esta es la primera clase del bloque dictado por el profesor y debe lograr dos efectos simultáneos: recuperar el lenguaje de las clases 1 a 5 y mostrar que las garantías estudiadas no son abstractas, sino que dependen de decisiones físicas concretas. La clase debe disminuir ansiedad, hacer visibles conexiones y entregar un criterio de diseño reusable.
+Esta clase inaugura el bloque dictado por el profesor y tiene una responsabilidad doble. Debe recuperar el lenguaje de las primeras cinco clases sin convertir el repaso en repetición, y debe mostrar que las garantías lógicas estudiadas se apoyan en decisiones físicas concretas: qué se persiste, cuándo se espera, qué se conserva, qué trabajo se difiere y qué métrica permite saber si el sistema sigue sano.
 
-El aprendizaje central es:
+El riesgo principal es comenzar demasiado rápido con vocabulario técnico. Si WAL, MVCC, \texttt{EXPLAIN}, compaction y stalls aparecen como definiciones aisladas, el estudiante puede repetirlas sin comprender por qué existen. Por eso la secuencia de la clase debe ser:
+
+\[
+\text{intuición} \rightarrow \text{problema real} \rightarrow \text{regla}
+\rightarrow \text{ejecución} \rightarrow \text{falla} \rightarrow
+\text{métrica} \rightarrow \text{decisión}.
+\]
+
+\begin{uakeybox}
+Resultado cognitivo central: al finalizar, el estudiante debe poder mirar un commit, un snapshot, un plan de ejecución o un dashboard de compaction y reconstruir qué garantía se intenta sostener, ante qué falla, con qué costo y mediante qué evidencia.
+\end{uakeybox}
+
+La clase no debe convertirse en una capacitación de PostgreSQL o RocksDB. Esos productos funcionan como casos reales que muestran que los principios aparecen en motores concretos. La pregunta transferible es:
+
+\begin{quote}
+¿Qué problema resuelve este mecanismo, qué no resuelve, dónde desplaza el costo y qué observación haría cambiar nuestra decisión?
+\end{quote}
+
+\subsection{Resultados de aprendizaje observables}
+
+Al terminar la clase, el estudiante debería poder:
+
+\begin{itemize}
+\item conectar incertidumbre, retry, replicación, consenso y transacciones con necesidades de almacenamiento;
+\item distinguir aceptado, escrito, flushed, durable, committed, aplicado, visible y replicado;
+\item explicar WAL primero en lenguaje intuitivo y luego mediante sus dos reglas de orden;
+\item completar un timeline WAL y resolver correctamente cuatro puntos de crash;
+\item justificar por qué un commit durable puede coexistir con páginas atrasadas;
+\item explicar MVCC como conservación de ediciones y luego como reglas de snapshot y visibilidad;
+\item determinar qué versión observa cada transacción y por qué una lectura larga retiene historia;
+\item explicar por qué MVCC no equivale automáticamente a serializabilidad;
+\item distinguir índice, planner, \texttt{EXPLAIN} y \texttt{EXPLAIN ANALYZE};
+\item leer un plan simple desde abajo hacia arriba y justificar un índice compuesto;
+\item explicar compaction como pago de deuda física y un stall como backpressure;
+\item interpretar pending bytes, L0 files, write amplification y stall time;
+\item elegir entre B-tree y LSM a partir del workload, los SLO y la evidencia.
+\end{itemize}
+
+\subsection{Arquitectura didáctica v9 adaptada a la secuencia intuitiva v11}
+
+La clase dispone de 180 minutos. Ningún bloque expositivo debería superar 12--15 minutos sin una pregunta, predicción, demostración o tarea breve.
+
 \begin{center}
-\textbf{un commit, una réplica y un índice solo tienen sentido si se declara qué garantía ofrecen, ante qué falla y con qué costo medible.}
+\small
+\begin{tabular}{p{0.12\textwidth}p{0.21\textwidth}p{0.55\textwidth}}
+\toprule
+Tiempo & Bloque & Propósito y evidencia \\
+\midrule
+0--8 & Promesa y crash & CampusShop: compra confirmada y corte de energía. Predicción individual antes de toda definición. \\
+8--20 & Repaso ágil & Cinco conexiones, una frase por clase. Diagnóstico V/F sin discusión extensa. \\
+20--38 & Cinco intuiciones & WAL, MVCC, índice/EXPLAIN, compaction y stall en lenguaje cotidiano; cada una termina con ``qué no resuelve''. \\
+38--70 & WAL profundo & Jerarquía, frontera durable, dos reglas, timeline progresivo, cuatro crashes, group commit y checkpoints. \\
+70--80 & Actividad WAL & Parejas completan timeline y defienden el punto del ACK. \\
+80--90 & Pausa & Recuperación cognitiva; preparar terminal de la demo. \\
+90--120 & MVCC & Timeline vacío, snapshot, versiones, VACUUM, transacción larga y write skew. \\
+120--147 & Índices y EXPLAIN & Consulta real, predicción, salida sin índice, diseño compuesto, salida con índice y costo de mantenimiento. \\
+147--168 & LSM y compaction & Ruta de write/read, merge, dashboard, backlog y write stall. \\
+168--178 & Integración & CampusShop frente a telemetría. Decisión en grupos mediante problema, evidencia y trade-off. \\
+178--180 & Exit ticket & Cuatro respuestas breves y anuncio del puente hacia logs distribuidos. \\
+\bottomrule
+\end{tabular}
 \end{center}
 
-\section{Resultados de aprendizaje}
-Al terminar, el estudiante debe poder:
+\subsection{Preparación previa del docente}
+
+\subsubsection{Entre 48 y 24 horas antes}
+
 \begin{itemize}
-\item conectar timeout, idempotencia, replicación, consenso y transacciones con persistencia;
-\item explicar por qué una escritura aceptada no es necesariamente durable;
-\item construir un timeline WAL/crash/recovery;
-\item explicar snapshots y costo de retener versiones en MVCC;
-\item comparar B-tree y LSM mediante patrón de carga y amplificaciones;
-\item proponer métricas y un experimento para validar una elección de almacenamiento.
+\item Compilar y recorrer las diapositivas completas, verificando que los overlays no obliguen a avanzar demasiado rápido.
+\item Ejecutar el script de \texttt{EXPLAIN} con una base local o en contenedor y guardar una salida estática de respaldo.
+\item Verificar que el ejemplo sin índice produzca un plan claramente distinto del ejemplo con índice. No buscar un número específico de milisegundos.
+\item Imprimir o guardar la hoja de timelines vacíos, la ficha de actividad y el dashboard de compaction.
+\item Revisar la configuración del proyector y aumentar el tamaño de fuente de la terminal.
+\item Elegir una historia personal o cercana de pérdida de datos, consulta lenta o saturación que pueda contarse en menos de 60 segundos.
 \end{itemize}
 
-\section{Arquitectura didáctica v9}
+\subsubsection{Treinta minutos antes}
 
-La clase está diseñada para 180 minutos y evita más de 15--18 minutos continuos de exposición sin actividad.
+\begin{itemize}
+\item Dibujar el timeline WAL vacío en la mitad izquierda del pizarrón.
+\item Dibujar el timeline MVCC vacío en la mitad derecha.
+\item Reservar una tercera zona con cinco rótulos permanentes: garantía, falla, mecanismo, costo y evidencia.
+\item Abrir la terminal en la consulta de CampusShop y dejar preparadas las dos salidas de \texttt{EXPLAIN}.
+\item Proyectar la portada antes de que ingresen los estudiantes.
+\item Tener visible un cronómetro para proteger el ritmo y la pausa.
+\end{itemize}
 
-\begin{tabular}{p{0.14\textwidth}p{0.19\textwidth}p{0.58\textwidth}}
+\subsubsection{Cinco minutos antes}
+
+Comprobar que puede decir sin leer las cinco conexiones con las clases previas:
+
+\begin{enumerate}
+\item \textbf{Clase 1:} la incertidumbre del cliente exige evidencia durable del lado servidor.
+\item \textbf{Clase 2:} un retry es seguro solo si identidad y resultado sobreviven al crash.
+\item \textbf{Clase 3:} más copias no determinan por sí solas durabilidad, autoridad ni frescura.
+\item \textbf{Clase 4:} consenso decide qué recordar; storage debe recordarlo de verdad.
+\item \textbf{Clase 5:} ACID define el contrato; WAL y MVCC implementan parte de él.
+\end{enumerate}
+
+El repaso completo no debería superar doce minutos.
+
+\subsection{Plan de pizarrón}
+
+Mantener tres zonas durante toda la clase:
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm]
+\draw[thick,UAIngNavy] (0,0) rectangle (14,5.5);
+\draw[thick,UAIngNavy] (5.2,0)--(5.2,5.5);
+\draw[thick,UAIngNavy] (10.3,0)--(10.3,5.5);
+\node[font=\bfseries] at (2.6,5.1){A. Timeline WAL};
+\node[font=\bfseries] at (7.75,5.1){B. Timeline MVCC};
+\node[font=\bfseries] at (12.15,5.1){C. Decisión};
+\draw[->] (0.6,3.6)--(4.6,3.6);
+\node[font=\small] at (2.6,3.1){cliente / backend / WAL / página};
+\draw[->] (5.8,3.6)--(9.7,3.6);
+\node[font=\small] at (7.75,3.1){lector / escritor / versiones / visibilidad};
+\node[align=left,font=\small] at (12.15,3.0){Garantía\\Falla\\Mecanismo\\Costo\\Evidencia};
+\end{tikzpicture}
+\end{center}
+
+No borrar las zonas A y B hasta el cierre. La acumulación visible de eventos permite que los estudiantes perciban progreso y conecta las distintas partes de la clase.
+
+\subsection{Guion de apertura y conducción detallada}
+
+\subsubsection{Minutos 0--8: abrir con una promesa, no con una sigla}
+
+Proyectar el caso conductor y decir:
+
+\begin{quote}
+``La aplicación confirmó una compra y un segundo después se cortó la energía. Todavía no quiero que me definan WAL. Quiero que me digan dónde debe estar la evidencia para que esa promesa siga siendo verdadera.''
+\end{quote}
+
+Dar 45 segundos individuales y 60 segundos en parejas. Recoger tres respuestas: RAM, disco, réplica, log. Anotarlas sin corregir y preguntar:
+
+\begin{itemize}
+\item ¿esas palabras significan lo mismo?;
+\item ¿qué falla tolera cada ubicación?;
+\item ¿cuál permite reconstruir pedido e inventario como una unidad?;
+\item ¿qué respuesta del cliente se vuelve peligrosa si nos equivocamos?
+\end{itemize}
+
+\textbf{Respuesta esperada:} no basta con que el dato ``esté en algún lado''. Debe existir una frontera durable y una historia que permita distinguir commit de trabajo incompleto.
+
+\textbf{No hacer:} definir WAL antes de que aparezca la necesidad.
+
+\subsubsection{Minutos 8--20: repaso ágil de las clases 1 a 5}
+
+Mostrar la diapositiva de las cinco conexiones. Decir una frase por clase y pedir un ejemplo solamente en una de ellas. Después usar el diagnóstico V/F.
+
+Procedimiento:
+
+\begin{enumerate}
+\item todos votan simultáneamente;
+\item elegir la afirmación con mayor desacuerdo;
+\item pedir dos argumentos opuestos de 30 segundos;
+\item no revelar todavía las cinco respuestas;
+\item anunciar que se volverá al diagnóstico al final.
+\end{enumerate}
+
+\textbf{Señal de logro:} comienzan a separar durable, replicado, visible y aplicado.
+
+\textbf{Frase de transición:}
+
+\begin{quote}
+``Hoy dejamos de tratar estas palabras como etiquetas. Vamos a buscar los bytes, las esperas y las estructuras que las hacen verdaderas.''
+\end{quote}
+
+\subsubsection{Minutos 20--38: construir las cinco intuiciones}
+
+Este bloque debe ser breve y visual. Dedicar aproximadamente tres minutos a cada concepto. En todos los casos usar la misma microestructura:
+
+\begin{enumerate}
+\item analogía;
+\item definición en una frase;
+\item por qué existe;
+\item qué no resuelve solo.
+\end{enumerate}
+
+\subsubsection{WAL: el cuaderno de evidencia}
+
+Decir:
+
+\begin{quote}
+``Antes de modificar el libro caro, el motor anota en un cuaderno durable cómo reconstruir el cambio.''
+\end{quote}
+
+Pregunta: ¿por qué el cuaderno debe ser durable antes que la página? Respuesta esperada: porque una página sin historia puede dejar un estado inexplicable tras crash.
+
+\subsubsection{MVCC: conservar ediciones}
+
+Decir:
+
+\begin{quote}
+``Un lector no necesita impedir una nueva edición; puede seguir leyendo la edición con la que comenzó.''
+\end{quote}
+
+Pregunta: ¿quién paga por conservar esas ediciones? Respuesta: almacenamiento, cache, garbage collection y mantenimiento.
+
+\subsubsection{Índice y EXPLAIN: mapa y navegador}
+
+Decir:
+
+\begin{quote}
+``El índice es un mapa adicional; EXPLAIN muestra la ruta que el planner eligió y ANALYZE agrega un cronómetro real.''
+\end{quote}
+
+Pregunta: ¿un mapa siempre mejora un viaje? Respuesta: no; mantenerlo cuesta y la ruta depende del destino y de la distribución real.
+
+\subsubsection{Compaction: ordenar pilas}
+
+Decir:
+
+\begin{quote}
+``La LSM escribe rápido formando pilas ordenadas. Compaction paga después el trabajo de fusionarlas y limpiar versiones.''
+\end{quote}
+
+Pregunta: ¿qué recurso consume esa limpieza? Respuesta: I/O, CPU, espacio temporal y ancho de banda del dispositivo.
+
+\subsubsection{Stall: el molinete}
+
+Decir:
+
+\begin{quote}
+``Si entran 90 MB/s y solo puedo organizar 60, el molinete reduce la entrada; no crea capacidad, protege estabilidad.''
+\end{quote}
+
+Pregunta: ¿stall es siempre un error? Respuesta: no; es un mecanismo sano de backpressure, aunque su frecuencia puede evidenciar dimensionamiento insuficiente.
+
+Cerrar el bloque con el mapa conceptual de las cinco preguntas.
+
+\subsubsection{Minutos 38--70: WAL desde la intuición hasta el crash recovery}
+
+\subsubsection{Ubicar el byte}
+
+Recorrer aplicación, buffers, page cache, controlador y medio. En cada capa preguntar: ``¿qué falla todavía puede borrar esto?''. Introducir la diferencia entre insert, write y flush LSN solo como prueba de que un motor real distingue esas posiciones.
+
+\subsubsection{Dos órdenes que no pueden invertirse}
+
+Escribir en el pizarrón:
+
+\[
+\text{log de update durable} \prec \text{page write},
+\qquad
+\text{commit durable} \prec \text{ACK}.
+\]
+
+Pedir a un estudiante que explique cada relación sin usar la palabra ``porque sí''.
+
+\subsubsection{Completar el timeline}
+
+Usar las tarjetas o la construcción progresiva de slides. El orden esperado es:
+
+\begin{enumerate}
+\item request con idempotency key;
+\item \texttt{BEGIN};
+\item registros de pedido e inventario;
+\item páginas sucias en buffer;
+\item registro de commit;
+\item flush del WAL;
+\item ACK;
+\item páginas y checkpoint posteriores.
+\end{enumerate}
+
+Mover el crash a cuatro posiciones. Para cada una, pedir una respuesta con tres elementos: qué sabe el cliente, qué sabe recovery y qué acción corresponde.
+
+\subsubsection{Group commit y checkpoint}
+
+Explicar group commit como amortización, no como debilitamiento automático. Preguntar: ``¿qué condición debe cumplirse para mantener durabilidad?''. Respuesta: ningún ACK antes del flush que incluya su commit.
+
+Presentar checkpoint como límite del trabajo de recovery. Evitar decir simplemente ``guarda todo''. Destacar el trade-off entre RTO y presión de escritura normal.
+
+\subsubsection{Minutos 70--80: actividad breve de WAL}
+
+Entregar o proyectar el timeline vacío. En parejas:
+
+\begin{enumerate}
+\item ubicar los eventos;
+\item marcar la frontera durable;
+\item colocar dos crashes;
+\item escribir una frase de recovery por crash.
+\end{enumerate}
+
+Seleccionar dos respuestas distintas. Corregir mediante invariantes, no mediante autoridad: ningún ACK confirmado puede desaparecer y ninguna transacción incompleta debe hacerse visible.
+
+\subsubsection{Minutos 80--90: pausa}
+
+Antes de la pausa, dejar escrita esta pregunta:
+
+\begin{quote}
+``Si WAL resuelve supervivencia, ¿cómo evitamos que un reporte largo detenga el checkout?''
+\end{quote}
+
+Durante la pausa, preparar la terminal de \texttt{EXPLAIN} y verificar la salida de respaldo.
+
+\subsubsection{Minutos 90--120: MVCC desde una fotografía coherente}
+
+\subsubsection{Caso de apertura}
+
+Plantear un reporte de ventas de 40 segundos mientras siguen entrando compras. Preguntar: ``¿debe cambiar el resultado a mitad del reporte?''. Permitir dos respuestas y pedir que declaren qué contrato de lectura están suponiendo.
+
+\subsubsection{Completar el timeline}
+
+Agregar $v_1$, inicio de $T_R$, creación y commit de $v_2$, nueva lectura de $T_R$ y final del snapshot. Debe quedar claro que $T_R$ sigue viendo $v_1$ y una transacción nueva puede ver $v_2$.
+
+\subsubsection{Introducir el costo}
+
+Extender el timeline con muchas versiones y preguntar quién impide limpiar $v_1$. Conectar con transacciones largas, bloat, cache e I/O. Presentar \texttt{VACUUM} como garbage collection condicionada por visibilidad, no como ``botón de limpieza''.
+
+\subsubsection{Evitar la falsa equivalencia con serializabilidad}
+
+Recuperar el ejemplo de write skew. Preguntar: ``¿qué conflicto directo ve el motor?''. La respuesta es que puede no existir write--write sobre la misma fila, aunque el invariante global se rompa.
+
+\subsubsection{Minutos 120--147: índices y EXPLAIN como lectura de evidencia}
+
+\subsubsection{Antes de mostrar el índice}
+
+Proyectar la consulta de las últimas 20 compras confirmadas. Pedir que identifiquen igualdad, filtro, orden y límite. Solicitar dos índices candidatos y escribirlos en el pizarrón.
+
+\subsubsection{Plan sin índice}
+
+Mostrar la salida y leerla desde abajo hacia arriba:
+
+\begin{enumerate}
+\item cómo obtiene filas;
+\item cuántas descarta;
+\item si ordena;
+\item cuántos buffers toca;
+\item qué entrega al nodo superior.
+\end{enumerate}
+
+No comenzar por el tiempo total.
+
+\subsubsection{Plan con índice}
+
+Mostrar el índice compuesto y pedir que expliquen por qué el orden de columnas refleja la forma de la consulta. Comparar trabajo eliminado: scan amplio, descarte y sort.
+
+\subsubsection{Costo y límites}
+
+Preguntar: ``¿qué paga cada INSERT ahora?''. Deben aparecer actualización del índice, WAL, páginas, cache, vacuum y espacio. Recordar que los números son ilustrativos y dependen de datos, estadísticas y cache.
+
+\subsubsection{Minutos 147--168: LSM, compaction y stalls}
+
+\subsubsection{Cambiar el workload}
+
+Pasar de 500 writes/s de CampusShop a 100.000 eventos/s de telemetría. Preguntar qué cambia cuando el patrón dominante es append masivo.
+
+\subsubsection{Ruta de escritura y lectura}
+
+Recorrer WAL, memtable, immutable, L0, L1 y L2. Después invertir la mirada: una lectura busca desde lo reciente hacia lo antiguo y puede consultar varios runs. Introducir Bloom filters y tombstones por necesidad, no como lista.
+
+\subsubsection{Dashboard}
+
+Leer las métricas en este orden:
+
+\begin{enumerate}
+\item ingreso frente a capacidad de compaction;
+\item tendencia de pending bytes;
+\item archivos L0 frente a umbrales;
+\item write amplification;
+\item stall time y efecto en p99.
+\end{enumerate}
+
+Pedir una cadena causal completa. Si el estudiante propone ``aumentar threads'', preguntar qué métrica mostraría que funcionó y qué recurso podría empeorar.
+
+\subsubsection{Minutos 168--178: integración y decisión en grupos}
+
+Dividir la clase en dos mitades:
+
+\begin{itemize}
+\item Grupo A: CampusShop, workload OLTP y compra exactamente una vez.
+\item Grupo B: telemetría, ingestión masiva y vistas de 10 segundos.
+\end{itemize}
+
+Cada grupo prepara 90 segundos con esta estructura:
+
+\begin{enumerate}
+\item problema y carga;
+\item mecanismo elegido;
+\item costo aceptado;
+\item dos métricas;
+\item evidencia que haría cambiar de diseño.
+\end{enumerate}
+
+No aceptar ``B-tree para lectura y LSM para escritura'' sin matices. La respuesta debe hablar de p99, rangos, compaction, recovery y hardware.
+
+\subsubsection{Minutos 178--180: cierre y exit ticket}
+
+Volver a las cinco afirmaciones iniciales y responderlas en menos de 90 segundos. Después pedir el exit ticket:
+
+\begin{enumerate}
+\item diferencia entre escrito, committed y durable;
+\item costo oculto de MVCC;
+\item tres evidencias de \texttt{EXPLAIN};
+\item señal de deuda de compaction.
+\end{enumerate}
+
+Cerrar con:
+
+\begin{quote}
+``Hoy vimos cómo un nodo conserva y organiza historia. La próxima clase veremos cómo esa historia se convierte en una interfaz distribuida entre productores y consumidores.''
+\end{quote}
+
+\subsection{Demostraciones guiadas}
+
+\subsubsection{Demo 1: crash recovery con tarjetas}
+
+\textbf{Objetivo:} separar commit lógico, flush durable, ACK y page write.
+
+\textbf{Procedimiento:}
+
+\begin{enumerate}
+\item entregar tarjetas a siete estudiantes;
+\item pedir que se ordenen físicamente;
+\item ubicar una tarjeta CRASH en cuatro posiciones;
+\item pedir al resto que vote REDO, UNDO o ninguno;
+\item justificar con el invariante del cliente.
+\end{enumerate}
+
+\textbf{Error útil:} si colocan ACK antes de flush, no corregir inmediatamente; mover el crash detrás del ACK y preguntar cómo sostendrían la promesa.
+
+\subsubsection{Demo 2: MVCC humano}
+
+\textbf{Objetivo:} hacer visible que dos lectores pueden observar versiones distintas sin que una sea ``incorrecta'' respecto de su snapshot.
+
+Tres estudiantes representan $v_1$, $v_2$ y el lector. El lector recibe una tarjeta de snapshot antes de $v_2$. Después del commit, preguntar a quién debe consultar. Agregar un segundo lector iniciado después. Finalmente retirar al primero y declarar $v_1$ elegible para limpieza.
+
+\subsubsection{Demo 3: EXPLAIN sin y con índice}
+
+\textbf{Secuencia:}
+
+\begin{enumerate}
+\item mostrar la consulta sin ejecutar;
+\item pedir predicción del plan;
+\item ejecutar \texttt{EXPLAIN (ANALYZE, BUFFERS)} sin índice;
+\item subrayar scan, filas descartadas, sort y buffers;
+\item crear el índice compuesto y ejecutar \texttt{ANALYZE};
+\item repetir el plan;
+\item preguntar qué trabajo desapareció y qué costo permanente apareció.
+\end{enumerate}
+
+\textbf{Plan de contingencia:} si el planner no cambia por tamaño o cache, usar la salida estática incluida. No forzar configuraciones artificiales sin explicar que se está haciendo.
+
+\subsubsection{Demo 4: compaction manual y dashboard}
+
+Entregar tres listas ordenadas con versiones repetidas y tombstones. Pedir fusionarlas y contar entradas leídas y escritas. Después mostrar el dashboard y conectar el trabajo manual con write amplification, pending bytes y stalls.
+
+\subsection{Preguntas socráticas y respuestas esperadas}
+
+\begin{center}
+\small
+\begin{tabular}{p{0.42\textwidth}p{0.47\textwidth}}
 \toprule
-Tiempo & Bloque & Propósito \\
+Pregunta & Respuesta esperada / seguimiento \\
 \midrule
-0--15 & Apertura & Caso del checkout confirmado y corte de energía. Pedir predicciones antes de explicar WAL. \\
-15--40 & Repaso 1--5 & Recuperación activa mediante cinco afirmaciones y mapa conceptual. No volver a dictar las clases previas. \\
-40--70 & WAL y recovery & Timeline en pizarra, frontera de durabilidad, PostgreSQL y checkpoints. \\
-70--80 & Pausa activa & Los estudiantes dibujan dónde puede estar un byte después de write(). \\
-80--110 & MVCC & Snapshot de reporte largo, versiones, VACUUM y write skew. \\
-110--120 & Pausa & Recuperación breve. \\
-120--145 & B-tree / índices & Consulta real, índice compuesto y costo de sobreindexación. \\
-145--165 & LSM / compaction & Ruta de escritura, RocksDB, amplificaciones y write stalls. \\
-165--177 & Caso grupal & Ledger bancario vs telemetría IoT. Defender elección y métricas. \\
-177--180 & Exit ticket & Tres preguntas de síntesis. \\
+¿Qué significa ``el dato está escrito''? & Debe nombrar una capa. Seguimiento: ¿qué falla todavía puede borrarlo? \\
+¿Por qué una réplica en RAM no sustituye un WAL durable? & Tolera fallas diferentes. Seguimiento: ¿y un WAL local sustituye una réplica? \\
+¿Por qué WAL se escribe antes? & Para que toda página persistida tenga historia recuperable. \\
+¿Puede haber commit correcto con página atrasada? & Sí, si el commit y log necesarios son durables y recovery puede rehacer. \\
+¿Por qué REDO puede repetirse? & Debe ser idempotente o estar protegido por LSN/identidad. \\
+¿Qué compra MVCC con historia? & Menos bloqueo lector--escritor; paga versiones, GC y bloat. \\
+¿Usar MVCC implica Serializable? & No; depende de reglas de aislamiento y detección de conflictos. \\
+¿Qué diferencia EXPLAIN de ANALYZE? & El primero planea/estima; el segundo ejecuta y mide. \\
+¿Por qué un índice puede no usarse? & Baja selectividad o costo de heap mayor que scan secuencial. \\
+¿Dónde se paga la escritura rápida de una LSM? & Flush, compaction, amplificaciones y espacio temporal. \\
+¿Un stall es una falla? & Es backpressure protector; su recurrencia puede evidenciar déficit sostenido. \\
+¿Qué métrica haría cambiar la arquitectura? & Debe nombrar tendencia, SLO y umbral, no solo un promedio. \\
 \bottomrule
 \end{tabular}
+\end{center}
 
-\section{Preparación previa del docente}
+\subsection{Errores previsibles y estrategia de corrección}
 
-\begin{itemize}
-\item Llevar dibujado un timeline vacío para WAL y un segundo para MVCC.
-\item Preparar una salida simple de \texttt{EXPLAIN} de una consulta con y sin índice.
-\item Tener una diapositiva o captura de métricas de compaction: bytes escritos, backlog o stall.
-\item Elegir un caso cercano a los estudiantes: compra confirmada, ranking de juego o telemetría de campus.
-\item Ensayar en una frase la conexión de cada clase previa con storage; el repaso debe ser ágil.
-\end{itemize}
-
-\section{Secuencia de conducción}
-
-\subsection{Apertura: generar una necesidad, no una definición}
-
-Plantee: “El backend confirmó la compra y un segundo después se cortó la energía. ¿Dónde tiene que estar el dato para que la promesa siga siendo verdadera?” Dé 60 segundos individuales y 90 segundos en parejas. Recoja tres respuestas sin corregirlas todavía.
-
-El objetivo es que aparezcan palabras como RAM, disco, réplica y log, y que los estudiantes descubran que las usan como si fueran equivalentes.
-
-\subsection{Repaso de clases 1 a 5}
-
-Use las cinco afirmaciones de las slides. Pida voto con manos y justificación de una frase. Después conecte:
-\begin{itemize}
-\item timeout con registro idempotente durable;
-\item replicación con política de ACK;
-\item consenso con estado estable;
-\item transacción con WAL/MVCC;
-\item CAP con disponibilidad de la mayoría durable.
-\end{itemize}
-
-No explique cada tema desde cero. Si una brecha es grande, anótela para material de recuperación, pero mantenga el ritmo.
-
-\subsection{WAL: trabajar tres puntos de crash}
-
-Dibuje BEGIN, WAL, página, COMMIT, ACK y CRASH. Mueva el crash a tres posiciones y pregunte qué debe ver recovery. Insista en que REDO debe ser repetible y que ACK solo tiene sentido después de la frontera durable.
-
-Conecte con PostgreSQL como ejemplo real, sin convertir la clase en una capacitación de producto. La pregunta no es “qué comando usa PostgreSQL”, sino por qué el diseño permite desacoplar commit de páginas.
-
-\subsection{MVCC: usar una lectura larga}
-
-El reporte largo es mejor que una definición. Pregunte: “¿Qué debería ver la segunda lectura del reporte si hubo nuevas ventas?”. Dibuje versiones. Después introduzca el costo: filas muertas, snapshots antiguos y vacuum.
-
-Recupere write skew de la clase 5 para evitar la falsa conclusión “MVCC = serializable”.
-
-\subsection{Índices y LSM: enseñar decisión, no taxonomía}
-
-Para B-tree use una consulta completa y permita que propongan índices. Para LSM use una carga de telemetría. En ambos casos, cierre con costo de mantenimiento.
-
-La comparación debe terminar con métricas: si los estudiantes no pueden decir qué medirían, todavía no defendieron la decisión.
-
-\section{Casos reales y cómo narrarlos}
-
-\subsection{PostgreSQL WAL}
-
-Narrativa: “PostgreSQL puede confirmar sin escribir cada página porque el WAL permite rehacer”. No afirmar que fsync o hardware son infalibles; la garantía depende de configuración y frontera de persistencia.
-
-\subsection{PostgreSQL MVCC y VACUUM}
-
-Narrativa: “una lectura larga puede conservar el pasado y hacer más caro el presente”. Es un ejemplo concreto de que las abstracciones tienen costo operacional.
-
-\subsection{RocksDB compaction y stalls}
-
-Narrativa: “escribir rápido genera deuda de organización; si no se paga al ritmo de ingreso, el motor aplica backpressure”. Conecte con resiliencia futura.
-
-\section{Demostraciones sugeridas}
-
-\begin{uademo}
-\textbf{Demo 1: plan de ejecución.} Mostrar una consulta sin índice y luego con índice compuesto. Preguntar qué trabajo se evitó y qué costo se agregó a escrituras.
-\end{uademo}
-
-\begin{uademo}
-\textbf{Demo 2: recovery conceptual.} Entregar tarjetas BEGIN, UPDATE, COMMIT y CRASH a cinco estudiantes. Ordenarlas y decidir qué se rehace.
-\end{uademo}
-
-\begin{uademo}
-\textbf{Demo 3: compaction.} Usar tres listas ordenadas en papel y fusionarlas, contando cuántos valores se reescriben aunque solo dos sean nuevos.
-\end{uademo}
-
-\section{Preguntas socráticas}
-
-\begin{itemize}
-\item ¿Qué significa exactamente “el dato está escrito”?
-\item ¿Qué falla tolera una réplica en RAM que no tolera un WAL local, y viceversa?
-\item ¿Por qué recovery puede repetir REDO sin duplicar el efecto?
-\item ¿Qué historia conserva MVCC y quién paga por conservarla?
-\item ¿Qué consulta concreta justifica este índice?
-\item ¿Dónde se paga la escritura rápida de una LSM?
-\item ¿Qué métrica haría que usted cambiara de decisión?
-\end{itemize}
-
-\section{Errores previsibles y estrategia de corrección}
-
-\begin{tabular}{p{0.37\textwidth}p{0.53\textwidth}}
+\begin{center}
+\small
+\begin{tabular}{p{0.31\textwidth}p{0.57\textwidth}}
 \toprule
-Error & Intervención \\
+Error & Intervención docente \\
 \midrule
-“write exitoso = durable” & Pedir ubicar el byte en la jerarquía y mover el crash. \\
-“replicado = consistente y durable” & Separar cantidad de copias, persistencia y política de lectura. \\
-“MVCC evita conflictos” & Recuperar write skew con dos filas. \\
-“más índices siempre mejora” & Pedir costo por insert y evidencia de uso. \\
-“LSM siempre es más rápida” & Preguntar por point lookup, compaction y p99. \\
-“promedio bueno = sistema sano” & Introducir stalls y cola larga. \\
+``write exitoso = durable'' & Pedir ubicar el byte en la jerarquía y mover una caída de energía. \\
+``replicado = consistente y durable'' & Separar número de copias, medio, política de ACK y lectura. \\
+``WAL es un backup'' & Preguntar qué ocurre si se pierde el dispositivo completo o se corrompe toda la historia. \\
+``MVCC evita conflictos'' & Recuperar write skew con dos filas y un invariante global. \\
+``VACUUM borra datos arbitrariamente'' & Volver a la regla de visibilidad y a snapshots activos. \\
+``más índices siempre mejora'' & Pedir costo por insert y evidencia de uso del planner. \\
+``EXPLAIN dice la verdad exacta'' & Separar estimaciones, mediciones y variabilidad del workload. \\
+``LSM siempre es más rápida'' & Preguntar por point lookup, range, WA, pending bytes y p99. \\
+``compaction es mantenimiento gratuito'' & Hacer contar bytes leídos y reescritos en el merge manual. \\
+``stall significa que todo está roto'' & Explicar backpressure y luego preguntar por frecuencia y tendencia. \\
 \bottomrule
 \end{tabular}
+\end{center}
 
-\section{Criterios de evaluación formativa}
+\subsection{Criterios de evaluación formativa}
 
-Durante la clase, una respuesta se considera lograda si incluye:
+Durante la clase, una respuesta se considera lograda si contiene cinco piezas:
+
 \begin{enumerate}
 \item garantía explícita;
 \item falla relevante;
@@ -165,50 +526,479 @@ Durante la clase, una respuesta se considera lograda si incluye:
 \item evidencia o métrica.
 \end{enumerate}
 
-Indicadores rápidos:
-\begin{itemize}
-\item \textbf{Inicial}: describe componentes, pero no garantía.
-\item \textbf{En desarrollo}: conecta mecanismo y falla, sin medir costo.
-\item \textbf{Logrado}: justifica mecanismo, límite y métrica.
-\item \textbf{Avanzado}: propone alternativa y condición para revisarla.
-\end{itemize}
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.68\textwidth}}
+\toprule
+Nivel & Indicador observable \\
+\midrule
+Inicial & Describe componentes o repite la analogía, pero no conecta con garantía. \\
+En desarrollo & Conecta mecanismo y falla, pero no explicita costo o validación. \\
+Logrado & Justifica mecanismo, límite, trade-off y métrica. \\
+Avanzado & Compara alternativas y declara una condición de revisión o refutación. \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\section{Cómo favorecer una evaluación positiva de la clase}
+La evaluación durante la clase debe ser de baja presión. Corregir modelos mentales, no calificar velocidad de respuesta.
 
-La mejor estrategia no es “entretener” superficialmente, sino reducir fricción cognitiva y hacer visible el progreso. Para esta clase:
-\begin{itemize}
-\item anuncie el mapa y vuelva a él al cerrar;
-\item explique primero con un caso y luego formalice;
-\item mantenga un mismo vocabulario: durable, visible, committed, aplicado;
-\item incluya al menos dos momentos de predicción antes de revelar la respuesta;
-\item cierre cada bloque con “qué problema resuelve, qué no resuelve y qué cuesta”;
-\item use el exit ticket y retome una duda al comienzo de la clase 7.
-\end{itemize}
+\subsection{Cómo favorecer claridad, aprendizaje y una evaluación positiva legítima}
 
-Los estudiantes suelen valorar claridad, aplicación, organización y posibilidad de preguntar. Estos comportamientos docentes producen esas percepciones de manera legítima.
+La meta no es ``actuar para la encuesta'', sino diseñar una experiencia que razonablemente sea percibida como clara, relevante y respetuosa.
 
-\section{Conexión con el Trabajo Final Integrador}
+\subsubsection{Hacer visible el mapa}
 
-Pida que cada grupo complete una ficha de una página:
-\begin{itemize}
-\item carga de lectura/escritura;
-\item dato crítico y garantía de durabilidad;
-\item estrategia de índice/partición;
-\item recovery y pérdida máxima tolerable;
-\item dos métricas de validación.
-\end{itemize}
+Anunciar al inicio las cuatro preguntas y volver a ellas en el cierre. Los estudiantes evalúan mejor una clase cuando pueden ubicar dónde están y qué aprendieron.
 
-No acepte “usaremos X porque escala”. Deben declarar el patrón de acceso y el costo aceptado.
+\subsubsection{Caso antes que definición}
 
-\section{Cierre y puente hacia clase 7}
+CampusShop reduce abstracción y da continuidad. Telemetría muestra que una misma solución no sirve para toda carga.
 
-Cierre con la frase: “Hoy vimos cómo un nodo conserva historia. La próxima clase veremos cómo esa historia se vuelve una interfaz distribuida entre productores y consumidores”.
+\subsubsection{Predicción antes de revelar}
 
-Exit ticket:
+Hacer al menos cuatro predicciones: punto del ACK, versión visible, índice propuesto y causa del backlog. La comparación entre predicción y evidencia produce aprendizaje memorable.
+
+\subsubsection{Vocabulario estable}
+
+Usar deliberadamente las mismas palabras: aceptado, escrito, durable, committed, aplicado, visible y replicado. Corregir sin humillar cuando se mezclan.
+
+\subsubsection{Cerrar cada bloque con tres preguntas}
+
 \begin{enumerate}
-\item diferencia entre aceptado y durable;
-\item costo oculto de MVCC;
-\item evidencia para elegir B-tree o LSM.
+\item ¿qué problema resuelve?;
+\item ¿qué no resuelve?;
+\item ¿dónde paga el costo?
+\end{enumerate}
+
+\subsubsection{Mostrar evidencia real sin perder el concepto}
+
+PostgreSQL y RocksDB deben aparecer como casos, no como autoridad incuestionable. Explicar qué parte del mecanismo es general y qué parte depende del producto.
+
+\subsubsection{Dar tiempo de preguntas protegido}
+
+Reservar dos minutos al final de WAL y dos al final de MVCC. No responder cada duda con una mini clase: clasificarla como aclaración, extensión o tema posterior.
+
+\subsubsection{Recoger feedback y devolverlo}
+
+Leer los exit tickets. Al comienzo de la clase 7, mostrar una diapositiva o decir en 90 segundos: ``Las dos dudas más repetidas fueron...''. Esa devolución demuestra escucha y continuidad.
+
+\subsection{Contingencias}
+
+\subsubsection{Si el repaso consume demasiado tiempo}
+
+Detenerlo en el minuto 20. Anotar brechas y ofrecer una hoja de recuperación. No sacrificar WAL ni MVCC para repetir clases previas.
+
+\subsubsection{Si falla la demo de PostgreSQL}
+
+Usar las salidas estáticas. Convertir la falla en una lección: una buena clase también tiene fallback y no depende de un único componente.
+
+\subsubsection{Si el grupo no comprende la frontera durable}
+
+Volver a una única pregunta: ``después del ACK y el corte, ¿qué evidencia debe existir?''. Retirar detalles de LSN hasta que la intuición sea estable.
+
+\subsubsection{Si MVCC queda confuso}
+
+Usar la demostración humana con dos lectores. Evitar empezar con IDs internos del motor.
+
+\subsubsection{Si queda poco tiempo para LSM}
+
+Priorizar cuatro ideas: write path, deuda de compaction, backlog y stall. Bloom filters y políticas de compaction pueden trasladarse a apuntes.
+
+\subsubsection{Si la clase avanza más rápido}
+
+Agregar una comparación entre índice parcial y compuesto, o pedir que calculen tiempo hasta el stop trigger del dashboard.
+
+\subsubsection{Si hay poca participación}
+
+Cambiar preguntas abiertas por voto V/F, opción A/B o 45 segundos individuales antes de pedir voluntarios.
+
+\subsection{Conexión con el Trabajo Final Integrador}
+
+Pedir a cada grupo una ficha de una página con:
+
+\begin{itemize}
+\item patrón de lectura y escritura;
+\item dato crítico y garantía de durabilidad;
+\item modelo de falla;
+\item aislamiento necesario;
+\item índice, partición o estructura física;
+\item recovery y pérdida máxima tolerable;
+\item dos métricas y un experimento de refutación.
+\end{itemize}
+
+No aceptar ``usaremos PostgreSQL/Cassandra porque escala''. La respuesta debe explicar qué consulta, qué tasa, qué garantía, qué costo y qué evidencia justifican la elección.
+
+\subsection{Material posterior a la clase}
+
+Dentro de las 24 horas siguientes:
+
+\begin{enumerate}
+\item publicar apuntes y guía;
+\item publicar las dos salidas de \texttt{EXPLAIN} aclarando que los tiempos son ilustrativos;
+\item responder las dos dudas más frecuentes del exit ticket;
+\item indicar qué ejercicios son esenciales: 4, 6, 11, 15, 19 y 20;
+\item conectar la próxima lectura con el paso de WAL local a log distribuido.
+\end{enumerate}
+
+\subsection{Bibliografía para preparar la clase}
+
+\begin{itemize}
+\item Kleppmann, \emph{Designing Data-Intensive Applications}: motores de almacenamiento, B-trees, LSM, transacciones y aislamiento.
+\item PostgreSQL Documentation: \emph{Write-Ahead Logging}, \emph{Concurrency Control}, \emph{Routine Vacuuming} y \emph{Using EXPLAIN}.
+\item O'Neil et al.: artículo original sobre Log-Structured Merge-Trees.
+\item RocksDB Wiki/Documentation: compaction, statistics, write stalls y tuning.
+\item Gray y Reuter: fundamentos de transacciones y recovery, como referencia avanzada.
+\end{itemize}
+
+Ruta de preparación recomendada: DDIA para la narrativa; PostgreSQL para WAL/MVCC/EXPLAIN; RocksDB para compaction y stalls; artículo LSM para el fundamento.
+
+\subsection{Clave del diagnóstico inicial}
+
+\begin{enumerate}
+\item \textbf{Falso:} el commit puede ser durable aunque la página siga atrasada.
+\item \textbf{Falso:} tres copias en RAM no garantizan supervivencia frente a pérdida común de energía.
+\item \textbf{Falso:} MVCC reduce contención, pero el nivel de aislamiento puede permitir write skew.
+\item \textbf{Falso:} el índice puede no utilizarse y siempre agrega costo de mantenimiento.
+\item \textbf{Falso:} LSM no elimina trabajo; difiere organización hacia flush y compaction.
+\end{enumerate}
+
+\subsection{Clave del exit ticket}
+
+\begin{enumerate}
+\item \textbf{Escrito/committed/durable:} escrito nombra una capa; committed nombra una decisión; durable afirma supervivencia frente al modelo de falla declarado.
+\item \textbf{Costo de MVCC:} versiones retenidas, metadata, garbage collection, bloat y más I/O.
+\item \textbf{EXPLAIN:} tipo de scan, filas estimadas/reales, filas descartadas, sort, buffers y tiempo en contexto.
+\item \textbf{Deuda de compaction:} pending bytes y L0 crecen, la tasa de compaction queda por debajo del ingreso y aumenta stall/p99.
+\end{enumerate}
+
+\subsection{Cierre sugerido}
+
+Terminar con una pausa breve y decir:
+
+\begin{quote}
+``La idea más importante no es que PostgreSQL use WAL o que RocksDB use compaction. Es que toda garantía lógica termina apoyándose en una frontera física y en trabajo que alguien debe pagar. La ingeniería comienza cuando ese costo puede medirse, discutirse y revisarse.''
+\end{quote}
+
+
+
+
+\clearpage
+\section{Parte B: dossier técnico de preparación}
+\subsection{Dossier técnico de preparación del docente}
+Esta sección no está pensada para ser proyectada ni explicada completa en el aula. Su función es que el docente pueda responder preguntas de profundización sin perder precisión y pueda distinguir con claridad la ruta esencial de la clase de los detalles avanzados.
+
+\subsubsection{Distinciones que no deben mezclarse}
+
+Antes de estudiar mecanismos conviene dominar este vocabulario:
+
+\begin{description}
+\item[Aceptado.] La aplicación o el motor recibió la solicitud. No implica persistencia ni éxito final.
+\item[Escrito.] Alguna capa recibió bytes mediante una operación de escritura. Puede tratarse de un buffer todavía volátil.
+\item[Flushed.] Los bytes fueron empujados hacia una frontera de almacenamiento más estable. El significado exacto depende de sistema operativo, dispositivo y configuración.
+\item[Committed.] El motor tomó una decisión lógica irreversible según su protocolo. La palabra solo es valiosa si el protocolo declara qué persistencia precede a esa decisión.
+\item[Durable.] El efecto sobrevivirá al modelo de falla declarado. Debe preguntarse siempre: ¿crash de proceso, corte de energía, pérdida de dispositivo o pérdida de sitio?
+\item[Aplicado.] La estructura principal refleja el cambio. En WAL, una transacción puede ser durable antes de que todas sus páginas estén materializadas.
+\item[Visible.] Una lectura determinada puede observar el cambio según su snapshot y nivel de aislamiento.
+\item[Replicado.] Existe más de una copia. Esto no implica por sí solo que las copias sean persistentes, actuales o mutuamente consistentes.
+\end{description}
+
+Una respuesta sólida del docente debe nombrar la frontera exacta. Evite frases como ``ya está en disco'' cuando el concepto que importa es ``el registro de commit y los registros WAL necesarios fueron sincronizados con almacenamiento estable bajo la configuración asumida''.
+
+\subsubsection{WAL: modelo técnico que conviene dominar}
+
+Write-Ahead Logging desacopla la confirmación de una transacción de la escritura inmediata de todas las páginas modificadas. Para ello impone dos órdenes:
+
+\begin{enumerate}
+\item antes de permitir que una página modificada llegue al medio persistente, los registros WAL que permiten rehacerla deben estar persistidos;
+\item antes de confirmar una transacción al cliente, su registro de commit y los registros previos necesarios deben haber cruzado la frontera durable exigida por la configuración.
+\end{enumerate}
+
+Conviene poder explicar los siguientes elementos:
+
+\begin{itemize}
+\item \textbf{LSN:} posición monótona dentro del log. Permite ordenar registros y comparar cuánto WAL conoce una página o réplica.
+\item \textbf{pageLSN:} LSN del último cambio reflejado en una página. Durante REDO, un registro anterior o igual puede omitirse porque su efecto ya está materializado.
+\item \textbf{dirty page:} página modificada en memoria cuyo estado aún no está necesariamente en el archivo de datos.
+\item \textbf{REDO:} reaplicación segura de cambios confirmados faltantes. Debe ser repetible: un segundo crash durante recovery no puede duplicar el efecto lógico.
+\item \textbf{UNDO:} reversión de efectos no confirmados en diseños que permiten su propagación a páginas persistentes. No todos los motores implementan exactamente la misma estrategia.
+\item \textbf{STEAL/NO-STEAL:} si una página con cambios de una transacción no confirmada puede escribirse antes del commit.
+\item \textbf{FORCE/NO-FORCE:} si todas las páginas modificadas deben escribirse al commit. WAL suele permitir NO-FORCE y, combinado con STEAL, requiere REDO y alguna estrategia de UNDO o visibilidad.
+\end{itemize}
+
+\paragraph{Pregunta previsible: ``¿WAL garantiza exactly-once?''}
+No. WAL permite reconstruir una historia de cambios locales y distinguir commit de trabajo incompleto. Exactly-once de negocio requiere además identidad estable de la operación, deduplicación y una frontera atómica entre el registro de esa identidad y el efecto. Un retry puede volver a ejecutar correctamente el mismo REDO sin que eso resuelva por sí solo la repetición de una compra iniciada desde afuera.
+
+\paragraph{Pregunta previsible: ``¿por qué no escribir directamente las páginas?''}
+Porque las páginas están dispersas y su escritura puede ser aleatoria y costosa. El log permite concentrar el camino crítico en appends secuenciales; las páginas se materializan después de forma agrupada. El costo no desaparece: se desplaza hacia escritura de fondo y recovery.
+
+\paragraph{Group commit.}
+Varios commits lógicos pueden esperar una misma sincronización física. La garantía no se debilita si ningún cliente recibe ACK antes de que el grupo completo sea durable. El trade-off es throughput frente a una espera de batching y mayor variabilidad de latencia.
+
+\paragraph{Checkpoint.}
+Un checkpoint reduce la historia que recovery debe inspeccionar y ayuda a limitar RTO. No reemplaza WAL, no constituye por sí solo un backup y no implica que todo el sistema distribuido esté en un estado global instantáneo. Checkpoints frecuentes aumentan I/O en régimen normal; muy espaciados alargan recovery y retienen más WAL.
+
+\subsubsection{MVCC: mecanismo de versiones y contrato de aislamiento}
+
+MVCC conserva versiones para que lectores y escritores interfieran menos. La intuición de ``fotografía'' es útil, pero el docente debe aclarar que la visibilidad se determina mediante metadata transaccional, no mediante una copia completa de toda la base.
+
+En un modelo simplificado, una versión puede representarse como:
+\[
+  v=(k,valor,x_{min},x_{max}),
+\]
+donde la transacción lectora decide si la versión es visible según su snapshot y el estado de las transacciones creadora y anuladora.
+
+Debe poder explicarse:
+
+\begin{itemize}
+\item una actualización crea una nueva versión y vuelve obsoleta a la anterior para snapshots futuros;
+\item snapshots viejos pueden seguir necesitando versiones anteriores;
+\item una transacción larga retiene historia, incrementa bloat y aumenta trabajo de limpieza e I/O;
+\item \texttt{VACUUM} o garbage collection recupera espacio solo cuando ninguna lectura legítima necesita la versión;
+\item MVCC no define por sí solo Read Committed, Snapshot Isolation o Serializable: el nivel de aislamiento agrega reglas sobre snapshots, conflictos y validación;
+\item Snapshot Isolation puede admitir write skew porque dos transacciones escriben objetos distintos luego de leer el mismo estado.
+\end{itemize}
+
+\paragraph{Pregunta previsible: ``¿lectores nunca bloquean escritores?''}
+No debe absolutizarse. MVCC reduce muchos bloqueos de lectura-escritura, pero siguen existiendo locks de esquema, conflictos de escritura, restricciones, mantenimiento, presión de recursos y casos específicos de implementación. La formulación segura es ``MVCC permite que muchas lecturas usen versiones anteriores sin esperar a escrituras concurrentes''.
+
+\paragraph{Pregunta previsible: ``¿por qué no guardar todas las versiones para siempre?''}
+Porque aumentan espacio, cache misses, costo de índices, tiempo de búsqueda y recuperación. La conservación de historia debe tener una política de reclamación coherente con snapshots, replicación y backups.
+
+\subsubsection{Índices y planner: lo que debe saber para interpretar \texttt{EXPLAIN}}
+
+Un B-tree mantiene poca altura mediante alto fan-out y permite igualdad, rangos y recorrido ordenado. Un índice es una estructura redundante: acelera ciertas preguntas a cambio de trabajo adicional en escrituras, WAL, almacenamiento, vacuum y cache.
+
+Para la consulta de CampusShop, el índice
+\begin{verbatim}
+(student_id, status, confirmed_at DESC)
+\end{verbatim}
+puede usar las igualdades como prefijo y entregar las filas ya ordenadas. El orden de columnas importa; un índice con las mismas columnas en otro orden puede no resolver la pregunta.
+
+Al leer \texttt{EXPLAIN (ANALYZE, BUFFERS)}, estudie:
+
+\begin{enumerate}
+\item forma del árbol de operadores, de abajo hacia arriba;
+\item filas estimadas frente a filas reales;
+\item loops;
+\item filas descartadas por filtros;
+\item sort y memoria o disco utilizado;
+\item buffers hit/read/dirtied/written;
+\item tiempo por nodo y tiempo total;
+\item selectividad y distribución de datos.
+\end{enumerate}
+
+\paragraph{Pregunta previsible: ``¿por qué el planner ignora mi índice?''}
+Porque estima que leer secuencialmente será más barato, por baja selectividad, tabla pequeña, datos mayormente en cache, estadísticas imprecisas, correlación física, cast o función que impide usar la clave, o porque el índice no satisface el prefijo requerido. La existencia de un índice no constituye una orden al planner.
+
+\paragraph{Pregunta previsible: ``¿un Index Scan siempre es mejor?''}
+No. Si se necesita una gran fracción de la tabla, saltar repetidamente entre índice y heap puede costar más que un recorrido secuencial. La comparación debe hacerse con carga representativa y no con una tabla vacía o enteramente cacheada.
+
+\subsubsection{LSM, compaction y stalls: modelo de capacidad}
+
+Una LSM transforma el camino de escritura en WAL, memtable y flush secuencial a SSTables inmutables. La lectura busca desde estructuras recientes hacia niveles más antiguos, auxiliada por índices, cache y Bloom filters. Las eliminaciones se expresan mediante tombstones hasta que compaction puede demostrar que ninguna versión antigua reaparecerá.
+
+El docente debe dominar tres amplificaciones:
+\[
+  WA=\frac{bytes\ físicos\ escritos}{bytes\ lógicos\ ingresados},\qquad
+  RA=\frac{estructuras\ o\ bloques\ consultados}{lectura\ lógica},
+\]
+\[
+  SA=\frac{espacio\ físico\ ocupado}{datos\ vivos}.
+\]
+
+La condición de estabilidad de fondo puede expresarse de forma intuitiva como:
+\[
+  \mu_{flush+compaction} \geq \lambda_{ingreso}\times WA_{efectiva}.
+\]
+Si se incumple de manera sostenida, crecen pending compaction bytes y archivos L0. El motor aplica slowdown o stall para que una cola física no crezca sin límite. El stall protege estabilidad, pero aumenta la latencia visible; su presencia frecuente exige investigar capacidad, skew, configuración, hardware, tamaño de memtables y política de compaction.
+
+\paragraph{Leveled frente a tiered/universal.}
+Leveled tiende a limitar solapamiento y favorecer lecturas y uso de espacio, a costa de reescribir más. Tiered conserva más runs y puede reducir algunas reescrituras, a costa de read/space amplification. No existe ganador universal.
+
+\paragraph{Pregunta previsible: ``¿LSM es siempre mejor para escribir?''}
+No. Puede ofrecer alto throughput de ingestión, pero el costo de compaction, WAL, índices secundarios, sincronización, write amplification y p99 debe incluirse. En cargas pequeñas, rangos exigentes o latencia estrictamente predecible, un B-tree puede ser preferible.
+
+\subsection{Cómo explicar los conceptos en tres profundidades}
+
+\subsubsection{WAL}
+\begin{description}
+\item[En 30 segundos.] ``Antes de prometer una compra, guardamos una evidencia durable que permita reconstruirla. Las páginas pueden escribirse después.''
+\item[En 2 minutos.] Dibuje cliente, backend, WAL y página; ubique commit durable antes del ACK y crash antes de la página; recovery ejecuta REDO.
+\item[En 5 minutos.] Agregue LSN, pageLSN, group commit, checkpoint y diferencia entre falla de proceso, energía y dispositivo.
+\end{description}
+
+\subsubsection{MVCC}
+\begin{description}
+\item[En 30 segundos.] ``En vez de obligar al lector a esperar, el motor conserva ediciones para que cada transacción vea una fotografía coherente.''
+\item[En 2 minutos.] Dibuje $v_1$, el snapshot del lector y luego $v_2$ confirmada; muestre que lectores nuevos y viejos observan versiones distintas.
+\item[En 5 minutos.] Agregue metadata de visibilidad, vacuum, transacciones largas, bloat y write skew.
+\end{description}
+
+\subsubsection{Índice y EXPLAIN}
+\begin{description}
+\item[En 30 segundos.] ``El índice es un mapa adicional; EXPLAIN muestra la ruta que el planner eligió y ANALYZE mide lo que ocurrió.''
+\item[En 2 minutos.] Compare Seq Scan+Sort frente a Index Scan y mire filas descartadas y buffers.
+\item[En 5 minutos.] Explique selectividad, estimaciones, índice compuesto, costo de mantenimiento y por qué un scan secuencial puede ser correcto.
+\end{description}
+
+\subsubsection{Compaction y stall}
+\begin{description}
+\item[En 30 segundos.] ``La LSM escribe rápido apilando runs; compaction paga después el ordenamiento. Si la deuda crece, el stall regula la entrada.''
+\item[En 2 minutos.] Muestre ingreso mayor que capacidad de compaction, backlog creciente y slowdown.
+\item[En 5 minutos.] Agregue amplificaciones, L0, tombstones, leveled/tiered y señales operativas.
+\end{description}
+
+\subsection{Banco de preguntas previsibles y respuestas breves}
+
+\begin{enumerate}
+\item \textbf{¿Un SSD elimina la necesidad de WAL?} No. Puede reducir diferencias de latencia, pero no elimina atomicidad, orden de persistencia, torn writes ni necesidad de recovery.
+\item \textbf{¿Qué pasa si el WAL también se pierde?} La garantía solo cubre la falla declarada. Se necesitan replicación, backups o almacenamiento redundante para pérdida de dispositivo o sitio.
+\item \textbf{¿Se puede responder antes del fsync?} Sí, si el contrato acepta pérdida tras crash y lo declara como commit asincrónico; no debe llamarse durable bajo ese modelo.
+\item \textbf{¿Checkpoint significa snapshot consistente de toda la aplicación?} No. Es un mecanismo del motor para acotar recovery; consistencia global requiere coordinación adicional.
+\item \textbf{¿MVCC es optimista?} Es un mecanismo de versiones que puede combinarse con distintas técnicas de control y validación; no debe reducirse a una única etiqueta.
+\item \textbf{¿Qué versión lee Read Committed?} En PostgreSQL, cada sentencia obtiene una vista al inicio de esa sentencia; otros niveles mantienen snapshots más largos.
+\item \textbf{¿Por qué VACUUM no devuelve siempre el archivo al sistema operativo?} A menudo marca espacio reutilizable dentro de la relación; compactar físicamente puede requerir operaciones más costosas.
+\item \textbf{¿Qué es un index-only scan?} Un plan que puede responder desde el índice si contiene las columnas necesarias y la visibilidad permite evitar visitas al heap.
+\item \textbf{¿Qué es un bitmap scan?} Una estrategia que reúne ubicaciones desde uno o más índices y luego lee páginas del heap de forma agrupada; útil para selectividad intermedia.
+\item \textbf{¿Bloom filter puede dar falso negativo?} En su diseño correcto, no; puede dar falso positivo y provocar una consulta adicional.
+\item \textbf{¿Cuándo puede eliminarse un tombstone?} Cuando se garantiza que no existe en niveles o réplicas relevantes una versión anterior que pueda resucitar.
+\item \textbf{¿Por qué medir p99?} Porque compaction, checkpoints y cache misses producen colas que el promedio puede ocultar.
+\end{enumerate}
+
+\subsection{Ruta esencial, profundización y evidencia para la auditoría}
+
+\begin{description}
+\item[Núcleo obligatorio.] Frontera durable, timeline WAL/crash/REDO, snapshot MVCC, costo de retención, lectura básica de EXPLAIN, ruta LSM, compaction y stall.
+\item[Profundización si hay tiempo.] STEAL/FORCE, pageLSN, index-only/bitmap scan, leveled/tiered y políticas específicas de vacuum.
+\item[Evidencia observable.] Voto inicial, timeline completado, comparación de planes, lectura de dashboard, decisión en grupos y exit ticket.
+\end{description}
+
+Durante una auditoría, no intente demostrar calidad cubriendo todas las diapositivas. Es más convincente que los estudiantes produzcan evidencia correcta: que ubiquen la frontera durable, predigan la versión visible, interpreten un plan y expliquen un stall mediante ingreso, capacidad y backlog.
+
+\subsection{Checklist personal de estudio antes de dictar}
+
+El docente debería poder responder afirmativamente:
+
+\begin{itemize}
+\item ¿Puedo distinguir commit, flush, apply, visibility y replication sin usar ``guardar'' como término ambiguo?
+\item ¿Puedo mover un crash por el timeline y explicar el resultado en cada posición?
+\item ¿Puedo explicar por qué REDO es repetible y qué rol cumple pageLSN?
+\item ¿Puedo explicar MVCC sin prometer ausencia total de locks?
+\item ¿Puedo dibujar write skew y separar mecanismo de aislamiento?
+\item ¿Puedo leer un EXPLAIN desde hojas a raíz y comparar estimación con realidad?
+\item ¿Puedo justificar un índice y también explicar cuándo retirarlo?
+\item ¿Puedo derivar backlog cuando ingreso supera capacidad de compaction?
+\item ¿Puedo comparar B-tree y LSM usando workload y SLO, no slogans?
+\item ¿Tengo una alternativa de pizarra si falla cada demostración?
+\end{itemize}
+
+\clearpage
+\section{Parte C: auditoría, evaluación y evidencias}
+\subsection{Preguntas que puede formular un auditor pedagógico}
+\subsubsection{¿Por qué comenzar con intuición y no con la definición formal?}
+
+Respuesta sugerida: la intuición activa conocimientos previos y crea una necesidad cognitiva. El caso no reemplaza la definición; la prepara. Inmediatamente después se explicitan modelo, supuestos, garantía y límites de la analogía. Esta secuencia reduce la cantidad de elementos nuevos que el estudiante debe coordinar al mismo tiempo y permite que la formalización responda a una pregunta que ya comprendió.
+
+\subsubsection{¿Cómo verifica que los estudiantes aprendieron y no solo siguieron la narración?}
+
+Respuesta sugerida: cada bloque contiene una predicción individual, una representación que el estudiante debe completar, una decisión con trade-off y una evidencia breve. El diagnóstico inicial reaparece al final, y el exit ticket exige explicar el mecanismo con palabras propias. Las guías alinean los mismos resultados mediante timelines, cálculos y diseños; por tanto, la clase produce artefactos observables, no solo exposición.
+
+\subsubsection{¿Por qué usa casos reales?}
+
+Respuesta sugerida: no se usan como argumento de autoridad ni como entrenamiento de producto. Se usan para mostrar que el mecanismo responde a una restricción real y que tiene métricas, fallas y costos observables. Después del caso se abstrae un método reusable para que el alumno pueda transferirlo a otro dominio.
+
+\subsubsection{¿Cómo evita que una clase de tres horas produzca sobrecarga cognitiva?}
+
+Respuesta sugerida: se divide en ciclos de 12--18 minutos con cambio de actividad; se mantiene un caso conductor y un vocabulario estable; se separa núcleo obligatorio de profundización; se introducen pausas de recuperación y se vuelve varias veces al mapa de la clase. No se intenta ``pasar todas las slides'': se protege la comprensión del núcleo y se deja el detalle avanzado como material de estudio.
+
+\subsubsection{¿Cómo se alinea la clase con la evaluación?}
+
+Respuesta sugerida: cada resultado de aprendizaje aparece en cuatro lugares: una actividad durante la clase, un ejercicio de la guía, una solución con criterio de corrección y una evidencia en el Trabajo Final. La evaluación privilegia la cadena problema--falla--garantía--mecanismo--trade-off--evidencia, coherente con el marco $D=(P,F,G,S,T)$.
+
+\subsubsection{¿Qué hace cuando aparece una concepción errónea?}
+
+Respuesta sugerida: no la corrige únicamente con una afirmación. Solicita una predicción, mueve el punto de falla en un timeline o construye un contraejemplo. Luego pide al estudiante reformular la regla. Las guías docentes identifican errores previsibles y una intervención concreta para cada uno.
+
+\subsubsection{¿Cómo favorece participación sin perder rigor?}
+
+Respuesta sugerida: primero solicita respuesta individual breve para evitar que participen siempre los mismos; después comparación en parejas y finalmente puesta en común. Las preguntas no buscan opinión libre, sino una decisión justificada por garantía, falla y evidencia. Se admiten soluciones distintas cuando preservan los invariantes y explicitan costos.
+
+\subsubsection{¿Qué evidencia conservaría para una auditoría posterior?}
+
+Conservar:
+\begin{itemize}
+\item resultados anónimos del diagnóstico inicial y final;
+\item una muestra de timelines o matrices completadas;
+\item respuestas del exit ticket y la devolución realizada en la clase siguiente;
+\item una rúbrica aplicada a una actividad;
+\item mejoras del Trabajo Final vinculadas con los conceptos de la clase;
+\item notas de ajuste docente: qué bloque tomó más tiempo y qué se modificará.
+\end{itemize}
+
+\subsubsection{Pregunta específica: ¿por qué reunir WAL, MVCC, índices y LSM en una sola clase?}
+
+Respuesta sugerida: la unidad no es una taxonomía de storage engines, sino la materialización física de cuatro promesas: sobrevivir, leer concurrentemente, encontrar y sostener carga. El caso CampusShop mantiene coherencia. La ruta esencial cubre WAL/MVCC/EXPLAIN/compaction; detalles de políticas se reservan para profundización.
+
+\subsubsection{Pregunta específica: ¿cómo evita que la clase sea una capacitación de PostgreSQL o RocksDB?}
+
+Respuesta sugerida: primero se deriva el mecanismo desde el problema; luego se observa una implementación real; finalmente se formula una decisión independiente del producto y una métrica de validación. Los nombres sirven como evidencia concreta, no como respuesta universal.
+
+\subsection{Matriz de corrección y preguntas de defensa de la guía}
+Esta matriz permite usar la guía como preparación de defensa oral. Una resolución escrita es completa cuando identifica garantía, falla, mecanismo, costo y evidencia; una respuesta que solo nombra una tecnología es insuficiente.
+
+\begin{enumerate}
+\item \textbf{Intuiciones.} Debe conservar la analogía sin sustituir la definición. Pregunta oral: ¿dónde deja de servir cada metáfora?
+\item \textbf{Puentes.} Debe conectar las cinco clases sin volver a explicarlas. Pregunta oral: ¿qué promesa previa se materializa físicamente en storage?
+\item \textbf{Vocabulario.} Debe separar accepted, written, flushed, committed, durable, visible y replicated. Pregunta oral: ¿frente a qué modelo de falla usa ``durable''?
+\item \textbf{Idempotencia.} Debe persistir identidad, efecto y resultado de manera coherente. Pregunta oral: ¿qué ocurre si el ACK se pierde luego del commit?
+\item \textbf{Jerarquía.} Debe ubicar el byte y distinguir write de fsync. Pregunta oral: ¿qué capa sigue siendo volátil?
+\item \textbf{Timeline WAL.} Debe analizar todos los puntos de crash. Pregunta oral: ¿qué se rehace si la página ya contiene el cambio?
+\item \textbf{Regla WAL.} Debe mostrar por qué el orden incorrecto impide recovery seguro. Pregunta oral: ¿qué cambia bajo STEAL/NO-STEAL?
+\item \textbf{REDO.} Debe explicar repetibilidad mediante pageLSN o asignación determinista. Pregunta oral: ¿por qué ``sumar'' es más peligroso que ``establecer''?
+\item \textbf{Group commit.} Debe distinguir throughput, latencia y riesgo. Pregunta oral: ¿se debilitó la garantía o cambió cómo se paga?
+\item \textbf{Checkpoint.} Debe calcular WAL y reconocer que el replay ideal no incluye todos los costos. Pregunta oral: ¿por qué checkpoint no es backup?
+\item \textbf{MVCC.} Debe derivar visibilidad por snapshot. Pregunta oral: ¿qué ve un lector que comienza después de $v_3$?
+\item \textbf{Lectura larga.} Debe construir la cadena snapshot--retención--bloat--I/O. Pregunta oral: ¿qué métrica confirma la hipótesis?
+\item \textbf{Write skew.} Debe mostrar que no hay conflicto write--write directo y proponer prevención. Pregunta oral: ¿qué nivel de aislamiento o lock usaría?
+\item \textbf{Índice.} Debe justificar orden de columnas con filtro y orden. Pregunta oral: ¿qué consulta no se beneficia de ese índice?
+\item \textbf{EXPLAIN.} Debe leer de hojas a raíz y diferenciar estimación de medición. Pregunta oral: ¿qué evidencia sugiere estadísticas desactualizadas?
+\item \textbf{Baja selectividad.} Debe explicar por qué el scan secuencial puede ser óptimo. Pregunta oral: ¿cómo probaría el retiro seguro del índice?
+\item \textbf{LSM.} Debe describir write path, read path y manifest. Pregunta oral: ¿qué estructura evita consultar todos los archivos para un miss?
+\item \textbf{Compaction.} Debe resolver versiones y tombstones con seguridad. Pregunta oral: ¿cuándo podría resucitar un valor borrado?
+\item \textbf{Stall.} Debe usar tasas y backlog, no solo umbrales. Pregunta oral: ¿qué ocurre si el ingreso permanece por encima de capacidad?
+\item \textbf{Diseño.} Debe producir dos decisiones distintas basadas en workload y SLO. Pregunta oral: ¿qué observación haría cambiar su elección?
+\end{enumerate}
+
+\subsection{Criterios transversales para una respuesta excelente}
+
+\begin{itemize}
+\item define el modelo de falla antes de afirmar durabilidad;
+\item distingue mecanismo físico de contrato transaccional;
+\item incluye al menos una ejecución adversarial;
+\item cuantifica cuando hay datos suficientes;
+\item identifica un costo desplazado y una métrica de validación;
+\item declara una alternativa y la condición bajo la cual la elegiría.
+\end{itemize}
+
+\subsection{Evidencias que conviene conservar}
+
+\begin{itemize}
+\item una fotografía o exportación del timeline, matriz o diagrama construido por el curso;
+\item resultados anónimos del diagnóstico inicial y del exit ticket;
+\item una respuesta estudiantil con feedback que muestre revisión conceptual;
+\item la conexión entre la actividad del aula y una decisión del Trabajo Final;
+\item un registro breve del tiempo real utilizado por bloque y del ajuste realizado para la clase siguiente.
+\end{itemize}
+
+\subsection{Checklist del día de la auditoría}
+
+\begin{enumerate}
+\item escribir la pregunta central y el mapa de la clase antes de comenzar;
+\item pedir una predicción individual antes de abrir la discusión;
+\item hacer visible una representación producida por estudiantes;
+\item formalizar después de la intuición y explicitar el límite de la analogía;
+\item cerrar cada núcleo con problema, garantía, costo y evidencia;
+\item proteger al menos ocho minutos para síntesis y exit ticket;
+\item recuperar en la clase siguiente una duda real recogida al cierre.
 \end{enumerate}
 
 \end{document}

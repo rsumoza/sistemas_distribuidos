@@ -1,7 +1,20 @@
 % !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
 \usetikzlibrary{decorations.pathreplacing,matrix,backgrounds,shapes.multipart}
+
+
+% Etiqueta pedagógica visible. Se define localmente para no modificar el .sty
+% compartido ni el build de GitHub.
+\newcommand{\UASlideTag}[2]{%
+  \begin{tikzpicture}[remember picture,overlay]
+    \node[anchor=north east,rounded corners=1mm,inner xsep=3pt,inner ysep=1.5pt,
+      draw=#2,fill=#2!8,text=#2,font=\fontsize{5.8}{6.4}\selectfont\bfseries]
+      at ([xshift=-0.72cm,yshift=-1.08cm]current page.north east) {#1};
+  \end{tikzpicture}%
+}
 
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
@@ -43,6 +56,7 @@
 
 % =============================================================================
 \begin{frame}{Qué debería poder explicar al final de la clase}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.45cm and 0.45cm]
 \node[uaOrange,text width=2.15cm,minimum height=1.15cm] (wal) {\textbf{WAL}\\cómo sobrevive un commit};
@@ -61,10 +75,37 @@ Una compra fue confirmada en la app del campus. Un segundo después se corta la 
 \end{block}
 \end{frame}
 
+\begin{frame}{Evidencias de aprendizaje de esta clase}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Durante la clase}
+\begin{itemize}
+\item completar un timeline WAL y decidir la frontera de ACK;
+\item completar un timeline MVCC y justificar visibilidad;
+\item leer un plan \texttt{EXPLAIN} antes y después de un índice.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Al cerrar}
+\begin{itemize}
+\item diagnosticar backlog y write stall;
+\item elegir B-tree, LSM o combinación por workload;
+\item defender la decisión con falla, garantía, costo y métrica.
+\end{itemize}
+\end{block}
+\end{columns}
+\begin{uakeybox}
+La auditoría del aprendizaje no se basa en haber ``visto'' términos: se basa en estas producciones observables.
+\end{uakeybox}
+\end{frame}
+
+
 % =============================================================================
-\UASectionSlide{Repaso ágil: cinco conexiones con storage}
+\UASectionSlide{Repaso ágil: cinco conexiones\\con storage}
 
 \begin{frame}{Una frase por cada clase previa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
 \begin{tikzpicture}[node distance=0.16cm]
@@ -81,6 +122,7 @@ Hoy dejamos de usar palabras como ``commit'', ``durable'' o ``aislado'' como abs
 \end{frame}
 
 \begin{frame}{Mini diagnóstico: vote antes de discutir}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
 Marque \textbf{V} o \textbf{F}. No busque todavía la respuesta perfecta: identifique qué palabra de cada frase le genera desconfianza.
 \begin{enumerate}
@@ -96,9 +138,10 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Primero la intuición: cinco ideas antes del detalle}
+\UASectionSlide{Primero la intuición: cinco ideas\\antes del detalle}
 
 \begin{frame}{WAL: el cuaderno de evidencia del motor}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.65cm and 0.75cm]
 \node[uaOrange,text width=2.55cm,minimum height=1.15cm] (intent) {\textbf{Intención}\\``confirmar compra''};
@@ -117,6 +160,7 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 \begin{frame}{MVCC: conservar ediciones para que leer no signifique esperar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.55cm]
 \node[uaSoft,text width=2.5cm] (v1) {Edición v1\\total = 120};
@@ -133,6 +177,7 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 \begin{frame}{Índice y EXPLAIN: mapa y navegador de una consulta}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.7cm and 0.8cm]
 \node[uaOrange,text width=2.7cm] (q) {Consulta\\``últimas 20 compras''};
@@ -151,6 +196,7 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 \begin{frame}{Compaction: ordenar y limpiar las pilas que dejamos pendientes}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \vspace{-0.08cm}
 \begin{center}
 \begin{tikzpicture}[node distance=0.35cm and 0.68cm]
@@ -172,6 +218,7 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 \begin{frame}{Write stall: el molinete que evita que la deuda crezca sin límite}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.65cm and 0.65cm]
 \node[uaOrange,text width=2.5cm] (in) {Ingreso\\90 MB/s};
@@ -191,6 +238,7 @@ La clase será buena si puede refutar o defender cada afirmación con un mecanis
 \end{frame}
 
 \begin{frame}{Mapa conceptual: qué pregunta responde cada mecanismo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.48cm and 0.52cm]
 \node[uaOrange,text width=2.2cm,minimum height=1.25cm] (a) {¿Sobrevive el commit al crash?\\\textbf{WAL}};
@@ -210,9 +258,10 @@ Ya sabemos qué significa cada término y por qué existe. Ahora vamos a justifi
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{WAL: construir durabilidad con un orden físico}
+\UASectionSlide{WAL: durabilidad mediante\\un orden físico}
 
 \begin{frame}{Caso conductor: compra confirmada, energía cortada}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{uakeybox}
@@ -239,6 +288,7 @@ A las 12:43:18, una estudiante compra el almuerzo. La API responde \texttt{200 O
 \end{frame}
 
 \begin{frame}{No todo ``write'' cruzó la frontera durable}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
 \begin{tikzpicture}[node distance=0.35cm and 0.9cm]
@@ -259,6 +309,7 @@ A las 12:43:18, una estudiante compra el almuerzo. La API responde \texttt{200 O
 \end{frame}
 
 \begin{frame}{Write-Ahead Logging: dos órdenes que no se pueden invertir}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.48\textwidth}
 \begin{block}{Regla 1 --- página}
@@ -284,6 +335,7 @@ El registro de \texttt{COMMIT} debe ser durable \textbf{antes} de confirmar éxi
 \end{frame}
 
 \begin{frame}{Timeline WAL vacío: cuatro carriles, una pregunta}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{center}
 \begin{tikzpicture}[x=1.05cm,y=0.8cm]
 \foreach \y/\lab in {3/{Cliente},2/{Backend},1/{WAL},0/{Página}}{
@@ -301,6 +353,7 @@ El registro de \texttt{COMMIT} debe ser durable \textbf{antes} de confirmar éxi
 \end{frame}
 
 \begin{frame}{Construcción progresiva del timeline WAL}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[x=1.05cm,y=0.78cm]
 \foreach \y/\lab in {3/{Cliente},2/{Backend},1/{WAL},0/{Página}}{
@@ -330,6 +383,7 @@ El registro de \texttt{COMMIT} debe ser durable \textbf{antes} de confirmar éxi
 \end{frame}
 
 \begin{frame}{Tres crashes, tres resultados correctos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
 \begin{tabular}{p{0.23\textwidth}p{0.29\textwidth}p{0.38\textwidth}}
@@ -348,6 +402,7 @@ La base recuperada debe corresponder a una historia posible de transacciones con
 \end{frame}
 
 \begin{frame}{Group commit: una espera física, varios commits lógicos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.45cm and 0.75cm]
 \node[uaSoft,text width=2.0cm] (t1) {T1 compra};
@@ -367,6 +422,7 @@ Mayor throughput y menor costo por commit, a cambio de una pequeña espera para 
 \end{frame}
 
 \begin{frame}{Checkpoints: acortar la historia que recovery debe reproducir}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[x=1.0cm,y=0.75cm]
 \draw[->,thick,UAIngNavy] (0,0)--(9.1,0) node[right,uaTiny]{LSN / tiempo};
@@ -387,6 +443,7 @@ Mayor throughput y menor costo por commit, a cambio de una pequeña espera para 
 \end{frame}
 
 \begin{frame}{Caso real: PostgreSQL desacopla COMMIT de las páginas}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{itemize}
@@ -411,6 +468,7 @@ Mayor throughput y menor costo por commit, a cambio de una pequeña espera para 
 \end{frame}
 
 \begin{frame}{Checkpoint de comprensión: WAL}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{enumerate}
 \item ¿Qué debe ser durable antes del ACK?
 \item ¿Por qué la página puede seguir atrasada?
@@ -423,9 +481,10 @@ El commit y la información de REDO; porque la página puede reconstruirse; WAL 
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{MVCC: conservar historia para reducir esperas}
+\UASectionSlide{MVCC: historia para reducir esperas}
 
 \begin{frame}{Caso: un reporte largo mientras siguen entrando compras}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{uakeybox}
@@ -448,6 +507,7 @@ Cada escritura crea una versión; cada lectura conserva una fotografía coherent
 \end{frame}
 
 \begin{frame}{Timeline MVCC vacío: cuatro carriles}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{center}
 \begin{tikzpicture}[x=1.05cm,y=0.8cm]
 \foreach \y/\lab in {3/{Lector $T_R$},2/{Escritor $T_W$},1/{Versiones},0/{Lectura visible}}{
@@ -465,6 +525,7 @@ Después del commit de v2, ¿qué debe leer una segunda consulta dentro del mism
 \end{frame}
 
 \begin{frame}{Construcción progresiva del timeline MVCC}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[x=1.05cm,y=0.77cm]
 \foreach \y/\lab in {3/{Lector $T_R$},2/{Escritor $T_W$},1/{Versiones},0/{Lectura visible}}{
@@ -494,6 +555,7 @@ Después del commit de v2, ¿qué debe leer una segunda consulta dentro del mism
 \end{frame}
 
 \begin{frame}{Visibilidad: el ``valor actual'' depende del snapshot}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[x=1.08cm,y=0.8cm]
 \draw[->,thick,UAIngNavy] (0,0)--(9.0,0) node[right,uaTiny]{tiempo lógico};
@@ -513,6 +575,7 @@ La transacción ve la versión más nueva cuyo creador es visible para su snapsh
 \end{frame}
 
 \begin{frame}{Caso real: PostgreSQL, versiones de fila y VACUUM}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{itemize}
@@ -538,6 +601,7 @@ La transacción ve la versión más nueva cuyo creador es visible para su snapsh
 \end{frame}
 
 \begin{frame}{MVCC no significa serializabilidad automática}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm and 1.2cm]
 \node[uaSoft,text width=3.6cm] (t1a) {$T_1$: lee A=1, B=1};
@@ -557,6 +621,7 @@ MVCC es un mecanismo de versiones; el nivel de aislamiento determina qué anomal
 \end{frame}
 
 \begin{frame}{Checkpoint de comprensión: MVCC}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{enumerate}
 \item ¿Qué versión ve una transacción que comenzó antes de una actualización ya confirmada?
 \item ¿Cuándo puede eliminarse una versión vieja?
@@ -569,9 +634,10 @@ Ve su snapshot; la versión se elimina cuando nadie relevante puede verla; MVCC 
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Índices y EXPLAIN: medir antes de optimizar}
+\UASectionSlide{Índices y EXPLAIN: medir\\antes de optimizar}
 
 \begin{frame}{Índice: una estructura adicional que evita leer todo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.42\textwidth}
 \begin{center}
@@ -594,6 +660,7 @@ Acelera algunas preguntas y encarece cada escritura que deba mantenerlo.
 \end{frame}
 
 \begin{frame}{La consulta del caso conductor}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{block}{Pregunta de producto}
 Mostrar las últimas 20 compras confirmadas de una estudiante.
 \end{block}
@@ -617,6 +684,7 @@ LIMIT 20;};
 \end{frame}
 
 \begin{frame}{EXPLAIN y EXPLAIN ANALYZE: plan frente a evidencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.47\textwidth}
 \begin{block}{\texttt{EXPLAIN}}
@@ -642,6 +710,7 @@ Ejecuta realmente la consulta y agrega \textbf{mediciones}: tiempos, filas, loop
 \end{frame}
 
 \begin{frame}{Cómo leer un plan: de abajo hacia arriba}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.38cm]
 \node[uaOrange,minimum width=6.2cm] (limit) {LIMIT: entrega 20 filas};
@@ -658,6 +727,7 @@ Ejecuta realmente la consulta y agrega \textbf{mediciones}: tiempos, filas, loop
 \end{frame}
 
 \begin{frame}{Sin índice: mucho trabajo para encontrar 20 filas}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{beamercolorbox}[wd=\linewidth,sep=0.18cm,rounded=true,shadow=false]{block body}
@@ -687,6 +757,7 @@ El motor recorre, filtra y ordena un conjunto mucho mayor que las 20 filas final
 \end{frame}
 
 \begin{frame}{Con índice compuesto: el plan hace menos trabajo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{beamercolorbox}[wd=\linewidth,sep=0.18cm,rounded=true,shadow=false]{block body}
@@ -717,6 +788,7 @@ Execution Time: 0.27 ms
 \end{frame}
 
 \begin{frame}{Comparar planes sin convertir los números en una promesa universal}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tabular}{lcc}
 \toprule
@@ -736,6 +808,7 @@ Los valores dependen de datos, estadísticas, caché, selectividad y hardware. L
 \end{frame}
 
 \begin{frame}{El costo del índice aparece en cada escritura}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm and 0.6cm]
 \node[uaOrange,minimum width=2.0cm] (ins) {INSERT};
@@ -759,9 +832,10 @@ No se agrega un índice porque ``parece útil'': se formula una hipótesis, se o
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{LSM y compaction: throughput ahora, deuda después}
+\UASectionSlide{LSM y compaction:\\throughput ahora, deuda después}
 
 \begin{frame}{Caso contrastante: telemetría del campus}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{uakeybox}
@@ -787,6 +861,7 @@ Sensores de aulas, energía y ocupación producen 80.000 eventos por segundo. La
 \end{frame}
 
 \begin{frame}{Ruta de escritura LSM: rápida porque difiere organización}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.5cm and 0.6cm]
 \node[uaOrange,minimum width=1.8cm] (w) {write(k,v)};
@@ -810,6 +885,7 @@ El camino crítico es principalmente secuencial. La deuda de fusionar runs, reti
 \end{frame}
 
 \begin{frame}{Compaction: merge ordenado y eliminación segura}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.45cm and 0.8cm]
 \node[uaSoft,text width=2.1cm] (a) {SST A\\a, c1, e, g};
@@ -829,6 +905,7 @@ Bytes leídos y reescritos, uso temporal de espacio, competencia por I/O y posib
 \end{frame}
 
 \begin{frame}{Ruta de lectura LSM: buscar desde lo nuevo hacia lo viejo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.42cm and 0.55cm]
 \node[uaOrange,minimum width=1.65cm] (get) {GET(k)};
@@ -854,6 +931,7 @@ Bytes leídos y reescritos, uso temporal de espacio, competencia por I/O y posib
 \end{frame}
 
 \begin{frame}{Panel de compaction: leer capacidad, deuda y efecto}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[x=0.76cm,y=0.5cm]
 \fill[UAIngPaper,rounded corners] (-0.35,-0.70) rectangle (12.1,5.25);
@@ -882,6 +960,7 @@ Ingreso sostenido mayor que compaction $\Rightarrow$ backlog creciente $\Rightar
 \end{frame}
 
 \begin{frame}{Write stall: backpressure, no magia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.65cm and 0.65cm]
 \node[uaOrange,text width=2.5cm] (in) {ingreso\\90 MB/s};
@@ -900,6 +979,7 @@ El stall protege al motor de una deuda infinita. Sin embargo, stalls frecuentes 
 \end{frame}
 
 \begin{frame}{Leveled y tiered: dos formas de distribuir el costo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
 \begin{tabular}{p{0.23\textwidth}p{0.32\textwidth}p{0.32\textwidth}}
@@ -922,6 +1002,7 @@ La política correcta depende del patrón de acceso, hardware, retención, ampli
 \UASectionSlide{Integración: decidir con evidencia}
 
 \begin{frame}{B-tree o LSM: una orientación, no una ley universal}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
 \begin{tabular}{p{0.16\textwidth}p{0.35\textwidth}p{0.35\textwidth}}
@@ -940,6 +1021,7 @@ Pregunta crítica & ¿qué consulta justifica el índice? & ¿puede compaction s
 \end{frame}
 
 \begin{frame}{Dos casos cercanos, dos hipótesis defendibles}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{columns}[T]
 \column{0.48\textwidth}
@@ -971,6 +1053,7 @@ Latencia p95/p99, throughput sostenible, RPO/RTO, amplificación, backlog, cache
 \end{frame}
 
 \begin{frame}{Actividad de 12 minutos: problema, evidencia, decisión}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
 \begin{columns}[T]
 \column{0.48\textwidth}
@@ -998,6 +1081,7 @@ Latencia p95/p99, throughput sostenible, RPO/RTO, amplificación, backlog, cache
 \end{frame}
 
 \begin{frame}{Volvemos al diagnóstico inicial}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{enumerate}
 \item \textbf{Falso:} el commit puede ser durable aunque la página siga atrasada.
 \item \textbf{Falso:} copiar en RAM no equivale a persistir.
@@ -1011,6 +1095,7 @@ Ningún mecanismo elimina costo: cambia \emph{cuándo}, \emph{dónde} y \emph{c�
 \end{frame}
 
 \begin{frame}{Método reusable para decidir almacenamiento}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.4cm]
 \node[uaOrange,text width=2.0cm] (a) {1. Carga};
@@ -1035,6 +1120,7 @@ Ningún mecanismo elimina costo: cambia \emph{cuándo}, \emph{dónde} y \emph{c�
 \end{frame}
 
 \begin{frame}{Cierre: de la intuición a la evidencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.42cm]
 \node[uaSoft,text width=2.0cm] (g) {promesa de negocio};
@@ -1054,6 +1140,7 @@ El almacenamiento no es una caja debajo del sistema: es donde las promesas lógi
 \end{frame}
 
 \begin{frame}{Exit ticket}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 Responda en tres líneas por punto:
 \begin{enumerate}
 \item ¿Qué diferencia hay entre \emph{aceptado}, \emph{escrito} y \emph{durable}?

@@ -1,423 +1,1177 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\usetikzlibrary{decorations.pathreplacing,matrix,backgrounds}
+
+
+\tikzset{
+  uaNoteNode/.style={draw=UAIngNavy,rounded corners=1.5mm,thick,fill=white,
+    minimum height=0.8cm,align=center,font=\small,inner sep=4pt},
+  uaNoteSoft/.style={uaNoteNode,fill=UAIngPaper},
+  uaNoteOrange/.style={uaNoteNode,draw=UAIngOrange,fill=UAIngPaper},
+  uaNoteArrow/.style={->,very thick,>=Latex,draw=UAIngNavy},
+  uaNoteOrangeArrow/.style={->,very thick,>=Latex,draw=UAIngOrange}
+}
 
 \UASetClassNumber{06}
 \UASetClassTitle{Sistemas de almacenamiento}
-\title{Clase 06 --- De las garantías lógicas al almacenamiento real}
+\title{Clase 06 --- WAL, MVCC, EXPLAIN, índices y LSM: de la intuición a la evidencia}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Propósito y mapa de la clase}
+\section{Propósito de la clase}
 
-Las primeras cinco clases construyeron un lenguaje para razonar sobre incertidumbre, comunicación remota, replicación, consenso y transacciones. Esta clase responde una pregunta que a menudo queda oculta detrás de esas abstracciones: \emph{¿qué debe ocurrir físicamente para que las garantías sigan siendo verdaderas después de una falla?}
+Las primeras cinco clases construyeron un lenguaje para razonar sobre incertidumbre, comunicación remota, replicación, consenso y transacciones. La clase 6 cambia deliberadamente de nivel: ya no pregunta solamente \emph{qué garantía queremos}, sino \emph{qué debe ocurrir físicamente para que esa garantía siga siendo verdadera después de una falla}.
 
-Cuando una API devuelve \texttt{200 OK}, cuando una réplica declara una entrada \emph{committed} o cuando una base de datos confirma \texttt{COMMIT}, existe una cadena de mecanismos que debe convertir decisiones lógicas en bytes recuperables. Esa cadena incluye buffers, page cache, registros de log, páginas de datos, versiones, índices, checkpoints y políticas de mantenimiento.
+Cuando una API devuelve \texttt{200 OK}, cuando una réplica declara una entrada \emph{committed} o cuando una base de datos confirma \texttt{COMMIT}, existe una cadena de mecanismos que transforma una intención lógica en bytes recuperables. En esa cadena aparecen buffers de proceso, page cache del sistema operativo, registros de log, sincronización con el dispositivo, páginas de datos, versiones, índices, checkpoints y tareas de mantenimiento.
 
 \begin{uakeybox}
-El almacenamiento no es una implementación secundaria. Es la capa donde atomicidad, durabilidad, aislamiento y rendimiento adquieren significado operativo.
+El almacenamiento no es una caja opaca situada debajo del sistema distribuido. Es el lugar donde las promesas lógicas se convierten en órdenes de escritura, esperas, recuperación y riesgos medibles.
 \end{uakeybox}
 
-Los objetivos de la clase son:
+Al finalizar esta clase, el estudiante debería poder:
+
 \begin{itemize}
-\item recuperar los conceptos esenciales de las clases 1 a 5 y conectarlos con mecanismos físicos;
-\item explicar la frontera entre una escritura aceptada, una escritura replicada y una escritura durable;
-\item comprender Write-Ahead Logging, checkpoints y recuperación;
-\item comprender MVCC como administración explícita de versiones y snapshots;
-\item comparar B-trees y LSM-trees a partir de cargas reales;
-\item razonar sobre write, read y space amplification;
-\item formular decisiones de almacenamiento mediante evidencia y no mediante preferencias de producto.
+\item relacionar timeout, retry, idempotencia, replicación, consenso y transacciones con persistencia;
+\item distinguir una operación aceptada, escrita, replicada, aplicada y durable;
+\item explicar la regla de Write-Ahead Logging y construir un timeline de crash recovery;
+\item explicar qué problema resuelve un checkpoint y qué costo introduce;
+\item razonar sobre visibilidad de versiones, snapshots y garbage collection en MVCC;
+\item leer un plan simple de \texttt{EXPLAIN} y justificar un índice mediante evidencia;
+\item explicar el flujo de escritura y lectura de una LSM-tree;
+\item interpretar write, read y space amplification, backlog de compaction y write stalls;
+\item comparar B-tree y LSM-tree desde la carga, la garantía y las métricas, no desde preferencias de producto.
 \end{itemize}
 
 \section{Repaso recuperativo de las clases 1 a 5}
 
+El repaso no debe entenderse como una repetición abreviada de las clases anteriores. Su propósito es recuperar una sola conexión por clase y mostrar por qué el storage engine se vuelve necesario.
+
 \subsection{Clase 1: incertidumbre y observación parcial}
 
-En un sistema distribuido, un componente no observa directamente el estado interno de otro. Si un cliente no recibe respuesta, no puede distinguir con certeza entre request perdido, servidor lento, servidor caído, operación ejecutada con respuesta perdida o partición de red. Esta indistinguibilidad tiene una consecuencia directa para el almacenamiento: una operación debe tener una identidad y un resultado durable si se desea que los reintentos sean seguros.
+En un sistema distribuido, un cliente no observa directamente el estado interno del servidor. Si una respuesta no llega, no puede distinguir con certeza entre request perdido, servidor lento, servidor caído, operación ejecutada con respuesta perdida o partición de red.
 
-Ejemplo: un cliente envía \texttt{POST /transferencias} y recibe timeout. Si el servidor no conserva un identificador idempotente junto con el resultado, el retry puede crear una segunda transferencia. La idempotencia no se resuelve solo en la API; requiere persistir la relación entre intención lógica y efecto realizado.
+La conexión con almacenamiento es directa: si el cliente puede reintentar una operación cuya ejecución desconoce, el servidor necesita conservar evidencia durable de la intención lógica y del resultado producido.
+
+\begin{quote}
+La incertidumbre del cliente exige memoria durable del lado servidor.
+\end{quote}
 
 \subsection{Clase 2: RPC, timeout, retry e idempotencia}
 
-Un retry mejora progreso frente a fallas transitorias, pero puede repetir una operación ya ejecutada. Para una operación no naturalmente idempotente, el servidor suele:
+Un retry mejora progreso frente a fallas transitorias, pero también puede repetir un efecto ya realizado. Para una operación no naturalmente idempotente, como cobrar una compra, el servidor suele recibir una clave estable y tratar varios intentos físicos como una sola operación lógica.
+
+Una implementación razonable debe persistir, como una unidad coherente:
+
 \begin{enumerate}
-\item recibir una clave idempotente estable;
-\item buscar si la operación lógica ya fue procesada;
-\item ejecutar y persistir efecto y resultado como una unidad coherente;
-\item devolver el mismo resultado ante reintentos.
+\item la clave idempotente;
+\item el estado de la operación;
+\item el efecto realizado;
+\item la respuesta que debe devolverse ante nuevos intentos.
 \end{enumerate}
 
-La pregunta física es inmediata: ¿en qué momento la clave y el resultado son suficientemente durables como para responder al cliente? Si se responde antes de cruzar esa frontera, un crash puede borrar el registro y volver inseguro el retry.
+Si la API responde antes de que esa relación sea durable, un crash puede borrar la evidencia y convertir el siguiente retry en un segundo cobro.
+
+\begin{quote}
+La idempotencia de una API depende también del contrato de durabilidad del almacenamiento.
+\end{quote}
 
 \subsection{Clase 3: replicación y consistencia}
 
-Replicar y persistir no son sinónimos. Una copia en RAM de tres nodos puede perderse con una falla común; una copia persistente en un único dispositivo puede sobrevivir un crash local, pero no la destrucción del dispositivo. También es posible que varias réplicas sean durables y, aun así, representen versiones divergentes.
+Replicar y persistir no son sinónimos. Tres copias en RAM pueden perderse ante una falla común; una copia durable en un único dispositivo puede sobrevivir al crash del proceso, pero no a la pérdida del dispositivo. Además, varias copias durables pueden representar versiones distintas.
 
-Por lo tanto, una política de confirmación debe declarar qué evento considera suficiente:
+Por eso una política de confirmación debe declarar qué evento considera suficiente:
+
 \begin{itemize}
 \item recepción en memoria local;
-\item append al WAL local;
-\item \texttt{fsync} local;
+\item append a un buffer de WAL;
+\item escritura al kernel;
+\item flush durable local;
 \item persistencia en una réplica remota;
 \item persistencia en una mayoría;
 \item aplicación a la estructura de datos principal.
 \end{itemize}
 
-Cada elección cambia latencia, disponibilidad y probabilidad de pérdida.
+Cada opción cambia latencia, disponibilidad, RPO y el conjunto de fallas toleradas.
 
-\subsection{Clase 4: consenso y orden lógico}
-
-Raft y Paxos acuerdan un orden de entradas. Sin embargo, el acuerdo lógico necesita un soporte físico. Si un nodo “recuerda” un voto o una entrada solo en memoria y reinicia, puede violar las premisas de seguridad del algoritmo. Por eso, los protocolos de consenso especifican qué estado debe persistirse antes de emitir ciertas respuestas.
-
-Una frase útil es:
 \begin{quote}
-El consenso decide qué debe recordarse; el storage engine determina si realmente puede recordarse después de un crash.
+Más copias no determinan por sí solas ni durabilidad ni consistencia.
 \end{quote}
+
+\subsection{Clase 4: consenso y orden común}
+
+Raft o Paxos pueden acordar qué entrada pertenece al log lógico. Sin embargo, sus demostraciones de seguridad suponen que ciertos estados sobreviven a los reinicios. Un nodo que olvida un voto o un término puede responder de manera incompatible con su historia anterior.
+
+\begin{quote}
+El consenso decide qué debe recordarse; el almacenamiento determina si realmente puede recordarse después de un crash.
+\end{quote}
+
+Esto explica por qué los protocolos de consenso especifican qué datos deben persistirse antes de emitir determinadas respuestas.
 
 \subsection{Clase 5: transacciones y serializabilidad}
 
-Atomicidad y durabilidad requieren log y recuperación. El aislamiento puede implementarse con locks, validación optimista o versiones. Snapshot Isolation se apoya típicamente en MVCC, pero no equivale a serializabilidad: dos transacciones pueden leer el mismo snapshot y escribir elementos distintos, generando write skew.
+Las transacciones definen un contrato lógico. Atomicidad exige no exponer medias transacciones; durabilidad exige que un commit sobreviva; aislamiento define qué historias concurrentes pueden observarse; consistencia exige preservar invariantes.
 
-La clase 5 definió el contrato. La clase 6 estudia parte de su implementación física.
+WAL, recovery, locks, validación, MVCC e índices son mecanismos que participan en la materialización física de ese contrato. Sin embargo, ningún mecanismo aislado equivale a ACID completo.
 
-\section{La frontera de durabilidad}
+\begin{quote}
+La clase 5 definió el contrato; la clase 6 estudia cómo parte de ese contrato se sostiene sobre almacenamiento real.
+\end{quote}
 
-\subsection{Una llamada a write no es necesariamente un dato durable}
 
-Entre una aplicación y el medio persistente existen varias capas: buffer de usuario, runtime, page cache del sistema operativo, controlador, cache del dispositivo y medio físico. Una operación puede retornar cuando los bytes llegaron a una capa volátil. Por eso, la durabilidad depende de la semántica de \texttt{fsync}, de la configuración de hardware y del protocolo de recuperación.
+\section{Cómo estudiar este capítulo}
 
-Esto explica por qué “la aplicación escribió el archivo” no es una prueba suficiente. El sistema necesita definir una frontera de persistencia y medir el costo de cruzarla.
+Este capítulo está organizado en tres pasadas. La primera construye una intuición con un caso real; la segunda formaliza el mecanismo y sus supuestos; la tercera somete la solución a una falla o a una medición. Para estudiar de manera eficaz:
 
-\subsection{Costo de fsync y group commit}
+\begin{enumerate}
+\item explique primero el problema sin mencionar una tecnología;
+\item dibuje la ejecución normal y mueva el punto de falla;
+\item identifique la garantía exacta y su frontera;
+\item anote qué costo se desplaza hacia latencia, almacenamiento, reparación u operación;
+\item cierre proponiendo una métrica o un experimento que podría refutar su diseño.
+\end{enumerate}
 
-Forzar almacenamiento estable en cada operación puede ser costoso. Los motores agrupan varios commits para amortizar una sincronización física. El beneficio es mayor throughput; el costo es que las transacciones comparten una espera y que la latencia puede crecer bajo carga.
+\begin{uainfo}
+Las analogías del capítulo son puertas de entrada, no definiciones finales. Una respuesta completa debe poder abandonar la analogía y utilizar el vocabulario técnico correspondiente.
+\end{uainfo}
 
-Un punto pedagógico importante es que el batching no debilita necesariamente la durabilidad si todos los participantes reciben confirmación solo después de que el grupo ha sido persistido. Cambia la forma de pagar el costo, no la garantía declarada.
+\section{Caso conductor: una compra confirmada en el campus}
 
-\section{Write-Ahead Logging}
+Consideremos una aplicación de compra para el comedor universitario. Una estudiante confirma un pedido y recibe \texttt{200 OK}. Un segundo después, el servidor pierde energía.
+
+El sistema debe preservar tres propiedades:
+
+\begin{enumerate}
+\item al reiniciar, el pedido confirmado debe existir;
+\item un retry del cliente no debe generar un segundo cobro;
+\item un reporte largo de ventas debe observar un estado coherente mientras siguen entrando compras.
+\end{enumerate}
+
+Estas tres propiedades conducen a tres preguntas diferentes:
+
+\begin{itemize}
+\item \textbf{Durabilidad:} ¿qué debe cruzar una frontera física antes de responder?
+\item \textbf{Visibilidad:} ¿qué versión ve cada transacción concurrente?
+\item \textbf{Acceso:} ¿cómo encuentra el motor las filas requeridas sin recorrer todo el conjunto?
+\end{itemize}
+
+El caso aparecerá de nuevo en WAL, MVCC e índices. Más adelante se contrastará con una carga diferente: telemetría de aulas, energía y ocupación del campus.
+
+
+\section{Cinco intuiciones antes del detalle}
+
+Antes de formalizar, conviene construir una imagen mental de cada mecanismo. Las analogías siguientes no sustituyen la definición técnica: sirven para responder primero \emph{qué problema intenta resolver} cada concepto. Después, cada intuición será sometida a reglas, fallas y métricas.
+
+\subsection{WAL: el cuaderno de evidencia}
+
+Imagine un libro de cuentas cuyas páginas son costosas de reescribir. Antes de modificar esas páginas, el motor anota en un cuaderno durable qué cambio debe poder reconstruir. Ese cuaderno es el \emph{write-ahead log}.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.75cm]
+\node[uaNoteOrange,text width=3.2cm] (intent) {Intención lógica\\``confirmar compra''};
+\node[uaNoteSoft,text width=3.2cm,right=of intent] (log) {Cuaderno durable\\cómo rehacer};
+\node[uaNoteSoft,text width=3.2cm,right=of log] (pages) {Páginas e índices\\pueden esperar};
+\node[uaNoteOrange,text width=3.2cm,right=of pages] (redo) {Tras el crash\\releer y rehacer};
+\draw[uaNoteOrangeArrow] (intent)--(log);
+\draw[uaNoteArrow] (log)--(pages);
+\draw[uaNoteOrangeArrow] (pages)--(redo);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Qué es:} una secuencia de registros que describe cambios y decisiones de commit.
+\item \textbf{Por qué existe:} persistir secuencialmente una historia compacta suele ser más barato que forzar cada página modificada en el camino crítico.
+\item \textbf{Qué permite:} recuperar cambios confirmados cuyas páginas todavía estaban atrasadas.
+\item \textbf{Qué no resuelve solo:} idempotencia de negocio, replicación, backups o consenso global.
+\end{itemize}
+
+La frase intuitiva que debe quedar es:
+
+\begin{quote}
+Primero persisto la evidencia que me permite reconstruir; después puedo materializar las páginas con más libertad.
+\end{quote}
+
+\subsection{MVCC: conservar ediciones}
+
+Un documento compartido no necesita borrar una edición apenas aparece otra. Puede conservar ambas y mostrar a cada lector la edición coherente con el momento en que comenzó. MVCC aplica esa idea a filas o claves.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.75cm]
+\node[uaNoteSoft,text width=3.1cm] (v1) {Versión $v_1$\\total = 120};
+\node[uaNoteOrange,text width=3.1cm,right=of v1] (v2) {Versión $v_2$\\total = 135};
+\node[uaNoteSoft,text width=5.2cm,right=of v2,align=left] (readers) {Reporte iniciado antes: sigue viendo $v_1$.\\Consulta nueva: puede ver $v_2$.};
+\draw[uaNoteArrow] (v1)--node[above,font=\scriptsize]{UPDATE}(v2);
+\draw[uaNoteOrangeArrow] (v2)--(readers);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Qué es:} control de concurrencia mediante múltiples versiones y reglas de visibilidad.
+\item \textbf{Por qué existe:} permite que lectores y escritores progresen con menos bloqueo mutuo.
+\item \textbf{Costo desplazado:} historia retenida, garbage collection, bloat y metadatos.
+\item \textbf{Límite:} MVCC es un mecanismo; el nivel de aislamiento determina qué anomalías siguen permitidas.
+\end{itemize}
+
+\subsection{Índice y \texttt{EXPLAIN}: mapa y navegador}
+
+Un índice se parece a un mapa adicional que reduce el espacio de búsqueda. \texttt{EXPLAIN} se parece al navegador que muestra la ruta que el optimizador planea tomar; \texttt{EXPLAIN ANALYZE} recorre esa ruta y agrega observaciones reales.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaNoteOrange,text width=3.0cm] (q) {Consulta\\últimas 20 compras};
+\node[uaNoteSoft,text width=3.0cm,right=of q] (idx) {Índice\\mapa adicional};
+\node[uaNoteSoft,text width=3.0cm,right=of idx] (exp) {\texttt{EXPLAIN}\\ruta estimada};
+\node[uaNoteOrange,text width=3.0cm,right=of exp] (ana) {\texttt{ANALYZE}\\ruta medida};
+\draw[uaNoteOrangeArrow] (q)--(idx);
+\draw[uaNoteArrow] (idx)--(exp);
+\draw[uaNoteOrangeArrow] (exp)--(ana);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Qué es un índice:} una estructura redundante que organiza claves para responder ciertas preguntas con menos trabajo.
+\item \textbf{Qué es \texttt{EXPLAIN}:} una representación del plan elegido por el optimizador y de sus estimaciones.
+\item \textbf{Qué agrega \texttt{ANALYZE}:} ejecuta la consulta y reporta filas y tiempos observados; con \texttt{BUFFERS}, agrega evidencia de I/O lógico.
+\item \textbf{Trade-off:} cada índice que acelera algunas lecturas encarece inserciones, actualizaciones, WAL, espacio y mantenimiento.
+\end{itemize}
+
+\subsection{Compaction: ordenar las pilas pendientes}
+
+Una LSM-tree acepta escrituras rápidas formando archivos ordenados e inmutables. Esos archivos se acumulan como pilas. Compaction fusiona pilas, conserva la versión vigente y elimina información obsoleta cuando es seguro.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm and 0.85cm]
+\node[uaNoteSoft,text width=2.6cm] (a) {SST A\\a,c,e,g};
+\node[uaNoteSoft,text width=2.6cm,below=of a] (b) {SST B\\b,c,f,h};
+\node[uaNoteSoft,text width=2.6cm,below=of b] (t) {tombstone\\c};
+\node[uaNoteOrange,text width=3.6cm,right=1.1cm of b] (m) {merge ordenado\\elige versión nueva\\elimina obsoletas};
+\node[uaNoteSoft,text width=3.1cm,right=1.1cm of m] (out) {SST resultante\\a,b,e,f,g,h};
+\draw[uaNoteArrow] (a)--(m);
+\draw[uaNoteArrow] (b)--(m);
+\draw[uaNoteArrow] (t)--(m);
+\draw[uaNoteOrangeArrow] (m)--(out);
+\end{tikzpicture}
+\end{center}
+
+Compaction no es una tarea cosmética. Consume lectura, escritura, CPU y espacio temporal. Si su capacidad sostenida es menor que el ingreso, la deuda física crece.
+
+\subsection{Write stall: el molinete de estabilidad}
+
+Cuando llegan datos más rápido de lo que flush y compaction pueden absorber, el motor no puede crear capacidad por configuración. Solo puede acumular temporalmente, desacelerar, rechazar o redistribuir carga. Un \emph{write stall} es una forma de backpressure: reduce admisión para impedir una deuda sin límite.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.75cm]
+\node[uaNoteOrange,text width=2.8cm] (in) {Ingreso\\90 MB/s};
+\node[uaNoteSoft,text width=3.2cm,right=of in] (backlog) {Memtables + L0\\backlog creciente};
+\node[uaNoteSoft,text width=3.0cm,right=of backlog] (cmp) {Compaction\\60 MB/s};
+\node[uaNoteOrange,text width=3.0cm,right=of cmp] (stall) {Slowdown / stall\\admitir menos};
+\draw[uaNoteOrangeArrow] (in)--(backlog);
+\draw[uaNoteArrow] (backlog)--(cmp);
+\draw[uaNoteOrangeArrow] (cmp)--(stall);
+\end{tikzpicture}
+\end{center}
+
+La lectura correcta es doble:
+
+\begin{itemize}
+\item un stall puntual puede ser un mecanismo sano de autoprotección;
+\item stalls frecuentes o prolongados son evidencia de que capacidad, configuración o patrón de carga no están alineados.
+\end{itemize}
+
+\subsection{Mapa de preguntas}
+
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.31\textwidth}p{0.35\textwidth}}
+\toprule
+Concepto & Pregunta intuitiva & Evidencia que lo vuelve técnico \\
+\midrule
+WAL & ¿Cómo sobrevive el commit? & orden de registros, flush, recovery, RPO/RTO \\
+MVCC & ¿Cómo leen mientras otros escriben? & snapshots, visibilidad, versiones retenidas, aborts \\
+Índice / EXPLAIN & ¿Cómo encuentra filas sin leer todo? & plan, estimaciones, filas, buffers, tiempos \\
+Compaction & ¿Dónde se paga la escritura rápida? & bytes reescritos, L0, pending bytes, I/O \\
+Stall & ¿Cómo evita el motor una cola infinita? & tiempo en stall, p99, backlog y tasa sostenible \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{uakeybox}
+Las analogías sirven para comenzar. Una respuesta universitaria debe terminar especificando garantía, falla, mecanismo, costo y evidencia.
+\end{uakeybox}
+
+\section{La jerarquía física y la frontera de durabilidad}
+
+\subsection{Una llamada a \texttt{write()} no es necesariamente durabilidad}
+
+Entre una aplicación y el medio persistente existen varias capas. Una representación simplificada es:
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm,>=Latex,every node/.style={font=\small,align=center}]
+\node[draw,rounded corners,minimum width=4.0cm] (app) {Aplicación};
+\node[draw,rounded corners,below=of app,minimum width=4.0cm] (buf) {Buffer del proceso / runtime};
+\node[draw,rounded corners,below=of buf,minimum width=4.0cm] (os) {Page cache del sistema operativo};
+\node[draw,rounded corners,below=of os,minimum width=4.0cm] (ctrl) {Controlador y cache del dispositivo};
+\node[draw,rounded corners,below=of ctrl,minimum width=4.0cm,fill=UAIngPaper] (media) {Medio persistente};
+\draw[->,thick] (app)--(buf);
+\draw[->,thick] (buf)--(os);
+\draw[->,thick] (os)--(ctrl);
+\draw[->,thick,UAIngOrange] (ctrl)--(media);
+\end{tikzpicture}
+\end{center}
+
+Una llamada a \texttt{write()} puede terminar cuando el kernel aceptó los bytes en su cache, aunque todavía no hayan llegado al medio persistente. En caso de pérdida de energía, esos bytes pueden desaparecer. Por eso hay que distinguir:
+
+\begin{itemize}
+\item \textbf{aceptado:} alguna capa recibió la operación;
+\item \textbf{escrito:} los bytes salieron de ciertos buffers, pero no necesariamente son permanentes;
+\item \textbf{flushed / durable:} el sistema considera que los bytes cruzaron la frontera de persistencia definida;
+\item \textbf{aplicado:} la estructura principal refleja el cambio;
+\item \textbf{replicado:} otra copia recibió el cambio, con una semántica que debe especificarse.
+\end{itemize}
+
+Estas palabras no son intercambiables. Una arquitectura seria debe definirlas operacionalmente.
+
+\subsection{La frontera depende del modelo de falla}
+
+No existe una noción de durabilidad independiente del modelo de falla. Un flush local puede tolerar un crash de proceso y una pérdida de energía correctamente manejada por el dispositivo, pero no la destrucción física del disco. Una mayoría durable puede tolerar la pérdida de algunos nodos, pero introduce coordinación y puede quedar indisponible durante una partición.
+
+En consecuencia, una garantía de durabilidad debería acompañarse de preguntas como:
+
+\begin{itemize}
+\item ¿frente a qué fallas se promete supervivencia?;
+\item ¿cuánta pérdida de datos reciente es aceptable, es decir, cuál es el RPO?;
+\item ¿cuánto tiempo puede tardar la recuperación, es decir, cuál es el RTO?;
+\item ¿qué hardware, configuración y protocolo sostienen esa promesa?;
+\item ¿qué evidencia permite auditar que la frontera se cruzó realmente?
+\end{itemize}
+
+\subsection{Insert LSN, write LSN y flush LSN}
+
+PostgreSQL permite observar diferentes posiciones del WAL. Conceptualmente:
+
+\begin{itemize}
+\item \emph{insert position}: final lógico de lo insertado en buffers internos;
+\item \emph{write position}: datos escritos desde buffers del servidor hacia el sistema operativo;
+\item \emph{flush position}: último punto conocido como durable.
+\end{itemize}
+
+Esta distinción ofrece un ejemplo concreto de por qué ``generado'', ``escrito'' y ``durable'' no son sinónimos.
+
+\section{WAL: construir durabilidad con un orden físico}
+
+\subsection{Problema que resuelve}
+
+Modificar cada página de datos y forzarla a disco antes de responder sería costoso. Además, una transacción puede afectar varias páginas: si el sistema cae después de escribir algunas pero no otras, quedaría una mezcla incoherente.
+
+WAL resuelve este problema imponiendo un orden seguro entre una descripción compacta del cambio y las páginas modificadas.
 
 \subsection{La regla WAL}
 
-Write-Ahead Logging impone un orden entre log y páginas:
+La regla tiene dos partes:
+
 \begin{enumerate}
-\item el registro que describe una modificación debe llegar al log durable antes de que la página modificada pueda escribirse al almacenamiento principal;
-\item el registro de commit debe ser durable antes de confirmar la transacción al cliente.
+\item el registro que permite rehacer una modificación debe llegar al WAL durable antes de que la página modificada pueda llegar al almacenamiento principal;
+\item el registro de commit debe ser durable antes de confirmar éxito al cliente.
 \end{enumerate}
 
-La ventaja es que las páginas de datos pueden escribirse de forma diferida y en un orden eficiente. Si ocurre un crash, el log contiene información suficiente para rehacer cambios confirmados que aún no estaban reflejados en las páginas.
+Esto permite una política \emph{no-force}: las páginas de datos no tienen que escribirse en cada commit. El log secuencial se persiste en el camino crítico; las páginas pueden drenarse después en un orden más eficiente.
 
-\subsection{Caso real: PostgreSQL}
+\begin{uakeybox}
+WAL no elimina el trabajo de escribir páginas. Cambia el orden del riesgo: primero hace durable una historia recuperable y después materializa esa historia en las estructuras principales.
+\end{uakeybox}
 
-La documentación oficial de PostgreSQL explica que no es necesario forzar cada página modificada en cada commit. Si el WAL es durable, la recuperación puede hacer \emph{roll-forward} y reaplicar cambios que no llegaron a los archivos de datos. Esta decisión reduce I/O aleatorio en el camino crítico y convierte el log secuencial en la base de la durabilidad.
+\subsection{Timeline completo del caso}
 
-No debe interpretarse como “PostgreSQL no escribe datos”. Significa que la escritura de páginas se desacopla temporalmente de la confirmación, bajo una regla de orden segura.
+Una historia simplificada para la compra es:
 
-\subsection{REDO y UNDO}
+\begin{center}
+\begin{tikzpicture}[x=1.35cm,y=0.85cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->,thick] (0,0)--(8.4,0) node[right]{tiempo};
+\foreach \x/\lab in {0.5/{BEGIN},1.6/{WAL UPDATE},2.8/{buffer},4.0/{WAL COMMIT},5.0/{flush},6.0/{ACK},7.0/{CRASH},8.0/{REDO}} {
+  \draw (\x,0.12)--(\x,-0.12);
+  \node[above] at (\x,0.15){\lab};
+}
+\draw[very thick,UAIngOrange] (0.5,-0.5)--(5.0,-0.5);
+\node[below] at (2.75,-0.5){historia confirmada recuperable};
+\draw[very thick,UAIngNavy,dashed] (2.8,-0.95)--(7.0,-0.95);
+\node[below] at (4.9,-0.95){la página puede seguir atrasada};
+\end{tikzpicture}
+\end{center}
 
-Los diseños de recovery varían. Conceptualmente:
+Los eventos importantes son:
+
+\begin{enumerate}
+\item la transacción comienza;
+\item se registra la información que permite rehacer la modificación;
+\item la página en memoria cambia;
+\item se agrega el registro de commit;
+\item el WAL se fuerza hasta el commit;
+\item recién entonces se confirma al cliente;
+\item ocurre el crash antes de escribir la página;
+\item recovery vuelve a aplicar el cambio confirmado.
+\end{enumerate}
+
+\subsection{Tres puntos de crash}
+
+\paragraph{Crash antes del commit durable.}
+Puede existir trabajo en memoria e incluso registros de actualización en WAL, pero no hay evidencia durable de una decisión de commit. Recovery no debe exponer esa transacción como confirmada. El tratamiento exacto depende del motor: puede ignorar versiones no confirmadas, ejecutar UNDO o seguir otro protocolo equivalente.
+
+\paragraph{Crash después del commit durable y antes de la página.}
+La transacción fue confirmada correctamente. Recovery debe hacer REDO de los cambios que todavía no están reflejados en las páginas.
+
+\paragraph{Crash después de página y commit.}
+La página puede ya contener el valor. Recovery debe reconocer que el cambio está aplicado o volver a aplicarlo de manera segura. De ahí surge la necesidad de que REDO sea repetible.
+
+\subsection{REDO, UNDO y políticas de buffer}
+
+Dos decisiones clásicas ayudan a entender recovery:
+
 \begin{itemize}
-\item REDO reaplica cambios de transacciones confirmadas que faltan en las páginas;
-\item UNDO elimina efectos de transacciones que no alcanzaron commit.
+\item \textbf{STEAL / NO-STEAL:} si una página con cambios no confirmados puede llegar al disco antes del commit;
+\item \textbf{FORCE / NO-FORCE:} si todas las páginas modificadas deben forzarse al commit.
 \end{itemize}
 
-Algunos motores usan estrategias que minimizan o evitan UNDO físico mediante MVCC, páginas copy-on-write o reglas de no-propagación. El mensaje central no es memorizar una única implementación, sino entender qué información necesita recovery para distinguir historia confirmada de trabajo incompleto.
+Una combinación frecuente es STEAL + NO-FORCE. Permite usar buffers con flexibilidad y evita forzar todas las páginas en cada commit, pero exige información suficiente para UNDO y REDO o mecanismos equivalentes. ARIES es la referencia clásica para este estilo de recovery; PostgreSQL implementa decisiones propias, combinando WAL, MVCC y recovery de avance.
 
-\subsection{Ejemplo paso a paso}
+\subsection{Por qué REDO debe ser repetible}
 
-Supongamos una transacción que actualiza $x$ de 3 a 5:
-\begin{enumerate}
-\item se agrega al WAL el registro de cambio;
-\item se modifica la página en memoria;
-\item se agrega y persiste el registro de commit;
-\item se responde al cliente;
-\item ocurre un crash antes de escribir la página de datos;
-\item recovery encuentra el commit y rehace la modificación.
-\end{enumerate}
+Recovery puede sufrir otra caída y volver a comenzar. Si un registro dice ``sumar 1500'' y se aplica sin saber si ya ocurrió, una repetición podría duplicar el efecto. Los motores evitan esto mediante información de página, LSN y reglas de aplicación que permiten determinar si un registro ya está reflejado.
 
-Si el crash hubiese ocurrido antes del registro durable de commit, recovery no debería presentar la transacción como confirmada.
+La intuición correcta es que REDO lleva la página al estado descrito por la historia confirmada; no repite ciegamente una operación de negocio.
+
+\subsection{Group commit}
+
+Forzar almacenamiento estable por cada transacción puede limitar throughput. Group commit agrupa varios commits y paga una sincronización física compartida. La garantía no se debilita si cada transacción recibe ACK solo después de que el grupo cruzó la frontera durable.
+
+El trade-off es:
+
+\begin{itemize}
+\item mayor throughput y mejor amortización de I/O;
+\item espera compartida y cambios en la distribución de latencia;
+\item posible interacción con batching, colas y p99 bajo carga.
+\end{itemize}
+
+\subsection{Commit asincrónico}
+
+Algunos motores permiten responder antes de que el commit sea flushed. Esto mejora latencia, pero crea una ventana en la que una transacción confirmada al cliente puede perderse ante una caída. No es ``la misma durabilidad más rápida'': es una garantía distinta que debe declararse.
 
 \section{Checkpoints y tiempo de recuperación}
 
-Un checkpoint establece un punto desde el cual recovery puede comenzar sin releer toda la historia. Suele implicar:
+Si recovery tuviera que reproducir todo el WAL desde el origen, el tiempo de reinicio crecería sin límite. Un checkpoint establece un punto de referencia a partir del cual basta procesar una porción más reciente de la historia.
+
+Conceptualmente, un checkpoint coordina:
+
 \begin{itemize}
-\item registrar un punto consistente;
-\item escribir o programar la escritura de páginas sucias;
-\item conservar WAL suficiente para recuperar desde ese punto;
-\item coordinar con replicación, backups y snapshots.
+\item el estado de páginas modificadas;
+\item un punto conocido del WAL;
+\item retención del log necesario;
+\item información para que recovery sepa dónde comenzar.
 \end{itemize}
 
-El intervalo de checkpoint es un trade-off:
+El intervalo de checkpoint redistribuye costo:
+
 \begin{itemize}
-\item más frecuente: menor recovery, mayor presión de escritura y riesgo de picos;
-\item menos frecuente: menor trabajo de checkpoint durante operación, mayor WAL y recovery más largo.
+\item \textbf{muy frecuente:} menor WAL a reproducir, pero más presión de escritura y riesgo de picos;
+\item \textbf{muy espaciado:} menos trabajo periódico, pero más WAL retenido y mayor RTO.
 \end{itemize}
 
-El objetivo no es “hacer muchos checkpoints”, sino cumplir un objetivo de recuperación sin destruir la latencia normal.
+La elección correcta no es ``más checkpoints''. Es una configuración compatible con RTO, capacidad de I/O y SLO de latencia normal.
 
-\section{MVCC: concurrencia mediante múltiples versiones}
+\section{Caso real: PostgreSQL y roll-forward recovery}
 
-\subsection{Idea central}
+La documentación oficial de PostgreSQL describe el principio de WAL: los cambios de archivos de datos solo deben escribirse después de que los registros que los describen hayan sido flushed a almacenamiento permanente. Si ocurre un crash, el servidor puede restaurar consistencia reproduciendo registros desde el último checkpoint.
 
-Multi-Version Concurrency Control conserva múltiples versiones de un dato. Una transacción lee las versiones visibles según su snapshot, mientras nuevas escrituras crean versiones posteriores. Esto permite que lectores y escritores avancen con menor bloqueo mutuo.
+Tres consecuencias didácticas son importantes:
 
-Un modelo simplificado para una versión es:
+\begin{enumerate}
+\item un commit correcto no implica que todas las páginas modificadas ya estén en su ubicación final;
+\item el log secuencial permite sacar I/O aleatorio del camino crítico;
+\item la promesa depende también del dispositivo: si el hardware informa falsamente que un flush terminó, la regla puede quedar subvertida.
+\end{enumerate}
+
+PostgreSQL también expone funciones para diferenciar la posición insertada, escrita y flushed del WAL, lo cual vuelve observable la frontera conceptual discutida antes.
+
+\section{MVCC: conservar historia para reducir esperas}
+
+\subsection{Problema que resuelve}
+
+Supongamos que un reporte de ventas tarda 40 segundos y, al mismo tiempo, el sistema registra nuevas compras. Sin múltiples versiones, hay dos alternativas poco satisfactorias:
+
+\begin{itemize}
+\item bloquear escritores durante toda la lectura;
+\item permitir que el reporte mezcle datos de momentos diferentes.
+\end{itemize}
+
+MVCC conserva varias versiones y permite que la lectura observe un snapshot coherente mientras el presente continúa avanzando.
+
+\subsection{Modelo simplificado de versión}
+
+Una versión puede representarse conceptualmente como:
+
 \[
-(x, valor, inicio, fin)
+(x,\; valor,\; t_{inicio},\; t_{fin})
 \]
-La versión es visible si el snapshot de la transacción cae dentro de su intervalo de validez y la transacción que la creó es visible según las reglas del motor.
 
-\subsection{Snapshot coherente}
+La versión es visible para un snapshot $s$ si el cambio que la creó es visible en $s$ y el cambio que la reemplazó todavía no lo era. En motores reales, estas reglas se implementan con identificadores de transacción, estados de commit y metadatos de fila o página.
 
-Una transacción de lectura que comienza en $t_s$ puede seguir viendo el estado correspondiente a $t_s$ aunque otras transacciones confirmen nuevas versiones. Esta propiedad es muy útil para reportes largos, backups consistentes y lecturas repetibles.
+\subsection{Timeline de visibilidad}
 
-Sin MVCC, una alternativa sería bloquear escritores durante toda la lectura o aceptar que el reporte mezcle estados de momentos diferentes.
+\begin{center}
+\begin{tikzpicture}[x=1.3cm,y=0.85cm,>=Latex,every node/.style={font=\scriptsize}]
+\draw[->,thick] (0,0)--(8.2,0) node[right]{tiempo};
+\foreach \x/\lab in {0.7/{v1=120},1.8/{$T_R$ inicia},3.0/{lee v1},4.3/{v2 creada},5.4/{v2 commit},6.6/{$T_R$ lee v1},7.6/{$T_R$ termina}} {
+  \draw (\x,0.12)--(\x,-0.12);
+  \node[above] at (\x,0.15){\lab};
+}
+\draw[very thick,UAIngOrange] (1.8,-0.55)--(7.6,-0.55);
+\node[below] at (4.7,-0.55){snapshot estable de $T_R$};
+\end{tikzpicture}
+\end{center}
+
+Aunque v2 se confirma durante la ejecución, $T_R$ puede seguir viendo v1. Una transacción nueva, en cambio, podrá ver v2. Esto reduce bloqueo entre lectores y escritores.
+
+\subsection{MVCC no elimina el costo de concurrencia}
+
+Conservar historia tiene costos:
+
+\begin{itemize}
+\item más versiones ocupan espacio;
+\item índices pueden contener referencias a versiones que ya no son visibles;
+\item las páginas se vuelven menos densas;
+\item aumenta I/O y se degrada cache locality;
+\item se necesita garbage collection o vacuum;
+\item snapshots largos retrasan la reclamación.
+\end{itemize}
+
+Por eso una frase útil es:
+
+\begin{quote}
+MVCC cambia espera por administración de historia; la historia también cuesta.
+\end{quote}
 
 \subsection{Caso real: PostgreSQL y VACUUM}
 
-En PostgreSQL, una actualización crea una nueva versión de fila y deja la versión anterior disponible hasta que ninguna transacción pueda verla. Cuando las versiones dejan de ser necesarias, \texttt{VACUUM} permite reutilizar el espacio y mantener saludables tablas e índices.
+En PostgreSQL, un \texttt{UPDATE} crea una nueva versión de fila. La versión anterior no puede eliminarse mientras una transacción activa aún pueda verla. Cuando ya no es visible para ningún snapshot relevante, \texttt{VACUUM} permite que el espacio vuelva a reutilizarse.
 
-Una transacción muy larga puede mantener snapshots antiguos y retrasar la limpieza. Esto genera bloat, más páginas que leer, más trabajo de vacuum y presión sobre índices. El caso muestra que MVCC no “elimina” el costo de concurrencia: lo transforma en costo de retención y garbage collection.
+Una transacción muy larga puede mantener un horizonte antiguo y provocar:
 
-\subsection{MVCC y anomalías}
-
-MVCC es un mecanismo, no un modelo único de aislamiento. Dependiendo de las reglas del motor, puede ofrecer Read Committed, Repeatable Read, Snapshot Isolation o Serializable. Snapshot Isolation evita varias anomalías, pero puede admitir write skew.
-
-Por lo tanto, la pregunta correcta no es “¿usa MVCC?”, sino “¿qué historia permite observar y qué conflictos detecta antes de commit?”.
-
-\section{B-trees e índices orientados a páginas}
-
-\subsection{Por qué B-tree funciona bien en OLTP}
-
-Un B-tree usa nodos con alto fan-out para mantener poca altura. Cada nodo suele alinearse con una página del almacenamiento. La búsqueda requiere pocas lecturas y soporta igualdad, rangos y orden.
-
-El índice es particularmente útil para patrones como:
 \begin{itemize}
-\item buscar una cuenta por identificador;
-\item listar pedidos de un cliente ordenados por fecha;
-\item recorrer un rango de timestamps;
-\item encontrar el siguiente valor mayor o menor.
+\item acumulación de tuplas muertas;
+\item bloat de tablas e índices;
+\item más páginas leídas por consulta;
+\item mayor trabajo de vacuum;
+\item presión sobre almacenamiento y cache.
 \end{itemize}
 
-\subsection{Costo de mantenimiento}
+El problema no es solamente de espacio. Una tabla inflada cambia el plan y la latencia de consultas.
 
-Cada índice adicional aumenta:
+\subsection{MVCC y niveles de aislamiento}
+
+MVCC no es un nivel de aislamiento único. Un motor puede usar versiones para implementar Read Committed, Repeatable Read, Snapshot Isolation o Serializable. Las diferencias dependen de cuándo se toma el snapshot y qué conflictos o dependencias se validan.
+
+Snapshot Isolation suele ofrecer lecturas coherentes y evitar conflictos write-write directos, pero puede admitir write skew.
+
+\subsection{Write skew}
+
+Supongamos dos filas A y B con el invariante ``al menos una debe permanecer activa''.
+
 \begin{itemize}
-\item trabajo de inserción y actualización;
-\item espacio;
-\item WAL generado;
-\item trabajo de vacuum o compaction;
-\item probabilidad de page splits y cache misses.
+\item $T_1$ lee A=1, B=1 y escribe A=0.
+\item $T_2$ lee A=1, B=1 y escribe B=0.
 \end{itemize}
 
-Por eso, “crear un índice para acelerar” no es suficiente. Deben observarse planes de ejecución, selectividad, cardinalidad, distribución de datos y carga de escritura.
+Cada transacción ve un snapshot válido y escribe una fila distinta. Si ambas confirman, el estado final A=0, B=0 viola el invariante. No hubo conflicto write-write sobre la misma fila.
 
-\subsection{Índices compuestos}
+Posibles respuestas incluyen:
 
-El orden de columnas importa. Para una consulta que filtra por \texttt{cliente\_id} y ordena por fecha, un índice compuesto puede evitar tanto el scan como el sort. Sin embargo, ese mismo índice puede ser poco útil para consultas que solo filtran por la segunda columna.
+\begin{itemize}
+\item aislamiento serializable;
+\item lock explícito sobre un recurso común;
+\item reformular el invariante para crear una contención detectable;
+\item validación de dependencias al commit;
+\item operación atómica especializada.
+\end{itemize}
 
-El diseño de índices es diseño de carga, no diseño de esquema aislado.
+La lección es que un snapshot coherente no equivale automáticamente a una historia serializable.
 
-\section{LSM-trees}
+\section{Índices y \texttt{EXPLAIN}: medir antes de optimizar}
+
+\subsection{Qué es \texttt{EXPLAIN} y qué no es}
+
+\texttt{EXPLAIN} no ``optimiza'' la consulta ni garantiza que el plan sea bueno. Expone el plan que el optimizador eligió a partir de estadísticas y un modelo de costo. Debe leerse desde los nodos hoja hacia la raíz: primero cómo se obtienen filas, luego cómo se filtran, combinan, ordenan o limitan.
+
+\texttt{EXPLAIN ANALYZE} ejecuta realmente la consulta. Por eso debe utilizarse con cuidado sobre operaciones que modifican datos o sobre cargas productivas sensibles. Los tiempos de una ejecución aislada no constituyen una promesa universal; sí permiten contrastar forma del plan, cardinalidad estimada y observada, buffers y trabajo descartado.
+
+\begin{uainfo}
+Pregunta de lectura: no pregunte primero ``¿cuántos milisegundos tardó?''. Pregunte ``¿qué trabajo hizo el motor, cuántas filas produjo cada nodo y qué evidencia muestra que ese trabajo era necesario?''.
+\end{uainfo}
+
+\subsection{Por qué un B-tree mantiene poca altura}
+
+Un B-tree almacena muchos separadores y punteros por página. Su alto fan-out produce árboles poco profundos. Si una página interna puede contener cientos de punteros, incluso millones de claves requieren pocas lecturas de nivel.
+
+El B-tree es un índice generalista adecuado para:
+
+\begin{itemize}
+\item igualdad;
+\item rangos;
+\item ordenamiento;
+\item búsqueda del siguiente o anterior;
+\item prefijos compatibles con la estructura del índice.
+\end{itemize}
+
+\subsection{El costo de mantener índices}
+
+Cada índice adicional puede aumentar:
+
+\begin{itemize}
+\item trabajo de \texttt{INSERT}, \texttt{UPDATE} y \texttt{DELETE};
+\item volumen de WAL;
+\item número de páginas modificadas;
+\item espacio y cache pressure;
+\item splits;
+\item trabajo de vacuum o reindexación.
+\end{itemize}
+
+Por lo tanto, ``crear un índice'' no es una optimización gratuita. Es intercambiar costo de lectura por costo de escritura, espacio y mantenimiento.
+
+\subsection{Consulta del caso conductor}
+
+La app necesita mostrar las últimas 20 compras de una estudiante:
+
+\begin{verbatim}
+SELECT id, total, created_at
+FROM campus_purchases
+WHERE student_id = 42
+ORDER BY created_at DESC
+LIMIT 20;
+\end{verbatim}
+
+Un índice solo sobre \texttt{student\_id} puede localizar las filas de la estudiante, pero quizá deba ordenar después. Un índice compuesto:
+
+\begin{verbatim}
+CREATE INDEX idx_purchases_student_created
+ON campus_purchases (student_id, created_at DESC);
+\end{verbatim}
+
+puede satisfacer filtro y orden, permitiendo cortar tras 20 entradas.
+
+\subsection{Salida de \texttt{EXPLAIN} sin índice}
+
+Una salida didáctica simplificada puede mostrar:
+
+\begin{verbatim}
+Limit  (actual time=86.411..86.417 rows=20)
+  -> Sort  (top-N heapsort)
+       Sort Key: created_at DESC
+       -> Seq Scan on campus_purchases
+            Filter: (student_id = 42)
+            Rows Removed by Filter: 998752
+Execution Time: 86.450 ms
+\end{verbatim}
+
+La forma del trabajo es:
+
+\begin{enumerate}
+\item recorrer casi toda la tabla;
+\item descartar filas de otros estudiantes;
+\item ordenar las coincidencias;
+\item conservar 20.
+\end{enumerate}
+
+\subsection{Salida con índice compuesto}
+
+\begin{verbatim}
+Limit  (actual time=0.035..0.041 rows=20)
+  -> Index Scan using idx_purchases_student_created
+       on campus_purchases
+       Index Cond: (student_id = 42)
+Execution Time: 0.071 ms
+\end{verbatim}
+
+El índice entrega primero las entradas de la clave buscada y en el orden requerido. El \texttt{LIMIT} puede cortar temprano.
+
+Los tiempos anteriores son ilustrativos y no deben tratarse como benchmark reproducible. Lo importante es aprender a leer la forma del plan.
+
+\subsection{Qué observar en \texttt{EXPLAIN (ANALYZE, BUFFERS)}}
+
+\begin{itemize}
+\item tipo de scan;
+\item costo estimado;
+\item filas estimadas frente a reales;
+\item filas descartadas por filtros;
+\item operaciones de sort;
+\item loops;
+\item buffers hit/read;
+\item tiempo total y variabilidad entre ejecuciones.
+\end{itemize}
+
+Una discrepancia grande entre filas estimadas y reales puede indicar estadísticas desactualizadas, correlación de columnas o distribución que el planner no modeló bien.
+
+\subsection{Selectividad y cuándo un seq scan es correcto}
+
+Si una consulta devuelve gran parte de la tabla, usar el índice puede implicar demasiados accesos dispersos al heap. El planner puede preferir un scan secuencial incluso cuando existe un índice. Eso no significa automáticamente que el índice ``no funciona''; significa que para esa consulta y esos datos otra estrategia parece más barata.
+
+\subsection{Índices compuestos y orden de columnas}
+
+El orden de columnas define qué prefijos son útiles. Para una consulta que fija \texttt{student\_id} y recorre fechas, resulta natural un índice con \texttt{student\_id} como primera columna y \texttt{created\_at} como segunda. Invertir ese orden produce una estructura físicamente distinta y no ofrece el mismo acceso.
+
+La elección debería partir de consultas reales y de su distribución, no solo del esquema lógico.
+
+\subsection{Covering e índices parciales}
+
+Un índice puede incluir columnas para permitir un index-only scan en determinadas condiciones, aunque en PostgreSQL la visibilidad de la fila también influye. Los índices parciales permiten indexar solo un subconjunto, por ejemplo compras pendientes, reduciendo tamaño y costo cuando ese subconjunto es pequeño y consultado con frecuencia.
+
+Estas técnicas son útiles, pero aumentan especificidad y deben justificarse con carga real.
+
+\section{LSM y compaction: throughput ahora, deuda después}
 
 \subsection{Motivación}
 
-Las LSM-trees convierten muchas escrituras aleatorias en una secuencia de appends y merges. El camino típico es:
+Una Log-Structured Merge-Tree transforma muchas escrituras pequeñas y aleatorias en appends y merges secuenciales. Es atractiva para cargas de ingestión intensa, stores clave-valor, series temporales y telemetría.
+
+La arquitectura típica contiene:
+
+\begin{itemize}
+\item WAL para durabilidad;
+\item memtable ordenada en RAM;
+\item immutable memtable pendiente de flush;
+\item SSTables inmutables en disco;
+\item niveles o tiers;
+\item compaction en background;
+\item metadata o manifest para describir los archivos activos.
+\end{itemize}
+
+\subsection{Ruta de escritura}
+
+Una escritura sigue, conceptualmente, estos pasos:
+
 \begin{enumerate}
-\item persistir en WAL;
-\item insertar en una memtable ordenada;
-\item congelar y hacer flush a una SSTable inmutable;
-\item fusionar SSTables mediante compaction.
+\item append al WAL;
+\item inserción en la memtable;
+\item respuesta según la política de durabilidad;
+\item congelamiento de la memtable cuando alcanza un umbral;
+\item flush secuencial a una SSTable L0;
+\item compaction hacia niveles inferiores.
 \end{enumerate}
 
-Esta arquitectura es atractiva para ingestión intensa, telemetría, series temporales y stores clave-valor.
+El camino crítico es corto, pero el sistema adquiere una deuda de organización que debe pagar después.
 
-\subsection{Lecturas}
+\subsection{SSTables}
 
-Una lectura puede necesitar consultar memtable, SSTables recientes y niveles compactados. Para reducir I/O se usan:
+Una SSTable es un archivo inmutable con claves ordenadas. La inmutabilidad simplifica escritura secuencial y concurrencia. Sin embargo, una clave puede aparecer en varias SSTables con diferentes versiones, y un tombstone puede representar una eliminación que todavía no puede descartarse.
+
+\subsection{Ruta de lectura}
+
+Una búsqueda puede consultar:
+
+\begin{enumerate}
+\item memtable activa;
+\item immutable memtables;
+\item archivos L0, que pueden solaparse;
+\item niveles compactados.
+\end{enumerate}
+
+Para reducir trabajo se usan:
+
 \begin{itemize}
-\item índices por archivo;
 \item Bloom filters;
+\item índices por archivo y por bloque;
 \item block cache;
-\item compaction que limita solapamiento;
-\item búsqueda desde datos más recientes hacia más antiguos.
+\item metadata de rangos;
+\item compaction que controla solapamiento.
 \end{itemize}
 
-Los tombstones representan eliminaciones y deben conservarse hasta que sea seguro eliminar versiones antiguas en todos los niveles relevantes.
+\subsection{Bloom filters}
 
-\subsection{Compaction}
+Un Bloom filter puede afirmar con certeza que una clave no está en un archivo. Si responde ``quizá'', el archivo debe consultarse. Por ello:
 
-Compaction fusiona runs ordenados, retiene la versión necesaria y elimina datos obsoletos cuando es seguro. No es un proceso gratuito: lee y reescribe datos que la aplicación quizá no modificó recientemente.
-
-RocksDB ofrece diferentes estrategias porque cada una redistribuye costo:
 \begin{itemize}
-\item leveled compaction suele reducir read y space amplification, pero puede aumentar write amplification;
-\item tiered o universal compaction reduce parte de la reescritura, pero puede aumentar runs consultados y espacio temporal;
-\item FIFO es apropiada para ciertos logs con TTL y requisitos simples.
+\item falsos positivos generan I/O adicional;
+\item falsos negativos no deben ocurrir;
+\item más bits por clave reducen falsos positivos, pero consumen memoria y metadata.
 \end{itemize}
 
-\subsection{Write stalls y backpressure}
+Son especialmente útiles para point lookups de claves ausentes; ayudan menos en grandes range scans.
 
-Si el ritmo de ingreso supera durante demasiado tiempo la capacidad de flush y compaction, se acumulan archivos y niveles. La latencia de lectura y el espacio empeoran. Un motor responsable desacelera o detiene escrituras para evitar una degradación sin límite.
+\subsection{Tombstones}
 
-La documentación de RocksDB denomina \emph{write stalls} a esta regulación. Es un ejemplo concreto de backpressure dentro de un storage engine.
+Como las SSTables son inmutables, una eliminación se registra como tombstone. Ese tombstone debe propagarse durante compaction hasta que sea seguro descartar tanto la marca como las versiones antiguas. Eliminarlo demasiado pronto podría hacer reaparecer una versión vieja almacenada en otro nivel.
 
-\section{Las tres amplificaciones}
+\section{Compaction y stalls: pagar y regular la deuda diferida}
+
+\subsection{De la intuición a la operación física}
+
+La analogía de ``ordenar pilas'' es útil porque deja visible el costo diferido. La aplicación escribe una versión una vez; el motor puede leerla y reescribirla varias veces a medida que la mueve entre niveles. Ese trabajo compite con lecturas y nuevas escrituras. La capacidad sostenida del sistema depende tanto del camino de ingreso como del trabajo de mantenimiento.
+
+\subsection{Por qué existe}
+
+Compaction fusiona runs ordenados, resuelve versiones, propaga tombstones y reorganiza rangos. Sin compaction, crecerían el número de archivos, read amplification y space amplification.
 
 \subsection{Write amplification}
 
-Relación entre bytes físicos escritos y bytes lógicos modificados. WAL, índices, compaction, replicación y backups pueden multiplicar escritura.
+\[
+WA = \frac{\text{bytes físicos escritos}}{\text{bytes lógicos ingresados}}
+\]
+
+Un dato puede escribirse en WAL, SSTable L0 y varias compactaciones. Índices, replicación y backups pueden agregar más escritura fuera del motor.
 
 \subsection{Read amplification}
 
-Cantidad de estructuras o bloques consultados para responder una lectura. En una LSM puede crecer si existen muchos runs; en un B-tree puede crecer por cache misses, bloat o mala selectividad.
+Read amplification mide cuántas estructuras, archivos o bloques deben consultarse para responder. En una LSM aumenta cuando existen muchos runs o solapamientos. Bloom filters y cache la reducen, pero no la eliminan.
 
 \subsection{Space amplification}
 
-Relación entre espacio físico y estado lógico vivo. Versiones MVCC, tombstones, archivos solapados, índices y espacio temporal de compaction contribuyen.
+\[
+SA = \frac{\text{espacio físico ocupado}}{\text{estado lógico vivo}}
+\]
 
-Estas tres dimensiones rara vez se minimizan simultáneamente. La ingeniería consiste en elegir una forma del costo compatible con la carga y los SLO.
+Versiones, tombstones, archivos solapados y espacio temporal de compaction contribuyen.
 
-\section{Comparación razonada: B-tree y LSM}
+\subsection{Leveled compaction}
 
-\begin{tabular}{p{0.23\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+En leveled compaction, los niveles mayores buscan mantener rangos poco solapados. Esto favorece lectura y control de espacio, pero puede reescribir datos varias veces al moverlos entre niveles.
+
+\subsection{Tiered o universal compaction}
+
+Conserva varios runs y los fusiona por grupos. Puede reducir parte de la reescritura temprana, pero aumenta el número de runs consultados y el espacio temporal. Es una redistribución de costo, no una mejora absoluta.
+
+\subsection{Write stalls}
+
+Si la tasa de ingreso supera sostenidamente la capacidad de flush y compaction, se acumulan immutable memtables, archivos L0 y bytes pendientes. El motor puede desacelerar o detener escrituras para evitar degradación sin límite.
+
+RocksDB documenta write stalls como una forma de backpressure. Sin ellos, el sistema podría aumentar space amplification hasta quedarse sin disco y read amplification hasta volver inutilizables las consultas.
+
+\subsection{Métricas de compaction}
+
+Las métricas más útiles incluyen:
+
+\begin{itemize}
+\item bytes leídos y escritos por compaction;
+\item bytes pendientes de compaction;
+\item cantidad de archivos L0;
+\item número y duración de stalls;
+\item tiempo total en stall;
+\item write amplification;
+\item latencia p95/p99 de escritura y lectura;
+\item utilización del dispositivo;
+\item throughput de flush/compaction frente a ingreso.
+\end{itemize}
+
+Una salida donde ingresan 90 MB/s, compaction procesa 60 MB/s y el backlog crece no describe un pico inocente si la diferencia persiste. Describe una cola inestable. El throughput aceptado en el frente no es sostenible.
+
+
+\subsection{Leer un dashboard de compaction como una cadena causal}
+
+Considere una ventana de cinco minutos con las siguientes señales ilustrativas:
+
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.20\textwidth}p{0.36\textwidth}}
 \toprule
-Criterio & B-tree & LSM-tree \\
+Señal & Valor & Pregunta que habilita \\
 \midrule
-Write path & actualización de páginas e índices & WAL, memtable, flush y compaction \\
-Point lookup & pocas páginas, comportamiento estable & varios runs; Bloom y cache ayudan \\
-Range scan & natural por orden del árbol & eficiente si hay pocos runs y buena compaction \\
-Carga típica & OLTP equilibrado o read-heavy & ingestión intensa y write-heavy \\
-Costo diferido & vacuum, splits, reindex & compaction, tombstones, stalls \\
+User bytes & 120 GB & ¿cuánto dato lógico ingresó? \\
+Compaction write & 780 GB & ¿cuánto trabajo físico adicional se pagó? \\
+Write amplification & $6.5\times$ & ¿es compatible con SSD, costo y vida útil? \\
+Pending compaction bytes & 18 GB & ¿la deuda crece o se drena? \\
+L0 files & 28 de 36 & ¿qué tan cerca está el umbral de stop? \\
+Stall time & 3.4 s/min & ¿cuánto backpressure ya siente la aplicación? \\
 \bottomrule
 \end{tabular}
+\end{center}
 
-No se debe concluir que “B-tree es para lectura y LSM para escritura” como regla absoluta. La implementación, cache, hardware, tamaño de datos, compaction y patrón de consultas pueden invertir resultados. La frase sirve como orientación inicial, no como benchmark.
+Ninguna señal aislada explica el sistema. La interpretación correcta relaciona tasas y tendencias:
 
-\section{Dos casos de diseño}
-
-\subsection{Ledger bancario}
-
-Requisitos:
-\begin{itemize}
-\item baja latencia predecible;
-\item transacciones y rangos temporales;
-\item invariantes estrictos;
-\item carga de lectura y escritura equilibrada;
-\item auditoría y recovery controlado.
-\end{itemize}
-
-Una solución relacional con WAL, B-tree y MVCC puede ser razonable. Esto no evita evaluar replicación, checkpoints, índices y aislamiento.
-
-\subsection{Telemetría IoT}
-
-Requisitos:
-\begin{itemize}
-\item alto throughput de ingestión;
-\item append por dispositivo y timestamp;
-\item retención temporal;
-\item consultas por rango y agregaciones;
-\item tolerancia a frescura eventual en vistas analíticas.
-\end{itemize}
-
-Una LSM-tree con compaction orientada a tiempo, particionamiento y Bloom filters puede ser razonable. Deben medirse stalls, lag de compaction, espacio y latencia de rango.
-
-\section{Método para tomar la decisión}
-
-Use la secuencia:
 \begin{enumerate}
-\item describir carga: ratios, tamaño, skew y crecimiento;
-\item declarar garantías: durabilidad, recovery, aislamiento y frescura;
-\item elegir mecanismo inicial;
-\item identificar el costo desplazado;
-\item definir métricas y experimento;
-\item revisar la elección con evidencia.
+\item si ingestión supera compaction, el backlog crece;
+\item al crecer L0 y solapamiento, aumenta trabajo de lectura;
+\item más compaction compite por I/O y puede elevar p99;
+\item el motor aplica slowdown o stop para recuperar estabilidad;
+\item si la diferencia de capacidad persiste, el tuning solo redistribuye el problema: hay que reducir ingreso, aumentar capacidad o cambiar la arquitectura.
 \end{enumerate}
 
-Métricas relevantes:
+\section{Caso contrastante: telemetría del campus}
+
+Sensores de aulas, energía y ocupación generan decenas de miles de eventos por segundo. La carga presenta:
+
 \begin{itemize}
-\item latencia p50/p95/p99 de lectura y escritura;
-\item throughput sostenible;
-\item bytes WAL por byte lógico;
-\item write/read/space amplification;
-\item tiempo de checkpoint y crash recovery;
-\item tamaño de backlog de compaction;
-\item cache hit rate;
-\item bloat o versiones retenidas.
+\item escrituras append;
+\item claves por dispositivo y tiempo;
+\item consultas por rango temporal;
+\item retención y expiración;
+\item vistas analíticas que toleran cierta frescura eventual.
 \end{itemize}
 
+Una LSM-tree puede ser una hipótesis razonable, pero todavía deben definirse:
+
+\begin{itemize}
+\item política de WAL y pérdida máxima aceptable;
+\item tamaño de memtable;
+\item estrategia de compaction;
+\item particionamiento temporal;
+\item Bloom filters;
+\item TTL y manejo de tombstones;
+\item métricas de backlog y stalls;
+\item recuperación y replicación.
+\end{itemize}
+
+Decir ``usaremos RocksDB porque escribe rápido'' no constituye una defensa. La defensa necesita un modelo de carga y un experimento.
+
+\section{B-tree y LSM: comparación razonada}
+
+\begin{center}
+\begin{tabular}{p{0.19\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+\toprule
+Criterio & B-tree / páginas & LSM-tree / runs \\
+\midrule
+Write path & Actualización de páginas e índices; más I/O aleatorio & WAL, memtable, flush y compaction diferida \\
+Point lookup & Pocas páginas, comportamiento estable si la cache está sana & Puede consultar varios runs; Bloom y cache ayudan \\
+Range scan & Natural por orden del árbol & Eficiente si hay pocos runs y buena compaction \\
+Mantenimiento & Splits, vacuum, bloat y reindex & Tombstones, compaction, stalls y amplificaciones \\
+Carga típica & OLTP equilibrado o read-heavy & Ingestión sostenida y write-heavy \\
+Pregunta crítica & ¿Qué consulta justifica cada índice? & ¿Puede compaction sostener la tasa de ingreso? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La comparación ``B-tree para lectura, LSM para escritura'' es una orientación inicial, no una ley. Cache, hardware, tamaño de valores, compresión, patrón de rangos, distribución de claves y configuración pueden cambiar el resultado.
+
+\section{Dos decisiones de arquitectura}
+
+\subsection{Compra en campus}
+
+Características:
+
+\begin{itemize}
+\item transacciones cortas;
+\item consulta de compras por estudiante y fecha;
+\item actualización de inventario;
+\item necesidad de idempotencia y durabilidad;
+\item latencia p99 predecible.
+\end{itemize}
+
+Una hipótesis inicial razonable es PostgreSQL u otro motor transaccional con WAL, MVCC y B-tree. La decisión debe validarse con:
+
+\begin{itemize}
+\item p95/p99 de checkout;
+\item tasa de commits;
+\item latencia de flush;
+\item tiempo de recovery;
+\item bloat y vacuum;
+\item uso y costo de índices;
+\item comportamiento bajo concurrencia e invariantes.
+\end{itemize}
+
+\subsection{Telemetría del campus}
+
+Características:
+
+\begin{itemize}
+\item ingestión masiva;
+\item append por dispositivo y timestamp;
+\item rangos temporales;
+\item retención;
+\item tolerancia a frescura eventual en vistas.
+\end{itemize}
+
+Una hipótesis inicial es una LSM con particionamiento temporal. Las métricas incluyen:
+
+\begin{itemize}
+\item throughput sostenible, no solo pico;
+\item backlog de compaction;
+\item write/read/space amplification;
+\item p99 de escritura durante compaction;
+\item latencia de rangos;
+\item espacio temporal;
+\item stalls;
+\item recovery y pérdida máxima.
+\end{itemize}
+
+\section{Método reusable para decidir storage}
+
+Una decisión madura puede organizarse en seis pasos:
+
+\begin{enumerate}
+\item \textbf{Describir la carga.} Ratio de lectura/escritura, tamaño de claves y valores, skew, crecimiento, rangos, concurrencia y retención.
+\item \textbf{Declarar garantías.} Durabilidad, RPO, RTO, aislamiento, consistencia y frescura.
+\item \textbf{Elegir una hipótesis de mecanismo.} WAL, MVCC, B-tree, LSM, particionamiento y replicación.
+\item \textbf{Identificar el costo desplazado.} Flush, vacuum, compaction, cache, espacio, coordinación o recovery.
+\item \textbf{Definir métricas.} Percentiles de latencia y throughput sostenible. Agregar amplificaciones, backlog, hit rate y objetivos RPO/RTO.
+\item \textbf{Diseñar un experimento que pueda refutar la elección.} No solo demostrar el caso feliz.
+\end{enumerate}
+
+\begin{uakeybox}
+Una arquitectura queda mejor defendida cuando incluye la condición bajo la cual el equipo estaría dispuesto a cambiarla.
+\end{uakeybox}
+
+\section{Demostración reproducible de \texttt{EXPLAIN}}
+
+El paquete de esta clase incluye un script SQL que:
+
+\begin{enumerate}
+\item crea una tabla de compras del campus;
+\item genera un conjunto sintético con \texttt{generate\_series};
+\item ejecuta \texttt{EXPLAIN (ANALYZE, BUFFERS)} sin índice;
+\item crea un índice compuesto;
+\item repite la consulta;
+\item permite discutir qué cambió en el plan y qué costo se agregó a escrituras.
+\end{enumerate}
+
+Los tiempos concretos dependen de hardware, cache y tamaño del dataset. La evidencia principal no es una cifra aislada, sino la diferencia entre \texttt{Seq Scan + Sort} e \texttt{Index Scan} compatible con filtro, orden y límite.
+
 \section{Aplicación del marco del curso}
+
+Para la telemetría del campus:
 
 \[
 D=(P,F,G,S,T)
 \]
 
-Ejemplo para telemetría:
 \begin{itemize}
 \item $P$: ingerir y consultar eventos a alta tasa;
-\item $F$: crash, backlog de compaction, pérdida de dispositivo, picos de carga;
-\item $G$: pérdida máxima acotada, recovery dentro de objetivo, rangos consultables;
-\item $S$: WAL, LSM, replicación, compaction y retención;
-\item $T$: más write amplification, latencia de compaction y consistencia eventual en vistas.
+\item $F$: crash, pérdida de dispositivo, picos, compaction atrasada, saturación y partición;
+\item $G$: pérdida máxima acotada, recuperación dentro del objetivo y rangos consultables;
+\item $S$: WAL, LSM, replicación, compaction, retención y backpressure;
+\item $T$: write amplification, latencia de compaction, más complejidad y consistencia eventual en vistas.
 \end{itemize}
+
+Para la compra en campus:
+
+\begin{itemize}
+\item $P$: confirmar compras exactamente una vez a nivel lógico;
+\item $F$: timeout, retry, crash, pérdida de energía y concurrencia;
+\item $G$: durabilidad, idempotencia, inventario coherente y p99 acotado;
+\item $S$: transacción, WAL durable, MVCC, índice compuesto y recuperación;
+\item $T$: fsync, mantenimiento de índices, vacuum y coordinación.
+\end{itemize}
+
+
+
+\section{Precisiones técnicas indispensables}
+
+Esta sección reúne distinciones que suelen provocar respuestas aparentemente correctas pero conceptualmente incompletas.
+
+\subsection{WAL no produce exactamente una vez por sí solo}
+
+WAL permite reconstruir una historia confirmada después de un crash. No identifica automáticamente que dos requests sean la misma operación lógica. Para una compra reintentada hacen falta, además, una clave idempotente, una restricción de unicidad y la persistencia atómica del efecto y del resultado asociado a esa clave.
+
+\subsection{La regla WAL contiene dos órdenes diferentes}
+
+Primero, el registro que explica una modificación debe ser durable antes de que la página modificada alcance almacenamiento estable. Segundo, el registro de commit debe ser durable antes del ACK al cliente. El primer orden protege recovery; el segundo protege la promesa externa de durabilidad.
+
+\subsection{Checkpoint, backup y réplica responden preguntas distintas}
+
+Un checkpoint acota cuánto log debe releerse. Un backup permite recuperar frente a pérdida o corrupción más amplia. Una réplica mejora disponibilidad y puede reducir pérdida, pero también puede reproducir una corrupción lógica. Ninguno reemplaza automáticamente a los otros.
+
+\subsection{MVCC es un mecanismo; el aislamiento es el contrato}
+
+Conservar versiones reduce bloqueo entre lectores y escritores. Las reglas de snapshot, detección de conflictos y validación de commit determinan si el contrato resultante es Read Committed, Snapshot Isolation o Serializable. Preguntar solamente ``¿usa MVCC?'' no alcanza.
+
+\subsection{El planner compara costos; no obedece la existencia de un índice}
+
+Un índice puede ser ignorado cuando la consulta devuelve una fracción grande de la tabla, las estadísticas son incorrectas, el orden del índice no coincide con el predicado o el acceso aleatorio cuesta más que un scan secuencial. La evidencia relevante es el plan y la distribución real de los datos.
+
+\subsection{Compaction es capacidad de mantenimiento}
+
+Una LSM es estable cuando flush y compaction pueden absorber, en promedio y bajo picos razonables, el trabajo que la aplicación crea. Un stall ocasional puede proteger al motor; stalls frecuentes indican que la capacidad de mantenimiento, la política de niveles o el hardware no sostienen la carga.
+
+\section{Glosario operativo mínimo}
+
+\begin{description}
+\item[Aceptado:] una capa recibió la operación; no dice cuánto sobrevivirá.
+\item[Escrito:] los bytes fueron entregados a alguna capa inferior; puede seguir siendo volátil.
+\item[Durable:] la operación cruzó la frontera de persistencia declarada para el modelo de falla.
+\item[Committed:] la transacción tomó una decisión final según el protocolo; debe aclararse si esa decisión es durable.
+\item[Aplicado:] la estructura principal refleja el cambio; puede ocurrir después del commit durable.
+\item[Visible:] una lectura puede observar el cambio según su snapshot y nivel de aislamiento.
+\item[Replicado:] otra copia recibió el cambio; debe aclararse si fue memoria, disco o quorum.
+\item[Backlog:] trabajo pendiente que el sistema todavía debe absorber.
+\item[Stall:] regulación deliberada de admisión para evitar crecimiento ilimitado del backlog.
+\end{description}
 
 \section{Errores conceptuales frecuentes}
 
 \begin{itemize}
-\item confundir write exitoso con write durable;
-\item asumir que replicación sustituye a persistencia;
-\item creer que MVCC elimina todas las anomalías;
-\item crear índices sin observar costo de mantenimiento;
+\item confundir \texttt{write()} exitoso con durabilidad;
+\item suponer que replicación sustituye a persistencia;
+\item pensar que \texttt{COMMIT} implica páginas ya escritas;
+\item creer que WAL por sí solo implementa ACID completo;
+\item afirmar que MVCC elimina conflictos o garantiza serializabilidad;
+\item crear índices sin observar consultas, selectividad ni costo de escritura;
 \item tratar compaction como mantenimiento gratuito;
-\item elegir una estructura por nombre de producto y no por carga;
-\item medir solo throughput medio e ignorar colas y p99;
-\item ignorar recovery hasta el primer incidente.
+\item comparar motores solo mediante throughput medio;
+\item ignorar p99, backlog y recuperación;
+\item elegir una tecnología por reputación sin formular una carga falsable.
 \end{itemize}
 
-\section{Bibliografía guiada y casos reales}
+\section{Bibliografía guiada}
 
 \begin{itemize}
-\item Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 3 y 7: estructuras de almacenamiento, índices, transacciones y MVCC.
-\item PostgreSQL, \href{https://www.postgresql.org/docs/current/wal-intro.html}{Write-Ahead Logging}: relación entre WAL, páginas y crash recovery.
-\item PostgreSQL, \href{https://www.postgresql.org/docs/current/routine-vacuuming.html}{Routine Vacuuming}: versiones MVCC, visibilidad y limpieza.
-\item RocksDB, \href{https://github.com/facebook/rocksdb/wiki/RocksDB-Overview}{Overview} y \href{https://github.com/facebook/rocksdb/wiki/Write-Stalls}{Write Stalls}: compaction y regulación de escritura.
-\item O'Neil et al., \emph{The Log-Structured Merge-Tree}: fundamento académico de la estructura LSM.
+\item Martin Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 3 y 7. Leer primero para construir el modelo conceptual de estructuras de almacenamiento, índices y transacciones.
+\item PostgreSQL, documentación oficial, capítulo de Reliability and the Write-Ahead Log. Concentrarse en la regla WAL, configuración y la advertencia sobre dispositivos que informan flush de manera incorrecta.
+\item PostgreSQL, documentación oficial de \texttt{EXPLAIN} e índices. Practicar la lectura de scans, sorts, estimaciones, filas reales y buffers.
+\item PostgreSQL, documentación de MVCC y routine vacuuming. Relacionar versiones visibles, snapshots largos y bloat.
+\item RocksDB Wiki, \emph{Compaction Stats and DB Status}, \emph{Write Stalls} y \emph{Tuning Guide}. Observar cómo backlog, L0 y stalls convierten compaction en un problema operacional.
+\item Patrick O'Neil et al., ``The Log-Structured Merge-Tree'', \emph{Acta Informatica}, 1996. Referencia fundacional de LSM-trees.
+\item Mohan et al., ``ARIES: A Transaction Recovery Method Supporting Fine-Granularity Locking and Partial Rollbacks Using Write-Ahead Logging'', ACM TODS, 1992. Lectura avanzada sobre recovery.
 \end{itemize}
 
-Ruta sugerida: leer primero DDIA para el modelo conceptual, luego PostgreSQL para una implementación transaccional y finalmente RocksDB para observar los trade-offs de compaction en un motor LSM.
+Ruta sugerida: DDIA para el mapa; PostgreSQL para una implementación transaccional observable; RocksDB para compaction y backpressure; artículos fundacionales para profundización.
 
 \section{Conexión con el Trabajo Final Integrador}
 
-En el Trabajo Final, la estrategia de datos no debe expresarse como “usaremos PostgreSQL/Cassandra”. Debe incluir:
+La estrategia de datos del Trabajo Final no debe expresarse como ``usaremos PostgreSQL'', ``usaremos Cassandra'' o ``usaremos RocksDB''. Debe incluir:
+
 \begin{itemize}
 \item patrón de lectura y escritura;
-\item volumen y crecimiento;
-\item garantía de durabilidad;
-\item aislamiento necesario;
-\item estrategia de índice o particionamiento;
-\item recovery y backups;
-\item métricas que validarían la decisión.
+\item volumen, crecimiento y skew;
+\item dato crítico e invariante;
+\item frontera de durabilidad;
+\item RPO y RTO;
+\item nivel de aislamiento;
+\item estrategia de índices o particionamiento;
+\item recovery, backups y replicación;
+\item costos de vacuum o compaction;
+\item métricas y experimento de validación.
 \end{itemize}
 
 \section{Autoevaluación}
 
+Responda sin mirar el texto y luego vuelva a cada sección para justificar con una regla o una métrica.
+
 \begin{enumerate}
 \item ¿Por qué una página de datos puede estar atrasada después de un commit correcto?
-\item ¿Qué diferencia existe entre WAL durable y réplica en memoria?
+\item ¿Qué diferencia existe entre insert, write y flush del WAL?
+\item ¿Qué falla tolera un WAL local que no tolera una réplica en RAM, y viceversa?
+\item ¿Por qué REDO debe poder repetirse?
+\item ¿Qué cambia group commit y qué no cambia?
+\item ¿Cómo afecta el intervalo de checkpoint al RTO y a la latencia normal?
 \item ¿Qué snapshot ve una transacción larga en MVCC?
 \item ¿Por qué una transacción larga puede producir bloat?
+\item ¿Por qué MVCC no implica serializabilidad?
+\item ¿Qué trabajo evita el índice $(student\_id, created\_at)$ en el caso estudiado?
+\item ¿Por qué un seq scan puede ser correcto aunque exista un índice?
 \item ¿Qué costo introduce cada índice adicional?
-\item ¿Por qué la compaction puede detener escrituras?
-\item ¿Qué amplificación optimizaría para una carga de telemetría y cuál aceptaría aumentar?
-\item ¿Qué mediría para defender una elección B-tree/LSM ante un comité?
+\item ¿Cómo se escribe un dato en una LSM?
+\item ¿Qué problema resuelven Bloom filters y qué error admiten?
+\item ¿Por qué no puede eliminarse inmediatamente un tombstone?
+\item ¿Qué significa write amplification?
+\item ¿Cómo se detecta que compaction no sostiene el ritmo de ingreso?
+\item ¿Por qué un write stall puede proteger al sistema?
+\item ¿Qué mediría para defender B-tree frente a LSM en una carga concreta?
+\item ¿Qué evidencia podría hacerle cambiar la arquitectura elegida?
 \end{enumerate}
 
 \section{Síntesis final}
 
+WAL hace recuperable una historia confirmada; los checkpoints acotan el trabajo de recovery; MVCC conserva historias concurrentes para reducir bloqueo; B-trees organizan acceso por páginas; LSM-trees convierten appends en trabajo diferido de compaction. Ningún mecanismo es gratuito.
+
 \begin{uakeybox}
-WAL hace recuperable una historia confirmada; MVCC administra historias concurrentes; B-trees y LSM-trees organizan el acceso físico. Ningún mecanismo es gratuito. El diseño correcto convierte garantías y cargas en decisiones medibles de persistencia, versiones, índices y mantenimiento.
+El diseño correcto de almacenamiento conecta carga, falla, garantía, mecanismo, costo y evidencia. La pregunta central no es ``¿qué motor es más rápido?'', sino ``¿qué promesa debe sobrevivir, qué trabajo se desplaza y cómo sabremos si la decisión sigue siendo válida?''
 \end{uakeybox}
 
 \end{document}
