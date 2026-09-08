@@ -5,6 +5,12 @@
 \UASetDate{2026}
 \usetikzlibrary{decorations.pathreplacing,matrix,backgrounds,shapes.multipart}
 
+% Evitar cortes silábicos innecesarios y conservar una lectura fluida.
+\hyphenpenalty=9000
+\exhyphenpenalty=9000
+\tolerance=1800
+\emergencystretch=1.3em
+
 
 % Etiqueta pedagógica visible. Se define localmente para no modificar el .sty
 % compartido ni el build de GitHub.
@@ -17,9 +23,9 @@
 }
 
 \UASetClassNumber{06}
-\UASetClassTitle{Sistemas de almacenamiento}
+\UASetClassTitle{Storage distribuido y almacenamiento permanente}
 \title{\UACourse}
-\subtitle{Clase 06 --- WAL, MVCC, EXPLAIN, índices y LSM}
+\subtitle{Clase 06 --- Storage distribuido:\\almacenamiento permanente, acceso concurrente y rendimiento bajo fallas}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -35,16 +41,15 @@
   uaTiny/.style={font=\tiny,align=center,text=UAIngText},
   uaLane/.style={draw=UAIngRule,line width=0.9pt},
   uaEvent/.style={circle,fill=UAIngNavy,inner sep=2.2pt},
-  uaEventOrange/.style={circle,fill=UAIngOrange,inner sep=2.4pt}
+  uaEventOrange/.style={circle,fill=UAIngOrange,inner sep=2.4pt},
+  uaEventBox/.style={draw=UAIngNavy,rounded corners=1.2mm,fill=white,
+    minimum height=0.46cm,align=center,font=\tiny,inner xsep=3pt,inner ysep=1.5pt},
+  uaEventBoxOrange/.style={uaEventBox,draw=UAIngOrange,fill=UAIngPaper},
+  uaProcess/.style={draw=UAIngOrange,rounded corners=1.2mm,fill=UAIngPaper,
+    minimum height=0.48cm,align=center,font=\tiny,inner xsep=4pt,inner ysep=1.7pt}
 }
 
 \newcommand{\SourceLine}[1]{\vfill{\tiny\color{UAIngMuted}Fuente / referencia: #1}}
-\newcommand{\ThreePartConcept}[3]{%
-  \begin{columns}[T]
-  \column{0.31\textwidth}\begin{block}{En una frase}#1\end{block}
-  \column{0.31\textwidth}\begin{block}{Por qué existe}#2\end{block}
-  \column{0.31\textwidth}\begin{alertblock}{No resuelve por sí solo}#3\end{alertblock}
-  \end{columns}}
 
 \begin{document}
 {
@@ -54,25 +59,331 @@
 \end{frame}
 }
 
+
 % =============================================================================
-\begin{frame}{Qué debería poder explicar al final de la clase}
+\begin{frame}{Pregunta central: ¿qué resuelve el storage distribuido?}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.55\textwidth}
+\begin{uakeybox}
+En esta clase, \textbf{storage distribuido} significa \textbf{almacenamiento distribuido}: nodos y protocolos que convierten operaciones en estado permanente, recuperable y consultable aun cuando ocurren fallas.
+\end{uakeybox}
+\begin{itemize}
+\item Conserva decisiones después de un reinicio.
+\item Coordina lecturas y escrituras simultáneas.
+\item Encuentra datos con latencia predecible.
+\item Absorbe carga sin acumular trabajo sin límite.
+\end{itemize}
+\column{0.41\textwidth}
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm and 0.45cm]
-\node[uaOrange,text width=2.15cm,minimum height=1.15cm] (wal) {\textbf{WAL}\\cómo sobrevive un commit};
-\node[uaSoft,text width=2.15cm,minimum height=1.15cm,right=of wal] (mvcc) {\textbf{MVCC}\\cómo conviven lectores y escritores};
-\node[uaSoft,text width=2.15cm,minimum height=1.15cm,right=of mvcc] (exp) {\textbf{EXPLAIN}\\cómo razona el planner};
-\node[uaSoft,text width=2.15cm,minimum height=1.15cm,right=of exp] (cmp) {\textbf{Compaction}\\dónde se paga la escritura rápida};
-\node[uaOrange,text width=2.15cm,minimum height=1.15cm,right=of cmp] (stall) {\textbf{Stall}\\cómo protege el motor};
-\draw[uaOrangeArrow] (wal)--(mvcc);
-\draw[uaArrow] (mvcc)--(exp);
-\draw[uaArrow] (exp)--(cmp);
-\draw[uaOrangeArrow] (cmp)--(stall);
+\begin{tikzpicture}[node distance=0.23cm]
+\node[uaOrange,text width=3.15cm,minimum height=0.70cm] (op) {Operación lógica\\``confirmar compra''};
+\node[uaSoft,text width=3.15cm,below=of op] (dist) {Capa distribuida\\particiona, replica y ordena};
+\node[uaSoft,text width=3.15cm,below=of dist] (eng) {Motores locales\\persisten, versionan e indexan};
+\node[uaOrange,text width=3.15cm,below=of eng] (state) {Estado permanente\\recuperable y consultable};
+\draw[uaOrangeArrow] (op)--(dist);
+\draw[uaArrow] (dist)--(eng);
+\draw[uaOrangeArrow] (eng)--(state);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Caso conductor}
-Una compra fue confirmada en la app del campus. Un segundo después se corta la energía. Al volver, debe existir exactamente una vez, poder leerse de forma coherente y encontrarse con baja latencia.
+\end{columns}
+\end{frame}
+
+\begin{frame}{Dónde se ubica el storage dentro del sistema distribuido}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.34cm and 0.42cm]
+\node[uaOrange,text width=1.80cm] (clients) {Clientes};
+\node[uaSoft,text width=2.05cm,right=of clients] (services) {Servicios de aplicación};
+\node[uaSoft,text width=2.85cm,right=of services] (dist) {Capa distribuida\\enrutamiento, réplica y autoridad};
+\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=0.86cm] (n1) {Nodo A\\motor + medio persistente};
+\node[uaSoft,text width=2.05cm,right=0.48cm of dist] (n2) {Nodo B\\motor + medio persistente};
+\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=-0.86cm] (n3) {Nodo C\\motor + medio persistente};
+\draw[uaOrangeArrow] (clients)--(services);
+\draw[uaArrow] (services)--(dist);
+\draw[uaArrow] (dist.east)--(n1.west);
+\draw[uaArrow] (dist.east)--(n2.west);
+\draw[uaArrow] (dist.east)--(n3.west);
+\node[draw=UAIngOrange,rounded corners=2mm,fit=(n1)(n2)(n3),inner sep=3pt,label={[uaTiny,text=UAIngOrange]above:nodos de almacenamiento}] {};
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Capa distribuida}
+Ubica y replica los datos; además, decide qué nodo tiene autoridad para confirmar cada operación.
 \end{block}
+\column{0.48\textwidth}
+\begin{block}{Motor local}
+Convierte esas decisiones en bytes persistentes, versiones visibles, índices y procedimientos de recuperación.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Qué llamaremos ``motor de almacenamiento''}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.45cm and 0.55cm]
+\node[uaOrange,text width=2.0cm] (req) {Lectura o escritura};
+\node[uaSoft,text width=2.35cm,right=of req] (txn) {Gestor transaccional};
+\node[uaSoft,text width=2.35cm,right=of txn,yshift=1.05cm] (plan) {Planificador y ejecutor};
+\node[uaSoft,text width=2.35cm,right=of txn] (buf) {Memoria intermedia};
+\node[uaSoft,text width=2.35cm,right=of txn,yshift=-1.05cm] (log) {Registro de recuperación};
+\node[uaSoft,text width=2.55cm,right=0.75cm of buf,yshift=0.65cm] (struct) {Árboles e índices\\archivos ordenados};
+\node[uaOrange,text width=2.55cm,right=0.75cm of buf,yshift=-0.65cm] (media) {Páginas y archivos\\en medio persistente};
+\draw[uaOrangeArrow] (req)--(txn);
+\draw[uaArrow] (txn)--(plan);
+\draw[uaArrow] (txn)--(buf);
+\draw[uaArrow] (txn)--(log);
+\draw[uaArrow] (plan)--(struct);
+\draw[uaArrow] (buf)--(struct);
+\draw[uaArrow] (log)--(media);
+\draw[uaOrangeArrow] (struct)--(media);
+\node[draw=UAIngNavy,rounded corners=2mm,fit=(txn)(plan)(buf)(log)(struct)(media),inner sep=6pt,label={[uaTiny]above:interior de un nodo de almacenamiento}] {};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Definición de trabajo}
+El \textbf{motor de almacenamiento} es el software que traduce operaciones lógicas en bytes, versiones, estructuras de acceso y reglas de recuperación sobre un medio persistente.
+\end{block}
+\end{frame}
+
+\begin{frame}{Siglas centrales I: WAL y MVCC}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\footnotesize
+\begin{uainfo}
+\textbf{WAL --- \textit{Write-Ahead Logging}.} En español: \textbf{registro anticipado de escritura}. El motor registra primero la evidencia necesaria para reconstruir un cambio después de una falla.
+\end{uainfo}
+\vspace{0.08cm}
+\begin{uainfo}
+\textbf{MVCC --- \textit{Multi-Version Concurrency Control}.} En español: \textbf{control de concurrencia multiversión}. El motor conserva varias versiones de un dato y decide cuál puede observar cada transacción.
+\end{uainfo}
+\vspace{0.08cm}
+\begin{block}{Relación con el problema general}
+WAL sostiene la recuperación de decisiones confirmadas. MVCC organiza el acceso concurrente a una historia de datos. Ninguno sustituye al otro.
+\end{block}
+\end{frame}
+
+\begin{frame}{Siglas centrales II: LSM-tree}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\footnotesize
+\begin{uainfo}
+\textbf{LSM-tree --- \textit{Log-Structured Merge-tree}.} En español: \textbf{árbol de fusión estructurado como log}. Recibe escrituras en memoria, las vuelca a archivos ordenados e inmutables y, más tarde, fusiona esos archivos.
+\end{uainfo}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Qué optimiza}
+Reduce el trabajo aleatorio en el camino crítico y favorece una alta tasa de ingestión.
+\end{block}
+\column{0.48\textwidth}
+\begin{alertblock}{Qué costo desplaza}
+Genera compactación posterior, lecturas sobre varios archivos y trabajo pendiente que debe controlarse.
+\end{alertblock}
+\end{columns}
+\vspace{0.05cm}
+\textbf{Convención.} Usaremos la sigla LSM, pero siempre indicaremos qué responsabilidad cumple, qué garantía aporta y qué costo desplaza.
+\end{frame}
+
+\begin{frame}{Cinco responsabilidades, no cinco términos aislados}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.25\textwidth}p{0.28\textwidth}p{0.34\textwidth}}
+\toprule
+Responsabilidad & Pregunta concreta & Mecanismo que estudiaremos \\
+\midrule
+Registrar decisiones & ¿Cómo sobrevive una compra ya confirmada? & Registro anticipado de escritura (WAL) y recuperación \\
+Controlar concurrencia & ¿Qué puede ver un reporte mientras cambian los datos? & Control de concurrencia multiversión (MVCC) e instantáneas lógicas \\
+Elegir una ruta física & ¿Cómo encontrar 20 filas entre un millón? & Índices, planificador y \texttt{EXPLAIN} (muestra el plan elegido) \\
+Optimizar escrituras & ¿Cómo convertir muchas escrituras en entrada/salida eficiente? & Árbol B o árbol LSM \\
+Proteger capacidad & ¿Qué ocurre si el mantenimiento queda atrás? & Compactación, trabajo pendiente y pausa de escritura \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Ningún mecanismo constituye por sí solo el sistema de almacenamiento completo. Cada uno cubre una responsabilidad y aporta una garantía específica.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Del dato lógico a los objetos físicos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.32cm and 0.48cm]
+\node[uaOrange,text width=2.45cm] (id) {Solicitud de compra\\ID 9F2A};
+\node[uaSoft,text width=2.25cm,right=of id] (row) {Fila nueva en\\\texttt{purchases}};
+\node[uaSoft,text width=2.25cm,right=of row] (page) {Página P17\\bloque físico};
+\node[uaSoft,text width=2.25cm,right=of page] (media) {Archivo de datos\\en el medio};
+\node[uaSoft,text width=2.25cm,below=0.50cm of row] (wal) {Entrada WAL\\para ID 9F2A};
+\node[uaSoft,text width=2.25cm,below=0.50cm of page] (idx) {Entrada de índice I5\\ruta hacia P17};
+\draw[uaOrangeArrow] (id)--(row);
+\draw[uaArrow] (row)--(page);
+\draw[uaArrow] (page)--(media);
+\draw[uaArrow] (row)--(wal);
+\draw[uaArrow] (idx)--(page);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Qué significa 9F2A}
+Es un \textbf{identificador estable de la operación lógica}. Si el cliente reintenta, vuelve a enviar 9F2A para que el servidor reconozca la misma compra.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Qué no significa}
+No es el contenido de la fila ni una posición física. P17 e I5 son etiquetas didácticas para una página de datos y una entrada de índice.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Vocabulario previo I: confirmar y volver durable}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.65\textwidth}}
+\toprule
+Término & Significado en esta clase \\
+\midrule
+\textbf{COMMIT} & Decisión del motor de aceptar definitivamente los efectos de una transacción. El COMMIT puede estar decidido antes de que todas las páginas hayan sido escritas. \\
+\textbf{ACK} & \textit{Acknowledgement}, o acuse de recibo. Es la respuesta enviada al cliente cuando se cumplió la garantía que el sistema promete. \\
+\textbf{X durable} & La evidencia necesaria para reconstruir X sobrevivirá a la falla que el modelo declara. ``Durable'' siempre debe leerse respecto de una falla concreta. \\
+\textbf{Log durable} & Porción del WAL cuyos bytes necesarios para recuperación ya sobrevivirían a la falla declarada. \\
+\textbf{Flush durable} & Operación de volcado ya concluida que llevó los bytes requeridos del WAL más allá de la frontera durable. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{alertblock}{Regla de lectura}
+Cuando aparezca ``X durable'', pregunte: ¿qué falla se considera y qué evidencia de X seguirá disponible después de esa falla?
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Vocabulario previo II: escribir y vaciar buffers}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.65\textwidth}}
+\toprule
+Término & Significado en esta clase \\
+\midrule
+\texttt{write}/append & Copiar o agregar bytes a una capa del sistema; la llamada puede terminar mientras los datos siguen en memoria o caché. \\
+Flush o volcado & Mover datos acumulados en un buffer hacia una capa inferior del sistema de almacenamiento. Un flush común no implica necesariamente durabilidad. \\
+\texttt{fsync} & Solicitar al sistema operativo que sincronice los datos relevantes con el medio persistente, de acuerdo con el hardware y la configuración. \\
+Entrada/salida (E/S) & Transferencia de datos entre memoria, sistema operativo y dispositivo persistente. \\
+Página sucia (dirty page) & Página modificada en memoria que todavía no fue escrita en el archivo de datos. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{alertblock}{Pregunta de ingeniería}
+Cuando alguien diga ``ya está escrito'', pregunte: ¿en qué capa terminó la operación y qué falla todavía podría borrar esos bytes?
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Vocabulario previo III: fallar y recuperar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.65\textwidth}}
+\toprule
+Término & Significado en esta clase \\
+\midrule
+Caída abrupta (crash) & Pérdida repentina de un proceso, del sistema operativo o de energía. El modelo debe indicar qué capas se pierden. \\
+Recuperación (recovery) & Procedimiento de reinicio que usa la evidencia persistida para reconstruir un estado lógico válido. \\
+REDO & Reaplicación de un cambio confirmado que aún no estaba materializado en su página de datos o índice. \\
+Punto de control (checkpoint) & Punto durable que acota desde qué posición del WAL debe comenzar la recuperación. \\
+LSN & \textit{Log Sequence Number}: número de secuencia que identifica una posición en el WAL; no es un reloj físico. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Estos términos describen cómo el motor transforma bytes persistidos en un estado lógico válido después de una falla.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Vocabulario previo IV: concurrencia y consistencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.64\textwidth}}
+\toprule
+Término & Significado en esta clase \\
+\midrule
+Versión & Representación de un dato creada por una transacción y visible para determinados lectores. \\
+Snapshot & Instantánea lógica que determina qué transacciones y versiones puede observar una lectura. \\
+Vista coherente & Resultado cuyas filas obedecen la misma regla de visibilidad, sin mezclar momentos arbitrarios. \\
+Serializabilidad & Garantía de que el resultado concurrente equivale a alguna ejecución de las transacciones una detrás de otra. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Vocabulario previo V: consultas y definición del esquema}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.64\textwidth}}
+\toprule
+Término & Significado en esta clase \\
+\midrule
+SQL & \textit{Structured Query Language}: lenguaje estructurado de consultas para leer y modificar datos. \\
+DDL & \textit{Data Definition Language}: parte de SQL que crea o modifica estructuras, por ejemplo \texttt{CREATE INDEX}. \\
+Planificador & Componente que compara rutas físicas posibles y elige un plan estimado. \\
+\texttt{EXPLAIN} & Comando que muestra el plan elegido por el planificador. \\
+\texttt{EXPLAIN ANALYZE} & Ejecuta la consulta y agrega mediciones reales al plan. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+% =============================================================================
+\UASectionSlide{Repaso ágil: cinco puentes\\hacia el almacenamiento}
+
+\begin{frame}{Una frase por cada clase previa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.09cm]
+\node[uaSoft,text width=0.91\textwidth,align=left] (a) {\textbf{Clase 1 --- Incertidumbre:} si no sabemos qué ocurrió, el almacenamiento conserva evidencia para responder de manera estable.};
+\node[uaSoft,text width=0.91\textwidth,align=left,below=of a] (b) {\textbf{Clase 2 --- RPC y reintento:} el reintento es seguro solo si identidad, efecto y resultado sobreviven a la falla.};
+\node[uaSoft,text width=0.91\textwidth,align=left,below=of b] (c) {\textbf{Clase 3 --- Replicación:} varias copias no indican por sí solas cuáles son durables, actuales ni autorizadas.};
+\node[uaSoft,text width=0.91\textwidth,align=left,below=of c] (d) {\textbf{Clase 4 --- Consenso:} el protocolo decide qué debe recordarse; cada nodo debe persistirlo realmente.};
+\node[uaSoft,text width=0.91\textwidth,align=left,below=of d] (e) {\textbf{Clase 5 --- Transacciones:} ACID define el contrato; WAL y MVCC implementan parte de ese contrato.};
+\end{tikzpicture}
+\end{center}
+\vspace{0.05cm}
+\textbf{Transición.} Hoy preguntamos qué bytes, esperas y estructuras vuelven verdaderas palabras como ``COMMIT'', ``durable'' y ``aislado''.
+\end{frame}
+
+\begin{frame}{Prediagnóstico intuitivo: razone antes de nombrar mecanismos}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{enumerate}
+\item La aplicación mostró ``compra confirmada'' y un segundo después se cortó la energía. ¿Puede desaparecer al reiniciar?
+\item Un reporte empezó a las 12:00 y durante su ejecución entraron nuevas compras. ¿Deberían cambiar sus totales a mitad del reporte?
+\item Para mostrar 20 compras entre un millón, ¿es razonable revisar siempre todas las filas?
+\item Ingresan 90 MB/s y el mantenimiento físico procesa 60 MB/s. ¿Puede la cola interna permanecer acotada indefinidamente?
+\item Tres nodos conservan el dato solo en memoria principal (RAM). ¿Sobrevive un corte de energía común?
+\end{enumerate}
+\begin{alertblock}{Consigna}
+Todavía no responda con el nombre de un mecanismo. Describa primero el comportamiento correcto y la falla que está imaginando.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Mapa conceptual: dónde aparece cada mecanismo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.34cm and 0.38cm]
+\node[uaOrange,text width=2.22cm,minimum height=1.25cm] (a) {Decisión durable\\\textbf{WAL + recuperación}};
+\node[uaSoft,text width=2.22cm,minimum height=1.25cm,right=of a] (b) {Historia accedida\\concurrentemente\\\textbf{MVCC}};
+\node[uaSoft,text width=2.22cm,minimum height=1.25cm,right=of b] (c) {Ruta de acceso\\\textbf{índice + EXPLAIN}};
+\node[uaSoft,text width=2.22cm,minimum height=1.25cm,right=of c] (d) {Camino de escritura\\\textbf{árbol B / LSM}};
+\node[uaOrange,text width=2.22cm,minimum height=1.25cm,right=of d] (e) {Protección de capacidad\\\textbf{compactación + pausa}};
+\draw[uaOrangeArrow] (a)--(b);
+\draw[uaArrow] (b)--(c);
+\draw[uaArrow] (c)--(d);
+\draw[uaOrangeArrow] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+El hilo conductor será siempre el mismo: problema, mecanismo, garantía, costo y evidencia.
+\end{uakeybox}
 \end{frame}
 
 \begin{frame}{Evidencias de aprendizaje de esta clase}
@@ -81,8 +392,8 @@ Una compra fue confirmada en la app del campus. Un segundo después se corta la 
 \column{0.48\textwidth}
 \begin{block}{Durante la clase}
 \begin{itemize}
-\item completar un timeline WAL y decidir la frontera de ACK;
-\item completar un timeline MVCC y justificar visibilidad;
+\item completar un timeline WAL y decidir cuándo enviar el ACK;
+\item completar un timeline MVCC y justificar qué versión es visible;
 \item leer un plan \texttt{EXPLAIN} antes y después de un índice.
 \end{itemize}
 \end{block}
@@ -90,356 +401,314 @@ Una compra fue confirmada en la app del campus. Un segundo después se corta la 
 \begin{block}{Al cerrar}
 \begin{itemize}
 \item diagnosticar backlog y write stall;
-\item elegir B-tree, LSM o combinación por workload;
+\item elegir un árbol B, una LSM-tree o una combinación según la carga de trabajo;
 \item defender la decisión con falla, garantía, costo y métrica.
 \end{itemize}
 \end{block}
 \end{columns}
-\begin{uakeybox}
-La auditoría del aprendizaje no se basa en haber ``visto'' términos: se basa en estas producciones observables.
-\end{uakeybox}
 \end{frame}
 
-
 % =============================================================================
-\UASectionSlide{Repaso ágil: cinco conexiones\\con storage}
+\UASectionSlide{WAL y recuperación:\\hacer durable una decisión}
 
-\begin{frame}{Una frase por cada clase previa}
+\begin{frame}{CampusShop: qué cambia físicamente al confirmar una compra}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
-\begin{center}
-\begin{tikzpicture}[node distance=0.16cm]
-\node[uaSoft,text width=0.91\textwidth,align=left] (a) {\textbf{Clase 1 --- Incertidumbre:} si no sabemos qué ocurrió, storage conserva la evidencia que permite responder de manera estable.};
-\node[uaSoft,text width=0.91\textwidth,align=left,below=of a] (b) {\textbf{Clase 2 --- RPC y retry:} un retry es seguro solo si identidad, efecto y resultado sobreviven al crash.};
-\node[uaSoft,text width=0.91\textwidth,align=left,below=of b] (c) {\textbf{Clase 3 --- Replicación:} varias copias no dicen cuáles son durables, actuales ni autorizadas.};
-\node[uaSoft,text width=0.91\textwidth,align=left,below=of c] (d) {\textbf{Clase 4 --- Consenso:} el protocolo decide qué recordar; cada nodo debe persistirlo de verdad.};
-\node[uaSoft,text width=0.91\textwidth,align=left,below=of d] (e) {\textbf{Clase 5 --- Transacciones:} ACID define el contrato; WAL y MVCC implementan parte de ese contrato físicamente.};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Transición}
-Hoy dejamos de usar palabras como ``commit'', ``durable'' o ``aislado'' como abstracciones y preguntamos qué bytes, esperas y estructuras las vuelven verdaderas.
-\end{block}
-\end{frame}
-
-\begin{frame}{Mini diagnóstico: vote antes de discutir}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
-\small
-Marque \textbf{V} o \textbf{F}. No busque todavía la respuesta perfecta: identifique qué palabra de cada frase le genera desconfianza.
-\begin{enumerate}
-\item Si \texttt{COMMIT} respondió, la página de la tabla ya está necesariamente en el SSD.
-\item Si el dato está en tres memorias RAM, entonces es durable.
-\item MVCC evita toda anomalía de concurrencia.
-\item Un índice siempre mejora el rendimiento global.
-\item Una LSM-tree elimina el costo de escribir.
-\end{enumerate}
-\begin{alertblock}{Volveremos al final}
-La clase será buena si puede refutar o defender cada afirmación con un mecanismo, una falla y una métrica.
-\end{alertblock}
-\end{frame}
-
-% =============================================================================
-\UASectionSlide{Primero la intuición: cinco ideas\\antes del detalle}
-
-\begin{frame}{WAL: el cuaderno de evidencia del motor}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm and 0.75cm]
-\node[uaOrange,text width=2.55cm,minimum height=1.15cm] (intent) {\textbf{Intención}\\``confirmar compra''};
-\node[uaSoft,text width=2.55cm,minimum height=1.15cm,right=of intent] (diary) {\textbf{Cuaderno durable}\\anotar cómo rehacer};
-\node[uaSoft,text width=2.55cm,minimum height=1.15cm,right=of diary] (book) {\textbf{Datos}\\actualizar después};
-\node[uaOrange,text width=2.55cm,minimum height=1.15cm,right=of book] (recover) {\textbf{Tras el crash}\\releer el cuaderno};
-\draw[uaOrangeArrow] (intent)--(diary);
-\draw[uaArrow] (diary)--(book);
-\draw[uaOrangeArrow] (book)--(recover);
-\end{tikzpicture}
-\end{center}
-\ThreePartConcept
-{Anotar la evidencia recuperable \textbf{antes} de depender de la página modificada.}
-{Es más barato persistir un log secuencial que forzar cada página y cada índice en cada commit.}
-{No reemplaza replicación, backups, consistencia global ni idempotencia de la API.}
-\end{frame}
-
-\begin{frame}{MVCC: conservar ediciones para que leer no signifique esperar}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.55cm]
-\node[uaSoft,text width=2.5cm] (v1) {Edición v1\\total = 120};
-\node[uaOrange,text width=2.5cm,right=of v1] (v2) {Edición v2\\total = 135};
-\node[uaSoft,text width=3.2cm,right=0.9cm of v2] (reader) {El reporte que empezó antes sigue leyendo v1; una consulta nueva puede leer v2.};
-\draw[uaArrow] (v1)--node[above,uaTiny]{UPDATE crea otra versión}(v2);
-\draw[uaOrangeArrow] (v2)--(reader);
-\end{tikzpicture}
-\end{center}
-\ThreePartConcept
-{Cada transacción lee una \textbf{edición coherente} del dato.}
-{Evita que un reporte largo bloquee todas las escrituras que ocurren mientras se ejecuta.}
-{No garantiza por sí solo serializabilidad; conservar versiones también cuesta espacio y mantenimiento.}
-\end{frame}
-
-\begin{frame}{Índice y EXPLAIN: mapa y navegador de una consulta}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm and 0.8cm]
-\node[uaOrange,text width=2.7cm] (q) {Consulta\\``últimas 20 compras''};
-\node[uaSoft,text width=2.7cm,right=of q] (idx) {Índice\\un mapa adicional};
-\node[uaSoft,text width=2.7cm,right=of idx] (plan) {EXPLAIN\\la ruta elegida};
-\node[uaOrange,text width=2.7cm,right=of plan] (measure) {EXPLAIN ANALYZE\\ruta + cronómetro};
-\draw[uaOrangeArrow] (q)--(idx);
-\draw[uaArrow] (idx)--(plan);
-\draw[uaOrangeArrow] (plan)--(measure);
-\end{tikzpicture}
-\end{center}
-\ThreePartConcept
-{El índice reduce dónde buscar; \texttt{EXPLAIN} muestra cómo planea buscar el motor.}
-{Permite discutir trabajo físico: scans, filtros, sorts, filas, buffers y tiempo.}
-{Un índice no siempre se usa; \texttt{EXPLAIN} estima y \texttt{ANALYZE} ejecuta realmente la consulta.}
-\end{frame}
-
-\begin{frame}{Compaction: ordenar y limpiar las pilas que dejamos pendientes}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\vspace{-0.08cm}
-\begin{center}
-\begin{tikzpicture}[node distance=0.35cm and 0.68cm]
-\node[uaSoft,text width=2.1cm] (a) {Pila A\\a, c, e, g};
-\node[uaSoft,text width=2.1cm,below=of a] (b) {Pila B\\b, c, f, h};
-\node[uaSoft,text width=2.1cm,below=of b] (t) {Tombstone\\eliminar c};
-\node[uaOrange,text width=3.0cm,right=1.1cm of b] (m) {Merge ordenado\\elegir versión vigente\\descartar obsoletas};
-\node[uaSoft,text width=2.5cm,right=1.1cm of m] (out) {Pila limpia\\a, b, e, f, g, h};
-\draw[uaArrow] (a.east)--(m.west);
-\draw[uaArrow] (b.east)--(m.west);
-\draw[uaArrow] (t.east)--(m.west);
-\draw[uaOrangeArrow] (m)--(out);
-\end{tikzpicture}
-\end{center}
-\ThreePartConcept
-{Fusionar archivos ordenados y eliminar versiones o borrados que ya no son necesarios.}
-{Una LSM acepta writes rápidos porque difiere parte de la organización física.}
-{No es gratuito: lee, reescribe, usa espacio temporal y compite por I/O.}
-\end{frame}
-
-\begin{frame}{Write stall: el molinete que evita que la deuda crezca sin límite}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm and 0.65cm]
-\node[uaOrange,text width=2.5cm] (in) {Ingreso\\90 MB/s};
-\node[uaSoft,text width=2.5cm,right=of in] (queue) {Memtables + L0\\backlog creciente};
-\node[uaSoft,text width=2.5cm,right=of queue] (clean) {Flush + compaction\\60 MB/s};
-\node[uaOrange,text width=2.5cm,right=of clean] (gate) {Slowdown / stall\\admitir menos};
-\draw[uaOrangeArrow] (in)--(queue);
-\draw[uaArrow] (queue)--(clean);
-\draw[uaOrangeArrow] (clean)--(gate);
-\draw[uaOrangeArrow] (gate) to[bend left=27] node[above,uaTiny]{backpressure} (in);
-\end{tikzpicture}
-\end{center}
-\ThreePartConcept
-{El motor desacelera o detiene escrituras cuando no puede absorberlas de manera sostenida.}
-{Protege espacio, lecturas y estabilidad en vez de aceptar una cola infinita.}
-{No crea capacidad. Stalls frecuentes indican deuda de compaction, hardware insuficiente o una carga mal dimensionada.}
-\end{frame}
-
-\begin{frame}{Mapa conceptual: qué pregunta responde cada mecanismo}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.48cm and 0.52cm]
-\node[uaOrange,text width=2.2cm,minimum height=1.25cm] (a) {¿Sobrevive el commit al crash?\\\textbf{WAL}};
-\node[uaSoft,text width=2.2cm,minimum height=1.25cm,right=of a] (b) {¿Qué versión puede leer cada transacción?\\\textbf{MVCC}};
-\node[uaSoft,text width=2.2cm,minimum height=1.25cm,right=of b] (c) {¿Qué ruta usará la consulta?\\\textbf{EXPLAIN}};
-\node[uaSoft,text width=2.2cm,minimum height=1.25cm,right=of c] (d) {¿Dónde se paga el orden diferido?\\\textbf{Compaction}};
-\node[uaOrange,text width=2.2cm,minimum height=1.25cm,right=of d] (e) {¿Cómo se protege el motor saturado?\\\textbf{Stall}};
-\draw[uaOrangeArrow] (a)--(b);
-\draw[uaArrow] (b)--(c);
-\draw[uaArrow] (c)--(d);
-\draw[uaOrangeArrow] (d)--(e);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Orden pedagógico}
-Ya sabemos qué significa cada término y por qué existe. Ahora vamos a justificar sus reglas, analizar crashes y aprender a leer evidencia real.
-\end{block}
-\end{frame}
-
-% =============================================================================
-\UASectionSlide{WAL: durabilidad mediante\\un orden físico}
-
-\begin{frame}{Caso conductor: compra confirmada, energía cortada}
-\UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{columns}[T]
-\column{0.58\textwidth}
+\column{0.54\textwidth}
 \begin{uakeybox}
-A las 12:43:18, una estudiante compra el almuerzo. La API responde \texttt{200 OK}. Un segundo después, el servidor pierde energía.
+La operación con ID \textbf{9F2A} inserta una fila en \texttt{purchases}, descuenta una unidad en \texttt{inventory} y actualiza un índice por estudiante y fecha.
 \end{uakeybox}
-\begin{enumerate}
-\item ¿Qué debe haber cruzado una frontera durable?
-\item ¿Puede la página de la tabla seguir en memoria?
-\item ¿Cómo distingue recovery una transacción confirmada de una incompleta?
-\end{enumerate}
-\column{0.38\textwidth}
+\begin{itemize}
+\item 9F2A identifica la misma compra lógica si el cliente reintenta.
+\item Las filas viven lógicamente en tablas.
+\item El motor modifica páginas en memoria.
+\item El WAL conserva evidencia para la recuperación.
+\end{itemize}
+\column{0.42\textwidth}
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaOrange,minimum width=3.1cm] (app) {App del estudiante};
-\node[uaSoft,below=of app,minimum width=3.1cm] (api) {API de compras};
-\node[uaSoft,below=of api,minimum width=3.1cm] (wal) {WAL};
-\node[uaSoft,below=of wal,minimum width=3.1cm] (page) {Páginas de datos};
-\draw[uaArrow] (app)--(api);
-\draw[uaArrow] (api)--(wal);
-\draw[uaArrow] (wal)--(page);
+\begin{tikzpicture}[node distance=0.22cm]
+\node[uaOrange,text width=3.25cm] (op) {Solicitud\\ID de operación 9F2A};
+\node[uaSoft,text width=3.25cm,below=of op] (p) {\texttt{purchases}: nueva fila};
+\node[uaSoft,text width=3.25cm,below=of p] (i) {\texttt{inventory}: stock $-1$};
+\node[uaSoft,text width=3.25cm,below=of i] (idx) {índice: nueva entrada};
+\node[uaOrange,text width=3.25cm,below=of idx] (wal) {WAL: cambios + COMMIT};
+\draw[uaArrow] (op)--(p);
+\draw[uaArrow] (p)--(i);
+\draw[uaArrow] (i)--(idx);
+\draw[uaOrangeArrow] (idx)--(wal);
 \end{tikzpicture}
 \end{center}
 \end{columns}
 \end{frame}
 
-\begin{frame}{No todo ``write'' cruzó la frontera durable}
+\begin{frame}{La frontera durable: definición antes de usarla}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.42\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=0.25cm]
+\node[uaSoft,minimum width=3.0cm] (app) {Aplicación};
+\node[uaSoft,below=of app,minimum width=3.0cm] (proc) {Buffer del proceso};
+\node[uaSoft,below=of proc,minimum width=3.0cm] (os) {Caché del sistema operativo};
+\node[uaSoft,below=of os,minimum width=3.0cm] (dev) {Caché del dispositivo};
+\node[uaOrange,below=0.55cm of dev,minimum width=3.0cm] (media) {Medio persistente};
+\draw[uaArrow] (app)--(proc);
+\draw[uaArrow] (proc)--(os);
+\draw[uaArrow] (os)--(dev);
+\draw[uaOrangeArrow] (dev)--node[right,uaTiny,text=UAIngOrange]{cruce durable}(media);
+\end{tikzpicture}
+\end{center}
+\column{0.54\textwidth}
+\begin{block}{Definición}
+La \textbf{frontera durable} es el punto a partir del cual, bajo el modelo de falla declarado, permanece disponible la evidencia necesaria para reconstruir la operación.
+\end{block}
+\begin{alertblock}{No existe una frontera universal}
+Depende de la falla considerada y de la semántica efectiva de \texttt{fsync}, del sistema operativo, del controlador, del dispositivo y de su configuración.
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Qué es WAL y por qué está separado de las páginas}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.47\textwidth}
+\begin{block}{Definición intuitiva}
+WAL es el registro secuencial del motor. Primero conserva la evidencia que permitirá reconstruir una decisión; después, las páginas pueden escribirse en el orden físico más conveniente.
+\end{block}
+\begin{block}{Definición técnica}
+El registro anticipado de escritura impone dos órdenes: la evidencia de recuperación debe volverse durable antes que la página modificada; además, el COMMIT debe volverse durable antes de enviar el ACK.
+\end{block}
+\column{0.49\textwidth}
+\begin{center}
+\begin{tikzpicture}[x=0.92cm,y=0.92cm]
+\node[uaOrange,text width=3.35cm] (txn) at (0,2.35) {Gestor transaccional};
+\node[uaSoft,text width=3.05cm] (wal1) at (-2.05,1.10) {1. Agrega cambios\\al archivo WAL};
+\node[uaSoft,text width=3.05cm] (buf) at (2.05,1.10) {2. Modifica páginas\\en memoria};
+\node[uaOrange,text width=3.05cm] (wald) at (-2.05,-0.20) {Log durable\\después del flush};
+\node[uaSoft,text width=3.05cm] (pages) at (2.05,-0.20) {Páginas persistidas\\más adelante};
+\node[uaSoft,text width=4.0cm] (rec) at (0,-1.55) {Recuperación: usa el WAL durable\\para completar páginas atrasadas};
+\draw[uaOrangeArrow] (txn.south west)--(wal1.north);
+\draw[uaArrow] (txn.south east)--(buf.north);
+\draw[uaOrangeArrow] (wal1)--(wald);
+\draw[uaArrow] (buf)--(pages);
+\draw[uaArrow] (wald.south)--(rec.north west);
+\draw[uaOrangeArrow] (rec.north east)--(pages.south);
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\end{frame}
+
+\begin{frame}{WAL: dos reglas, dos fallas que evitan}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Regla 1 --- log antes que página}
+\textbf{Orden:} registro WAL $\rightarrow$ flush durable $\rightarrow$ página de datos.
+\end{block}
+\begin{itemize}
+\item \textbf{Propósito:} que toda página persistida tenga evidencia suficiente para ser interpretada o rehecha.
+\item \textbf{Falla evitada:} una página nueva sin registro recuperable del cambio que la produjo.
+\end{itemize}
+\column{0.48\textwidth}
+\begin{block}{Regla 2 --- COMMIT antes que ACK}
+\textbf{Orden:} registro COMMIT $\rightarrow$ flush durable $\rightarrow$ ACK al cliente.
+\end{block}
+\begin{itemize}
+\item \textbf{Propósito:} que cada confirmación enviada pueda reconstruirse tras un crash.
+\item \textbf{Falla evitada:} mostrar ``confirmada'' y perder luego la decisión de COMMIT.
+\end{itemize}
+\end{columns}
+\begin{uakeybox}
+Garantía buscada: después de la recuperación aparecen todas las transacciones confirmadas y ninguna transacción incompleta se presenta como confirmada.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Por qué WAL aparece como un carril propio en el timeline}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
-\begin{tikzpicture}[node distance=0.35cm and 0.9cm]
-\node[uaSoft,minimum width=3.0cm] (app) {Aplicación};
-\node[uaSoft,below=of app,minimum width=3.0cm] (buf) {Buffer del proceso};
-\node[uaSoft,below=of buf,minimum width=3.0cm] (page) {Page cache del SO};
-\node[uaSoft,below=of page,minimum width=3.0cm] (ctrl) {Cache del dispositivo};
-\node[uaOrange,below=of ctrl,minimum width=3.0cm] (media) {Medio persistente};
-\draw[uaArrow] (app)--(buf);
-\draw[uaArrow] (buf)--(page);
-\draw[uaArrow] (page)--(ctrl);
-\draw[uaOrangeArrow] (ctrl)--(media);
-\node[uaSoft,text width=5.0cm,align=left,right=1.2cm of page] (note) {Una llamada a \texttt{write()} puede terminar cuando los bytes todavía están en una capa volátil.\\[2mm]\textbf{Pregunta correcta:} ¿qué capa confirmó y qué falla tolera esa confirmación?};
-\draw[uaOrangeArrow] (note.west)--(page.east);
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[uaOrange,text width=1.65cm] (client) at (-5.35,0.35) {Cliente};
+\node[uaSoft,text width=1.95cm] (service) at (-3.15,0.35) {Servicio de aplicación};
+\node[draw=UAIngOrange,rounded corners=2mm,minimum width=8.05cm,minimum height=2.85cm] at (1.80,0.20) {};
+\node[uaTiny,text=UAIngOrange,anchor=south] at (1.80,1.72) {un único motor de almacenamiento};
+\node[uaSoft,text width=2.05cm] (txn) at (-0.65,1.00) {Gestor transaccional};
+\node[uaSoft,text width=2.05cm] (wal) at (2.05,1.00) {Archivo WAL};
+\node[uaSoft,text width=2.05cm] (mem) at (-0.65,-0.55) {Páginas en memoria};
+\node[uaOrange,text width=2.20cm] (pages) at (2.05,-0.55) {Páginas e índices persistentes};
+\node[uaSoft,text width=1.85cm] (rec) at (4.80,0.20) {Recuperación};
+\draw[uaOrangeArrow] (client)--(service);
+\draw[uaArrow] (service.east)--(txn.west);
+\draw[uaArrow] (txn)--(wal);
+\draw[uaArrow] (txn)--(mem);
+\draw[uaOrangeArrow] (mem)--(pages);
+\draw[uaArrow] (wal.east)--(rec.north west);
+\draw[uaOrangeArrow] (rec.south west)--(pages.east);
 \end{tikzpicture}
 \end{center}
-\SourceLine{La frontera real depende de SO, \texttt{fsync}, controlador, dispositivo y configuración.}
-\end{frame}
-
-\begin{frame}{Write-Ahead Logging: dos órdenes que no se pueden invertir}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\vspace{-0.10cm}
 \begin{columns}[T]
 \column{0.48\textwidth}
-\begin{block}{Regla 1 --- página}
-El registro que permite rehacer la modificación debe ser durable \textbf{antes} de que la página modificada pueda llegar al archivo de datos.
-\end{block}
+\begin{itemize}
+\item \textbf{1. Registrar:} el gestor agrega evidencia al WAL.
+\item \textbf{2. Modificar:} las páginas cambian primero en memoria.
+\end{itemize}
 \column{0.48\textwidth}
-\begin{block}{Regla 2 --- cliente}
-El registro de \texttt{COMMIT} debe ser durable \textbf{antes} de confirmar éxito al cliente.
-\end{block}
+\begin{itemize}
+\item \textbf{3. Materializar:} las páginas se escriben después.
+\item \textbf{4. Recuperar:} tras un crash, el WAL permite completarlas.
+\end{itemize}
 \end{columns}
-\vspace{0.25cm}
-\begin{center}
-\begin{tikzpicture}[node distance=0.55cm]
-\node[uaSoft,text width=2.25cm] (r) {WAL UPDATE};
-\node[uaOrange,text width=2.25cm,right=of r] (f) {flush WAL};
-\node[uaSoft,text width=2.25cm,right=of f] (ack) {ACK};
-\node[uaSoft,text width=2.25cm,below=0.65cm of f] (p) {página diferida};
-\draw[uaArrow] (r)--(f);
-\draw[uaOrangeArrow] (f)--(ack);
-\draw[uaArrow] (f)--(p);
-\end{tikzpicture}
-\end{center}
+
 \end{frame}
 
-\begin{frame}{Timeline WAL vacío: cuatro carriles, una pregunta}
+\begin{frame}{Timeline WAL vacío: ubique primero las fronteras}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{center}
-\begin{tikzpicture}[x=1.05cm,y=0.8cm]
-\foreach \y/\lab in {3/{Cliente},2/{Backend},1/{WAL},0/{Página}}{
-  \node[uaTiny,anchor=east] at (0.35,\y){\lab};
-  \draw[uaLane] (0.55,\y)--(10.0,\y);
+\begin{tikzpicture}[x=0.92cm,y=0.67cm]
+\foreach \y/\lab in {4/{Cliente},3/{Servicio},2/{Motor / memoria},1/{Archivo WAL},0/{Páginas / índices}}{
+  \node[uaTiny,anchor=east] at (0.55,\y){\lab};
+  \draw[uaLane] (0.75,\y)--(10.6,\y);
 }
-\draw[->,thick,UAIngNavy] (0.55,-0.55)--(10.0,-0.55) node[right,uaTiny]{tiempo};
-\foreach \x in {1.3,2.5,3.7,4.9,6.1,7.3,8.5,9.4}{\draw[UAIngRule] (\x,-0.45)--(\x,-0.65);}
-\node[uaLabel,text width=9.0cm] at (5.2,3.65){Ubique: request, WAL de actualización, dirty page, COMMIT, flush, ACK, crash y REDO.};
+\draw[->,thick,UAIngNavy] (0.75,-0.62)--(10.6,-0.62) node[right,uaTiny]{tiempo};
+\node[uaLabel,text width=9.1cm] at (5.55,4.55){Ubique: solicitud, cambios, página sucia, registro COMMIT, flush durable, ACK, crash y REDO.};
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Predicción}
-¿En qué columna sería legítimo mostrar ``compra confirmada'' sin depender de que la página final ya esté escrita?
+¿Qué evento debe haberse completado antes de mostrar ``compra confirmada''? Marque también qué carriles pertenecen al mismo motor de almacenamiento.
 \end{alertblock}
 \end{frame}
 
 \begin{frame}{Construcción progresiva del timeline WAL}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[x=1.05cm,y=0.78cm]
-\foreach \y/\lab in {3/{Cliente},2/{Backend},1/{WAL},0/{Página}}{
-  \node[uaTiny,anchor=east] at (0.35,\y){\lab};
-  \draw[uaLane] (0.55,\y)--(10.0,\y);
+\begin{tikzpicture}[x=0.92cm,y=0.66cm]
+\foreach \y/\lab in {4/{Cliente},3/{Servicio},2/{Motor / memoria},1/{WAL},0/{Páginas / índices}}{
+  \node[uaTiny,anchor=east] at (0.55,\y){\lab};
+  \draw[uaLane] (0.75,\y)--(10.6,\y);
 }
-\draw[->,thick,UAIngNavy] (0.55,-0.58)--(10.0,-0.58) node[right,uaTiny]{tiempo};
-\uncover<1->{\node[uaEventOrange] at (1.25,3){}; \node[uaTiny,above=0.12cm] at (1.25,3){request}; \draw[uaOrangeArrow] (1.25,2.86)--(1.25,2.14);}
-\uncover<2->{\node[uaEvent] at (2.45,1){}; \node[uaTiny,below=0.12cm] at (2.45,1){WAL UPDATE}; \draw[uaArrow] (2.45,1.86)--(2.45,1.14);}
-\uncover<3->{\node[uaEvent] at (3.65,0){}; \node[uaTiny,below=0.12cm] at (3.65,0){dirty page}; \draw[uaArrow] (3.65,1.86)--(3.65,0.14);}
-\uncover<4->{\node[uaEvent] at (4.85,1){}; \node[uaTiny,above=0.12cm] at (4.85,1){COMMIT}; \draw[uaArrow] (4.85,1.86)--(4.85,1.14);}
-\uncover<5->{\draw[very thick,UAIngOrange] (5.75,-0.15)--(5.75,3.25); \node[uaTiny,above=0.10cm,text=UAIngOrange] at (5.75,3.25){flush}; \draw[very thick,UAIngOrange] (2.45,0.72)--(5.75,0.72);}
-\uncover<6->{\node[uaEventOrange] at (6.75,3){}; \node[uaTiny,above=0.12cm] at (6.75,3){ACK}; \draw[uaOrangeArrow] (6.75,2.14)--(6.75,2.86);}
-\uncover<7->{\draw[very thick,UAIngNavy,dashed] (7.75,-0.15)--(7.75,3.25); \node[uaTiny,above=0.10cm] at (7.75,3.25){CRASH};}
-\uncover<8->{\node[uaEventOrange] at (8.85,0){}; \node[uaTiny,below=0.12cm] at (8.85,0){REDO}; \draw[uaOrangeArrow] (8.85,0.86)--(8.85,0.14);}
-\uncover<5->{\node[uaTiny,text=UAIngOrange] at (4.10,0.46){historia recuperable};}
+\draw[->,thick,UAIngNavy] (0.75,-0.62)--(10.6,-0.62) node[right,uaTiny]{tiempo};
+
+\uncover<1->{
+  \node[uaEventBoxOrange] (e1) at (1.35,4) {1. solicitud\,9F2A};
+  \draw[uaOrangeArrow] (e1.south)--(1.35,3.08);
+}
+\uncover<2->{
+  \node[uaEventBox] (e2) at (2.35,2) {2. preparar\\cambios};
+  \draw[uaArrow] (2.35,2.92)--(e2.north);
+}
+\uncover<3->{
+  \node[uaEventBox] (e3) at (3.40,1) {3. WAL\\UPDATE};
+  \draw[uaArrow] (3.40,1.92)--(e3.north);
+}
+\uncover<4->{
+  \node[uaEventBox] (e4) at (4.45,0) {4. páginas\\sucias};
+  \draw[uaArrow] (4.45,1.92)--(e4.north);
+}
+\uncover<5->{
+  \node[uaEventBox] (e5) at (5.45,1) {5. registro\\COMMIT};
+  \draw[uaArrow] (5.45,1.92)--(e5.north);
+}
+\uncover<6->{
+  \draw[very thick,UAIngOrange] (6.55,-0.15)--(6.55,4.18);
+  \node[uaEventBoxOrange,anchor=south] at (6.55,4.25) {6. flush durable};
+}
+\uncover<7->{
+  \node[uaEventBoxOrange] (e7) at (7.55,4) {7. ACK\\confirmada};
+  \draw[uaOrangeArrow] (7.55,3.08)--(e7.south);
+}
+\uncover<8->{
+  \draw[very thick,UAIngNavy,dashed] (8.55,-0.15)--(8.55,4.18);
+  \node[uaEventBox,anchor=south] at (8.55,4.25) {8. crash};
+}
+\uncover<9->{
+  \node[uaEventBoxOrange] (e9) at (9.65,0) {9. REDO};
+  \draw[uaOrangeArrow] (9.65,0.92)--(e9.north);
+}
 \end{tikzpicture}
 \end{center}
-\only<1>{\begin{block}{Paso 1}Llega una intención lógica. El request ID permite reconocer retries de la misma compra.\end{block}}
-\only<2>{\begin{block}{Paso 2}El WAL describe el cambio. Aún puede estar solo en buffers.\end{block}}
-\only<3>{\begin{block}{Paso 3}La página se modifica en memoria; todavía no hace falta escribirla al SSD.\end{block}}
-\only<4>{\begin{block}{Paso 4}El commit ya está en el log, pero todavía no es durable.\end{block}}
-\only<5>{\begin{block}{Paso 5}El flush cruza la frontera durable: recovery puede reconstruir la decisión.\end{block}}
-\only<6>{\begin{block}{Paso 6}Ahora el ACK puede prometer durabilidad bajo el modelo declarado.\end{block}}
-\only<7>{\begin{block}{Paso 7}La energía cae con la página aún atrasada.\end{block}}
-\only<8>{\begin{block}{Paso 8}Recovery ejecuta REDO y materializa la compra sin inventar una transacción nueva.\end{block}}
+\only<1>{\begin{block}{Paso 1}El cliente envía una intención con identidad estable.\end{block}}
+\only<2>{\begin{block}{Paso 2}El motor prepara cambios lógicos en memoria.\end{block}}
+\only<3>{\begin{block}{Paso 3}El WAL describe cómo rehacerlos; todavía puede estar en buffers.\end{block}}
+\only<4>{\begin{block}{Paso 4}Las páginas se modifican en memoria y quedan sucias.\end{block}}
+\only<5>{\begin{block}{Paso 5}El registro COMMIT expresa la decisión, pero aún no es durable.\end{block}}
+\only<6>{\begin{block}{Paso 6}El flush lleva el WAL relevante más allá de la frontera durable declarada.\end{block}}
+\only<7>{\begin{block}{Paso 7}Ahora el servicio puede confirmar sin esperar que todas las páginas estén escritas.\end{block}}
+\only<8>{\begin{block}{Paso 8}El crash borra memoria y buffers volátiles.\end{block}}
+\only<9>{\begin{block}{Paso 9}Recuperación lee el WAL y REDO materializa en las páginas los cambios confirmados que faltan.\end{block}}
 \end{frame}
 
-\begin{frame}{Tres crashes, tres resultados correctos}
+\begin{frame}{Criterio de corrección de recuperación: todas y solo las confirmadas}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
+\scriptsize
 \begin{center}
-\begin{tabular}{p{0.23\textwidth}p{0.29\textwidth}p{0.38\textwidth}}
+\begin{tabular}{p{0.24\textwidth}p{0.28\textwidth}p{0.39\textwidth}}
 \toprule
-Punto de crash & Evidencia durable & Resultado de recovery \\
+Punto del crash & Evidencia durable disponible & Resultado correcto después de recuperar \\
 \midrule
-Antes de COMMIT durable & Puede existir UPDATE; no hay decisión durable & No presentar la compra como confirmada. \\
-Después de COMMIT durable, antes de la página & WAL de cambio + COMMIT & REDO: reaplicar el estado confirmado. \\
-Después de página y COMMIT & Página + WAL & Verificar y repetir REDO de forma idempotente si fuera necesario. \\
+Antes del COMMIT durable & Puede haber registros de cambio, pero no una decisión durable de COMMIT & La compra no aparece confirmada; el trabajo incompleto se descarta o revierte según el diseño. \\
+Después del COMMIT durable, antes de escribir páginas & Registros de cambio y COMMIT en el WAL durable & REDO reconstruye pedido, stock e índice. \\
+Después del COMMIT y de las páginas & WAL y páginas ya están materializados & La recuperación verifica el estado; repetir REDO no debe producir un segundo efecto lógico. \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{block}{Invariante}
-La base recuperada debe corresponder a una historia posible de transacciones confirmadas, no a una mezcla de medias transacciones.
-\end{block}
+\begin{uakeybox}
+Los tres resultados son correctos porque aplican el mismo criterio: conservar todas las transacciones confirmadas y no convertir una transacción incompleta en confirmada.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Group commit: una espera física, varios commits lógicos}
+\begin{frame}{Group commit: compartir el costo sin debilitar la garantía}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm and 0.75cm]
-\node[uaSoft,text width=2.0cm] (t1) {T1 compra};
-\node[uaSoft,text width=2.0cm,below=of t1] (t2) {T2 pago};
-\node[uaSoft,text width=2.0cm,below=of t2] (t3) {T3 reserva};
-\node[uaSoft,text width=3.1cm,right=1.0cm of t2] (buf) {WAL buffer\\T1 COMMIT\\T2 COMMIT\\T3 COMMIT};
-\node[uaOrange,text width=2.6cm,right=1.0cm of buf] (fs) {un \texttt{fsync}\\amortizado};
+\begin{tikzpicture}[node distance=0.25cm and 0.55cm]
+\node[uaSoft,text width=2.15cm] (t1) {$T_1$ compra};
+\node[uaSoft,text width=2.15cm,below=of t1] (t2) {$T_2$ pago};
+\node[uaSoft,text width=2.15cm,below=of t2] (t3) {$T_3$ reserva};
+\node[uaSoft,text width=2.85cm,right=0.75cm of t2] (buf) {Buffer WAL\\tres COMMIT};
+\node[uaOrange,text width=2.35cm,right=0.55cm of buf] (fs) {un flush durable\\compartido};
+\node[uaSoft,text width=2.35cm,right=0.55cm of fs] (acks) {tres ACK\\después del flush};
 \draw[uaArrow] (t1.east)--(buf.west);
 \draw[uaArrow] (t2.east)--(buf.west);
 \draw[uaArrow] (t3.east)--(buf.west);
 \draw[uaOrangeArrow] (buf)--(fs);
+\draw[uaArrow] (fs)--(acks);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Trade-off}
-Mayor throughput y menor costo por commit, a cambio de una pequeña espera para formar el grupo. La garantía no se debilita si cada ACK sale después del mismo flush durable.
-\end{block}
+\begin{uakeybox}
+\textbf{Ganancia:} un acceso físico amortiza varios COMMIT. \quad
+\textbf{Costo:} cada transacción puede esperar brevemente.\\[2pt]
+\textbf{Garantía:} cada ACK sigue saliendo solamente después de que su COMMIT quedó durable.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Checkpoints: acortar la historia que recovery debe reproducir}
+\begin{frame}{Checkpoint: un punto durable desde donde comenzar recuperación}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
-\begin{tikzpicture}[x=1.0cm,y=0.75cm]
-\draw[->,thick,UAIngNavy] (0,0)--(9.1,0) node[right,uaTiny]{LSN / tiempo};
-\draw[very thick,UAIngMuted] (0.8,0)--(5.5,0);
-\draw[very thick,UAIngOrange] (5.5,0)--(8.5,0);
-\draw[very thick,UAIngNavy] (5.5,-0.45)--(5.5,0.55);
-\draw[very thick,UAIngOrange] (8.5,-0.45)--(8.5,0.55);
-\node[uaTiny,above=0.10cm] at (5.5,0.55){checkpoint};
-\node[uaTiny,above=0.10cm] at (8.5,0.55){crash};
-\node[uaTiny,below=0.15cm] at (3.1,0){páginas ya materializadas};
-\node[uaTiny,below=0.15cm,text=UAIngOrange] at (7.0,0){WAL a reproducir};
+\begin{tikzpicture}[x=0.93cm,y=0.72cm]
+\draw[->,thick,UAIngNavy] (0,0)--(9.4,0) node[right,uaTiny]{LSN / progreso};
+\fill[UAIngPaper] (0.7,-0.42) rectangle (4.0,0.42);
+\fill[UAIngOrange!18] (4.0,-0.42) rectangle (8.4,0.42);
+\draw[very thick,UAIngNavy] (4.0,-0.65)--(4.0,0.80);
+\draw[very thick,UAIngOrange] (8.4,-0.65)--(8.4,0.80);
+\node[uaTiny] at (2.35,0){páginas materializadas};
+\node[uaTiny,text=UAIngOrange] at (6.20,0){WAL que debe reproducirse};
+\node[uaTiny,above=0.08cm] at (4.0,0.80){checkpoint};
+\node[uaTiny,text=UAIngOrange,above=0.08cm] at (8.4,0.80){crash};
 \end{tikzpicture}
 \end{center}
-\begin{columns}[T]
-\column{0.48\textwidth}\begin{block}{Más frecuentes}Recovery menor; más presión de I/O y posible jitter durante operación.\end{block}
-\column{0.48\textwidth}\begin{block}{Más espaciados}Camino normal más suave; más WAL retenido y recovery más largo.\end{block}
-\end{columns}
+\begin{block}{Qué es}
+Registra suficiente progreso durable para que la recuperación no comience desde el origen del WAL.
+\end{block}
+\begin{itemize}
+\item \textbf{Más frecuente:} menos WAL por reproducir, pero más entrada/salida y posibles picos.
+\item \textbf{Más espaciado:} operación normal más suave, pero recuperación y retención mayores.
+\end{itemize}
 \end{frame}
 
 \begin{frame}{Caso real: PostgreSQL desacopla COMMIT de las páginas}
@@ -447,130 +716,173 @@ Mayor throughput y menor costo por commit, a cambio de una pequeña espera para 
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{itemize}
-\item El WAL correspondiente debe llegar a almacenamiento estable antes que los cambios de archivos de datos.
-\item Tras un crash, el motor reproduce WAL desde un punto de recuperación para restaurar consistencia.
-\item El hardware y la configuración forman parte de la garantía: un dispositivo que ``miente'' sobre flush puede romperla.
+\item El WAL relevante debe llegar a almacenamiento estable antes que los cambios de archivos de datos.
+\item Tras un crash, recuperación reproduce WAL para restaurar un estado válido.
+\item Las páginas de tablas e índices pueden estar atrasadas respecto del COMMIT.
+\item Hardware y configuración forman parte de la garantía efectiva.
 \end{itemize}
 \column{0.38\textwidth}
 \begin{center}
-\begin{tikzpicture}[node distance=0.4cm]
+\begin{tikzpicture}[node distance=0.35cm]
 \node[uaSoft,minimum width=3.2cm] (wal) {WAL secuencial};
-\node[uaOrange,below=of wal,minimum width=3.2cm] (flush) {flush / commit};
-\node[uaSoft,below=of flush,minimum width=3.2cm] (pages) {páginas diferidas};
-\node[uaSoft,below=of pages,minimum width=3.2cm] (redo) {recovery / REDO};
+\node[uaOrange,below=of wal,minimum width=3.2cm] (flush) {COMMIT durable};
+\node[uaSoft,below=of flush,minimum width=3.2cm] (pages) {páginas atrasadas};
+\node[uaSoft,below=of pages,minimum width=3.2cm] (redo) {recuperación / REDO};
 \draw[uaArrow] (wal)--(flush);
 \draw[uaArrow] (flush)--(pages);
 \draw[uaOrangeArrow] (pages)--(redo);
 \end{tikzpicture}
 \end{center}
 \end{columns}
-\SourceLine{PostgreSQL, documentación oficial sobre Write-Ahead Logging y recovery.}
+\SourceLine{PostgreSQL, documentación oficial sobre Write-Ahead Logging y recuperación.}
 \end{frame}
 
-\begin{frame}{Checkpoint de comprensión: WAL}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}{Checkpoint de comprensión: WAL y recuperación}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{enumerate}
-\item ¿Qué debe ser durable antes del ACK?
-\item ¿Por qué la página puede seguir atrasada?
-\item ¿Qué resuelve WAL y qué problemas quedan fuera?
+\item Defina con sus palabras la frontera durable para el caso CampusShop.
+\item Explique por qué una página puede seguir en memoria después de un COMMIT correcto.
+\item Mueva el crash a tres puntos del timeline y prediga el estado recuperado.
+\item Explique qué garantiza WAL y qué queda a cargo de replicación, backups e idempotencia.
 \end{enumerate}
-\pause
-\begin{block}{Respuesta esperada}
-El commit y la información de REDO; porque la página puede reconstruirse; WAL resuelve recovery local bajo su modelo, pero no reemplaza replicación, backups, consistencia global ni idempotencia.
-\end{block}
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{MVCC: historia para reducir esperas}
+\UASectionSlide{MVCC: acceder concurrentemente\\a una historia coherente}
 
-\begin{frame}{Caso: un reporte largo mientras siguen entrando compras}
+\begin{frame}{Problema antes del mecanismo: un reporte y 900 compras nuevas}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{columns}[T]
-\column{0.58\textwidth}
 \begin{uakeybox}
-Un reporte del comedor tarda 40 segundos. Durante ese tiempo entran 900 compras nuevas. ¿Debe mezclar estados de momentos distintos? ¿Debe bloquear todas las escrituras?
+Un reporte del comedor comienza a las 12:00 y tarda 40 segundos. Durante ese intervalo entran 900 compras. ¿Debe mezclar filas de momentos distintos? ¿Debe bloquear a todos los escritores?
 \end{uakeybox}
-\begin{block}{Respuesta de MVCC}
-Cada escritura crea una versión; cada lectura conserva una fotografía coherente definida por su snapshot.
-\end{block}
-\column{0.38\textwidth}
 \begin{center}
-\begin{tikzpicture}[node distance=0.4cm]
-\node[uaSoft,minimum width=3.1cm] (v1) {v1: total = 120};
-\node[uaOrange,below=of v1,minimum width=3.1cm] (v2) {v2: total = 135};
-\node[uaSoft,below=of v2,minimum width=3.1cm] (r) {dos snapshots\\dos vistas coherentes};
-\draw[uaArrow] (v1)--(v2);
-\draw[uaOrangeArrow] (v2)--(r);
+\begin{tikzpicture}[node distance=0.55cm and 0.7cm]
+\node[uaOrange,text width=2.8cm] (report) {Reporte largo\\inicia 12:00};
+\node[uaSoft,text width=2.8cm,right=of report] (writes) {900 escrituras\\12:00--12:00:40};
+\node[uaSoft,text width=3.1cm,right=of writes] (question) {¿Bloquear escritores, mezclar momentos o conservar una vista coherente?};
+\draw[uaOrangeArrow] (report)--(writes);
+\draw[uaArrow] (writes)--(question);
 \end{tikzpicture}
 \end{center}
-\end{columns}
 \end{frame}
 
-\begin{frame}{Timeline MVCC vacío: cuatro carriles}
+\begin{frame}{Vocabulario de MVCC antes del timeline}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.20\textwidth}p{0.68\textwidth}}
+\toprule
+Término & Definición de trabajo \\
+\midrule
+Versión & Representación de una fila creada por una transacción y válida para determinados lectores. \\
+Transacción lectora & Operación que consulta datos bajo una regla de visibilidad. \\
+Transacción escritora & Operación que crea una versión nueva y no borra de inmediato la anterior. \\
+Snapshot & Instantánea lógica que determina qué transacciones confirmadas y qué versiones son visibles. \\
+Visibilidad & Decisión de si una versión pertenece a la historia que ese snapshot puede observar. \\
+Vista coherente & Resultado cuyas filas se seleccionan con la misma regla de visibilidad. \\
+Serializabilidad & Garantía de que la ejecución concurrente equivale a alguna ejecución serial de las transacciones. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{alertblock}{Límite de la metáfora}
+``Fotografía'' no significa copiar toda la base. Tampoco implica serializabilidad por sí sola: describe una regla para elegir versiones.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{MVCC en una imagen: dos lectores, dos vistas coherentes}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.38cm and 0.55cm]
+\node[uaOrange,text width=3.2cm] (before) {Antes\\v1 = 120 ya está confirmada};
+\node[uaSoft,text width=3.4cm,right=of before] (writer) {Escritor\\crea v2 = 135 y ejecuta COMMIT};
+\node[uaSoft,text width=3.25cm,right=of writer,yshift=0.65cm] (old) {Reporte iniciado antes\\sigue leyendo v1};
+\node[uaSoft,text width=3.25cm,right=of writer,yshift=-0.65cm] (new) {Lectura iniciada después\\puede leer v2};
+\draw[uaOrangeArrow] (before)--(writer);
+\draw[uaArrow] (writer.east)--++(0.28,0)--(old.west);
+\draw[uaOrangeArrow] (writer.east)--++(0.28,0)--(new.west);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Idea central}
+MVCC conserva versiones y aplica reglas de visibilidad. Dos lectores pueden observar versiones diferentes sin que el reporte antiguo cambie a mitad de ejecución.
+\end{block}
+\end{frame}
+
+\begin{frame}{Timeline MVCC vacío: cuatro carriles y términos conocidos}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{center}
-\begin{tikzpicture}[x=1.05cm,y=0.8cm]
+\begin{tikzpicture}[x=1.0cm,y=0.78cm]
 \foreach \y/\lab in {3/{Lector $T_R$},2/{Escritor $T_W$},1/{Versiones},0/{Lectura visible}}{
-  \node[uaTiny,anchor=east] at (0.55,\y){\lab};
-  \draw[uaLane] (0.75,\y)--(10.0,\y);
+  \node[uaTiny,anchor=east] at (0.65,\y){\lab};
+  \draw[uaLane] (0.85,\y)--(10.1,\y);
 }
-\draw[->,thick,UAIngNavy] (0.75,-0.55)--(10.0,-0.55) node[right,uaTiny]{tiempo};
-\foreach \x in {1.4,2.6,3.8,5.0,6.2,7.4,8.6,9.4}{\draw[UAIngRule] (\x,-0.45)--(\x,-0.65);}
-\node[uaLabel,text width=9.0cm] at (5.3,3.65){Ubique: v1, inicio del snapshot, primera lectura, creación de v2, commit, segunda lectura, fin y reclamación.};
+\draw[->,thick,UAIngNavy] (0.85,-0.58)--(10.1,-0.58) node[right,uaTiny]{tiempo};
+\node[uaLabel,text width=8.9cm] at (5.4,3.62){Ubique: v1, inicio del snapshot, lectura, creación de v2, COMMIT, segunda lectura, fin y reclamación.};
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Predicción}
-Después del commit de v2, ¿qué debe leer una segunda consulta dentro del mismo reporte $T_R$?
+Después del COMMIT de v2, ¿qué lee una segunda consulta dentro del mismo reporte y qué lee un reporte nuevo?
 \end{alertblock}
 \end{frame}
 
 \begin{frame}{Construcción progresiva del timeline MVCC}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[x=1.05cm,y=0.77cm]
+\begin{tikzpicture}[x=1.0cm,y=0.76cm]
 \foreach \y/\lab in {3/{Lector $T_R$},2/{Escritor $T_W$},1/{Versiones},0/{Lectura visible}}{
-  \node[uaTiny,anchor=east] at (0.55,\y){\lab};
-  \draw[uaLane] (0.75,\y)--(10.0,\y);
+  \node[uaTiny,anchor=east] at (0.65,\y){\lab};
+  \draw[uaLane] (0.85,\y)--(10.1,\y);
 }
-\draw[->,thick,UAIngNavy] (0.75,-0.58)--(10.0,-0.58) node[right,uaTiny]{tiempo};
-\uncover<1->{\node[uaEvent] at (1.35,1){}; \node[uaTiny,above=0.12cm] at (1.35,1){v1 = 120};}
-\uncover<2->{\node[uaEventOrange] at (2.45,3){}; \node[uaTiny,above=0.12cm] at (2.45,3){inicia};}
-\uncover<3->{\node[uaEvent] at (3.55,0){}; \node[uaTiny,below=0.12cm] at (3.55,0){lee v1}; \draw[uaArrow] (3.55,2.86)--(3.55,0.14);}
-\uncover<4->{\node[uaEvent] at (4.75,2){}; \node[uaTiny,above=0.12cm] at (4.75,2){crea v2}; \node[uaEvent] at (4.75,1){}; \draw[uaArrow] (4.75,1.86)--(4.75,1.14);}
-\uncover<5->{\node[uaEventOrange] at (5.95,2){}; \node[uaTiny,above=0.12cm] at (5.95,2){commit};}
-\uncover<6->{\node[uaEvent] at (7.15,0){}; \node[uaTiny,below=0.12cm] at (7.15,0){$T_R$ lee v1}; \node[uaTiny,above=0.14cm,text=UAIngOrange] at (7.15,1){nuevo lector: v2};}
-\uncover<7->{\node[uaEventOrange] at (8.35,3){}; \node[uaTiny,above=0.12cm] at (8.35,3){termina};}
-\uncover<8->{\node[uaEventOrange] at (9.25,1){}; \node[uaTiny,below=0.12cm] at (9.25,1){v1 reclamable};}
-\uncover<2->{\draw[very thick,UAIngOrange] (2.45,2.72)--(8.35,2.72); \node[uaTiny,text=UAIngOrange,anchor=west] at (2.65,2.86){snapshot de $T_R$};}
+\draw[->,thick,UAIngNavy] (0.85,-0.60)--(10.1,-0.60) node[right,uaTiny]{tiempo};
+\uncover<1->{\node[uaEventBox] at (1.35,1) {1. v1};}
+\uncover<2->{
+  \node[uaEventBoxOrange,text width=1.55cm] at (2.45,3) {2. inicia $T_R$\\snapshot $S_R$};
+  \draw[very thick,UAIngOrange] (3.35,2.66)--(8.05,2.66);
+}
+\uncover<3->{
+  \node[uaEventBox] (m3) at (3.55,0) {3. lee v1};
+  \draw[uaArrow] (3.55,2.90)--(m3.north);
+}
+\uncover<4->{
+  \node[uaEventBox] (m4a) at (4.65,2) {4. crea};
+  \node[uaEventBox] (m4b) at (4.65,1) {v2};
+  \draw[uaArrow] (m4a.south)--(m4b.north);
+}
+\uncover<5->{\node[uaEventBoxOrange] at (6.20,2) {5. COMMIT};}
+\uncover<6->{
+  \node[uaEventBox] at (6.95,0) {$T_R$: v1};
+  \node[uaEventBoxOrange] at (6.95,1) {lector nuevo: v2};
+}
+\uncover<7->{\node[uaEventBoxOrange] at (8.30,3) {7. termina $T_R$};}
+\uncover<8->{\node[uaEventBoxOrange] at (9.35,1) {8. v1 reclamable};}
 \end{tikzpicture}
 \end{center}
-\only<1>{\begin{block}{Paso 1}Existe una versión confirmada v1.\end{block}}
-\only<2>{\begin{block}{Paso 2}$T_R$ fija la fotografía que considera visible.\end{block}}
-\only<3>{\begin{block}{Paso 3}La primera lectura obtiene v1.\end{block}}
-\only<4>{\begin{block}{Paso 4}$T_W$ crea v2 sin borrar la historia que todavía necesita $T_R$.\end{block}}
-\only<5>{\begin{block}{Paso 5}v2 se confirma y será visible para snapshots nuevos.\end{block}}
-\only<6>{\begin{block}{Paso 6}$T_R$ sigue leyendo v1; otro lector que empieza después puede leer v2.\end{block}}
+\only<1>{\begin{block}{Paso 1}v1 es la versión confirmada existente.\end{block}}
+\only<2>{\begin{block}{Paso 2}$T_R$ fija una regla de visibilidad: su snapshot.\end{block}}
+\only<3>{\begin{block}{Paso 3}La primera lectura elige v1.\end{block}}
+\only<4>{\begin{block}{Paso 4}$T_W$ crea v2 sin borrar v1.\end{block}}
+\only<5>{\begin{block}{Paso 5}v2 confirma y queda disponible para snapshots posteriores.\end{block}}
+\only<6>{\begin{block}{Paso 6}$T_R$ mantiene v1; un lector nuevo puede elegir v2.\end{block}}
 \only<7>{\begin{block}{Paso 7}Termina el snapshot largo.\end{block}}
-\only<8>{\begin{block}{Paso 8}v1 puede reclamarse si ninguna otra transacción o mecanismo la necesita.\end{block}}
+\only<8>{\begin{block}{Paso 8}v1 puede limpiarse cuando ninguna regla de visibilidad la necesite.\end{block}}
 \end{frame}
 
-\begin{frame}{Visibilidad: el ``valor actual'' depende del snapshot}
+\begin{frame}{Regla simplificada de visibilidad}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[x=1.08cm,y=0.8cm]
-\draw[->,thick,UAIngNavy] (0,0)--(9.0,0) node[right,uaTiny]{tiempo lógico};
-\draw[very thick,UAIngNavy] (0.8,0.75)--(4.6,0.75);
-\draw[very thick,UAIngOrange] (4.6,0.75)--(8.2,0.75);
-\node[uaTiny,above=0.12cm] at (2.7,0.75){v1 visible};
-\node[uaTiny,above=0.12cm,text=UAIngOrange] at (6.4,0.75){v2 visible};
-\draw[UAIngNavy,dashed] (3.2,-0.25)--(3.2,1.35);
-\draw[UAIngOrange,dashed] (6.2,-0.25)--(6.2,1.35);
-\node[uaSoft,text width=2.2cm] at (3.2,-0.85){snapshot A\\lee v1};
-\node[uaOrange,text width=2.2cm] at (6.2,-0.85){snapshot B\\lee v2};
+\begin{tikzpicture}[x=1.0cm,y=0.8cm]
+\draw[->,thick,UAIngNavy] (0,0)--(9.1,0) node[right,uaTiny]{historia lógica};
+\draw[very thick,UAIngNavy] (0.8,0.8)--(4.7,0.8);
+\draw[very thick,UAIngOrange] (4.7,0.8)--(8.3,0.8);
+\node[uaTiny,above=0.12cm] at (2.75,0.8){v1 visible};
+\node[uaTiny,text=UAIngOrange,above=0.12cm] at (6.5,0.8){v2 visible};
+\draw[UAIngNavy,dashed] (3.1,-0.25)--(3.1,1.4);
+\draw[UAIngOrange,dashed] (6.3,-0.25)--(6.3,1.4);
+\node[uaSoft,text width=2.15cm] at (3.1,-0.90){snapshot A\\elige v1};
+\node[uaOrange,text width=2.15cm] at (6.3,-0.90){snapshot B\\elige v2};
 \end{tikzpicture}
 \end{center}
-\begin{block}{Simplificación útil}
-La transacción ve la versión más nueva cuyo creador es visible para su snapshot y cuya eliminación todavía no lo era.
+\begin{block}{Lectura conceptual}
+Una versión es visible si su creador pertenece a la historia confirmada que el snapshot puede observar y su reemplazo/eliminación todavía no era visible para ese snapshot.
 \end{block}
 \end{frame}
 
@@ -579,62 +891,59 @@ La transacción ve la versión más nueva cuyo creador es visible para su snapsh
 \begin{columns}[T]
 \column{0.58\textwidth}
 \begin{itemize}
-\item Un \texttt{UPDATE} crea una nueva versión de la fila.
-\item La anterior sigue existiendo mientras algún snapshot pueda verla.
-\item \texttt{VACUUM} recupera espacio reutilizable cuando esa historia deja de ser necesaria.
-\item Una transacción larga puede aumentar bloat, I/O y presión sobre índices.
+\item Un \texttt{UPDATE} crea una versión nueva de la fila.
+\item La versión anterior permanece mientras algún snapshot pueda verla.
+\item \texttt{VACUUM} recupera espacio reutilizable cuando la historia deja de ser necesaria.
+\item Una transacción larga retrasa la limpieza y aumenta bloat, E/S y presión sobre índices.
 \end{itemize}
 \column{0.38\textwidth}
 \begin{center}
 \begin{tikzpicture}[node distance=0.35cm]
-\node[uaSoft,minimum width=3.3cm] (a) {fila v1};
-\node[uaOrange,below=of a,minimum width=3.3cm] (b) {UPDATE crea v2};
-\node[uaSoft,below=of b,minimum width=3.3cm] (c) {snapshot retiene v1};
-\node[uaSoft,below=of c,minimum width=3.3cm] (d) {VACUUM cuando es seguro};
-\draw[uaArrow] (a)--(b);
-\draw[uaArrow] (b)--(c);
-\draw[uaOrangeArrow] (c)--(d);
+\node[uaSoft,minimum width=3.25cm] (v1) {v1 visible};
+\node[uaOrange,below=of v1,minimum width=3.25cm] (v2) {UPDATE crea v2};
+\node[uaSoft,below=of v2,minimum width=3.25cm] (hold) {snapshot retiene v1};
+\node[uaSoft,below=of hold,minimum width=3.25cm] (vac) {VACUUM cuando es seguro};
+\draw[uaArrow] (v1)--(v2);
+\draw[uaArrow] (v2)--(hold);
+\draw[uaOrangeArrow] (hold)--(vac);
 \end{tikzpicture}
 \end{center}
 \end{columns}
 \SourceLine{PostgreSQL, documentación oficial sobre MVCC y routine vacuuming.}
 \end{frame}
 
-\begin{frame}{MVCC no significa serializabilidad automática}
+\begin{frame}{MVCC no equivale automáticamente a serializabilidad}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=0.5cm and 1.2cm]
-\node[uaSoft,text width=3.6cm] (t1a) {$T_1$: lee A=1, B=1};
-\node[uaSoft,text width=3.6cm,right=of t1a] (t2a) {$T_2$: lee A=1, B=1};
-\node[uaSoft,text width=3.6cm,below=of t1a] (t1b) {$T_1$: escribe A=0};
-\node[uaSoft,text width=3.6cm,below=of t2a] (t2b) {$T_2$: escribe B=0};
-\node[uaOrange,text width=5.6cm,below=0.65cm of $(t1b)!0.5!(t2b)$] (end) {Ambas confirman: A=0, B=0\\se viola ``al menos uno debe quedar activo''};
+\begin{tikzpicture}[node distance=0.45cm and 1.0cm]
+\node[uaSoft,text width=3.5cm] (t1a) {$T_1$: lee A=1, B=1};
+\node[uaSoft,text width=3.5cm,right=of t1a] (t2a) {$T_2$: lee A=1, B=1};
+\node[uaSoft,text width=3.5cm,below=of t1a] (t1b) {$T_1$: escribe A=0};
+\node[uaSoft,text width=3.5cm,below=of t2a] (t2b) {$T_2$: escribe B=0};
+\node[uaOrange,text width=5.5cm,below=0.65cm of $(t1b)!0.5!(t2b)$] (end) {Ambas confirman: A=0, B=0\\se viola ``al menos una debe seguir activa''};
 \draw[uaArrow] (t1a)--(t1b);
 \draw[uaArrow] (t2a)--(t2b);
 \draw[uaOrangeArrow] (t1b)--(end);
 \draw[uaOrangeArrow] (t2b)--(end);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Conexión con clase 5}
-MVCC es un mecanismo de versiones; el nivel de aislamiento determina qué anomalías todavía son posibles.
+\begin{block}{Conclusión}
+MVCC administra versiones. El nivel de aislamiento y la detección de conflictos determinan qué anomalías, como write skew, siguen siendo posibles.
 \end{block}
 \end{frame}
 
 \begin{frame}{Checkpoint de comprensión: MVCC}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{enumerate}
-\item ¿Qué versión ve una transacción que comenzó antes de una actualización ya confirmada?
-\item ¿Cuándo puede eliminarse una versión vieja?
-\item ¿Qué no se puede concluir solamente porque un motor ``usa MVCC''?
+\item Explique snapshot sin usar la metáfora de una copia completa.
+\item ¿Qué lee un reporte que comenzó antes del COMMIT de v2?
+\item ¿Cuándo puede limpiarse v1 y quién puede retrasar esa limpieza?
+\item ¿Qué no se puede concluir solo porque el motor ``usa MVCC''?
 \end{enumerate}
-\pause
-\begin{block}{Respuesta esperada}
-Ve su snapshot; la versión se elimina cuando nadie relevante puede verla; MVCC no determina por sí solo serializabilidad ni ausencia de write skew.
-\end{block}
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Índices y EXPLAIN: medir\\antes de optimizar}
+\UASectionSlide{Índices y EXPLAIN:\\medir antes de optimizar}
 
 \begin{frame}{Índice: una estructura adicional que evita leer todo}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -688,22 +997,22 @@ LIMIT 20;};
 \begin{columns}[T]
 \column{0.47\textwidth}
 \begin{block}{\texttt{EXPLAIN}}
-Muestra el plan elegido y sus \textbf{estimaciones}: tipo de scan, joins, orden, costo y cardinalidad esperada.
+Muestra el plan elegido y sus \textbf{estimaciones}: forma de acceso, filtros, orden, costo y cantidad esperada de filas.
 \end{block}
 \column{0.47\textwidth}
 \begin{alertblock}{\texttt{EXPLAIN ANALYZE}}
-Ejecuta realmente la consulta y agrega \textbf{mediciones}: tiempos, filas, loops y, con \texttt{BUFFERS}, I/O observado.
+Ejecuta la consulta y agrega \textbf{mediciones reales}: tiempos, filas, repeticiones y, con \texttt{BUFFERS}, entrada/salida observada.
 \end{alertblock}
 \end{columns}
 \vspace{0.3cm}
 \begin{center}
 \begin{tikzpicture}[node distance=0.55cm]
-\node[uaSoft,text width=2.5cm] (sql) {SQL};
-\node[uaSoft,text width=2.5cm,right=of sql] (planner) {Planner\\elige ruta};
-\node[uaSoft,text width=2.5cm,right=of planner] (plan) {Plan\\estimado};
-\node[uaOrange,text width=2.5cm,right=of plan] (run) {Ejecución\\medida};
-\draw[uaArrow] (sql)--(planner);
-\draw[uaArrow] (planner)--(plan);
+\node[uaSoft,text width=2.5cm] (sql) {Consulta SQL};
+\node[uaSoft,text width=2.5cm,right=of sql] (planificador) {Planificador\\elige una ruta};
+\node[uaSoft,text width=2.5cm,right=of planificador] (plan) {Plan estimado};
+\node[uaOrange,text width=2.5cm,right=of plan] (run) {Ejecución medida};
+\draw[uaArrow] (sql)--(planificador);
+\draw[uaArrow] (planificador)--(plan);
 \draw[uaOrangeArrow] (plan)--(run);
 \end{tikzpicture}
 \end{center}
@@ -758,9 +1067,10 @@ El motor recorre, filtra y ordena un conjunto mucho mayor que las 20 filas final
 
 \begin{frame}{Con índice compuesto: el plan hace menos trabajo}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{columns}[T]
-\column{0.58\textwidth}
-\begin{beamercolorbox}[wd=\linewidth,sep=0.18cm,rounded=true,shadow=false]{block body}
+\column{0.60\textwidth}
+\begin{beamercolorbox}[wd=\linewidth,sep=0.15cm,rounded=true,shadow=false]{block body}
 \ttfamily\scriptsize
 Limit  (actual time=0.20..0.24 rows=20)\\
 \quad -> Index Scan using\\
@@ -771,20 +1081,21 @@ Limit  (actual time=0.20..0.24 rows=20)\\
 \qquad Buffers: shared hit=5\\
 Execution Time: 0.27 ms
 \end{beamercolorbox}
-\column{0.38\textwidth}
+\vspace{0.15cm}
+\begin{block}{DDL utilizado}
+\texttt{CREATE INDEX ... ON purchases(student\_id, status, confirmed\_at DESC);}
+\end{block}
+\column{0.36\textwidth}
 \begin{uakeybox}
 \textbf{Qué cambió}
 \begin{itemize}
-\item 5 buffers.
-\item 20 filas útiles.
-\item Sin sort explícito.
-\item LIMIT corta temprano.
+\item Se tocaron 5 buffers.
+\item Se obtuvieron 20 filas útiles.
+\item No hubo ordenamiento separado.
+\item \texttt{LIMIT} detuvo el recorrido temprano.
 \end{itemize}
 \end{uakeybox}
 \end{columns}
-\begin{block}{DDL didáctico}
-\texttt{CREATE INDEX ... ON purchases(student\_id, status, confirmed\_at DESC);}
-\end{block}
 \end{frame}
 
 \begin{frame}{Comparar planes sin convertir los números en una promesa universal}
@@ -810,8 +1121,8 @@ Los valores dependen de datos, estadísticas, caché, selectividad y hardware. L
 \begin{frame}{El costo del índice aparece en cada escritura}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=0.5cm and 0.6cm]
-\node[uaOrange,minimum width=2.0cm] (ins) {INSERT};
+\begin{tikzpicture}[node distance=0.5cm and 0.58cm]
+\node[uaOrange,minimum width=2.0cm] (ins) {\texttt{INSERT}};
 \node[uaSoft,right=of ins,minimum width=2.0cm] (heap) {tabla};
 \node[uaSoft,right=of heap,minimum width=2.0cm] (i1) {índice 1};
 \node[uaSoft,right=of i1,minimum width=2.0cm] (i2) {índice 2};
@@ -820,161 +1131,308 @@ Los valores dependen de datos, estadísticas, caché, selectividad y hardware. L
 \draw[uaArrow] (heap)--(i1);
 \draw[uaArrow] (i1)--(i2);
 \draw[uaArrow] (i2)--(i3);
-\node[uaTiny,below=0.35cm of heap]{páginas};
-\node[uaTiny,below=0.35cm of i1]{WAL};
-\node[uaTiny,below=0.35cm of i2]{cache};
-\node[uaTiny,below=0.35cm of i3]{vacuum};
+\node[uaTiny,below=0.35cm of heap]{más páginas};
+\node[uaTiny,below=0.35cm of i1]{más WAL};
+\node[uaTiny,below=0.35cm of i2]{más caché};
+\node[uaTiny,below=0.35cm of i3]{más mantenimiento};
 \end{tikzpicture}
 \end{center}
 \begin{block}{Regla de ingeniería}
-No se agrega un índice porque ``parece útil'': se formula una hipótesis, se observa el plan y se mide el workload real.
+No se agrega un índice porque ``parece útil''. Se formula una hipótesis, se observa el plan y se mide la carga de trabajo real.
 \end{block}
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{LSM y compaction:\\throughput ahora, deuda después}
+\UASectionSlide{LSM-tree: escrituras rápidas,\\organización posterior}
 
-\begin{frame}{Caso contrastante: telemetría del campus}
+\begin{frame}{Qué es una LSM-tree y por qué aparece}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{columns}[T]
-\column{0.58\textwidth}
+\column{0.54\textwidth}
+\begin{block}{Definición intuitiva}
+Una LSM-tree recibe escrituras en memoria y luego las vuelca a archivos ordenados e inmutables. Como esos archivos se acumulan, el motor debe fusionarlos periódicamente.
+\end{block}
 \begin{uakeybox}
-Sensores de aulas, energía y ocupación producen 80.000 eventos por segundo. La mayoría son appends; las consultas recorren un dispositivo y una ventana temporal.
+No elimina el costo de escritura: desplaza gran parte de la entrada/salida aleatoria fuera del camino crítico y la paga mediante mantenimiento posterior.
 \end{uakeybox}
-\begin{itemize}
-\item Alta tasa de escritura sostenida.
-\item Claves ordenables por dispositivo y tiempo.
-\item Retención y borrado por antigüedad.
-\item Lecturas puntuales y rangos temporales.
-\end{itemize}
-\column{0.38\textwidth}
+\column{0.42\textwidth}
 \begin{center}
-\begin{tikzpicture}[node distance=0.25cm]
-\foreach \i/\lab in {1/{aula-101},2/{lab-2},3/{medidor-7},4/{aula-201},5/{clima-3}}{
- \node[uaSoft,minimum width=3.4cm] (n\i) at (0,{-(\i-1)*0.58}) {\lab, ts, valor};
-}
-\draw[uaOrangeArrow] (-2.2,-1.15)--(-1.0,-1.15);
-\node[uaTiny,left] at (-2.2,-1.15){flujo};
+\begin{tikzpicture}[node distance=0.22cm]
+\node[uaOrange,minimum width=3.15cm] (wal) {WAL};
+\node[uaSoft,minimum width=3.15cm,below=of wal] (mem) {tabla en memoria};
+\node[uaProcess,minimum width=2.20cm,below=of mem] (flush) {volcado (flush)};
+\node[uaSoft,minimum width=3.15cm,below=of flush] (files) {SSTables en L0};
+\node[uaProcess,minimum width=2.20cm,below=of files] (compact) {compactación};
+\node[uaSoft,minimum width=3.15cm,below=of compact] (levels) {niveles L1, L2, ...};
+\draw[uaOrangeArrow] (wal)--(mem);
+\draw[uaArrow] (mem)--(flush);
+\draw[uaOrangeArrow] (flush)--(files);
+\draw[uaArrow] (files)--(compact);
+\draw[uaOrangeArrow] (compact)--(levels);
 \end{tikzpicture}
 \end{center}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Ruta de escritura LSM: rápida porque difiere organización}
+\begin{frame}{Vocabulario LSM antes de hablar de compactación}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=0.5cm and 0.6cm]
-\node[uaOrange,minimum width=1.8cm] (w) {write(k,v)};
-\node[uaSoft,right=of w,minimum width=1.7cm] (wal) {WAL};
-\node[uaSoft,right=of wal,minimum width=2.0cm] (mem) {memtable};
-\node[uaSoft,right=of mem,minimum width=2.2cm] (imm) {memtable inmutable};
-\node[uaSoft,below=0.75cm of imm,minimum width=2.0cm] (l0) {SSTables L0};
-\node[uaSoft,left=of l0,minimum width=2.0cm] (l1) {Nivel L1};
-\node[uaSoft,left=of l1,minimum width=2.0cm] (l2) {Nivel L2};
+\begin{tabular}{p{0.22\textwidth}p{0.64\textwidth}}
+\toprule
+Término & Significado \\
+\midrule
+Memtable & Tabla ordenada en memoria que recibe las escrituras recientes. \\
+Flush & Volcado de una memtable inmutable a un archivo persistente. \\
+SSTable & \textit{Sorted String Table}: archivo ordenado e inmutable de pares clave--valor. \\
+Run & Secuencia o archivo ya ordenado que puede participar en una fusión. \\
+Nivel L0, L1, L2 & Conjuntos sucesivos de SSTables organizados por tamaño y solapamiento. \\
+Marca de borrado (tombstone) & Registro que representa una eliminación y debe conservarse hasta que sea seguro olvidar versiones anteriores. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Vocabulario LSM: mantenimiento y protección}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tabular}{p{0.22\textwidth}p{0.64\textwidth}}
+\toprule
+Término & Significado \\
+\midrule
+Merge ordenado & Fusión que recorre runs ya ordenados, elige la menor clave disponible y produce otra secuencia ordenada sin ordenar desde cero. \\
+Compactación & Merge ordenado que además reduce solapamiento y elimina versiones obsoletas cuando es seguro. \\
+Trabajo pendiente (backlog) & Cantidad de bytes o archivos que todavía deben ser compactados. \\
+Pausa de escritura (write stall) & Desaceleración o detención temporal de escrituras que protege al motor cuando el trabajo pendiente amenaza la estabilidad. \\
+Amplificación & Trabajo físico adicional respecto del dato lógico: puede medirse en escrituras, lecturas o espacio. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Caso contrastante: telemetría del campus}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{uakeybox}
+Sensores de aulas, energía y ocupación producen 80.000 eventos por segundo. Las consultas recorren un dispositivo y una ventana temporal.
+\end{uakeybox}
+\begin{center}
+\begin{tikzpicture}[node distance=0.30cm and 0.55cm]
+\node[uaSoft,text width=2.35cm] (s1) {sensor de aula};
+\node[uaSoft,text width=2.35cm,below=of s1] (s2) {medidor de energía};
+\node[uaSoft,text width=2.35cm,below=of s2] (s3) {sensor climático};
+\node[uaOrange,text width=2.65cm,right=0.80cm of s2] (in) {canal de ingestión\\80.000 eventos/s};
+\node[uaSoft,text width=3.0cm,right=0.80cm of in] (key) {clave ordenada\\(dispositivo, tiempo)};
+\node[uaSoft,text width=2.65cm,right=0.80cm of key] (store) {motor LSM\\retención temporal};
+\draw[uaArrow] (s1.east)--(in.west);
+\draw[uaOrangeArrow] (s2.east)--(in.west);
+\draw[uaArrow] (s3.east)--(in.west);
+\draw[uaOrangeArrow] (in)--(key);
+\draw[uaArrow] (key)--(store);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{itemize}
+\item Tasa de escritura alta y sostenida.
+\item Claves ordenables por dispositivo y tiempo.
+\end{itemize}
+\column{0.48\textwidth}
+\begin{itemize}
+\item Retención y borrado por antigüedad.
+\item Búsquedas puntuales y rangos temporales.
+\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Ruta de escritura LSM: del write a una SSTable L0}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.28cm and 0.30cm]
+\node[uaOrange,text width=1.55cm] (w) {escritura\\$(k,v)$};
+\node[uaSoft,text width=1.35cm,right=of w] (wal) {WAL};
+\node[uaSoft,text width=1.65cm,right=of wal] (mem) {memtable};
+\node[uaSoft,text width=2.05cm,right=of mem] (imm) {memtable\\inmutable};
+\node[uaProcess,text width=1.45cm,right=of imm] (flush) {volcado\\(flush)};
+\node[uaSoft,text width=1.65cm,right=of flush] (l0) {SSTable\\nivel L0};
 \draw[uaOrangeArrow] (w)--(wal);
 \draw[uaArrow] (wal)--(mem);
 \draw[uaArrow] (mem)--(imm);
-\draw[uaArrow] (imm)--node[right,uaTiny]{flush}(l0);
-\draw[uaArrow] (l0)--node[above,uaTiny]{compaction}(l1);
-\draw[uaArrow] (l1)--node[above,uaTiny]{compaction}(l2);
+\draw[uaOrangeArrow] (imm)--(flush);
+\draw[uaOrangeArrow] (flush)--(l0);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Idea central}
-El camino crítico es principalmente secuencial. La deuda de fusionar runs, retirar tombstones y limitar solapamiento se paga en background.
+\begin{block}{Qué ocurre en el camino crítico}
+La escritura se registra en el WAL, se incorpora a una estructura ordenada en memoria y, más tarde, una memtable inmutable se vuelca como una SSTable de nivel L0.
 \end{block}
+\begin{alertblock}{Qué queda para después}
+L0 puede acumular archivos solapados. La compactación posterior reorganiza esos archivos y los desplaza hacia niveles más estables.
+\end{alertblock}
 \end{frame}
 
-\begin{frame}{Compaction: merge ordenado y eliminación segura}
+\begin{frame}{Compactación: merge ordenado y eliminación segura}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm and 0.8cm]
-\node[uaSoft,text width=2.1cm] (a) {SST A\\a, c1, e, g};
-\node[uaSoft,text width=2.1cm,below=of a] (b) {SST B\\b, c2, f, h};
-\node[uaSoft,text width=2.1cm,below=of b] (t) {tombstone\\eliminar c};
-\node[uaOrange,text width=3.1cm,right=1.0cm of b] (m) {merge ordenado\\elige c2 como versión nueva\\aplica tombstone cuando es seguro};
-\node[uaSoft,text width=2.5cm,right=1.0cm of m] (out) {SST nueva\\a, b, e, f, g, h};
-\draw[uaArrow] (a.east)--(m.west);
-\draw[uaArrow] (b.east)--(m.west);
-\draw[uaArrow] (t.east)--(m.west);
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[uaSoft,text width=2.15cm] (a) at (-4.70,1.10) {SSTable A\\a, c1, e, g};
+\node[uaSoft,text width=2.15cm] (b) at (-4.70,0.00) {SSTable B\\b, c2, f, h};
+\node[uaSoft,text width=2.15cm] (t) at (-4.70,-1.10) {marca de borrado\\eliminar c};
+\node[uaOrange,text width=3.25cm] (m) at (0.00,0.00) {merge ordenado\\compara claves\\conserva la versión vigente};
+\node[uaSoft,text width=2.75cm] (out) at (4.45,0.00) {SSTable resultante\\a, b, e, f, g, h};
+\coordinate (mA) at ($(m.west)+(0,0.65)$);
+\coordinate (mB) at (m.west);
+\coordinate (mT) at ($(m.west)+(0,-0.65)$);
+\draw[uaArrow] (a.east)--++(0.45,0)|-(mA);
+\draw[uaArrow] (b.east)--(mB);
+\draw[uaArrow] (t.east)--++(0.45,0)|-(mT);
 \draw[uaOrangeArrow] (m)--(out);
 \end{tikzpicture}
 \end{center}
 \begin{block}{Qué se paga}
-Bytes leídos y reescritos, uso temporal de espacio, competencia por I/O y posible aumento de p99.
+La compactación lee y reescribe datos, utiliza espacio temporal, compite por E/S y puede aumentar el percentil 99 de latencia.
 \end{block}
 \end{frame}
 
-\begin{frame}{Ruta de lectura LSM: buscar desde lo nuevo hacia lo viejo}
+\begin{frame}{Filtro de Bloom: decidir qué SSTables se pueden omitir}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{uainfo}
+Un \textbf{filtro de Bloom} es un resumen probabilístico y compacto de las claves de una SSTable. Para una búsqueda de clave exacta no devuelve el valor: responde \textbf{definitivamente ausente} o \textbf{posiblemente presente}.
+\end{uainfo}
 \begin{center}
-\begin{tikzpicture}[node distance=0.42cm and 0.55cm]
-\node[uaOrange,minimum width=1.65cm] (get) {GET(k)};
-\node[uaSoft,right=of get,minimum width=1.8cm] (mem) {memtable};
-\node[uaSoft,right=of mem,minimum width=1.8cm] (l0) {L0 runs};
-\node[uaSoft,right=of l0,minimum width=1.8cm] (l1) {L1};
-\node[uaSoft,right=of l1,minimum width=1.8cm] (l2) {L2};
-\draw[uaOrangeArrow] (get)--(mem);
-\draw[uaArrow] (mem)--(l0);
-\draw[uaArrow] (l0)--(l1);
-\draw[uaArrow] (l1)--(l2);
-\node[uaSoft,text width=2.4cm,below=0.65cm of l0] (bloom) {Bloom filter\\``seguro que no''};
-\node[uaSoft,text width=2.4cm,below=0.65cm of l1] (cache) {Block cache\\evita I/O};
-\draw[uaArrow] (bloom)--(l0);
-\draw[uaArrow] (cache)--(l1);
+\begin{tikzpicture}[node distance=0.34cm and 0.40cm]
+\node[uaSoft,text width=2.45cm] (sst) {SSTable A\\claves: a, c, e, g};
+\node[uaOrange,text width=2.45cm,right=of sst] (bf) {Filtro de Bloom\\resumen de claves};
+\node[uaSoft,text width=2.15cm,right=of bf,yshift=0.72cm] (qno) {buscar z};
+\node[uaSoft,text width=2.15cm,right=of bf,yshift=-0.72cm] (qmaybe) {buscar c};
+\node[uaOrange,text width=2.45cm,right=of qno] (no) {algún bit es 0\\definitivamente ausente};
+\node[uaSoft,text width=2.45cm,right=of qmaybe] (maybe) {todos los bits son 1\\posiblemente presente};
+\draw[uaOrangeArrow] (sst)--(bf);
+\draw[uaArrow] (bf.east)--(qno.west);
+\draw[uaArrow] (bf.east)--(qmaybe.west);
+\draw[uaOrangeArrow] (qno)--(no);
+\draw[uaArrow] (qmaybe)--(maybe);
 \end{tikzpicture}
 \end{center}
 \begin{itemize}
-\item Muchos runs aumentan read amplification.
-\item Un falso positivo del Bloom filter cuesta una lectura; un falso negativo no está permitido.
-\item Tombstones deben sobrevivir hasta que sea seguro olvidar versiones viejas.
+\item \textbf{Definitivamente ausente:} el motor omite esa SSTable para la búsqueda. Esto reemplaza la expresión ambigua ``archivo imposible''.
+\item \textbf{Posiblemente presente:} el motor consulta el índice y, si corresponde, los bloques de datos; puede ser un falso positivo.
+\item Un filtro bien construido no debe producir falsos negativos: no puede descartar un archivo que sí contiene la clave.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Panel de compaction: leer capacidad, deuda y efecto}
+\begin{frame}{Ruta de lectura LSM: descartar antes de leer el dispositivo}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[x=0.76cm,y=0.5cm]
-\fill[UAIngPaper,rounded corners] (-0.35,-0.70) rectangle (12.1,5.25);
-\node[anchor=west,font=\small\bfseries,text=UAIngNavy] at (0,4.92){RocksDB / telemetría --- ventana 10 min (valores ilustrativos)};
-\node[uaSoft,text width=2.18cm] at (1.25,3.83){Ingreso\\\textbf{90 MB/s}};
-\node[uaSoft,text width=2.18cm] at (4.05,3.83){Compaction\\\textbf{60 MB/s}};
-\node[uaOrange,text width=2.18cm] at (6.85,3.83){Backlog\\\textbf{18 GB}};
-\node[uaSoft,text width=2.18cm] at (9.65,3.83){L0 files\\\textbf{28 / 36}};
-\node[anchor=west,uaTiny] at (0.70,2.82){Backlog de compaction (GB)};
-\draw[->,thick] (0.85,0.42)--(8.95,0.42) node[right,uaTiny]{min};
-\draw[->,thick] (0.85,0.42)--(0.85,2.62);
-\foreach \x/\h in {1.25/0.25,2.20/0.46,3.15/0.70,4.10/0.96,5.05/1.22,6.00/1.47,6.95/1.66,7.90/1.83}{
-  \fill[UAIngOrange] (\x,0.42) rectangle +(0.50,\h);
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=0.30cm and 0.34cm]
+\node[uaOrange,text width=1.70cm] (get) {buscar clave $k$};
+\node[uaSoft,text width=1.70cm,right=of get] (mem) {revisar memtables};
+\node[uaSoft,text width=2.05cm,right=of mem] (cand) {SSTable candidata};
+\node[diamond,draw=UAIngNavy,thick,fill=UAIngPaper,aspect=2.15,align=center,font=\tiny,
+      inner xsep=1.5pt,inner ysep=1pt,right=0.42cm of cand] (bf) {¿Bloom dice\\``tal vez''?};
+\node[uaSoft,text width=2.05cm,right=0.45cm of bf,yshift=0.72cm] (skip) {No\\omitir SSTable};
+\node[uaOrange,text width=2.05cm,right=0.45cm of bf,yshift=-0.72cm] (idx) {Sí\\consultar índice};
+\node[uaSoft,text width=2.15cm,right=0.35cm of idx] (data) {caché o\\bloque en dispositivo};
+\draw[uaOrangeArrow] (get)--(mem);
+\draw[uaArrow] (mem)--(cand);
+\draw[uaArrow] (cand)--(bf);
+\draw[uaArrow] (bf.east)--(skip.west);
+\draw[uaOrangeArrow] (bf.east)--(idx.west);
+\draw[uaOrangeArrow] (idx)--(data);
+\end{tikzpicture}}%
+\end{center}
+\vspace{0.08cm}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Orden de búsqueda}
+Primero se revisa lo más reciente. Para cada SSTable candidata, Bloom puede evitar una lectura física.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Resultado correcto}
+Si aparecen varias versiones, el motor elige la más reciente que sea visible y respeta las marcas de borrado.
+\end{block}
+\end{columns}
+\begin{itemize}
+\item Un falso positivo agrega trabajo; un falso negativo haría perder un dato existente y no es admisible.
+\item La caché de bloques evita acceder al dispositivo cuando el bloque requerido ya está en memoria.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Panel de compactación I: qué señales observar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\renewcommand{\arraystretch}{0.95}
+\begin{center}
+\begin{tabular}{p{0.34\textwidth}p{0.17\textwidth}p{0.36\textwidth}}
+\toprule
+Señal & Valor ilustrativo & Qué informa \\
+\midrule
+Ingreso lógico & 90 MB/s & Trabajo nuevo recibido por el motor. \\
+Capacidad de compactación & 60 MB/s & Ritmo de reorganización de archivos. \\
+Déficit sostenido & 30 MB/s & Trabajo que se acumula por segundo. \\
+Trabajo pendiente & 18 GB & Datos todavía sin compactar. \\
+Archivos en L0 & 28 de 36 & Cercanía al umbral de protección. \\
+Percentil 99 de escritura & En aumento & Impacto sobre las operaciones más lentas. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.08cm}
+\textbf{Lectura conjunta.} Relacione ingreso, capacidad de mantenimiento, crecimiento del trabajo pendiente y latencia; ninguna cifra aislada basta para diagnosticar.
+\end{frame}
+
+\begin{frame}{Panel de compactación II: leer la evolución}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[x=0.72cm,y=0.48cm]
+\node[anchor=west,font=\small\bfseries,text=UAIngNavy] at (0,5.30){Trabajo pendiente de compactación durante 10 minutos};
+\draw[->,thick,UAIngNavy] (0.8,0.65)--(11.1,0.65) node[right,uaTiny]{minutos};
+\draw[->,thick,UAIngNavy] (0.8,0.65)--(0.8,4.75) node[above,uaTiny]{GB};
+\foreach \x/\h in {1.15/0.45,2.20/0.82,3.25/1.22,4.30/1.68,5.35/2.15,6.40/2.65,7.45/3.15,8.50/3.62}{
+  \fill[UAIngOrange] (\x,0.65) rectangle +(0.58,\h);
 }
-\draw[UAIngNavy,dashed,thick] (0.85,1.82)--(8.85,1.82);
-\draw[UAIngOrange,dashed,thick] (0.85,2.28)--(8.85,2.28);
-\draw[UAIngNavy,thick] (9.30,1.82)--(9.90,1.82);
-\node[uaTiny,anchor=west] at (10.02,1.82){slowdown 15 GB};
-\draw[UAIngOrange,thick] (9.30,2.28)--(9.90,2.28);
-\node[uaTiny,anchor=west,text=UAIngOrange] at (10.02,2.28){stop 22 GB};
+\draw[UAIngNavy,dashed,thick] (0.8,3.20)--(9.35,3.20);
+\draw[UAIngOrange,dashed,thick] (0.8,4.30)--(9.35,4.30);
+\node[uaTiny,anchor=west] at (9.55,3.20){umbral de desaceleración};
+\node[uaTiny,anchor=west,text=UAIngOrange] at (9.55,4.30){umbral de detención};
+\node[uaTiny,anchor=west] at (1.15,0.22){0};
+\node[uaTiny,anchor=west] at (8.50,0.22){10};
 \end{tikzpicture}
 \end{center}
-\begin{block}{Lectura causal}
-Ingreso sostenido mayor que compaction $\Rightarrow$ backlog creciente $\Rightarrow$ más L0, read amplification y p99 $\Rightarrow$ slowdown o stall.
+\begin{block}{Cadena causal}
+Ingreso mayor que capacidad de compactación $\Rightarrow$ trabajo pendiente creciente $\Rightarrow$ más archivos en L0 $\Rightarrow$ mayor trabajo de lectura y latencia $\Rightarrow$ protección mediante una pausa de escritura.
 \end{block}
 \end{frame}
 
-\begin{frame}{Write stall: backpressure, no magia}
+\begin{frame}{Pausa de escritura (write stall): proteger la estabilidad}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=0.65cm and 0.65cm]
-\node[uaOrange,text width=2.5cm] (in) {ingreso\\90 MB/s};
-\node[uaSoft,text width=2.5cm,right=of in] (q) {backlog\\crece};
-\node[uaSoft,text width=2.5cm,right=of q] (c) {capacidad física\\60 MB/s};
-\node[uaOrange,text width=2.5cm,right=of c] (s) {stall\\reduce admisión};
-\draw[uaOrangeArrow] (in)--(q);
-\draw[uaArrow] (q)--(c);
-\draw[uaOrangeArrow] (c)--(s);
-\draw[uaOrangeArrow] (s) to[bend left=28] node[above,uaTiny]{feedback} (in);
+\begin{tikzpicture}[node distance=0.30cm and 0.38cm]
+\node[uaOrange,text width=2.25cm] (in) {Ingreso solicitado\\90 MB/s};
+\node[uaSoft,text width=2.25cm,right=of in] (cap) {Capacidad de compactación\\60 MB/s};
+\node[uaOrange,text width=2.05cm,right=of cap] (def) {Déficit sostenido\\30 MB/s};
+\draw[uaOrangeArrow] (in)--(cap);
+\draw[uaOrangeArrow] (cap)--(def);
+
+\node[uaSoft,text width=2.05cm,below=0.70cm of def] (q) {Trabajo pendiente\\crece};
+\node[uaSoft,text width=2.05cm,left=0.38cm of q] (th) {Se supera\\un umbral};
+\node[uaOrange,text width=2.05cm,left=0.38cm of th] (stall) {Pausa de escritura\\reduce admisión};
+\node[uaSoft,text width=2.45cm,left=0.38cm of stall] (stable) {Ingreso efectivo $\leq$ capacidad\\el backlog se estabiliza};
+\draw[uaArrow] (def)--(q);
+\draw[uaArrow] (q)--(th);
+\draw[uaOrangeArrow] (th)--(stall);
+\draw[uaOrangeArrow] (stall)--(stable);
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Interpretación correcta}
-El stall protege al motor de una deuda infinita. Sin embargo, stalls frecuentes o prolongados indican que la carga sostenida excede la capacidad o que la política de compaction no acompaña al workload.
+La pausa no crea capacidad: evita que una cola interna crezca sin límite. Si aparece con frecuencia o dura demasiado, revela una carga sostenida superior a la capacidad o una política de compactación inadecuada.
 \end{alertblock}
 \end{frame}
 
@@ -984,17 +1442,17 @@ El stall protege al motor de una deuda infinita. Sin embargo, stalls frecuentes 
 \begin{center}
 \begin{tabular}{p{0.23\textwidth}p{0.32\textwidth}p{0.32\textwidth}}
 \toprule
- & Leveled & Tiered / universal \\
+ & Por niveles (leveled) & Por grupos (tiered / universal) \\
 \midrule
-Lecturas & Menos runs solapados & Más runs potenciales \\
+Lecturas & Menos archivos solapados & Más archivos potenciales \\
 Escrituras & Más reescritura en merges & Menos reescritura temprana \\
 Espacio & Mejor control & Más espacio temporal \\
-Carga típica & Point lookups sensibles & Ingestión intensa \\
+Carga típica & Búsquedas puntuales sensibles & Ingestión intensa \\
 \bottomrule
 \end{tabular}
 \end{center}
 \begin{block}{Decisión}
-La política correcta depende del patrón de acceso, hardware, retención, amplificaciones y SLO; no del nombre del producto.
+La política depende del patrón de acceso, del hardware, de la retención, de las amplificaciones y del objetivo de nivel de servicio (SLO); no del nombre del producto.
 \end{block}
 \end{frame}
 
@@ -1005,16 +1463,16 @@ La política correcta depende del patrón de acceso, hardware, retención, ampli
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tabular}{p{0.16\textwidth}p{0.35\textwidth}p{0.35\textwidth}}
+\begin{tabular}{p{0.17\textwidth}p{0.35\textwidth}p{0.35\textwidth}}
 \toprule
-Criterio & B-tree / páginas & LSM / runs ordenados \\
+Criterio & Árbol B y páginas & LSM y archivos ordenados \\
 \midrule
-Write path & Updates de páginas e índices & WAL + memtable + flush + compaction \\
-Point lookup & Pocas páginas si el índice ayuda & Puede revisar runs; Bloom y cache ayudan \\
-Rangos & Natural por orden del árbol & Bueno si compaction mantiene pocos runs \\
-Mantenimiento & Splits, vacuum, bloat, reindex & Tombstones, compaction, stalls \\
-Carga típica & OLTP equilibrado o read-heavy & Ingestión sostenida y write-heavy \\
-Pregunta crítica & ¿qué consulta justifica el índice? & ¿puede compaction sostener el ritmo? \\
+Camino de escritura & Actualiza páginas e índices & WAL + memtable + flush + compactación \\
+Búsqueda puntual & Pocas páginas si el índice ayuda & Puede revisar varios archivos; filtros y caché ayudan \\
+Rangos & Natural por el orden del árbol & Eficiente si la compactación mantiene pocos archivos \\
+Mantenimiento & Divisiones, VACUUM, bloat y reconstrucción & Tombstones, compactación y write stalls \\
+Carga típica & OLTP (procesamiento transaccional en línea) o predominio de lecturas & Ingestión sostenida y predominio de escrituras \\
+Pregunta crítica & ¿Qué consulta justifica el índice? & ¿Puede la compactación sostener el ritmo? \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -1028,27 +1486,27 @@ Pregunta crítica & ¿qué consulta justifica el índice? & ¿puede compaction s
 \begin{uainfo}
 \textbf{CampusShop}
 \begin{itemize}
-\item transacciones cortas;
-\item inventario e idempotencia;
-\item consultas por estudiante y fecha;
-\item p99 predecible.
+\item Transacciones cortas.
+\item Inventario e idempotencia.
+\item Consultas por estudiante y fecha.
+\item Percentil 99 predecible.
 \end{itemize}
-\textbf{Hipótesis:} WAL + MVCC + B-tree.
+\textbf{Hipótesis:} WAL + MVCC + árbol B.
 \end{uainfo}
 \column{0.48\textwidth}
 \begin{uainfo}
-\textbf{Telemetría de campus}
+\textbf{Telemetría del campus}
 \begin{itemize}
-\item ingestión masiva append;
-\item rangos por dispositivo/tiempo;
-\item retención temporal;
-\item vistas con frescura eventual.
+\item Ingestión masiva y secuencial.
+\item Rangos por dispositivo y tiempo.
+\item Retención temporal.
+\item Vistas con frescura eventual.
 \end{itemize}
-\textbf{Hipótesis:} WAL + LSM + compaction temporal.
+\textbf{Hipótesis:} WAL + LSM + compactación temporal.
 \end{uainfo}
 \end{columns}
 \begin{block}{Todavía falta evidencia}
-Latencia p95/p99, throughput sostenible, RPO/RTO, amplificación, backlog, cache hit rate y espacio.
+Medir percentiles 95 y 99, throughput sostenible, objetivo de punto de recuperación (RPO), objetivo de tiempo de recuperación (RTO), amplificación, backlog, tasa de aciertos de caché y espacio.
 \end{block}
 \end{frame}
 
@@ -1069,28 +1527,28 @@ Latencia p95/p99, throughput sostenible, RPO/RTO, amplificación, backlog, cache
 \begin{uainfo}
 \textbf{Equipo B --- Telemetría}
 \begin{itemize}
-\item Interprete backlog, write amplification y stall.
+\item Interprete backlog, amplificación de escritura y write stall.
 \item Proponga una hipótesis de causa.
-\item Diga qué medir antes de tunear.
+\item Diga qué medir antes de ajustar la configuración.
 \end{itemize}
 \end{uainfo}
 \end{columns}
 \begin{alertblock}{Entrega oral}
-90 segundos por equipo: problema, evidencia, decisión y trade-off.
+Cada equipo dispone de 90 segundos para presentar el problema, la evidencia, la decisión y su trade-off.
 \end{alertblock}
 \end{frame}
 
 \begin{frame}{Volvemos al diagnóstico inicial}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{enumerate}
-\item \textbf{Falso:} el commit puede ser durable aunque la página siga atrasada.
-\item \textbf{Falso:} copiar en RAM no equivale a persistir.
+\item \textbf{Falso:} el COMMIT puede ser durable aunque la página siga atrasada.
+\item \textbf{Falso:} copiar en memoria principal no equivale a persistir.
 \item \textbf{Falso:} MVCC reduce contención, pero no elimina todas las anomalías.
-\item \textbf{Falso:} un índice puede no usarse y siempre cuesta mantenerlo.
-\item \textbf{Falso:} una LSM desplaza trabajo hacia flush y compaction.
+\item \textbf{Falso:} un índice puede no utilizarse y siempre tiene costo de mantenimiento.
+\item \textbf{Falso:} una LSM desplaza trabajo hacia el flush y la compactación.
 \end{enumerate}
 \begin{block}{Patrón común}
-Ningún mecanismo elimina costo: cambia \emph{cuándo}, \emph{dónde} y \emph{cómo} se paga.
+Ningún mecanismo elimina el costo: cambia \emph{cuándo}, \emph{dónde} y \emph{cómo} se paga.
 \end{block}
 \end{frame}
 
@@ -1111,23 +1569,23 @@ Ningún mecanismo elimina costo: cambia \emph{cuándo}, \emph{dónde} y \emph{c�
 \end{tikzpicture}
 \end{center}
 \begin{itemize}
-\item Describa ratio, tamaño, skew, crecimiento y consultas.
-\item Declare qué falla tolera y qué significa durable.
+\item Describa proporciones de lectura y escritura, tamaño, sesgo, crecimiento y consultas.
+\item Declare qué falla debe tolerarse y qué significa durable en ese modelo.
 \item Elija un mecanismo inicial, no un producto por reputación.
-\item Identifique la deuda desplazada.
-\item Diseñe un experimento que pueda contradecir su elección.
+\item Identifique el costo que se desplaza a otra etapa.
+\item Diseñe un experimento capaz de contradecir su elección.
 \end{itemize}
 \end{frame}
 
 \begin{frame}{Cierre: de la intuición a la evidencia}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
-\begin{tikzpicture}[node distance=0.42cm]
-\node[uaSoft,text width=2.0cm] (g) {promesa de negocio};
-\node[uaSoft,text width=2.0cm,right=of g] (wal) {WAL\\recupera};
-\node[uaSoft,text width=2.0cm,right=of wal] (mvcc) {MVCC\\mantiene vistas};
-\node[uaSoft,text width=2.0cm,right=of mvcc] (idx) {índice + EXPLAIN\\reducen trabajo};
-\node[uaOrange,text width=2.0cm,right=of idx] (lsm) {compaction + stall\\controlan deuda};
+\begin{tikzpicture}[node distance=0.38cm]
+\node[uaSoft,text width=2.05cm] (g) {promesa de negocio};
+\node[uaSoft,text width=2.05cm,right=of g] (wal) {WAL\\permite recuperar};
+\node[uaSoft,text width=2.05cm,right=of wal] (mvcc) {MVCC\\mantiene vistas};
+\node[uaSoft,text width=2.05cm,right=of mvcc] (idx) {índice + EXPLAIN\\reducen trabajo};
+\node[uaOrange,text width=2.05cm,right=of idx] (lsm) {compactación + pausa\\protegen capacidad};
 \draw[uaArrow] (g)--(wal);
 \draw[uaArrow] (wal)--(mvcc);
 \draw[uaArrow] (mvcc)--(idx);
@@ -1135,7 +1593,7 @@ Ningún mecanismo elimina costo: cambia \emph{cuándo}, \emph{dónde} y \emph{c�
 \end{tikzpicture}
 \end{center}
 \begin{block}{Idea final}
-El almacenamiento no es una caja debajo del sistema: es donde las promesas lógicas se vuelven bytes, esperas, recuperación y riesgos medibles.
+El almacenamiento no es una caja debajo del sistema. Es la capa donde las promesas lógicas se convierten en bytes, esperas, recuperación y riesgos medibles.
 \end{block}
 \end{frame}
 
@@ -1146,10 +1604,10 @@ Responda en tres líneas por punto:
 \item ¿Qué diferencia hay entre \emph{aceptado}, \emph{escrito} y \emph{durable}?
 \item ¿Qué costo oculto introduce MVCC y cómo lo observaría?
 \item ¿Qué diferencia hay entre \texttt{EXPLAIN} y \texttt{EXPLAIN ANALYZE}?
-\item ¿Qué señales indican que una LSM está acumulando deuda de compaction?
+\item ¿Qué señales indican que una LSM acumula trabajo pendiente de compactación?
 \end{enumerate}
 \begin{alertblock}{Puente a la clase 7}
-Hoy vimos cómo un nodo conserva y organiza historia. La próxima clase estudia cómo un log se convierte en una interfaz distribuida entre productores y consumidores.
+Hoy vimos cómo un nodo conserva y organiza su historia. La próxima clase estudia cómo un log se convierte en una interfaz distribuida entre productores y consumidores.
 \end{alertblock}
 \end{frame}
 
