@@ -98,9 +98,9 @@ En esta clase, \textbf{storage distribuido} significa \textbf{almacenamiento dis
 \node[uaOrange,text width=1.80cm] (clients) {Clientes};
 \node[uaSoft,text width=2.05cm,right=of clients] (services) {Servicios de aplicación};
 \node[uaSoft,text width=2.85cm,right=of services] (dist) {Capa distribuida\\enrutamiento, réplica y autoridad};
-\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=0.86cm] (n1) {Nodo A\\motor + medio persistente};
+\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=1.2cm] (n1) {Nodo A\\motor + medio persistente};
 \node[uaSoft,text width=2.05cm,right=0.48cm of dist] (n2) {Nodo B\\motor + medio persistente};
-\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=-0.86cm] (n3) {Nodo C\\motor + medio persistente};
+\node[uaSoft,text width=2.05cm,right=0.48cm of dist,yshift=-1.2cm] (n3) {Nodo C\\motor + medio persistente};
 \draw[uaOrangeArrow] (clients)--(services);
 \draw[uaArrow] (services)--(dist);
 \draw[uaArrow] (dist.east)--(n1.west);
@@ -532,7 +532,7 @@ Garantía buscada: después de la recuperación aparecen todas las transacciones
 \small
 \begin{center}
 \begin{tikzpicture}[x=1cm,y=1cm]
-\node[uaOrange,text width=1.65cm] (client) at (-5.35,0.35) {Cliente};
+\node[uaOrange,text width=1.65cm] (client) at (-5.85,0.35) {Cliente};
 \node[uaSoft,text width=1.95cm] (service) at (-3.15,0.35) {Servicio de aplicación};
 \node[draw=UAIngOrange,rounded corners=2mm,minimum width=8.05cm,minimum height=2.85cm] at (1.80,0.20) {};
 \node[uaTiny,text=UAIngOrange,anchor=south] at (1.80,1.72) {un único motor de almacenamiento};
@@ -1391,7 +1391,7 @@ Percentil 99 de escritura & En aumento & Impacto sobre las operaciones más lent
 \small
 \begin{center}
 \begin{tikzpicture}[x=0.72cm,y=0.48cm]
-\node[anchor=west,font=\small\bfseries,text=UAIngNavy] at (0,5.30){Trabajo pendiente de compactación durante 10 minutos};
+\node[anchor=west,font=\small\bfseries,text=UAIngNavy] at (0,6.00){Trabajo pendiente de compactación durante 10 minutos};
 \draw[->,thick,UAIngNavy] (0.8,0.65)--(11.1,0.65) node[right,uaTiny]{minutos};
 \draw[->,thick,UAIngNavy] (0.8,0.65)--(0.8,4.75) node[above,uaTiny]{GB};
 \foreach \x/\h in {1.15/0.45,2.20/0.82,3.25/1.22,4.30/1.68,5.35/2.15,6.40/2.65,7.45/3.15,8.50/3.62}{
