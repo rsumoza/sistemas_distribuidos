@@ -1,30 +1,53 @@
 #!/usr/bin/env python3
-"""Ventanas por event time frente a processing time y late data."""
-from datetime import datetime, timedelta
-from collections import defaultdict
+"""Ventanas por event time y processing time, con evento tardío."""
+from __future__ import annotations
 
-events = [
+from collections import defaultdict
+from datetime import datetime, timedelta
+
+EVENTS = [
     ("E1", "10:00:40", "10:00:43", 10),
     ("E2", "10:02:15", "10:02:16", 20),
     ("E3", "10:04:50", "10:07:10", 30),
 ]
 FMT = "%H:%M:%S"
-WINDOW = 5
+WINDOW_MINUTES = 5
 
-def bucket(ts: str) -> str:
-    t = datetime.strptime(ts, FMT)
-    minute = (t.minute // WINDOW) * WINDOW
-    start = t.replace(minute=minute, second=0)
-    end = start + timedelta(minutes=WINDOW)
+
+def bucket(timestamp: str) -> str:
+    value = datetime.strptime(timestamp, FMT)
+    minute = (value.minute // WINDOW_MINUTES) * WINDOW_MINUTES
+    start = value.replace(minute=minute, second=0)
+    end = start + timedelta(minutes=WINDOW_MINUTES)
     return f"{start.strftime('%H:%M')}-{end.strftime('%H:%M')}"
 
-for mode, index in [("event_time", 1), ("processing_time", 2)]:
-    agg = defaultdict(int)
-    for _, event_t, arrival_t, value in events:
-        agg[bucket((event_t, arrival_t)[index-1])] += value
-    print(f"\n{mode}")
-    for w, total in sorted(agg.items()):
-        print(f"  {w}: {total}")
 
-print("\nCon watermark de 2 min, E3 llega 2m10s después del cierre 10:05:")
-print("  debe descartarse, enviarse a late-events o corregir una salida previa, según política.")
+def aggregate(time_index: int) -> dict[str, int]:
+    result: dict[str, int] = defaultdict(int)
+    for _event_id, event_time, arrival_time, value in EVENTS:
+        chosen_time = (event_time, arrival_time)[time_index]
+        result[bucket(chosen_time)] += value
+    return dict(result)
+
+
+def main() -> None:
+    for label, time_index in [("event_time", 0), ("processing_time", 1)]:
+        print(f"\n{label}")
+        for window, total in sorted(aggregate(time_index).items()):
+            print(f"  {window}: {total}")
+
+    event_time = datetime.strptime("10:04:50", FMT)
+    arrival_time = datetime.strptime("10:07:10", FMT)
+    close_time = datetime.strptime("10:05:00", FMT)
+    delay_from_event = arrival_time - event_time
+    delay_after_close = arrival_time - close_time
+
+    print("\nE3:")
+    print(f"  demora desde el hecho: {delay_from_event}")
+    print(f"  llegada posterior al cierre 10:05: {delay_after_close}")
+    print("  con watermark de 2 min, la política debe decidir:")
+    print("    descartar, enviar a late-events, reabrir o corregir una salida previa")
+
+
+if __name__ == "__main__":
+    main()

@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y streaming}
-\title{Clase 07 --- Ficha de aula: historia, offsets y tiempo}
+\UASetClassTitle{Logs distribuidos y procesamiento de streams}
+\title{Clase 07 --- Ficha de aula: historia, progreso y efectos}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -27,8 +27,42 @@ Event time & \rule{0pt}{1.1cm} & \\
 \bottomrule
 \end{tabular}
 
+
 \newpage
-\section{2. Particiones y keys}
+\section{2. Identidades y vocabulario del caso CampusShop}
+
+CampusShop confirma una compra y produce un evento. Complete sin mezclar los tres identificadores:
+
+\begin{center}
+\begin{tabular}{p{0.26\textwidth}p{0.28\textwidth}p{0.32\textwidth}}
+\toprule
+Elemento & Ejemplo & Qué identifica \\
+\midrule
+Operación lógica & \texttt{9F2A} & \rule{0pt}{1.05cm} \\
+Evento & \texttt{evt-9F2A-1} & \rule{0pt}{1.05cm} \\
+Posición del log & P2, offset 418 & \rule{0pt}{1.05cm} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Defina brevemente:
+
+\begin{description}
+\item[Broker:] \hrulefill
+\item[Topic:] \hrulefill
+\item[Partición:] \hrulefill
+\item[Offset:] \hrulefill
+\item[Committed offset:] \hrulefill
+\item[Consumer group:] \hrulefill
+\end{description}
+
+\begin{uawarn}
+Pregunta de control: ¿dos registros ubicados en P0, offset 42 y P1, offset 42 representan necesariamente el mismo evento? Justifique.
+\end{uawarn}
+
+\newpage
+\section{3. Particiones y keys}
+
 Eventos: \texttt{OrderCreated}, \texttt{PaymentAuthorized}, \texttt{OrderCancelled} para pedidos 9F2A y 1C7B.
 
 \begin{center}
@@ -48,8 +82,41 @@ Eventos: \texttt{OrderCreated}, \texttt{PaymentAuthorized}, \texttt{OrderCancell
 \item Métrica para detectarla: \hrulefill
 \end{enumerate}
 
+
 \newpage
-\section{3. Timeline de offset y crash}
+\section{4. Publicación, réplica y ACK}
+
+Suponga una partición con líder A y seguidores B y C. Dibuje el recorrido de un registro y marque cuándo se respondería al productor en cada política.
+
+\begin{center}
+\begin{tikzpicture}[node distance=1.1cm,>=Latex,every node/.style={align=center}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=2.2cm] (p) {Productor};
+\node[draw=UAIngNavy,rounded corners,thick,right=of p,text width=2.2cm] (a) {Líder A};
+\node[draw=UAIngOrange,rounded corners,thick,above right=0.35cm and 1.3cm of a,text width=2.2cm] (b) {Seguidor B};
+\node[draw=UAIngOrange,rounded corners,thick,below right=0.35cm and 1.3cm of a,text width=2.2cm] (c) {Seguidor C};
+\draw[->,thick] (p)--node[above]{publicar}(a);
+\draw[->,thick] (a)--(b);
+\draw[->,thick] (a)--(c);
+\end{tikzpicture}
+\end{center}
+
+\begin{tabular}{p{0.24\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+Política & Condición de ACK & Falla todavía posible \\
+\midrule
+Sin esperar & \rule{0pt}{1.0cm} & \\
+Solo líder & \rule{0pt}{1.0cm} & \\
+Réplicas requeridas & \rule{0pt}{1.0cm} & \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.35cm}
+\textbf{ISR significa:} \hrulefill\\[0.45cm]
+\textbf{Trade-off principal:} \hrulefill
+
+\newpage
+\section{5. Timeline de offset y crash}
+
 Complete dos veces: primero commit antes del efecto; luego efecto antes del commit.
 
 \begin{center}
@@ -67,7 +134,7 @@ Complete dos veces: primero commit antes del efecto; luego efecto antes del comm
 \textbf{Dato durable para idempotencia:} \hrulefill
 
 \newpage
-\section{4. Frontera de exactly-once}
+\section{6. Frontera de exactly-once}
 Marque con un rectángulo qué componentes participan en su garantía.
 
 \begin{center}
@@ -89,7 +156,7 @@ Complete:
 \end{itemize}
 
 \newpage
-\section{5. Dual write y outbox}
+\section{7. Dual write y outbox}
 Dibuje las dos ventanas de falla y luego la solución outbox.
 
 \begin{center}
@@ -109,7 +176,7 @@ Campos mínimos de outbox: \hrulefill\\[0.5cm]
 ¿Cómo deduplica el consumidor? \hrulefill
 
 \newpage
-\section{6. Event time, watermark y late data}
+\section{8. Event time, watermark y eventos tardíos}
 Eventos:
 \begin{center}
 \begin{tabular}{cccc}
@@ -131,13 +198,40 @@ Para ventanas de cinco minutos:
 \item Para fraude, ¿esperaría más o menos? ¿Por qué? \vspace{1cm}
 \end{enumerate}
 
+
+\newpage
+\section{9. Diagnóstico de lag y operación}
+
+Complete la interpretación del panel:
+
+\begin{center}
+\begin{tabular}{p{0.17\textwidth}p{0.18\textwidth}p{0.22\textwidth}p{0.30\textwidth}}
+\toprule
+Partición & Ingreso/s & Consumo/s & Hipótesis \\
+\midrule
+P0 & 10.000 & 10.300 & \rule{0pt}{0.9cm} \\
+P1 & 10.500 & 10.600 & \rule{0pt}{0.9cm} \\
+P2 & 38.000 & 16.000 & \rule{0pt}{0.9cm} \\
+P3 & 9.800 & 10.100 & \rule{0pt}{0.9cm} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{enumerate}
+\item ¿Qué partición acumula trabajo? \hrulefill
+\item ¿Agregar consumidores divide automáticamente P2? \hrulefill
+\item ¿Qué diferencia hay entre lag en offsets y edad del evento? \vspace{0.7cm}
+\item Proponga tres métricas adicionales. \vspace{0.8cm}
+\item ¿Qué podría significar una DLQ creciente? \vspace{0.8cm}
+\end{enumerate}
+
 \newpage
 
 \begin{uainfo}
 \textbf{Precisión para la ficha:} el identificador del evento y la marca de deduplicación deben persistirse atómicamente con el efecto local. Registrar primero el efecto y después el ID deja una ventana de duplicación.
 \end{uainfo}
 
-\section{7. Diseño y exit ticket}
+\section{10. Diseño y exit ticket}
 Caso: ranking de Asteria Online.
 
 \begin{tabular}{p{0.27\textwidth}p{0.60\textwidth}}

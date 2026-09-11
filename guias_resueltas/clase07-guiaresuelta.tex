@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y streaming}
-\title{Clase 07 --- Guía resuelta}
+\UASetClassTitle{Logs distribuidos y procesamiento de streams}
+\title{Clase 07 --- Guía resuelta: historia, progreso y efectos}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -110,7 +110,7 @@ Entrega: cuántas veces recibe el registro. Procesamiento: cuántas veces cambia
 \paragraph{Profundización.} Es útil escribir la garantía como una tupla: $(objeto, frontera, fallas)$. Ejemplo: ``una actualización del state store y su output Kafka se hacen visibles juntos ante crash de proceso''. Esto no afirma nada sobre el proveedor de email.\paragraph{Evaluación.} Rechazar expresiones de exactly-once sin objeto ni frontera.
 \end{uaanswer}
 \begin{uaexercise}
-\textbf{13. Kafka Streams transaccional.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
+\textbf{13. Pipeline transaccional dentro de Kafka.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
 \end{uaexercise}
 \begin{uaanswer}
 La transacción incluye offsets consumidos, cambios al state store/changelog y registros de salida. Si falla antes de commit, ninguno se hace visible a consumidores \texttt{read\_committed} y el input se reprocesa. Esto mantiene coherencia dentro del ecosistema Kafka, no necesariamente con sistemas externos.
@@ -123,7 +123,7 @@ La transacción incluye offsets consumidos, cambios al state store/changelog y r
 \begin{uaanswer}
 DB primero: crash antes de publicar deja factura sin evento. Evento primero: crash o rollback deja evento de una factura inexistente. Si ambos terminan pero la respuesta se pierde, el retry puede duplicar. Cambiar el orden no elimina el dual write.
 
-\paragraph{Profundización.} Hay además una tercera ventana: ambas operaciones terminan pero la respuesta al llamador se pierde; un retry puede repetir la intención. El análisis debe incluir identidad estable.\paragraph{Prueba.} Inyectar crash en cada corte y comprobar la invariantes: factura y evento no divergen silenciosamente.
+\paragraph{Profundización.} Hay además una tercera ventana: ambas operaciones terminan pero la respuesta al llamador se pierde; un retry puede repetir la intención. El análisis debe incluir identidad estable.\paragraph{Prueba.} Inyectar crash en cada corte y comprobar los invariantes: factura y evento no divergen silenciosamente.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{15. Transactional outbox.} Diseñe tablas, estados y proceso relay para resolver el dual write. Explique por qué el consumidor aún debe ser idempotente.
@@ -137,7 +137,7 @@ La transacción local inserta factura y fila outbox con \texttt{event\_id}, \tex
 \textbf{16. Event time.} Un evento ocurre a las 10:00 y llega a las 10:07. Compare el resultado en ventanas por event time y processing time.
 \end{uaexercise}
 \begin{uaanswer}
-Con event time, pertenece a la ventana de 10:00 aunque llegue tarde; puede corregir un resultado ya emitido. Con processing time, se cuenta en 10:07 y distorsiona el momento real. La elección depende de semántica y tolerancia a correcciones.
+Con event time, pertenece a la ventana de 10:00--10:05 aunque llegue a las 10:07; puede corregir un resultado ya emitido. Con processing time, se cuenta en 10:07 y distorsiona el momento real. La elección depende de semántica y tolerancia a correcciones.
 
 \paragraph{Profundización.} Si la ventana ya emitió un resultado, el sistema debe definir si reabre, produce una corrección o descarta. Esa política afecta consumidores y contratos.\paragraph{Evidencia.} Medir porcentaje y edad de late events y costo de recomputación.
 \end{uaanswer}

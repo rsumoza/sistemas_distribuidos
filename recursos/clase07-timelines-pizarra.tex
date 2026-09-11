@@ -1,0 +1,100 @@
+% !TeX encoding = UTF-8
+\documentclass[variant=guia,cover=none,mode=print]{ua-engineering-v6-article}
+\input{../config/course-config}
+\UASetSemester{Segundo cuatrimestre 2026}
+\UASetDate{2026}
+\UASetClassNumber{07}
+\UASetClassTitle{Logs distribuidos y procesamiento de streams}
+\title{Clase 07 --- Timelines y diagramas para el aula}
+\author{\UAProfessor}
+\date{\UADate}
+
+\begin{document}
+\maketitle
+
+\section{Particiones, keys y orden local}
+
+Ubique los eventos \texttt{OrderCreated}, \texttt{PaymentAuthorized} y \texttt{OrderCancelled} de las operaciones \texttt{9F2A} y \texttt{1C7B}. Repita el ejercicio con dos keys diferentes.
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex]
+\foreach \y/\lab in {3/P0,2/P1,1/P2,0/P3}{
+  \node[anchor=east,font=\bfseries] at (0,\y){\lab};
+  \draw[UAIngRule,line width=1pt] (0.25,\y)--(14.2,\y);
+  \foreach \x in {1,2,...,13}{\draw[UAIngRule] (\x,\y-0.08)--(\x,\y+0.08);}
+}
+\end{tikzpicture}
+\end{center}
+
+\textbf{Key propuesta:} \hrulefill\\[0.5cm]
+\textbf{Orden que preserva:} \hrulefill\\[0.5cm]
+\textbf{Orden que no preserva:} \hrulefill\\[0.5cm]
+\textbf{Hot key plausible:} \hrulefill
+
+\newpage
+\section{Publicación, réplica y condición de ACK}
+
+Complete el timeline. Diferencie append del líder, réplica en seguidores, ACK y failover.
+
+\begin{center}
+\begin{tikzpicture}[x=0.82cm,y=1cm,>=Latex]
+\foreach \y/\lab in {4/Productor,3/Líder A,2/Seguidor B,1/Seguidor C,0/Cliente}{
+  \node[anchor=east,font=\bfseries] at (0,\y){\lab};
+  \draw[UAIngRule,line width=1pt] (0.25,\y)--(14.2,\y);
+}
+\draw[->,thick] (0.25,-0.7)--(14.4,-0.7) node[right]{tiempo};
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+\item ¿Qué condición promete el ACK del líder? \vspace{0.7cm}
+\item ¿Qué condición promete esperar réplicas sincronizadas? \vspace{0.7cm}
+\item Mueva el crash del líder a tres posiciones y describa el resultado. \vspace{1.1cm}
+\end{enumerate}
+
+\newpage
+\section{Consumo, efecto, committed offset y crash}
+
+Complete dos veces. En la primera, confirme progreso antes del efecto. En la segunda, aplique el efecto antes de confirmar progreso.
+
+\begin{center}
+\begin{tikzpicture}[x=0.82cm,y=1cm,>=Latex]
+\foreach \y/\lab in {4/Broker,3/Consumer,2/Base local,1/Efecto externo,0/Offset}{
+  \node[anchor=east,font=\bfseries] at (0,\y){\lab};
+  \draw[UAIngRule,line width=1pt] (0.25,\y)--(14.2,\y);
+}
+\draw[->,thick] (0.25,-0.7)--(14.4,-0.7) node[right]{tiempo};
+\end{tikzpicture}
+\end{center}
+
+\textbf{Ventana de pérdida:} \hrulefill\\[0.55cm]
+\textbf{Ventana de duplicación:} \hrulefill\\[0.55cm]
+\textbf{Dato que debe persistirse junto al efecto local:} \hrulefill
+
+\newpage
+\section{Dual write, outbox, relay e inbox}
+
+Dibuje primero los dos órdenes inseguros. Luego complete el pipeline con sus fronteras transaccionales.
+
+\begin{center}
+\begin{tikzpicture}[node distance=0.63cm,>=Latex,every node/.style={align=center,font=\small}]
+\node[draw=UAIngOrange,rounded corners,thick,text width=1.75cm] (svc) {Servicio};
+\node[draw=UAIngNavy,rounded corners,thick,right=of svc,text width=2.00cm] (db) {Base + outbox};
+\node[draw=UAIngOrange,rounded corners,thick,right=of db,text width=1.85cm] (relay) {Relay / CDC};
+\node[draw=UAIngNavy,rounded corners,thick,right=of relay,text width=1.65cm] (broker) {Broker};
+\node[draw=UAIngOrange,rounded corners,thick,right=of broker,text width=2.00cm] (inbox) {Inbox + efecto};
+\draw[->,very thick] (svc)--(db);
+\draw[->,very thick,UAIngOrange] (db)--(relay);
+\draw[->,very thick] (relay)--(broker);
+\draw[->,very thick,UAIngOrange] (broker)--(inbox);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+\item ¿Qué dos cambios son atómicos en la base del productor? \vspace{0.7cm}
+\item ¿Por qué el relay puede republicar? \vspace{0.7cm}
+\item ¿Qué dos cambios son atómicos en la base del consumidor? \vspace{0.7cm}
+\item ¿Qué efecto externo sigue fuera de estas fronteras? \vspace{0.7cm}
+\end{enumerate}
+
+\end{document}

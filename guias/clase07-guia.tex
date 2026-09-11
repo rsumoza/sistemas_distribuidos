@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y streaming}
-\title{Clase 07 --- Guía de ejercicios}
+\UASetClassTitle{Logs distribuidos y procesamiento de streams}
+\title{Clase 07 --- Guía de ejercicios: historia, progreso y efectos}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -24,10 +24,10 @@ Dato & Valor de referencia \\
 \midrule
 Ingreso medio / pico & 80.000 / 120.000 eventos por segundo \\
 Capacidad sostenible por consumer & 5.000 eventos/s \\
-Topic inicial & 24 particiones, RF=3 \\
-Consumers principales & inventario, facturación, email y analítica \\
+Topic inicial & 24 particiones; factor de replicación 3 \\
+Consumidores principales & inventario, facturación, notificación y analítica \\
 SLO inventario & 99,9\% de pedidos reflejados en menos de 5 s \\
-Fallas a considerar & timeout de producer, crash de consumer, rebalance, hot key y evento tardío \\
+Fallas a considerar & timeout del productor, crash del consumidor, rebalance, clave caliente y evento tardío \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -83,7 +83,7 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 \end{uaexercise}
 \begin{uaexercise}
 
-\textbf{3. Número de particiones.} Un topic recibe 80.000 eventos/s y se estima que cada consumidor procesa 5.000 eventos/s. Proponga una cantidad inicial de particiones y discuta límites del cálculo.
+\textbf{3. Número de particiones.} Un topic recibe 80.000 eventos/s y se estima que cada partición puede ser procesada a 5.000 eventos/s por una instancia. Proponga una cantidad inicial de particiones y discuta límites del cálculo.
 
 \textit{Entregable mínimo:} un cálculo base, 30\% de margen y dos razones por las que el resultado puede fallar.
 \end{uaexercise}
@@ -125,7 +125,7 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 \end{uaexercise}
 \begin{uaexercise}
 
-\textbf{10. ACK del producer.} Compare confirmar con el líder frente a esperar réplicas in-sync. Analice latencia, disponibilidad y pérdida ante failover.
+\textbf{10. ACK del producer.} Compare confirmar con el líder frente a esperar las réplicas sincronizadas requeridas (ISR). Analice latencia, disponibilidad y pérdida ante failover.
 
 \textit{Entregable mínimo:} una tabla de ACK, falla cubierta, latencia y condición de indisponibilidad.
 \end{uaexercise}
@@ -143,7 +143,7 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 \end{uaexercise}
 \begin{uaexercise}
 
-\textbf{13. Kafka Streams transaccional.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
+\textbf{13. Pipeline transaccional dentro de Kafka.} Describa cómo coordinar input offsets, state store y output topic. Explique qué ocurre al abortar.
 
 \textit{Entregable mínimo:} un diagrama de transacción con abort/replay y límite externo.
 \end{uaexercise}
@@ -157,7 +157,7 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 
 \textbf{15. Transactional outbox.} Diseñe tablas, estados y proceso relay para resolver el dual write. Explique por qué el consumidor aún debe ser idempotente.
 
-\textit{Entregable mínimo:} un schema de outbox/inbox, relay, retención y prueba de repetición.
+\textit{Entregable mínimo:} un esquema de outbox/inbox, relay, retención y prueba de repetición.
 \end{uaexercise}
 \begin{uaexercise}
 
@@ -175,7 +175,7 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 
 \textbf{18. Stateful streaming.} Diseñe un join entre pedidos y pagos. Defina key, retención de estado, timeout de join y comportamiento ante evento tardío.
 
-\textit{Entregable mínimo:} un diagrama de join, estado retenido, timeout y late-data policy.
+\textit{Entregable mínimo:} un diagrama de join, estado retenido, timeout y política de eventos tardíos.
 \end{uaexercise}
 \begin{uaexercise}
 

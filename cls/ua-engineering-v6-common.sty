@@ -62,13 +62,13 @@
 % Metadatos institucionales. Cada documento puede redefinirlos.
 \newcommand{\UAUniversity}{Universidad Austral}
 \newcommand{\UAFaculty}{Facultad de Ingeniería}
-\newcommand{\UADepartment}{Departamento de Informática}
+\newcommand{\UADepartment}{Departamento de Computación}
 \newcommand{\UACampus}{Pilar}
-\newcommand{\UACareer}{Ingeniería en Informática}
+\newcommand{\UACareer}{Licenciatura en Ciencia de Datos}
 \newcommand{\UACommission}{Cohorte 2026}
 \newcommand{\UAProfessor}{Prof. Rodolfo Leonardo Sumoza Matos}
 \newcommand{\UASemester}{Segundo cuatrimestre 2026}
-\newcommand{\UACourse}{Sistemas Distribuidos}
+\newcommand{\UACourse}{Investigación Operativa}
 \newcommand{\UADate}{2026}
 \newcommand{\UAClassNumber}{}
 \newcommand{\UAClassTitle}{}
@@ -196,38 +196,3 @@
   enhanced,breakable,colback=UAIngPaper,colframe=UAIngOrange,
   boxrule=0.8pt,arc=1.6mm,left=3mm,right=3mm,top=2mm,bottom=2mm,
   title=\textbf{Respuesta orientativa},colbacktitle=UAIngOrange,coltitle=white}
-
-% -----------------------------------------------------------------------------
-% Extensiones pedagógicas para Sistemas Distribuidos (v6.2.1-safe)
-% Cambio aditivo y retrocompatible: no modifica logos, fuentes, metadatos,
-% colores ni entornos existentes. Las guardas evitan redefiniciones.
-% -----------------------------------------------------------------------------
-\makeatletter
-\@ifundefined{uacase}{%
-  \newtcolorbox{uacase}{%
-    enhanced,breakable,
-    colback=white,colframe=UAIngOrange,
-    boxrule=0.9pt,arc=1.6mm,
-    left=3mm,right=3mm,top=2mm,bottom=2mm,
-    title=\textbf{Caso real},
-    colbacktitle=UAIngOrange,coltitle=white}%
-}{}
-\@ifundefined{uademo}{%
-  \newtcolorbox{uademo}{%
-    enhanced,breakable,
-    colback=UAIngPaper,colframe=UAIngNavy,
-    boxrule=0.8pt,arc=1.6mm,
-    left=3mm,right=3mm,top=2mm,bottom=2mm,
-    title=\textbf{Demostración guiada},
-    colbacktitle=UAIngNavy,coltitle=white}%
-}{}
-\@ifundefined{uacheck}{%
-  \newtcolorbox{uacheck}{%
-    enhanced,breakable,
-    colback=white,colframe=UAIngNavy,
-    boxrule=0.8pt,arc=1.6mm,
-    left=3mm,right=3mm,top=2mm,bottom=2mm,
-    title=\textbf{Compruebe su comprensión},
-    colbacktitle=UAIngNavy,coltitle=white}%
-}{}
-\makeatother

@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Semánticas de consumo y atomicidad de la deduplicación.
+"""Demostración didáctica de offsets, pérdida, repetición e inbox atómica.
 
-No requiere Kafka. Modela el orden poll/efecto/commit/crash y hace explícito
-que el efecto local y la marca event_id deben persistirse en una misma
-transacción para que el replay sea seguro.
+No requiere Kafka. La simulación hace visible el orden entre:
+  poll -> efecto -> registro de deduplicación -> commit de offset -> crash.
 """
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+
+
+EVENT = {"offset": 42, "event_id": "evt-9F2A-1", "qty": 1}
 
 
 @dataclass
@@ -15,71 +19,70 @@ class State:
     processed_ids: set[str] = field(default_factory=set)
 
 
-EVENT = {"offset": 42, "event_id": "order-9F2A", "qty": 1}
-
-
-def effect_non_idempotent(s: State) -> None:
-    s.stock -= EVENT["qty"]
-    print(f"  efecto aplicado: stock={s.stock}")
-
-
-def effect_and_mark_atomic(s: State) -> None:
-    """Representa una transacción local: check + efecto + inbox/event_id."""
-    if EVENT["event_id"] in s.processed_ids:
-        print("  efecto omitido: event_id ya existe en inbox")
-        return
-    s.stock -= EVENT["qty"]
-    s.processed_ids.add(EVENT["event_id"])
-    print(f"  transacción local: stock={s.stock}, event_id persistido")
-
-
-def effect_then_crash_before_mark(s: State) -> None:
-    """Anti-ejemplo: efecto y marca se guardan por separado."""
-    s.stock -= EVENT["qty"]
-    print(f"  efecto persistido: stock={s.stock}")
-    print("  CRASH antes de persistir event_id -> el replay no podrá deduplicar")
-
-
 def at_most_once() -> None:
-    s = State()
-    print("\nAT-MOST-ONCE: poll -> commit offset -> crash -> efecto")
-    s.committed_offset = 43
+    state = State()
+    print("\nAT-MOST-ONCE: poll -> commit offset -> CRASH -> efecto")
+    print(f"  poll offset {EVENT['offset']}")
+    state.committed_offset = 43
     print("  commit offset 43")
     print("  CRASH antes del efecto")
-    print(f"  restart en {s.committed_offset}; stock={s.stock} (efecto perdido)")
+    print(
+        f"  restart en {state.committed_offset}; stock={state.stock} "
+        "(el efecto se perdió)"
+    )
 
 
 def at_least_once_without_idempotency() -> None:
-    s = State()
-    print("\nAT-LEAST-ONCE SIN IDEMPOTENCIA: efecto -> crash -> replay")
-    effect_non_idempotent(s)
-    print("  CRASH antes de commit offset")
-    effect_non_idempotent(s)
-    s.committed_offset = 43
-    print(f"  commit offset 43; stock final={s.stock} (duplicado)")
+    state = State()
+    print("\nAT-LEAST-ONCE SIN IDEMPOTENCIA: poll -> efecto -> CRASH -> replay")
+    print(f"  poll offset {EVENT['offset']}")
+    state.stock -= EVENT["qty"]
+    print(f"  efecto aplicado: stock={state.stock}")
+    print("  CRASH antes del commit del offset")
+    print(f"  restart en {state.committed_offset}; replay offset {EVENT['offset']}")
+    state.stock -= EVENT["qty"]
+    print(f"  efecto repetido: stock={state.stock}")
+    state.committed_offset = 43
+    print("  commit offset 43")
 
 
-def at_least_once_with_atomic_inbox() -> None:
-    s = State()
-    print("\nAT-LEAST-ONCE + INBOX ATÓMICA: efecto+event_id -> crash -> replay")
-    effect_and_mark_atomic(s)
-    print("  CRASH antes de commit offset")
-    effect_and_mark_atomic(s)
-    s.committed_offset = 43
-    print(f"  commit offset 43; stock final={s.stock} (un solo efecto lógico)")
+def atomic_inbox_and_effect() -> None:
+    state = State()
+    print("\nAT-LEAST-ONCE + INBOX ATÓMICA")
+
+    def local_transaction() -> None:
+        event_id = EVENT["event_id"]
+        if event_id in state.processed_ids:
+            print("  replay detectado: event_id ya procesado; no-op")
+            return
+        # Modelo didáctico: ambos cambios confirman o ninguno confirma.
+        state.processed_ids.add(event_id)
+        state.stock -= EVENT["qty"]
+        print(f"  COMMIT local: inbox + stock; stock={state.stock}")
+
+    print(f"  poll offset {EVENT['offset']}")
+    local_transaction()
+    print("  CRASH antes del commit del offset")
+    print(f"  restart en {state.committed_offset}; replay offset {EVENT['offset']}")
+    local_transaction()
+    state.committed_offset = 43
+    print(f"  commit offset 43; stock final={state.stock}")
 
 
-def non_atomic_dedup_counterexample() -> None:
-    s = State()
-    print("\nANTI-EJEMPLO: efecto y marca de deduplicación no son atómicos")
-    effect_then_crash_before_mark(s)
-    print("  replay:")
-    effect_and_mark_atomic(s)
-    print(f"  stock final={s.stock} (el efecto ocurrió dos veces)")
+def non_atomic_counterexample() -> None:
+    state = State()
+    print("\nCONTRAEJEMPLO: efecto e inbox NO son atómicos")
+    state.stock -= EVENT["qty"]
+    print(f"  efecto persistido: stock={state.stock}")
+    print("  CRASH antes de registrar event_id")
+    print("  replay: la inbox no reconoce el evento")
+    state.stock -= EVENT["qty"]
+    state.processed_ids.add(EVENT["event_id"])
+    print(f"  segundo efecto: stock={state.stock} (duplicación lógica)")
 
 
 if __name__ == "__main__":
     at_most_once()
     at_least_once_without_idempotency()
-    at_least_once_with_atomic_inbox()
-    non_atomic_dedup_counterexample()
+    atomic_inbox_and_effect()
+    non_atomic_counterexample()

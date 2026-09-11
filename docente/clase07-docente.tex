@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y streaming}
-\title{Clase 07 --- Guía docente magistral: Kafka, offsets, exactly-once y tiempo en streams}
+\UASetClassTitle{Logs distribuidos y procesamiento de streams}
+\title{Clase 07 --- Guía docente magistral: historia durable, progreso recuperable y efectos correctos}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -54,15 +54,15 @@ Al finalizar, el estudiante debe poder:
 Tiempo & Bloque & Propósito \\
 \midrule
 0--8 & Apertura & Venta relámpago de CampusShop; preguntar por qué no hacer cinco RPC sincrónicos. \\
-8--20 & Puente y diagnóstico & Del WAL local al log compartido; voto V/F sin corregir todavía. \\
-20--43 & Intuiciones & Película, carriles, señaladores, equipo, deuda, frontera y reloj del hecho. \\
-43--68 & Log y particiones & Modelo formal, keys, hot partitions, producer ACK e idempotencia. \\
-68--80 & Actividad breve & Distribuir tarjetas de eventos entre particiones y detectar skew. \\
+8--28 & Contexto, puente y vocabulario & Del WAL local al log compartido; CampusShop, identidades y términos previos. \\
+28--43 & Diagnóstico e intuiciones & Predicción individual; película, carriles, señaladores y reloj del hecho. \\
+43--72 & Log y publicación & Topic, particiones, keys, hot partitions, réplica, ACK e idempotencia. \\
+72--82 & Actividad breve & Distribuir eventos entre particiones, justificar key y detectar skew. \\
 80--90 & Pausa & Recuperación y preguntas anónimas. \\
-90--122 & Offsets & Timeline vacío; construir at-most-once, at-least-once, rebalance y lag. \\
-122--148 & Exactly-once y outbox & Fronteras, transacción Kafka--Kafka, dual write y outbox. \\
-148--169 & Streaming temporal & Stateful processing, event time, ventanas, watermark y late data. \\
-169--178 & Diseño grupal & Asteria/CampusShop: key, semántica, SLO y prueba de falla. \\
+92--124 & Consumo y progreso & Grupo, position, committed offset, timelines, rebalance y lag. \\
+124--151 & Efectos correctos & Inbox, frontera exactly-once, dual write, outbox y captura de cambios. \\
+151--171 & Streams con estado y tiempo & Changelog, ventanas, event time, watermark y eventos tardíos. \\
+171--178 & Diseño grupal & Asteria/CampusShop: key, semántica, SLO y prueba de falla. \\
 178--180 & Exit ticket & Cuatro respuestas breves para abrir la clase 8. \\
 \bottomrule
 \end{tabular}
@@ -76,7 +76,7 @@ No debe haber más de 15--18 minutos continuos de exposición. Cada bloque termi
 \begin{itemize}
 \item Ejecutar las demos de offsets y event time incluidas en el paquete.
 \item Imprimir una ficha de aula por estudiante o pareja.
-\item Preparar 18 tarjetas: seis eventos, seis offsets, dos CRASH, dos consumers y dos particiones.
+\item Preparar 20 tarjetas: seis eventos, seis offsets, dos CRASH, dos consumidores, tres particiones y una tarjeta de ACK.
 \item Verificar que la presentación muestre correctamente los diagramas de particiones y outbox.
 \item Definir el SLO del caso: ``99,9\% de pedidos reflejados en inventario en menos de 5 s''.
 \item Leer las secciones oficiales de Kafka sobre consumer position, committed offsets, producer idempotence y transactions.
@@ -126,6 +126,25 @@ Dé 45 segundos individuales y luego pregunte:
 \end{itemize}
 
 Recoja respuestas sin corregir todo. Utilícelas como hipótesis que la clase revisará.
+
+
+\subsection{Vocabulario mínimo antes de pedir decisiones}
+
+Antes del diagnóstico, dedique quince minutos a construir un lenguaje común. No dé por conocidos términos operativos solo porque aparecen en herramientas reales.
+
+\begin{description}
+\item[Broker.] Servidor intermediario que recibe y almacena particiones del log.
+\item[Topic.] Categoría lógica dividida en particiones.
+\item[Partición.] Carril append-only que ofrece orden local y limita paralelismo.
+\item[Key.] Clave que dirige eventos relacionados al mismo carril.
+\item[Offset.] Posición dentro de una partición; no es identidad de negocio.
+\item[Committed offset.] Progreso durable desde el que reinicia el grupo.
+\item[ACK.] Acuse de recibo del broker; su significado depende de qué réplicas debieron aceptar el registro.
+\item[ISR.] Réplicas suficientemente al día para la política de confirmación configurada.
+\item[SLO.] Objetivo cuantitativo de nivel de servicio, por ejemplo ``99,9\% de pedidos reflejados en inventario en menos de 5 s''.
+\end{description}
+
+Use en el pizarrón las tres identidades del caso: \texttt{operation\_id=9F2A}, \texttt{event\_id=evt-9F2A-1} y \texttt{P2, offset 418}. Si el estudiante mezcla estas identidades, no avance todavía hacia exactly-once.
 
 \subsection{Secuencia de conducción: de la intuición al formalismo}
 
@@ -200,20 +219,20 @@ Use las tres columnas del pizarrón. Dé ejemplos:
 \begin{itemize}
 \item producer idempotente: evita cierto duplicado en el log;
 \item transacción Kafka Streams: coordina offset, state store/changelog y output Kafka;
-\item API de pagos externa: queda fuera salvo protocolo/idempotencia propios.
+\item servicio de pagos externo: queda fuera salvo protocolo/idempotencia propios.
 \end{itemize}
 
 Pida que reformulen ``Kafka da exactly-once'' como una frase completa con objeto, frontera y fallas.
 
 \subsubsection{Dual write y outbox}
 
-Dibuje DB y broker. Pruebe los dos órdenes y coloque un crash entre escrituras. Espere a que el curso concluya que cambiar el orden no resuelve atomicidad.
+Dibuje la base de datos y el broker. Pruebe los dos órdenes y coloque un crash entre escrituras. Espere a que el curso concluya que cambiar el orden no resuelve atomicidad.
 
 Introduzca outbox como una sola transacción local. Marque explícitamente que el relay puede repetir y que el consumer debe deduplicar.
 
 \subsubsection{Event time y watermarks}
 
-Use un evento ocurrido a las 10:00 que llega a las 10:07. Pida ubicarlo primero por processing time y luego por event time. Pregunte cuánto esperarían para un dashboard y para fraude. La comparación hace emerger el trade-off latencia/completitud.
+Use un evento ocurrido a las 10:00 que llega a las 10:07. Pida ubicarlo primero por processing time y luego por event time. Señale que llega 2 min 10 s después del cierre 10:05 y pregunte cuánto esperarían para un dashboard y para fraude. La comparación hace emerger el trade-off latencia/completitud.
 
 \subsection{Casos reales y cómo narrarlos}
 
@@ -423,7 +442,7 @@ Se confirma el offset antes del efecto. Si hay crash entre ambos, el record no s
 Se aplica el efecto y después se confirma el offset. Si hay crash en medio, el record se relee. Esta semántica permite redelivery; no garantiza que todo record produzca un efecto exitoso, porque puede existir poison pill, error permanente o indisponibilidad externa.
 
 \paragraph{Exactly-once.}
-Debe definirse como una propiedad de una frontera. En un pipeline Kafka--procesamiento--Kafka, una transacción puede coordinar outputs y offsets. Un email, API de pago o base externa no entra automáticamente en esa transacción. Para efectos externos suelen usarse idempotencia, outbox/inbox, claves únicas o una transacción local que incluya efecto y deduplicación.
+Debe definirse como una propiedad de una frontera. En un pipeline que consume y vuelve a publicar dentro de Kafka, una transacción puede coordinar los offsets de entrada y los registros de salida. Un correo, un servicio de pago o una base externa no entra automáticamente en esa transacción. Para esos efectos suelen usarse idempotencia, outbox/inbox, claves únicas o una transacción local que incluya efecto y deduplicación.
 
 \paragraph{Pregunta previsible: ``¿exactly-once significa que el código se ejecuta una sola vez?''}
 No necesariamente. Puede haber reejecución física, pero el estado observable debe ser equivalente a una ejecución lógica. La distinción entre ejecución e impacto es central.
@@ -474,7 +493,7 @@ Las métricas mínimas incluyen:
 \item duración y frecuencia de rebalances;
 \item tiempo de procesamiento y error rate por operador;
 \item tamaño y tiempo de restauración de state stores;
-\item registros en DLQ y edad del record más antiguo;
+\item registros en DLQ (cola de mensajes no procesables) y edad del record más antiguo;
 \item skew de claves y utilización relativa de particiones.
 \end{itemize}
 
@@ -520,11 +539,29 @@ Lag es deuda de trabajo, no diagnóstico causal. Puede crecer por falta de CPU, 
 \item \textbf{¿Cómo elegir la key?} Primero identifique la unidad que requiere orden y luego valide distribución, skew y capacidad de escalado.
 \item \textbf{¿Qué ocurre si cambia el número de particiones?} El mapeo hash puede cambiar y una misma key podría no mantener continuidad histórica según la estrategia; debe planificarse.
 \item \textbf{¿Un lag cero prueba exactamente una vez?} No. Solo indica que el marcador alcanzó el final observado; el efecto pudo fallar, duplicarse o ser incorrecto.
-\item \textbf{¿DLQ resuelve poison pills?} Aísla disponibilidad, pero crea una deuda de corrección y exige ownership, replay seguro y SLO.
+\item \textbf{¿Una DLQ resuelve por sí sola los eventos no procesables?} Aísla disponibilidad, pero crea una deuda de corrección y exige ownership, replay seguro y SLO.
 \item \textbf{¿Qué limita el paralelismo de un consumer group?} La cantidad de particiones y el costo/estado por partición.
 \item \textbf{¿Outbox garantiza orden global?} No. Puede preservar orden por agregado con diseño adicional; múltiples relays y particiones requieren claves y secuencias.
 \item \textbf{¿Por qué no usar solo RPC?} RPC puede ser correcto para una respuesta inmediata, pero acopla disponibilidad y tiempo; el log compra desacoplamiento, replay y fan-out a costo de eventualidad y operación.
 \item \textbf{¿Watermark igual a reloj global?} No. Es una estimación operativa sobre progreso en event time.
+\end{enumerate}
+
+
+\subsubsection*{Preguntas técnicas adicionales que pueden surgir}
+
+\begin{enumerate}
+\item \textbf{¿Por qué el orden se limita a una partición?} Porque cada partición posee una secuencia propia. Coordinar un orden total entre todas las particiones agregaría una autoridad y un cuello de botella global que el diseño evita deliberadamente.
+\item \textbf{¿Cambiar el número de particiones puede alterar el mapeo de keys?} Sí. Según el particionador, una misma key puede mapear a otro número cuando cambia $N$. La continuidad histórica y la migración deben planificarse.
+\item \textbf{¿Qué diferencia hay entre retención y compactación de log?} Retención elimina segmentos por tiempo o tamaño; log compaction conserva, bajo reglas específicas, el valor más reciente por key. Ninguna equivale a la compactación de SSTables de una LSM estudiada en clase 6.
+\item \textbf{¿Qué significa \texttt{acks=all}?} El líder espera las réplicas sincronizadas requeridas por la configuración. La tolerancia real depende también del mínimo de ISR y de las reglas de elección.
+\item \textbf{¿Puede perderse un mensaje ya reconocido?} Depende de la política de ACK, replicación, persistencia y failover. Una respuesta del líder solo puede preceder a la copia en seguidores.
+\item \textbf{¿Qué pasa con un consumidor que tarda demasiado?} Puede perder su membresía, provocar rebalance y releer desde el committed offset. También puede quedar fuera de la ventana de retención si el atraso es extremo.
+\item \textbf{¿El commit de offset debe realizarse por cada registro?} No necesariamente. Confirmar en lotes reduce overhead, pero amplía el rango que puede repetirse tras un crash.
+\item \textbf{¿Qué es un poison pill?} Un evento que falla de forma permanente para un consumidor, por esquema inválido, dato imposible o bug. Reintentar sin límite puede bloquear una partición.
+\item \textbf{¿CDC y outbox son lo mismo?} No. Outbox es el patrón de persistir explícitamente un evento pendiente con el cambio de negocio; CDC es una técnica para observar cambios del log transaccional y publicarlos.
+\item \textbf{¿Qué ocurre si la outbox crece?} Debe medirse edad, cantidad pendiente, reintentos y retención. Una outbox acumulada es evidencia de que el relay o el broker no acompaña la tasa de negocio.
+\item \textbf{¿Un watermark descarta automáticamente eventos?} No. El watermark ayuda a disparar cálculos; la política del operador decide descartar, corregir, reabrir o derivar late data.
+\item \textbf{¿Cómo se preserva el orden de eventos de una saga?} Use una key por aggregate, secuencia monotónica y consumidores que detecten huecos o versiones incompatibles. El orden entre agregados sigue sin ser global.
 \end{enumerate}
 
 \subsection{Ruta esencial y profundización para 180 minutos}
