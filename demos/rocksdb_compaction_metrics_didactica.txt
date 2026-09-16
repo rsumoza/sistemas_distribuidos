@@ -1,42 +1,49 @@
-CLASE 06 - METRICAS DIDACTICAS DE COMPACTION
-=============================================
+CLASE 06 - METRICAS DIDACTICAS DE COMPACTACION
+================================================
 
-Estos valores son sintéticos y coherentes. No provienen de una instalación productiva.
-Se usan para aprender a construir una explicación causal y no para presentar un benchmark.
+Estos valores son sintéticos y coherentes con las diapositivas. No proceden de
+una instalación productiva y no constituyen un benchmark de RocksDB. El objetivo
+es aprender a construir una explicación causal y una política de validación.
 
-ESCENARIO A - EL MISMO DE LAS DIAPOSITIVAS
-------------------------------------------
-Ventana:                              10 min
+ESCENARIO A - DASHBOARD DE LA CLASE
+-----------------------------------
+Ventana observada:                    10 min
 Ingreso lógico sostenido:             90 MB/s
-Flush + compaction sostenidos:        60 MB/s
-Déficit:                              30 MB/s
+Flush + compactación sostenidos:      60 MB/s
+Déficit sostenido:                    30 MB/s
 Pending compaction bytes:             18 GB y creciendo
-L0 files:                             28
-Slowdown trigger didáctico:           15 GB
-Stop trigger didáctico:               22 GB / 36 archivos L0
+Umbral de slowdown:                   27 GB
+Umbral de stop:                       36 GB
+Archivos L0:                          28 de 36
 Write latency p50:                     4 ms
 Write latency p99:                   430 ms
 Write stall time:                      2.8 s en la ventana
 
-Cadena de lectura:
-1. ingreso > capacidad de mantenimiento;
-2. pending bytes y L0 crecen;
-3. aumenta read/space amplification y competencia por I/O;
-4. sube p99;
-5. el motor aplica slowdown o stall como backpressure.
+Cálculo idealizado, con unidades decimales:
+- hasta slowdown: (27-18) GB / 30 MB/s = 300 s = 5 min;
+- hasta stop:     (36-18) GB / 30 MB/s = 600 s = 10 min.
 
-ESCENARIO B - EXTENSION CUANTITATIVA DE LA GUIA
-------------------------------------------------
-Ingreso lógico sostenido:            145 MB/s
-Compaction sostenida:                110 MB/s
-Pending compaction bytes:             18 GB, +2.1 GB/min
-L0 files:                             28 de 36, +1.6 archivos/min
-Write amplification:                  6.5x
-Stall time:                            3.4 s/min
+Cadena causal a validar:
+1. ingreso > capacidad de mantenimiento;
+2. pending bytes y archivos L0 crecen;
+3. aumenta competencia por E/S y la cantidad de estructuras consultadas;
+4. sube la latencia p99;
+5. el motor aplica slowdown o write stall como backpressure.
+
+ESCENARIO B - INTERVENCION
+--------------------------
+Después de ampliar capacidad y ajustar compaction:
+Ingreso lógico sostenido:             90 MB/s
+Compactación sostenida:              105 MB/s
+Pending compaction bytes:             18 GB y decreciendo
+Archivos L0:                          28 y decreciendo
+Write amplification:                  7.1x
+Write latency p99:                    75 ms
+Write stall time:                      0.1 s en la ventana
 
 Preguntas:
-1. ¿Cuánto déficit de capacidad existe?
-2. ¿Cuánto falta para el stop trigger si la tendencia no cambia?
-3. ¿Qué intervención propondría?
-4. ¿Qué métrica demostraría que esa intervención funcionó?
-5. ¿Qué recurso podría empeorar al hacer compaction más agresiva?
+1. ¿La intervención estabilizó la cola? ¿Qué pendiente lo demuestra?
+2. ¿Qué costo pudo aumentar al hacer compactación más agresiva?
+3. ¿Qué recurso debe vigilarse: CPU, ancho de banda del dispositivo o caché?
+4. ¿Qué SLO permite decidir si el stall es protección aceptable o incapacidad?
+5. ¿Qué experimento distinguiría carga excesiva de una política mal configurada?

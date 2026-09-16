@@ -1,0 +1,6 @@
+PDF: build/guias_resueltas/clase06-guiaresuelta.pdf
+Pages: 11
+Encrypted: False
+Openable (PyMuPDF): True
+Likely scanned: False
+XFA present: False

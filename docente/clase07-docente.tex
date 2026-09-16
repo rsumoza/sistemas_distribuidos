@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y procesamiento de streams}
-\title{Clase 07 --- Guía docente magistral: historia durable, progreso recuperable y efectos correctos}
+\UASetClassTitle{Logs distribuidos y procesamiento de eventos}
+\title{Clase 07 --- Guía docente: de un hecho durable a un efecto recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -14,256 +14,205 @@
 \clearpage
 
 \section{Parte A: guion operativo para 180 minutos}
+
 \subsection{Objetivo pedagógico profundo}
 
-La clase debe cambiar el modelo mental ``Kafka es una cola rápida'' por una representación precisa y reusable:
+La Clase 06 mostró que parte del grupo aún no posee un modelo firme de memoria, persistencia, archivos y progreso recuperable. Por eso esta clase no debe comenzar con Kafka, offsets o exactly-once. Debe construir primero un modelo mínimo:
 
 \begin{center}
-\textbf{el log conserva historia; la partición define orden; el offset define progreso; la frontera transaccional define qué se vuelve visible junto; el dominio define el efecto útil.}
+\textbf{registro} $\rightarrow$ \textbf{secuencia append-only} $\rightarrow$ \textbf{lector} $\rightarrow$ \textbf{progreso durable}.
 \end{center}
 
-La progresión didáctica será la misma de la clase 6:
-\[
-\text{intuición}\rightarrow\text{caso}\rightarrow\text{modelo}\rightarrow\text{timeline}\rightarrow\text{falla}\rightarrow\text{costo}\rightarrow\text{métrica}\rightarrow\text{decisión}.
-\]
+Sobre esa base se incorporan particiones, keys, grupos de consumidores, fallas e idempotencia.
 
 \begin{uakeybox}
-La clase habrá funcionado si el estudiante puede mover un crash en un timeline y deducir pérdida o duplicación sin recitar de memoria ``at-most-once'' o ``at-least-once''.
+La clase habrá funcionado si el estudiante puede mover un crash en un timeline y deducir pérdida o duplicación sin recitar de memoria una etiqueta de entrega.
 \end{uakeybox}
+
+La progresión será:
+\[
+\text{situación observable}
+\rightarrow
+\text{predicción}
+\rightarrow
+\text{objetos concretos}
+\rightarrow
+\text{intuición}
+\rightarrow
+\text{definición}
+\rightarrow
+\text{falla}
+\rightarrow
+\text{evidencia}
+\rightarrow
+\text{decisión}.
+\]
 
 \subsection{Resultados de aprendizaje observables}
 
 Al finalizar, el estudiante debe poder:
 \begin{itemize}
-\item explicar intuitiva y formalmente log, partición, offset, consumer group, lag y event time;
-\item distinguir identidad de negocio de posición física en el log;
-\item elegir una key de partición a partir del orden requerido y del skew esperado;
+\item diferenciar memoria de trabajo, historia persistente y progreso durable;
+\item explicar registro, append, log, partición, key, offset y committed offset;
+\item elegir una key a partir del orden exigido por el dominio;
 \item construir timelines de at-most-once y at-least-once;
-\item declarar el alcance de producer idempotence y exactly-once;
-\item explicar por qué dual write no se resuelve cambiando el orden;
-\item diseñar transactional outbox e idempotent consumer;
-\item razonar sobre state stores, ventanas, watermarks y eventos tardíos;
-\item proponer un SLO extremo a extremo y una prueba de crash/rebalance.
+\item justificar idempotencia e inbox para un efecto local;
+\item descubrir las dos ventanas de dual write y explicar outbox;
+\item declarar la frontera de una garantía exactly-once;
+\item diagnosticar lag por partición;
+\item ubicar late data según event time y una política explícita.
 \end{itemize}
 
-\subsection{Arquitectura didáctica v9 para 180 minutos}
+No es objetivo nuclear memorizar configuraciones de Kafka, ISR, transacciones internas o restauración avanzada de state stores. Esos temas son extensión o respaldo.
+
+\subsection{Arquitectura didáctica v9 reestructurada para 180 minutos}
 
 \begin{center}
 \begin{tabular}{p{0.12\textwidth}p{0.22\textwidth}p{0.56\textwidth}}
 \toprule
 Tiempo & Bloque & Propósito \\
 \midrule
-0--8 & Apertura & Venta relámpago de CampusShop; preguntar por qué no hacer cinco RPC sincrónicos. \\
-8--28 & Contexto, puente y vocabulario & Del WAL local al log compartido; CampusShop, identidades y términos previos. \\
-28--43 & Diagnóstico e intuiciones & Predicción individual; película, carriles, señaladores y reloj del hecho. \\
-43--72 & Log y publicación & Topic, particiones, keys, hot partitions, réplica, ACK e idempotencia. \\
-72--82 & Actividad breve & Distribuir eventos entre particiones, justificar key y detectar skew. \\
-80--90 & Pausa & Recuperación y preguntas anónimas. \\
-92--124 & Consumo y progreso & Grupo, position, committed offset, timelines, rebalance y lag. \\
-124--151 & Efectos correctos & Inbox, frontera exactly-once, dual write, outbox y captura de cambios. \\
-151--171 & Streams con estado y tiempo & Changelog, ventanas, event time, watermark y eventos tardíos. \\
-171--178 & Diseño grupal & Asteria/CampusShop: key, semántica, SLO y prueba de falla. \\
-178--180 & Exit ticket & Cuatro respuestas breves para abrir la clase 8. \\
+0--12 & Caso real y predicción & CampusShop; distinguir operación, evento y efecto sin usar jerga. \\
+12--30 & Base mínima & Memoria, persistencia, registro, append, lector y progreso durable. \\
+30--48 & De RPC a historia compartida & Comparar llamadas sincrónicas con publicar un hecho durable. \\
+48--68 & Log, partición y key & Tarjetas físicas; orden local y hot partition. \\
+68--82 & Actividad 1 & Distribuir eventos y defender una key. \\
+82--92 & Pausa y recuperación & Repasar vocabulario mediante preguntas breves. \\
+92--112 & Consumer, offset y grupo & Position, committed offset y reparto de particiones. \\
+112--138 & Timelines de falla & At-most-once, at-least-once, event ID e inbox. \\
+138--156 & Dual write y outbox & Descubrir las dos ventanas antes de nombrar el patrón. \\
+156--169 & Tiempo en streams & Ventana, event time y late data; watermark como extensión. \\
+169--178 & Actividad 2 & CampusShop o Asteria: diseño y defensa. \\
+178--180 & Exit ticket & Cuatro respuestas para abrir Clase 08. \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-No debe haber más de 15--18 minutos continuos de exposición. Cada bloque termina con una predicción, un timeline, un cálculo o una decisión.
+No debe haber más de doce o quince minutos continuos de exposición. Las diapositivas EXTENSIÓN y RESPALDO no forman parte de la ruta obligatoria.
 
 \subsection{Preparación previa del docente}
 
 \subsubsection*{Cuarenta y ocho horas antes}
 \begin{itemize}
-\item Ejecutar las demos de offsets y event time incluidas en el paquete.
-\item Imprimir una ficha de aula por estudiante o pareja.
-\item Preparar 20 tarjetas: seis eventos, seis offsets, dos CRASH, dos consumidores, tres particiones y una tarjeta de ACK.
-\item Verificar que la presentación muestre correctamente los diagramas de particiones y outbox.
-\item Definir el SLO del caso: ``99,9\% de pedidos reflejados en inventario en menos de 5 s''.
-\item Leer las secciones oficiales de Kafka sobre consumer position, committed offsets, producer idempotence y transactions.
+\item Imprimir tarjetas de eventos, tres carriles, dos consumidores, una ficha de crash y dos marcadores de progreso.
+\item Ejecutar las demos de offsets, hot partition y outbox/inbox.
+\item Ensayar el caso CampusShop en menos de noventa segundos.
+\item Revisar operation ID, event ID y partición+offset.
+\item Elegir un solo caso adicional: ranking de Asteria para event time.
 \end{itemize}
 
 \subsubsection*{Treinta minutos antes}
 \begin{itemize}
-\item Dibujar cuatro carriles vacíos: Broker, Consumer, Efecto y Offset.
-\item Dibujar tres particiones P0--P2 y dejar espacio para asignar keys.
-\item Dejar en un lateral tres palabras: \textbf{entrega}, \textbf{estado}, \textbf{efecto}.
-\item Abrir la salida didáctica de métricas de lag y rebalance.
+\item Dibujar tres particiones P0--P2.
+\item Escribir: \textbf{leer $\neq$ procesar $\neq$ producir efecto $\neq$ confirmar progreso}.
+\item Preparar el timeline Broker--Consumer--Efecto--Offset.
+\item Dejar visible la pregunta central.
 \end{itemize}
 
 \subsubsection*{Cinco minutos antes}
 \begin{itemize}
-\item Comprobar que el modo presentación no muestra notas del docente.
-\item Dejar la primera pregunta visible al entrar los estudiantes.
-\item Asegurar un medio rápido de voto: manos, tarjetas V/F o encuesta web.
+\item Confirmar el medio de predicción individual.
+\item Entregar o dejar disponibles las fichas de aula.
+\item Recordar que EXTENSIÓN y RESPALDO se usan solo si el ritmo lo permite.
 \end{itemize}
 
 \subsection{Plan de pizarrón}
 
-Divida el pizarrón en tres zonas que permanezcan durante la clase:
-
+Divida el pizarrón en tres zonas permanentes:
 \begin{enumerate}
-\item \textbf{Izquierda: historia.} Topic, particiones y keys del caso.
-\item \textbf{Centro: timeline.} Poll, efecto, commit y crash.
-\item \textbf{Derecha: frontera.} Entrega / estado / efecto, con métricas debajo.
+\item \textbf{Historia:} particiones y registros.
+\item \textbf{Progreso:} position y committed offset.
+\item \textbf{Efecto:} estado de negocio, event ID y crash.
 \end{enumerate}
 
-No borre el timeline después de at-most-once. Dibuje at-least-once debajo; la comparación simultánea reduce carga cognitiva.
+Mantenga los timelines de pérdida y duplicación visibles al mismo tiempo. La comparación simultánea reduce carga cognitiva.
 
 \subsection{Guion de apertura}
 
-Diga, aproximadamente:
-
+Diga aproximadamente:
 \begin{quote}
-``CampusShop recibe miles de compras. Inventario, facturación, email y analítica deben reaccionar. Si el checkout espera a todos, el más lento determina la experiencia. Si solo publica un evento, ¿qué significa que ese evento fue procesado? Hoy vamos a seguir un hecho desde que nace hasta que produce un efecto y vamos a mover un crash por el camino.''
+``La clase anterior mostró cómo un nodo conserva una historia. Hoy esa historia se convierte en un punto de encuentro entre aplicaciones. CampusShop confirma una compra; inventario, email y analítica deben reaccionar, pero no queremos que la caída de email detenga checkout. Vamos a seguir un hecho y mover un crash por todo el recorrido.''
 \end{quote}
 
-Dé 45 segundos individuales y luego pregunte:
+Dé 45 segundos individuales y pregunte:
 \begin{itemize}
-\item ¿qué consumidores necesitan respuesta inmediata?;
-\item ¿qué consumidor puede atrasarse?;
-\item ¿qué efecto no puede duplicarse?;
-\item ¿qué orden necesita cada uno?
+\item ¿qué consumidor no puede duplicar su efecto?;
+\item ¿cuál puede atrasarse?;
+\item ¿qué debe recordar un consumidor después de caer?;
+\item ¿qué dato identifica la misma operación lógica?
 \end{itemize}
 
-Recoja respuestas sin corregir todo. Utilícelas como hipótesis que la clase revisará.
+Registre hipótesis sin corregirlas todas. Se revisarán al final.
 
+\subsection{Base mínima antes del vocabulario distribuido}
 
-\subsection{Vocabulario mínimo antes de pedir decisiones}
-
-Antes del diagnóstico, dedique quince minutos a construir un lenguaje común. No dé por conocidos términos operativos solo porque aparecen en herramientas reales.
-
+No suponga conocimientos sólidos de sistemas de archivos. Utilice solamente:
 \begin{description}
-\item[Broker.] Servidor intermediario que recibe y almacena particiones del log.
-\item[Topic.] Categoría lógica dividida en particiones.
-\item[Partición.] Carril append-only que ofrece orden local y limita paralelismo.
-\item[Key.] Clave que dirige eventos relacionados al mismo carril.
-\item[Offset.] Posición dentro de una partición; no es identidad de negocio.
-\item[Committed offset.] Progreso durable desde el que reinicia el grupo.
-\item[ACK.] Acuse de recibo del broker; su significado depende de qué réplicas debieron aceptar el registro.
-\item[ISR.] Réplicas suficientemente al día para la política de confirmación configurada.
-\item[SLO.] Objetivo cuantitativo de nivel de servicio, por ejemplo ``99,9\% de pedidos reflejados en inventario en menos de 5 s''.
+\item[Memoria de trabajo.] Estado rápido que puede perderse al reiniciar.
+\item[Registro.] Unidad que representa un hecho.
+\item[Append.] Agregar al final de una secuencia.
+\item[Log.] Historia retenida de registros.
+\item[Lector.] Proceso que recorre esa historia.
+\item[Posición actual.] Punto alcanzado por la ejecución viva.
+\item[Progreso durable.] Marca desde la que puede continuar otra instancia.
 \end{description}
 
-Use en el pizarrón las tres identidades del caso: \texttt{operation\_id=9F2A}, \texttt{event\_id=evt-9F2A-1} y \texttt{P2, offset 418}. Si el estudiante mezcla estas identidades, no avance todavía hacia exactly-once.
+Use la secuencia 416--420. Mueva el lector hasta 420, pero deje el progreso durable en 418. Pregunte qué reaparece tras un crash. Recién entonces introduzca \emph{position} y \emph{committed offset}.
 
 \subsection{Secuencia de conducción: de la intuición al formalismo}
 
-\subsubsection{Log: película retenida}
-
-Primero use la imagen de una película con señaladores. Explique que agregar un evento no mueve el señalador de ningún consumidor. Luego formalice una partición como:
-\[
-P_j=(e_{j,0},e_{j,1},\ldots).
-\]
-Pregunte qué propiedad se pierde al tener varios carriles. La respuesta esperada es que no existe orden global entre particiones.
-
-Cierre el concepto con tres frases:
+\subsubsection{De llamadas sincrónicas a un hecho durable}
+Dibuje checkout llamando a inventario, email y analítica. Pregunte qué sucede si email tarda veinte segundos. Luego inserte un log. La conclusión debe ser:
 \begin{itemize}
-\item resuelve retención y replay;
-\item no resuelve identidad de negocio ni efecto;
-\item cuesta almacenamiento, operación y gobierno de contratos.
+\item el log desacopla producción y procesamiento;
+\item no elimina fallas ni define el efecto correcto;
+\item desplaza complejidad hacia orden, progreso, idempotencia y operación.
 \end{itemize}
 
-\subsubsection{Partición: carril de orden y unidad de paralelismo}
-
-Entregue eventos \texttt{created}, \texttt{paid} y \texttt{cancelled} de dos pedidos. Pida que los ubiquen. Si alguien usa una key aleatoria, muestre una cancelación que aparece antes del pago para un consumidor.
-
-Después introduzca:
+\subsubsection{Log, partición y key}
+Use tarjetas de dos pedidos. Cada carril es una partición. Pida una key antes de mostrar una fórmula. Si el grupo elige tipo de evento, muestre cómo un pedido puede perder orden. Luego introduzca:
 \[
 partition(key)=h(key)\bmod N.
 \]
-No permita que la fórmula cierre la discusión: pregunte qué ocurre con un tenant o guild muy caliente. Introduzca skew, throughput por partición y dificultad de re-particionar preservando orden.
+Pregunte por una guild o tenant caliente. La key decide simultáneamente orden y distribución.
 
-\subsubsection{Offset: marcador, no identidad}
+\subsubsection{Productor y confirmación}
+Explique el timeout ambiguo: el evento pudo no llegar o pudo quedar durable y perderse el ACK. Introduzca identidad estable y retry. Deje ISR y producer idempotence como profundización si el grupo todavía está consolidando la base.
 
-Escriba en grande:
-\[
-\texttt{order\_id=9F2A}\neq\texttt{P2, offset 418}.
-\]
-Pida dos razones. La identidad sobrevive a retries y expresa el dominio; el offset depende de la partición y de una historia física lógica concreta.
-
-Distinga position de committed offset. Use el ejemplo position=101, committed=81. Pregunte cuántos registros pueden reaparecer: veinte.
-
-\subsubsection{Consumer group y rebalance}
-
-Asigne tres particiones a dos estudiantes. Agregue un tercer estudiante y pida reasignar sin que dos procesen simultáneamente la misma partición. Haga visible la pausa y el estado a restaurar.
-
-Conecte con autoscaling: escalar demasiado agresivamente puede crear rebalances que agraven el lag.
+\subsubsection{Consumer, position y committed offset}
+Use el marcador físico. Position es volátil; committed offset es el contrato de recuperación del grupo. Haga un consumer group humano con tres particiones y dos estudiantes. Agregue un tercero y muestre que el paralelismo útil no supera la cantidad de particiones.
 
 \subsubsection{Semánticas mediante timeline}
+No defina at-most-once antes de la ejecución.
 
-No defina at-most-once antes del timeline.
+Timeline A: leer 418, confirmar 419, crash, efecto ausente. Nombre el daño y luego la semántica.
 
-Construya:
-\begin{enumerate}
-\item poll 42;
-\item commit 43;
-\item crash;
-\item efecto nunca ejecutado.
-\end{enumerate}
+Timeline B: leer 418, aplicar efecto, crash antes de confirmar, releer y repetir. Nombre el daño y luego la semántica.
 
-Pida nombrar el daño. Recién entonces etiquete \textbf{at-most-once}.
-
-Luego:
-\begin{enumerate}
-\item poll 42;
-\item efecto;
-\item crash antes de commit;
-\item replay y segundo efecto.
-\end{enumerate}
-
-Etiquete \textbf{at-least-once}. Pregunte qué dato falta: identidad durable del efecto.
+La deducción esperada es que no existe un orden mágico: para un recurso local hace falta event ID + efecto + inbox en la misma transacción.
 
 \subsubsection{Exactly-once: declarar frontera}
-
-Use las tres columnas del pizarrón. Dé ejemplos:
-\begin{itemize}
-\item producer idempotente: evita cierto duplicado en el log;
-\item transacción Kafka Streams: coordina offset, state store/changelog y output Kafka;
-\item servicio de pagos externo: queda fuera salvo protocolo/idempotencia propios.
-\end{itemize}
-
-Pida que reformulen ``Kafka da exactly-once'' como una frase completa con objeto, frontera y fallas.
+No convierta exactly-once en el centro. Úselo para consolidar el método: exactamente una vez, ¿qué efecto, dentro de qué recursos y ante qué fallas? Un proveedor externo queda fuera si no participa del protocolo.
 
 \subsubsection{Dual write y outbox}
+Dibuje base y broker. Pruebe ambos órdenes con un crash intermedio. Espere que el grupo descubra que cambiar el orden no crea atomicidad. Introduzca outbox como negocio + evento pendiente en una transacción local. Haga perder el ACK del relay para mostrar por qué todavía se requiere inbox/idempotencia.
 
-Dibuje la base de datos y el broker. Pruebe los dos órdenes y coloque un crash entre escrituras. Espere a que el curso concluya que cambiar el orden no resuelve atomicidad.
-
-Introduzca outbox como una sola transacción local. Marque explícitamente que el relay puede repetir y que el consumer debe deduplicar.
-
-\subsubsection{Event time y watermarks}
-
-Use un evento ocurrido a las 10:00 que llega a las 10:07. Pida ubicarlo primero por processing time y luego por event time. Señale que llega 2 min 10 s después del cierre 10:05 y pregunte cuánto esperarían para un dashboard y para fraude. La comparación hace emerger el trade-off latencia/completitud.
-
-\subsection{Casos reales y cómo narrarlos}
-
-\subsubsection{Apache Kafka}
-
-Preséntelo como commit log particionado que desacopla productores y consumidores. Evite convertir la clase en capacitación de comandos. Cada término debe responder a un problema: partición para escala/orden local; offset para recovery; transacción para visibilidad conjunta dentro de una frontera.
-
-\subsubsection{CampusShop}
-
-Es el caso conductor porque todos comprenden pedido, inventario y email. Cambie la semántica por consumidor para mostrar que no existe una política universal.
-
-\subsubsection{Asteria Online}
-
-Use el ranking para introducir event time y correcciones tardías. El servidor autoritativo emite \texttt{CombatFinished}; el cliente no define el tiempo válido. Premios económicos requieren un cierre más fuerte que la vista en vivo.
+\subsubsection{Event time y late data}
+Use un evento ocurrido a las 10:04:50 y recibido a las 10:07:10. Event time resuelve la pertenencia; la política de late data resuelve qué hacer con la llegada posterior. Si falta tiempo, no formalice watermarks: deje event time, processing time y tres políticas de late data.
 
 \subsection{Demostraciones guiadas}
 
 \begin{uainfo}
-\textbf{Demo 1 --- offsets humanos.} Cinco estudiantes representan broker, consumer, inventario, offset y crash. Cambie el orden y haga votar pérdida/duplicación antes de nombrar la semántica.
+\textbf{Demo 1 --- secuencia y progreso.} Tarjetas 416--420, un lector y dos marcadores. Haga caer el lector y determine qué reaparece.
 \end{uainfo}
-
 \begin{uainfo}
-\textbf{Demo 2 --- hot partition.} Reparta veinte keys, doce del mismo tenant. Aplique un hash simplificado y muestre que el promedio del topic puede ser sano mientras una partición se atrasa.
+\textbf{Demo 2 --- hot partition.} Reparta eventos con una key sesgada. Muestre que consumidores ociosos no dividen el carril caliente.
 \end{uainfo}
-
 \begin{uainfo}
-\textbf{Demo 3 --- dual write.} Use dos tarjetas, DB y Kafka. Coloque CRASH entre ambas en cada orden. Agregue una tarjeta outbox y repita el análisis.
+\textbf{Demo 3 --- crash móvil.} Cuatro estudiantes representan broker, consumer, efecto y offset. Mueva la tarjeta CRASH.
 \end{uainfo}
-
 \begin{uainfo}
-\textbf{Demo 4 --- late event.} Ejecute el script provisto o use tarjetas con event time y arrival time; calcule una ventana con dos watermarks.
+\textbf{Demo 4 --- outbox e inbox.} Pierda el ACK del relay, publique dos copias con el mismo event ID y produzca un solo efecto lógico.
 \end{uainfo}
 
 \subsection{Preguntas socráticas y respuestas esperadas}
@@ -272,44 +221,44 @@ Use el ranking para introducir event time y correcciones tardías. El servidor a
 \toprule
 Pregunta & Núcleo esperado \\
 \midrule
-¿Qué orden necesita el negocio? & por entidad/aggregate, no necesariamente global \\
-¿Offset e ID son lo mismo? & no; posición física lógica frente a identidad de dominio \\
-¿Qué ocurre si efecto terminó y offset no? & replay y posible duplicación \\
-¿Qué cubre producer idempotence? & retries de producción dentro del protocolo \\
-¿Dónde termina exactly-once? & en los sistemas participantes de la transacción \\
-¿Qué resuelve outbox? & DB e intención de publicar atómicas localmente \\
-¿Por qué sigue habiendo duplicados? & relay no distingue ACK perdido de publicación ausente \\
-¿Qué significa tarde? & respecto de una política de event time/watermark \\
+¿Qué debe persistir un lector? & progreso suficiente para reiniciar \\
+¿Event ID y offset son iguales? & identidad del hecho frente a posición \\
+¿Dónde existe orden? & dentro de una partición \\
+¿Por qué una key puede ser mala? & rompe orden o concentra carga \\
+¿Qué pasa si efecto terminó y offset no? & replay y posible duplicación \\
+¿Qué resuelve inbox? & efecto y event ID atómicos localmente \\
+¿Qué resuelve outbox? & negocio e intención de publicar atómicos \\
+¿Qué deja fuera exactly-once? & recursos no participantes \\
 \bottomrule
 \end{tabular}
 
 \subsection{Errores previsibles y estrategias de corrección}
 
-\begin{tabular}{p{0.37\textwidth}p{0.54\textwidth}}
+\begin{tabular}{p{0.36\textwidth}p{0.55\textwidth}}
 \toprule
 Error & Intervención \\
 \midrule
-``Kafka garantiza orden'' & Dibujar dos particiones y pedir ordenar eventos cruzados. \\
-``Offset es ID'' & Escribir offset 42 en P0 y P1; preguntar cuál pedido es. \\
-``Lag cero implica correcto'' & Mostrar efecto fallido con offset adelantado. \\
-``Más consumers siempre ayuda'' & Comparar 12 consumers con 8 particiones. \\
-``Commit después resuelve todo'' & Mover crash después del efecto. \\
-``Exactly-once global'' & Dibujar proveedor de email fuera de la frontera. \\
-``Outbox elimina duplicados'' & Simular ACK perdido del relay. \\
-``Event time es hora de llegada'' & Usar teléfono offline y evento tardío. \\
+``Kafka es una cola'' & Mostrar dos consumidores releyendo la misma historia. \\
+``Offset es ID'' & Escribir offset 42 en P0 y P1. \\
+``Más consumidores siempre ayuda'' & Comparar cinco consumidores con tres particiones. \\
+``Lag cero significa correcto'' & Adelantar offset antes del efecto. \\
+``At-least-once nunca pierde'' & Introducir un poison event o dependencia permanentemente fallida. \\
+``Outbox elimina duplicados'' & Perder el ACK del relay. \\
+``Exactly-once es global'' & Dibujar email fuera de la transacción. \\
+``Event time es llegada'' & Usar un dispositivo offline. \\
 \bottomrule
 \end{tabular}
 
 \subsection{Criterios de evaluación formativa}
 
-Una respuesta se considera lograda si incluye:
+Una respuesta lograda incluye:
 \begin{enumerate}
 \item hecho e identidad;
-\item key y orden requerido;
-\item posición del commit;
+\item key y orden;
+\item estado durable de progreso;
 \item punto de crash;
 \item efecto e idempotencia;
-\item costo y métrica.
+\item métrica o prueba.
 \end{enumerate}
 
 \begin{center}
@@ -317,10 +266,10 @@ Una respuesta se considera lograda si incluye:
 \toprule
 Nivel & Evidencia \\
 \midrule
-Inicial & enumera Kafka, topic y consumer sin semántica \\
-En desarrollo & declara key y semántica, pero no modela crash \\
-Logrado & timeline correcto, frontera, trade-off y métrica \\
-Avanzado & compara alternativas y diseña experimento de falla \\
+Inicial & repite nombres sin dibujar ejecución \\
+En desarrollo & identifica componentes, pero no frontera de falla \\
+Logrado & timeline, garantía, límite y métrica \\
+Avanzado & compara alternativas y propone prueba adversarial \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -328,64 +277,60 @@ Avanzado & compara alternativas y diseña experimento de falla \\
 \subsection{Contingencias}
 
 \subsubsection*{Si falta tiempo}
-Conserve offsets, exactly-once/outbox y event time. Reduzca detalles de replicación del broker, que pueden quedar como lectura.
+Preserve: base mínima, key/partición, committed offset, dos timelines, inbox y outbox. Reduzca ISR, producer idempotence, state stores, watermarks y DLQ.
+
+\subsubsection*{Si la base del grupo sigue débil}
+No agregue más definiciones. Repita el mismo evento con tarjetas y haga narrar qué existe en RAM, qué está persistido y desde dónde reinicia.
 
 \subsubsection*{Si falla la demo}
-Use las tarjetas impresas; la clase no depende de un cluster Kafka real.
+La clase debe poder dictarse con tarjetas y pizarra; ningún concepto nuclear requiere un cluster Kafka.
 
 \subsubsection*{Si hay poca participación}
-Pida predicción individual escrita antes de abrir la discusión. Luego compare respuestas por parejas.
-
-\subsubsection*{Si el grupo domina Kafka operacional}
-Profundice en fronteras: proveedor externo, restore stateful, rebalances y schema evolution; no dedique tiempo a comandos básicos.
+Pida respuesta individual escrita antes de discutir en parejas. No comience con una pregunta abierta a toda el aula.
 
 \subsection{Cómo favorecer una experiencia de clase excelente}
 
 \begin{itemize}
-\item Anuncie desde el inicio la pregunta que podrán responder al final.
-\item Mantenga CampusShop como hilo conductor y use Asteria solo para transferencia.
-\item Dibuje antes de nombrar; haga predecir antes de revelar.
-\item Distinga permanentemente broker, consumidor, aplicación y negocio.
-\item Muestre una salida real o reproducible, pero no dependa de ella.
-\item Reserve dos pausas explícitas para preguntas.
-\item Cierre cada bloque con ``qué resuelve, qué no y qué cuesta''.
-\item Lea los exit tickets y retome una duda al comenzar clase 8.
+\item Reconozca la brecha detectada en Clase 06 sin presentarla como déficit personal.
+\item Haga visible la ruta mínima y no intente recorrer todo el respaldo.
+\item Mantenga CampusShop como caso conductor; Asteria aparece solo como transferencia.
+\item Defina pocos términos, úselos y recién después agregue otros.
+\item Dibuje antes de nombrar la semántica.
+\item Cierre cada bloque con ``qué resuelve, qué no resuelve y qué cuesta''.
+\item Reserve ocho minutos para la actividad final y dos para el exit ticket.
+\item Devuelva al inicio de Clase 08 una duda real del grupo.
 \end{itemize}
-
-Estas acciones favorecen claridad, organización, relevancia y posibilidad de participación: dimensiones que los estudiantes suelen valorar en encuestas, sin recurrir a entretenimiento superficial.
 
 \subsection{Conexión con el Trabajo Final Integrador}
 
-Cada grupo debe completar una ficha con:
+Cada grupo debe completar para un flujo basado en eventos:
 \begin{itemize}
-\item evento y owner;
+\item hecho y event ID;
+\item productor y owner;
 \item key y orden;
-\item topic/particiones y carga;
-\item semántica por consumidor;
-\item estrategia de dual write;
-\item efecto fuera de la frontera;
-\item SLO end-to-end;
-\item crash/rebalance a ensayar.
+\item consumidores y efectos;
+\item política de progreso;
+\item outbox/inbox;
+\item SLO extremo a extremo;
+\item crash o rebalance a ensayar.
 \end{itemize}
 
-No acepte ``usaremos Kafka porque escala''. Deben demostrar por qué el desacoplamiento, replay u orden local compran valor para su caso.
+No acepte ``usaremos Kafka porque escala''. Deben justificar desacoplamiento, replay u orden local.
 
 \subsection{Cierre, exit ticket y puente}
 
 Exit ticket:
 \begin{enumerate}
 \item Diferencia entre event ID y offset.
-\item Timeline mínimo de duplicación at-least-once.
-\item Frontera exacta de una garantía exactly-once propuesta.
-\item Una métrica que detecte hot partition.
+\item Timeline mínimo de duplicación.
+\item Qué resuelve outbox y qué deja abierto.
+\item Métrica para distinguir hot partition de consumidor lento.
 \end{enumerate}
 
-Cierre con:
+Cierre:
 \begin{quote}
-``Hoy vimos que distintos consumidores pueden ver la historia con retraso. En la próxima clase preguntaremos qué consistencia puede prometer un sistema cuando la red se parte y cuándo coordinar cuesta latencia aun sin fallas.''
+``Hoy vimos que la historia puede sobrevivir mientras distintos consumidores avanzan de manera diferente. En la próxima clase analizaremos qué ocurre cuando las réplicas mismas no pueden coordinarse.''
 \end{quote}
-
-
 
 
 \clearpage

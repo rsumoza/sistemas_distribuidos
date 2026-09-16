@@ -5,366 +5,459 @@
 \UASetDate{2026}
 
 \UASetClassNumber{06}
-\UASetClassTitle{Sistemas de almacenamiento}
-\title{Clase 06 --- Guía resuelta: de la intuición a la evidencia}
+\UASetClassTitle{Storage distribuido y almacenamiento permanente}
+\UASetDocKind{Guía resuelta}
+\title{Clase 06 --- Guía resuelta: persistencia, concurrencia y rendimiento bajo fallas}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
+\setlength{\emergencystretch}{2em}
 \maketitle
 
-\section{Cómo leer estas resoluciones}
+\section{Cómo leer las soluciones}
 
-Las respuestas siguientes son modelos de razonamiento, no recetas únicas. Una solución alternativa es válida si preserva los invariantes, explicita su modelo de falla y declara qué costo acepta. En cada respuesta se busca pasar por la secuencia:
-
-\[
-\text{intuición} \rightarrow \text{regla} \rightarrow \text{falla} \rightarrow
-\text{mecanismo} \rightarrow \text{costo} \rightarrow \text{evidencia}.
-\]
+Las respuestas son modelos de razonamiento, no recetas únicas. Una alternativa es válida si declara el modelo de falla, preserva el invariante, hace explícita la frontera de garantía y propone evidencia capaz de contradecir la elección.
 
 \begin{uakeybox}
-El criterio central no es recordar una sigla, sino explicar por qué el mecanismo sostiene una garantía y qué observación podría demostrar que la elección fue equivocada.
+La secuencia esperada es: contexto $\rightarrow$ garantía $\rightarrow$ mecanismo $\rightarrow$ ejecución adversarial $\rightarrow$ costo $\rightarrow$ evidencia.
 \end{uakeybox}
 
-\section{Resoluciones completas}
+\section{Resoluciones}
 
 \begin{uaexercise}
-\textbf{1. Cinco conceptos en lenguaje intuitivo y técnico.}
+\textbf{1. Del problema general a los mecanismos.}
 \end{uaexercise}
 \begin{uaanswer}
-Una respuesta posible es:
+Una tabla posible es:
 
 \begin{center}
 \small
-\begin{tabular}{p{0.13\textwidth}p{0.23\textwidth}p{0.24\textwidth}p{0.28\textwidth}}
+\begin{tabular}{p{0.19\textwidth}p{0.25\textwidth}p{0.25\textwidth}p{0.20\textwidth}}
 \toprule
-Concepto & Intuición & Definición técnica & Límite principal \\
+Responsabilidad & Escenario sin cubrir & Garantía buscada & Mecanismo candidato \\
 \midrule
-WAL & cuaderno durable antes de tocar el libro & log secuencial cuyos registros necesarios preceden a las páginas y cuyo commit se fuerza antes del ACK & no reemplaza replicación, backup ni idempotencia \\
-MVCC & conservar ediciones para lectores distintos & múltiples versiones más reglas de snapshot y visibilidad & no implica serializabilidad y requiere limpieza \\
-Índice & mapa adicional para no recorrer todo & estructura redundante organizada por claves y referencias & encarece writes, WAL, espacio y mantenimiento \\
-\texttt{EXPLAIN} & navegador que muestra la ruta elegida & plan de ejecución y estimaciones del optimizador & no ejecuta ni garantiza que el plan sea óptimo \\
-Compaction & ordenar y limpiar pilas acumuladas & merge de runs/SSTables que resuelve versiones y elimina datos obsoletos cuando es seguro & consume I/O, CPU y espacio; puede amplificar escrituras \\
-Stall & molinete que reduce la entrada & backpressure del motor ante exceso de memtables, L0 o backlog & protege estabilidad, pero no crea capacidad \\
+Registrar decisiones & Compra confirmada desaparece tras crash & Todas y solo las confirmadas sobreviven & WAL y recovery \\
+Controlar concurrencia & Reporte mezcla estados o bloquea checkout & Vista coherente con escritores activos & MVCC y snapshot \\
+Elegir ruta física & Se recorren un millón de filas para devolver 20 & Trabajo proporcional al subconjunto útil & Índice y planificador \\
+Optimizar escrituras & Muchas actualizaciones aleatorias saturan E/S & Ingestión sostenible & Árbol B o LSM según carga \\
+Proteger capacidad & Compactación queda atrás y el backlog crece & Cola interna acotada y p99 controlado & Compactación y write stall \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-La diferencia importante entre la intuición y la definición es que la primera permite recordar el propósito; la segunda permite razonar sobre orden, fallas y evidencia. Una explicación universitaria necesita ambas.
+La idea central es que ningún mecanismo constituye por sí solo ``el storage''. Cada uno cubre una responsabilidad distinta y desplaza un costo diferente.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{2. Cinco puentes hacia storage.}
+\textbf{2. Siglas y términos sin ambigüedad.}
 \end{uaexercise}
 \begin{uaanswer}
-Cinco frases posibles son:
+Una respuesta lograda incluye, al menos:
 
+\begin{description}
+\item[WAL.] Write-Ahead Logging, registro anticipado de escritura: evidencia para recuperar un cambio se registra antes de depender de la página modificada.
+\item[MVCC.] Multi-Version Concurrency Control, control de concurrencia multiversión: mantiene versiones y reglas de visibilidad por snapshot.
+\item[LSM-tree.] Log-Structured Merge-tree, árbol de fusión estructurado como log: escribe primero en memoria y SSTables, y reorganiza mediante compactación.
+\item[ACK.] Acknowledgement, acuse de recibo emitido cuando la garantía prometida ya se cumplió.
+\item[LSN.] Log Sequence Number, posición ordenada dentro del WAL.
+\item[SQL.] Structured Query Language, lenguaje de consulta y modificación de datos.
+\item[DDL.] Data Definition Language, parte de SQL que define estructuras; \texttt{CREATE INDEX} es DDL.
+\item[OLTP.] Online Transaction Processing, carga de transacciones cortas y concurrentes.
+\item[SLO.] Objetivo cuantitativo de nivel de servicio.
+\item[RPO.] Pérdida máxima de datos aceptable respecto de un punto de recuperación.
+\item[RTO.] Tiempo máximo aceptable para recuperar el servicio.
+\item[COMMIT.] Decisión definitiva del motor sobre los efectos de la transacción.
+\item[Log durable.] Prefijo del WAL que sobreviviría a la falla declarada.
+\item[Flush durable.] Volcado concluido que hizo persistentes los bytes requeridos.
+\item[Snapshot.] Regla lógica que determina qué versiones son visibles.
+\item[Serializabilidad.] Equivalencia con alguna ejecución secuencial de las transacciones.
+\item[SSTable.] Archivo ordenado e inmutable de pares clave--valor.
+\item[Merge ordenado.] Fusión lineal de runs ya ordenados para producir otro run ordenado.
+\item[Filtro de Bloom.] Resumen probabilístico que responde ausencia definitiva o presencia posible.
+\item[Write stall.] Backpressure que reduce o detiene escrituras para contener backlog.
+\end{description}
+
+La condición ``ninguna sigla sin definir'' evita frases circulares como ``LSM compacta SSTables con Bloom'' antes de explicar esos objetos.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{3. Identidad lógica y objetos físicos.}
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{Operación lógica}: comprar una unidad con identidad 9F2A. \textbf{Filas}: pedido e inventario. \textbf{Tablas}: \texttt{purchases} e \texttt{inventory}. \textbf{Página}: bloque físico, por ejemplo P17. \textbf{Índice}: ruta secundaria, por ejemplo I5. \textbf{WAL}: registros que describen cambios y COMMIT. \textbf{Resultado idempotente}: estado que relaciona 9F2A con el pedido y la respuesta final.
+
+Para que el retry sea seguro, el efecto de negocio y la marca de 9F2A deben confirmarse como una misma unidad transaccional. Si se descuenta stock y el proceso cae antes de persistir la clave idempotente, un retry puede volver a descontar. Si se registra la clave antes del efecto y luego se cae, el retry puede devolver éxito para una compra que no ocurrió. La atomicidad debe abarcar identidad, efecto y resultado.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{4. Prediagnóstico razonado.}
+\end{uaexercise}
+\begin{uaanswer}
 \begin{enumerate}
-\item \textbf{Clase 1:} la incertidumbre del cliente exige evidencia durable en el servidor.
-\item \textbf{Clase 2:} un retry es seguro solo si identidad, efecto y respuesta sobreviven al crash.
-\item \textbf{Clase 3:} más copias no determinan por sí solas durabilidad, autoridad ni frescura.
-\item \textbf{Clase 4:} consenso decide qué recordar; cada nodo debe persistirlo de verdad.
-\item \textbf{Clase 5:} ACID define el contrato y storage implementa físicamente atomicidad, aislamiento y durabilidad.
+\item La compra confirmada debe reaparecer una sola vez. Más adelante se asocia con WAL, COMMIT durable, recovery e idempotencia.
+\item El reporte debe usar una regla estable de visibilidad o declarar otra semántica. Se asocia con MVCC y snapshots.
+\item Conviene evitar recorrer y ordenar filas irrelevantes. Se asocia con índice, planificador y \texttt{EXPLAIN}.
+\item La cola crece a 30 MB/s mientras se mantenga el déficit. Se asocia con compactación, backlog y stall.
+\item Un corte común elimina todas las copias en RAM. Replicación volátil no equivale a persistencia.
 \end{enumerate}
 
-Ejemplo desarrollado: un cliente envía una transferencia, el servidor la ejecuta y la respuesta se pierde. Si el servidor conserva solo el saldo final, pero no la identidad de la intención y su resultado, el retry puede interpretarse como una nueva operación. La solución requiere una clave idempotente única y una transacción que persista de manera coherente la clave, el movimiento, el nuevo saldo y la respuesta. Si el ACK se emite antes del commit durable, un crash puede borrar esa relación y reabrir el riesgo de doble efecto. El puente entre RPC y storage es, por lo tanto, estructural: la semántica de retry depende de memoria durable.
+La actividad es correcta porque primero formula comportamiento y falla; después introduce el nombre del mecanismo.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{3. Vocabulario que no debe mezclarse.}
+\textbf{5. Timeline WAL y prefijo durable.}
 \end{uaexercise}
 \begin{uaanswer}
-Definiciones operativas:
-
-\begin{itemize}
-\item \textbf{Aceptado:} alguna capa recibió la operación.
-\item \textbf{Insertado en buffer:} el motor generó la entrada y la colocó en memoria propia.
-\item \textbf{Escrito al SO:} los bytes fueron entregados al kernel, pero pueden seguir en page cache.
-\item \textbf{Flushed/durable:} los bytes cruzaron la frontera de persistencia definida para el modelo de falla.
-\item \textbf{Committed:} el protocolo tomó una decisión final; debe aclararse si el commit ya es durable.
-\item \textbf{Aplicado:} la tabla, índice o estructura principal refleja el cambio.
-\item \textbf{Visible:} una lectura puede observarlo según snapshot y aislamiento.
-\item \textbf{Replicado:} otra copia lo recibió; debe indicarse si fue en RAM o en almacenamiento estable.
-\end{itemize}
-
-Un orden común en un motor WAL con páginas diferidas es:
-
-\[
-\text{aceptado} \rightarrow \text{buffer WAL} \rightarrow \text{write al SO}
-\rightarrow \text{flush durable} \rightarrow \text{commit/ACK}
-\rightarrow \text{página aplicada}.
-\]
-
-En un sistema replicado puede aparecer otro orden:
-
-\[
-\text{aceptado} \rightarrow \text{replicado en RAM} \rightarrow
-\text{durable local} \rightarrow \text{durable en mayoría} \rightarrow \text{visible}.
-\]
-
-El cliente observa request, respuesta y quizá una lectura posterior; no observa directamente caches ni LSN. El motor observa buffers, logs, snapshots y páginas. La palabra ``durable'' depende del modelo de falla: flush local no cubre destrucción del nodo, mientras una mayoría durable puede hacerlo, pagando más coordinación.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{4. CampusShop e idempotencia durable.}
-\end{uaexercise}
-\begin{uaanswer}
-Un esquema mínimo puede incluir:
-
-\begin{itemize}
-\item \texttt{requests(idempotency\_key UNIQUE, status, response, order\_id)};
-\item \texttt{orders(order\_id, student\_id, total, status)};
-\item \texttt{payments(payment\_id, order\_id UNIQUE, amount, status)};
-\item \texttt{inventory(item\_id, available)}.
-\end{itemize}
-
-En una sola transacción lógica se debe: reservar/descontar inventario, crear pedido, registrar cobro y persistir el resultado asociado a la clave. Ante un retry, el servidor busca la clave. Si está completada, devuelve la respuesta guardada; si está en progreso, aplica una política explícita; si no existe, inicia la transacción.
-
-Con durabilidad local, el ACK puede emitirse después de que el registro de commit correspondiente haya sido flushed al WAL local. Con durabilidad en mayoría, se espera además la persistencia en el quorum declarado. Antes de esa frontera, un crash puede borrar la decisión. Después, las páginas pueden seguir atrasadas: recovery las rehace desde el log. La constraint única sobre la clave evita que dos intentos concurrentes creen dos operaciones lógicas.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{5. ¿Dónde está el byte?}
-\end{uaexercise}
-\begin{uaanswer}
-Ruta simplificada:
+El orden recomendado es:
 
 \[
 \begin{aligned}
-\text{aplicación} &\rightarrow \text{buffer del proceso}
-\rightarrow \text{page cache del SO} \\
-&\rightarrow \text{cache del dispositivo}
-\rightarrow \text{medio persistente}.
+\text{request} &\rightarrow \text{preparar} \rightarrow \text{WAL UPDATE} \\
+&\rightarrow \text{dirty pages} \rightarrow \text{COMMIT record} \\
+&\rightarrow \text{flush hasta commitLSN} \rightarrow \text{ACK} \\
+&\rightarrow \text{crash} \rightarrow \text{REDO}.
 \end{aligned}
 \]
 
-Antes del medio persistente, un crash de proceso, kernel, pérdida de energía o cache sin protección puede destruir datos, según la capa. Un \texttt{write()} exitoso suele probar aceptación por el kernel, no permanencia física.
+El flush durable \textbf{no comienza} al agregar el primer \texttt{WAL UPDATE}. En ese paso comienza el append lógico al WAL y los bytes aún pueden estar en buffers. El flush ocurre después de agregar COMMIT y debe avanzar \texttt{flushLSN} hasta, como mínimo, \texttt{commitLSN}(T):
 
-Con \texttt{insert\_lsn}=1500, \texttt{write\_lsn}=1320 y \texttt{flush\_lsn}=980:
+\[
+\texttt{flushLSN} \geq \texttt{commitLSN}(T).
+\]
 
-\begin{itemize}
-\item solo insertadas y aún no escritas: $1500-1320=180$ unidades;
-\item escritas al SO pero no durables: $1320-980=340$ unidades;
-\item durables: hasta LSN 980.
-\end{itemize}
-
-La historia posterior a 980 no puede incluirse en una promesa de supervivencia frente a pérdida de energía bajo este modelo.
+Como WAL es secuencial, el prefijo incluye los registros de actualización anteriores que todavía no fueran durables. Si algunos ya lo eran, no hace falta reescribirlos; basta con avanzar la frontera persistida.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{6. Timeline WAL completo.}
+\textbf{6. Dos reglas, dos fallas.}
 \end{uaexercise}
 \begin{uaanswer}
-Un orden seguro es: request; \texttt{BEGIN}; registros de pedido e inventario; dirty pages; registro de \texttt{COMMIT}; flush del WAL; ACK; escritura posterior de páginas; checkpoint eventual.
+\textbf{Log antes que página}: el registro de REDO debe ser durable antes de permitir que la página modificada llegue al archivo de datos. Invertirlo puede dejar una página con un cambio que recovery no puede interpretar, completar o deshacer correctamente.
+
+\textbf{COMMIT antes que ACK}: el registro de COMMIT debe ser durable antes de responder éxito. Invertirlo permite que el cliente observe una promesa que desaparece tras un crash.
+
+La primera regla relaciona WAL y páginas; la segunda relaciona el motor y el cliente. Confundirlas conduce a la falsa idea de que una página debe estar persistida antes de cada ACK.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{7. Matriz de crashes y reconstrucción completa.}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{center}
+\small
+\begin{tabular}{p{0.25\textwidth}p{0.20\textwidth}p{0.23\textwidth}p{0.21\textwidth}}
+\toprule
+Punto & Cliente & Recovery & Estado lógico \\
+\midrule
+Antes de COMMIT & No recibió éxito & Descarta o deshace trabajo incompleto & No confirmada \\
+Después de append COMMIT, antes de flush & No recibió éxito & Depende de qué bytes sobrevivieron; el resultado es incierto para el cliente & Puede haber confirmado o no; retry con 9F2A resuelve \\
+Después de flush, antes de ACK & No recibió éxito o recibe timeout & Conserva y rehace la transacción & Confirmada; retry devuelve mismo resultado \\
+Después de ACK, antes de P17 & Recibió éxito & REDO materializa páginas todavía antiguas & Debe aparecer una sola vez \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+El segundo y tercer caso muestran por qué un timeout no describe el estado remoto. La idempotencia durable transforma la incertidumbre del cliente en una respuesta estable.
+
+La reconstrucción no depende del registro \texttt{COMMIT} aislado. Recovery combina:
+
+\[
+\text{páginas persistentes anteriores}
++
+\operatorname{REDO}(\text{registros WAL confirmados pendientes}).
+\]
+
+Los registros \texttt{WAL UPDATE} describen cómo insertar la compra, descontar inventario y actualizar el índice. El registro \texttt{COMMIT} indica que ese conjunto de cambios debe formar parte de la historia confirmada. En síntesis: los registros de actualización contienen el \emph{cómo}; el COMMIT contiene la \emph{decisión}. Si se perdiese todo el dispositivo, haría falta un backup base más WAL archivado o una réplica apropiada.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{8. REDO repetible.}
+\end{uaexercise}
+\begin{uaanswer}
+Si todos los registros corresponden a P17, recovery omite LSN 118 y 120 porque la página ya declara \texttt{pageLSN}=120. Aplica 121 y luego 123, actualizando el \texttt{pageLSN} después de cada modificación.
+
+Si recovery cae después de aplicar 121:
+
+\begin{itemize}
+\item si la página actualizada no llegó al medio, el siguiente recovery parte otra vez de la página durable con 120 y reaplica 121;
+\item si llegó con \texttt{pageLSN}=121, el siguiente recovery omite 121 y continúa con 123.
+\end{itemize}
+
+Esto es idempotencia física del procedimiento. No evita que dos requests distintos creen dos compras; para eso se usa 9F2A como identidad de negocio.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{9. Group commit cuantitativo.}
+\end{uaexercise}
+\begin{uaanswer}
+Con un \texttt{fsync} por transacción se solicitan 600 sincronizaciones por segundo. Si fueran estrictamente seriales y cada una costara 2,4 ms, la demanda sería 1.440 ms de dispositivo por segundo y el máximo teórico sería aproximadamente:
+
+\[
+\frac{1}{0{,}0024} \approx 416{,}7\ \text{transacciones/s}.
+\]
+
+Con grupos completos de 12, el límite ideal sería 50 sincronizaciones/s y el costo físico amortizado:
+
+\[
+\frac{2{,}4\ \text{ms}}{12}=0{,}2\ \text{ms/transacción}.
+\]
+
+Sin embargo, con 600 transacciones/s llega una transacción cada 1,67 ms. Un timeout de agrupación de 1 ms no alcanza por sí solo para reunir 12; la ocupación real depende de concurrencia, cola existente y commits que lleguen mientras otra sincronización está en curso. La conclusión correcta es medir tamaño de grupo y latencia, no asumir grupos completos.
+
+La garantía se conserva si cada ACK espera el flush que incluye su \texttt{commitLSN}.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{10. Checkpoint, backup y réplica.}
+\end{uaexercise}
+\begin{uaanswer}
+Usando unidades decimales:
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+Intervalo & Segundos & WAL máximo posterior \\
+\midrule
+2 min & 120 & 21.600 MB = 21,6 GB \\
+5 min & 300 & 54.000 MB = 54 GB \\
+15 min & 900 & 162.000 MB = 162 GB \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Más WAL posterior suele aumentar análisis y replay, por lo que presiona RTO. Checkpoints más frecuentes agregan E/S y pueden crear picos.
+
+El checkpoint acota recuperación local. No protege contra pérdida total o corrupción del dispositivo: eso requiere backup y/o réplica durable. La réplica mejora disponibilidad y tolerancia a fallas de nodo, pero no reemplaza un backup frente a borrado lógico, corrupción propagada o retención histórica.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{11. Timeline MVCC.}
+\end{uaexercise}
+\begin{uaanswer}
+El timeline correcto es:
 
 \begin{enumerate}
-\item \textbf{Crash antes del commit:} no debe aparecer una transacción confirmada. Si páginas no confirmadas llegaron al disco bajo STEAL, se requiere UNDO o una técnica equivalente de invisibilidad.
-\item \textbf{Commit en memoria, antes del flush:} el cliente aún no recibió ACK. Recovery puede no encontrar un commit durable y tratar el trabajo como abortado.
-\item \textbf{Después del flush, antes del ACK:} recovery conserva y rehace la transacción. El cliente puede reintentar; la clave idempotente permite devolver el resultado sin repetir el efecto.
-\item \textbf{Después del ACK, antes de las páginas:} el WAL durable sostiene la promesa. Recovery ejecuta REDO y materializa pedido e inventario.
+\item $v_1=120$ existe y está confirmada.
+\item $T_R$ comienza y fija $S_R$.
+\item La primera lectura elige $v_1$.
+\item $T_W$ crea $v_2=135$ sin eliminar $v_1$.
+\item $T_W$ confirma.
+\item La segunda lectura de $T_R$ sigue usando $S_R$ y observa $v_1$ si el nivel conserva snapshot.
+\item Un lector iniciado después del COMMIT puede observar $v_2$.
+\item Al terminar $T_R$, $v_1$ queda reclamable cuando ningún otro snapshot la necesita.
 \end{enumerate}
 
-El checkpoint no cambia qué transacciones están confirmadas: acorta la porción de historia que debe inspeccionarse o reproducirse.
+La justificación no es ``MVCC lo hace'', sino que ambas lecturas de $T_R$ usan la misma regla de visibilidad y $v_2$ no pertenecía a la historia observable al fijar $S_R$.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{7. Regla WAL y contraejemplo.}
+\textbf{12. Snapshot y vista coherente.}
 \end{uaexercise}
 \begin{uaanswer}
-Suponga que $T_1$ cambia $x:10\rightarrow20$. La página con $x=20$ se escribe al disco antes que el registro de log y antes del commit. Ocurre un crash. El disco contiene el efecto, pero recovery no dispone de una historia durable que diga quién lo produjo, si estaba confirmado o cómo restaurar el valor anterior. Bajo STEAL, esta ejecución viola atomicidad.
+Un snapshot no copia todas las páginas. Conserva metadatos que permiten decidir qué transacciones eran visibles. Una regla simplificada para una versión $v$ creada por $T_c$ y reemplazada por $T_r$ es:
 
-La corrección exige que el registro que permite REDO/UNDO sea durable antes de que la página pueda escribirse. El protocolo queda:
+\begin{quote}
+$v$ es visible si $T_c$ estaba confirmada y visible para el snapshot, y $T_r$ no estaba confirmada/visible para ese mismo snapshot.
+\end{quote}
+
+Ejemplo incoherente: un reporte lee el total de pedidos antes de una compra y el total de stock después de esa misma compra. Las filas obedecen momentos distintos y el reporte puede presentar una igualdad contable imposible.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{13. Transacción larga y bloat.}
+\end{uaexercise}
+\begin{uaanswer}
+En 90 minutos se producen hasta:
 
 \[
-\text{log update durable} \prec \text{page write},\qquad
-\text{commit record durable} \prec \text{ACK}.
+30.000 \times 90 = 2.700.000
 \]
 
-Con NO-STEAL, las páginas de transacciones no confirmadas no llegan al disco y se reduce la necesidad de UNDO físico, aunque aumenta presión de buffer. Con copy-on-write, se escriben nuevas páginas y una raíz o metadata durable decide qué versión pertenece al estado confirmado. Cambia el mecanismo, no la necesidad de distinguir historia válida de incompleta.
+actualizaciones. No todas implican una versión retenida distinta, pero la cifra dimensiona la presión potencial. El snapshot antiguo puede obligar a conservar versiones que de otro modo serían reclamables.
+
+Señales esperadas: edad de transacción, filas muertas, tamaño de tabla e índices, duración de VACUUM, cache hit rate descendente, más buffers por consulta, WAL creciente y p99 alto.
+
+Intervenciones razonables: reducir alcance del reporte, usar réplica de lectura, dividir el trabajo, establecer timeout de transacción, exportar un snapshot controlado, revisar autovacuum y evitar sesiones idle in transaction. Matar la consulta sin diagnóstico puede ser necesario en emergencia, pero no es una estrategia de diseño.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{8. REDO repetible e identidad de registros.}
+\textbf{14. MVCC no implica serializabilidad.}
 \end{uaexercise}
 \begin{uaanswer}
-``Establecer saldo=1500'' es idempotente respecto del estado objetivo: aplicarlo dos veces deja 1500. ``Sumar 500'' no lo es: dos replays producen 1000 adicionales.
-
-Solución basada en LSN: cada registro tiene un LSN y cada página conserva \texttt{pageLSN}. Recovery aplica el registro solo si $LSN>pageLSN$. Si se interrumpe luego de aplicar, el nuevo arranque observa que la página ya alcanzó ese LSN.
-
-Solución basada en identidad: la operación ``sumar 500'' lleva un \texttt{operation\_id}; el estado conserva qué IDs fueron aplicados, idealmente en la misma unidad atómica. Un retry o replay del mismo ID no vuelve a modificar el saldo. En ambos casos, la repetición física deja un único efecto lógico.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{9. Group commit, latencia y throughput.}
-\end{uaexercise}
-\begin{uaanswer}
-Ocho flushes seriales cuestan aproximadamente $8\times5=40$ ms de tiempo físico dominante. Un group commit puede persistir los ocho registros con un solo flush de unos 5 ms, más la espera de formar el grupo. El throughput potencial mejora casi ocho veces respecto del componente de flush, aunque el sistema real incluye CPU, I/O y contención.
-
-El p50 de una transacción puede crecer ligeramente si espera el grupo. Bajo carga, el p99 puede mejorar al evitar una cola de flushes individuales. La garantía se conserva si cada transacción recibe ACK solo después de que el flush grupal cubra su registro de commit.
-
-El commit asincrónico responde antes del flush: reduce latencia visible, pero acepta pérdida de operaciones ya confirmadas al usuario. Lo evitaría para CampusShop y podría considerarlo para telemetría reconstruible si el RPO permite perder una pequeña ventana y esa semántica se declara explícitamente.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{10. Checkpoints, RTO y presión de I/O.}
-\end{uaexercise}
-\begin{uaanswer}
-Con 180 MB/min:
+Invariante: al menos una guardia permanece activa. Estado inicial $A=1,B=1$.
 
 \begin{itemize}
-\item cada 3 min: 540 MB; replay ideal $540/300=1{,}8$ s;
-\item cada 12 min: 2160 MB; replay ideal $2160/300=7{,}2$ s;
-\item cada 30 min: 5400 MB; replay ideal $5400/300=18$ s.
+\item $T_1$ usa un snapshot con $A=1,B=1$ y escribe $A=0$.
+\item $T_2$ usa el mismo estado visible y escribe $B=0$.
+\item No existe conflicto write--write sobre una misma fila.
+\item Ambas confirman y el resultado $A=0,B=0$ viola el invariante.
 \end{itemize}
 
-El RTO real agrega arranque, descubrimiento del checkpoint, lectura de metadata, cache fría, I/O concurrente, verificación, fsync del recovery, reanudación de réplicas y calentamiento del servicio. Checkpoints frecuentes escriben más páginas sucias y pueden crear picos; muy espaciados alargan recovery y retienen más WAL.
-
-El experimento correcto ejecuta el workload representativo, varía el intervalo, mide p95/p99 de commits, bytes/s de checkpoint, duración del checkpoint y recovery real tras crashes controlados. La elección debe satisfacer simultáneamente el RTO y el SLO de operación normal.
+Mitigaciones: aislamiento serializable con detección de dependencias; lock explícito sobre el conjunto o una fila que materialice el invariante; rediseñar el dato para que ambas transacciones escriban un mismo recurso de coordinación. Cada alternativa paga bloqueo, abortos o complejidad de modelo.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{11. Timeline MVCC y visibilidad.}
+\textbf{15. De la visibilidad a la localización: árbol B y planes.}
 \end{uaexercise}
 \begin{uaanswer}
-Si $T_R$ toma snapshot antes del commit de $v_2$, todas sus lecturas dentro de un snapshot estable observan $v_1=120$, aunque $v_2=135$ y luego $v_3=140$ se confirmen. Una transacción iniciada después del commit de $v_3$ puede ver $v_3$.
-
-Para intervalos semiabiertos:
+MVCC y el índice no son sustitutos. El árbol B conduce desde claves de búsqueda hacia filas o páginas candidatas; después, las reglas MVCC determinan si cada versión candidata es visible para el snapshot. Un recorrido conceptual es:
 
 \[
-t=5\rightarrow v_1,\quad t=8\rightarrow v_2,\quad
- t=14\rightarrow v_2,\quad t=15\rightarrow v_3,\quad t=20\rightarrow v_3.
+\begin{aligned}
+(8421,\texttt{CONFIRMED})
+&\rightarrow \text{raíz}
+\rightarrow \text{hoja ordenada por fecha}\\
+&\rightarrow \text{referencias candidatas}
+\rightarrow \text{verificación MVCC}.
+\end{aligned}
 \]
 
-El modelo por intervalos es pedagógico. Un motor real suele usar IDs de transacción, estados de commit y reglas de visibilidad. La idea invariante es que ``valor actual'' depende del snapshot, no solo del reloj de pared.
+Plan A se lee desde \texttt{Seq Scan}: visita la tabla, filtra y descarta 9.980 filas, toca 840 buffers, ordena los resultados y finalmente entrega 20. El trabajo inicial es mucho mayor que la salida útil.
+
+Plan B usa un \texttt{Index Scan} cuya clave coincide con filtros y orden. Toca 5 buffers en el ejemplo, encuentra las primeras 20 entradas útiles y \texttt{LIMIT} detiene el recorrido sin un \texttt{Sort} separado. Algunas entradas podrían no ser visibles para el snapshot; en ese caso, el recorrido continúa hasta reunir 20 resultados visibles.
+
+La evidencia no es solo el tiempo: cambian acceso, filas descartadas, buffers y operador de orden. Los números son ilustrativos; deben reproducirse con datos, estadísticas y hardware reales.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{12. Una lectura larga hace más caro el presente.}
+\textbf{16. Diseñar y cuestionar un índice compuesto.}
 \end{uaexercise}
 \begin{uaanswer}
-El snapshot antiguo puede seguir necesitando versiones anteriores. Por eso el garbage collector o \texttt{VACUUM} no puede reclamarlas. Las versiones retenidas aumentan páginas y entradas de índice; más datos compiten por cache; aumentan cache misses e I/O; scans y mantenimiento tardan más; finalmente crecen latencia y WAL.
-
-Métricas útiles: edad de la transacción más antigua, cantidad de versiones muertas, tamaño de tabla/índices respecto de filas vivas, progreso y duración de vacuum, cache hit rate y p99 de consultas.
-
-Intervenciones:
-
-\begin{itemize}
-\item imponer límites o timeouts a transacciones largas: mejora limpieza, pero puede abortar reportes legítimos;
-\item mover reportes a réplica o snapshot exportado: aísla OLTP, pero agrega infraestructura y posible frescura menor;
-\item particionar o resumir datos: reduce la superficie leída, pero complica diseño y operación.
-\end{itemize}
-
-MVCC cambia bloqueo por administración de historia; no elimina el costo de concurrencia.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{13. MVCC no equivale a serializabilidad.}
-\end{uaexercise}
-\begin{uaanswer}
-$T_1$ y $T_2$ leen $A=1,B=1$. $T_1$ escribe $A=0$ y $T_2$ escribe $B=0$. Como modifican filas distintas, una implementación de Snapshot Isolation puede permitir ambos commits. El estado final $A=0,B=0$ viola el invariante ``al menos uno activo''.
-
-Alternativas:
-
-\begin{itemize}
-\item \textbf{bloqueo explícito del conjunto:} semántica clara; más espera y riesgo de contención;
-\item \textbf{fila centinela:} ambas transacciones actualizan un mismo registro y generan conflicto; simple, pero concentra carga;
-\item \textbf{Serializable:} el motor detecta dependencia peligrosa y aborta una transacción; preserva el modelo, pero exige retry y eleva aborts;
-\item \textbf{servicio autoritativo:} serializa la decisión fuera de la tabla; clarifica ownership, pero agrega componente y latencia de red.
-\end{itemize}
-
-La elección depende de frecuencia del conflicto, costo de abortar y criticidad del invariante.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{14. Diseñar el índice desde la pregunta.}
-\end{uaexercise}
-\begin{uaanswer}
-$(student\_id)$ reduce la búsqueda al estudiante, pero puede requerir filtrar estado y ordenar por fecha. $(confirmed\_at\ DESC)$ ofrece fecha global, pero mezcla estudiantes. $(student\_id,status,confirmed\_at\ DESC)$ satisface las dos igualdades, entrega el orden requerido y permite detenerse tras 20 entradas. $(status,confirmed\_at\ DESC,student\_id)$ es menos útil para localizar un estudiante porque el prefijo comienza por estado y fecha global.
-
-Un índice parcial sobre compras confirmadas puede ser:
+La sentencia es:
 
 \begin{verbatim}
-CREATE INDEX ... ON purchases(student_id, confirmed_at DESC)
-WHERE status = 'CONFIRMED';
+CREATE INDEX idx_purchase_student_status_date
+ON purchases(student_id, status, confirmed_at DESC);
 \end{verbatim}
 
-Un índice de cobertura podría incluir columnas proyectadas, reduciendo accesos al heap cuando las reglas de visibilidad lo permiten. El costo incluye escritura adicional, WAL, espacio, cache, vacuum y splits. Debe validarse con frecuencia real de consulta y carga de escritura.
+El prefijo de igualdades ubica estudiante y estado; la tercera columna entrega fechas en el orden requerido. El alto \emph{fan-out} significa que una página interna puede contener muchas claves separadoras y referencias. Por ello, la altura suele crecer lentamente y el motor necesita pocas lecturas de páginas para llegar a la hoja correcta.
+
+\begin{itemize}
+\item Solo por \texttt{status}: el índice puede ser poco útil porque la primera columna no está restringida. Puede evaluarse otro índice, uno parcial o un scan secuencial según cardinalidad.
+\item Rango de fecha global: el orden del índice no comienza por fecha; un índice cuyo prefijo sea \texttt{confirmed\_at} podría ser mejor.
+\item Por estudiante sin estado: puede aprovechar el prefijo \texttt{student\_id}, aunque quizá recorra varios estados.
+\item Si 95\% está confirmado: \texttt{status} tiene baja selectividad; puede evaluarse un índice parcial, cambiar el orden o aceptar un scan secuencial.
+\end{itemize}
+
+En cada caso se observarían el nodo de acceso, filas estimadas y reales, filas descartadas, buffers, ordenamientos y tiempo. La decisión se valida con planes y workload, no con una regla sintáctica aislada.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{15. Leer el plan de abajo hacia arriba.}
+\textbf{17. El índice también cuesta.}
 \end{uaexercise}
 \begin{uaanswer}
-En el plan sin índice, \texttt{Seq Scan} lee la tabla; el filtro descarta 998.000 filas; \texttt{Sort top-N} ordena candidatas; \texttt{Limit} conserva 20. Los 840 buffers indican una superficie amplia de páginas tocadas. Con el índice, \texttt{Index Scan} navega directamente al rango ya ordenado, produce 20 filas y toca 5 buffers; desaparecen el gran descarte y el sort.
+Procedimiento:
 
-Las estimaciones provienen del planner; los valores \texttt{actual} aparecen solo con \texttt{ANALYZE}. No se universalizan los tiempos por: cache fría/caliente, hardware, concurrencia, tamaño de tabla, distribución y estadísticas, configuración, autovacuum, parametrización y variación del workload. La evidencia fuerte es la reducción del trabajo, repetida bajo condiciones representativas.
+\begin{enumerate}
+\item medir uso de cada índice, consultas afectadas, p95/p99 y buffers;
+\item medir inserts/s, WAL/s, espacio, cache hit y tiempo de mantenimiento;
+\item reproducir el workload en staging con y sin índices;
+\item capturar \texttt{EXPLAIN ANALYZE} de consultas candidatas;
+\item retirar primero uno de manera reversible o marcarlo inválido/no usado según el motor;
+\item observar una ventana suficiente y mantener DDL de rollback.
+\end{enumerate}
+
+Eliminar un índice puede mejorar escrituras, reducir WAL y liberar caché, pero empeorar una consulta rara y crítica. La decisión debe incorporar frecuencia y criticidad, no solo conteo de usos.
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{16. Cuándo un índice existe y no debe usarse.}
+\textbf{18. Ruta completa de una clave en una LSM-tree.}
 \end{uaexercise}
 \begin{uaanswer}
-Con 92\% de filas activas, la selectividad es muy baja. Seguir el índice puede localizar casi toda la tabla y luego provocar muchos accesos al heap. Un scan secuencial aprovecha lectura continua y puede ser más barato. El planner compara costos esperados; la mera existencia del índice no obliga a usarlo.
-
-Para retirar un índice: inventariar definición y constraints; ampliar la ventana de observación para cubrir estacionalidad; revisar query logs y propietarios; medir tamaño, WAL y costo de mantenimiento; probar planes sin él en staging o mediante invisibilidad cuando exista; retirar gradualmente; monitorear latencia, scans y errores; conservar la definición y un rollback rápido. ``No usado en 30 días'' es indicio, no prueba suficiente.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{17. Ruta completa de una LSM.}
-\end{uaexercise}
-\begin{uaanswer}
-El write se registra en WAL y se inserta en una memtable ordenada. Al llenarse, la memtable se congela; una nueva recibe tráfico. La immutable memtable se vuelca secuencialmente a una SSTable L0; el manifest registra los archivos. Compaction fusiona runs y mueve versiones a L1/L2.
-
-Un point lookup consulta memtables desde lo nuevo, luego L0 potencialmente solapado y niveles inferiores. Índices por archivo ubican bloques; Bloom filters descartan archivos que seguramente no contienen la clave; block cache evita I/O repetido. Un range scan recorre rangos y fusiona iteradores de varios runs.
-
-El tombstone debe permanecer hasta que ninguna versión más antigua pueda reaparecer desde niveles no cubiertos. Eliminarlo demasiado pronto resucitaría datos borrados. La respuesta al cliente depende de la garantía: memtable para aceptación volátil; WAL flushed para durabilidad local; quorum durable para tolerancia a pérdida de nodos.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{18. Compaction como deuda física.}
-\end{uaexercise}
-\begin{uaanswer}
-El merge ordenado compara claves. La versión más nueva de $c$ reemplaza a la antigua. El tombstone de $e$ suprime la versión de $e$ si la compaction cubre todas las fuentes donde podría existir una versión más vieja. Una salida posible es $(a,b,c_{nuevo},f,g,h)$, omitiendo $e$ solo cuando se sabe que no reaparecerá desde niveles inferiores.
-
-Para descartar definitivamente el tombstone se necesita conocer el rango y niveles cubiertos, snapshots o replicación que aún podrían requerirlo y reglas de retención. Si cada elemento ocupa un bloque unitario, se leen 8 entradas de A/B más el tombstone y se escriben 6 entradas vivas: mucho más trabajo físico que la única actualización lógica de $c$ y el borrado de $e$. Esa diferencia es la intuición de write amplification.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{19. Dashboard de compaction y write stall.}
-\end{uaexercise}
-\begin{uaanswer}
-El déficit sostenido es $145-110=35$ MB/s. El backlog crece, aumenta L0 y solapamiento, las lecturas consultan más runs, compaction compite por I/O y el p99 de write sube. El stall de 3,4 s/min ya muestra backpressure visible. La write amplification de $6,5\times$ explica que el dispositivo trabaja mucho más que los bytes lógicos.
-
-Faltan $36-28=8$ archivos para el stop trigger. A 1,6 archivos/min, el tiempo estimado es $8/1{,}6=5$ minutos si la tendencia no cambia.
-
-Respuestas posibles: limitar productores y medir tasa admitida; aumentar threads/I/O de compaction y medir throughput más p99; repartir shards y medir skew; cambiar tamaño/política de niveles y medir WA/RA/SA. Ningún tuning crea ancho de banda: si la tasa sostenible sigue por debajo del ingreso, se debe reducir demanda o aumentar capacidad física/arquitectónica.
-\end{uaanswer}
-
-\begin{uaexercise}
-\textbf{20. Dos sistemas, dos decisiones defendibles.}
-\end{uaexercise}
-\begin{uaanswer}
-\textbf{CampusShop.} $P$: confirmar compras exactamente una vez y consultar historial rápido. $F$: crash, timeout, retry, pérdida de nodo y concurrencia sobre stock. $G$: RPO cercano a cero para ACK, consistencia transaccional e historial p95 menor a 100 ms. $S$: motor relacional B-tree con WAL durable, MVCC, clave idempotente única, transacción sobre pedido/pago/stock, índice $(student\_id,status,confirmed\_at\ DESC)$, checkpoints según RTO, réplica durable y backups. $T$: fsync y coordinación añaden latencia; índices y MVCC añaden mantenimiento.
-
-Métricas: p95/p99 de checkout, latencia de flush, commits/s, aborts, duplicados, WAL bytes/s, replication lag, bloat, duración de vacuum y RTO real. Experimento: crashes aleatorios entre commit, flush, ACK y page write con retries; ningún ACK puede perderse ni duplicarse.
-
-\textbf{Telemetría.} $P$: ingerir 100.000 eventos/s y consultar por dispositivo/ventana. $F$: bursts, crash, hotspot, disco lleno, backlog y partición. $G$: RPO declarado, vistas con 10 s de frescura y retención de 30 días. $S$: LSM particionada por tiempo y hash, WAL, replicación, Bloom filters, compaction orientada a tiempo, borrado por particiones/TTL y backpressure. Puede combinarse con un catálogo B-tree y vistas analíticas separadas. $T$: write amplification, espacio temporal, consistencia eventual de vistas y complejidad operacional.
-
-Métricas: eventos/s, MB/s lógico/físico, pending bytes, L0, stall time, WA/RA/SA, p99 de put/range, lag de vista, espacio y recovery. Experimento: tasa sostenida más bursts, queries concurrentes y crashes; la arquitectura queda refutada si el backlog crece sin límite o no cumple frescura y p99.
-\end{uaanswer}
-
-\section{Síntesis de la guía}
-
-Una respuesta excelente no elige primero un producto. Parte de la pregunta y termina con evidencia:
+Escritura:
 
 \[
-D=(P,F,G,S,T) + \text{métricas} + \text{experimento de refutación}.
+(k,v) \rightarrow WAL \rightarrow memtable \rightarrow memtable\ inmutable
+\rightarrow flush \rightarrow SSTable\ L0.
 \]
 
-WAL hace recuperable una historia confirmada; MVCC administra historias concurrentes; los índices reducen trabajo para preguntas específicas; una LSM difiere organización; compaction paga esa deuda y los stalls protegen al motor cuando la capacidad no alcanza.
+Lectura: revisar memtables, seleccionar SSTables por rango, consultar Bloom, omitir las que demuestran ausencia, consultar índice y caché/bloque para las candidatas, y elegir la versión visible más reciente.
+
+Una actualización crea otra versión. Una eliminación crea un tombstone. Ambos deben sobrevivir hasta que la compactación haya visto todos los runs donde podría existir una versión anterior; eliminar temprano el tombstone puede resucitar datos.
+
+``Archivo imposible'' es incorrecto. La expresión precisa es: \emph{SSTable que puede omitirse para esta búsqueda porque el filtro asegura que la clave no está allí}. Bloom puede producir falsos positivos, pero no falsos negativos.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{19. Diagnóstico cuantitativo de compactación.}
+\end{uaexercise}
+\begin{uaanswer}
+Déficit:
+
+\[
+90-60=30\ \text{MB/s}.
+\]
+
+Con unidades decimales, faltan 9 GB para slowdown:
+
+\[
+9.000/30=300\ \text{s}=5\ \text{min}.
+\]
+
+Faltan 18 GB para stop:
+
+\[
+18.000/30=600\ \text{s}=10\ \text{min}.
+\]
+
+Son tiempos ideales: la capacidad y el ingreso pueden variar.
+
+Hipótesis y evidencia:
+
+\begin{itemize}
+\item disco saturado: utilización, latencia y cola del dispositivo;
+\item write amplification alta: bytes físicos / bytes lógicos y política de niveles;
+\item demasiados archivos L0: conteo, frecuencia de flush y stalls por trigger;
+\item CPU insuficiente para compaction: uso por threads y tiempo de compaction;
+\item hot partition: bytes/QPS por shard;
+\item snapshots/tombstones retenidos: edad, versiones y espacio no reclamable.
+\end{itemize}
+
+El stall es protección cuando limita temporalmente la admisión y permite estabilizar backlog. Es evidencia de incapacidad cuando se vuelve frecuente, prolongado o consume el SLO de escritura.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{20. Dos cargas, dos arquitecturas defendibles.}
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{CampusShop.}
+
+\begin{itemize}
+\item $P$: confirmar compras e inventario y consultar historial.
+\item $F$: crash, timeout, retry, pérdida de nodo y consulta lenta.
+\item $G$: compra exactamente una vez a nivel lógico, inventario correcto, RPO cero frente a crash local confirmado y p99 de consulta acotado.
+\item $S$: base transaccional con WAL, MVCC, índice compuesto, idempotency key 9F2A y replicación durable según disponibilidad requerida.
+\item $T$: costo de coordinación, WAL, índices, VACUUM y failover.
+\item Evidencia: crash injection, reintentos, \texttt{EXPLAIN ANALYZE}, p99, tiempo de recovery y replica lag.
+\end{itemize}
+
+\textbf{Telemetría.}
+
+\begin{itemize}
+\item $P$: ingerir 80.000 eventos/s y consultar rangos por dispositivo/tiempo.
+\item $F$: crash, picos, pérdida de nodo, backlog, disco lento y late data.
+\item $G$: pérdida máxima declarada, throughput sostenible, RTO y rangos consultables.
+\item $S$: WAL, particionamiento temporal, LSM, SSTables, Bloom, compactación y retención.
+\item $T$: write/space amplification, frescura eventual, espacio temporal y stalls.
+\item Evidencia: soak test, p99, backlog slope, L0 files, WA, RPO/RTO y costo por GB.
+\end{itemize}
+
+La condición de revisión debe ser explícita. Ejemplo: abandonar la hipótesis LSM si el p99 de lectura puntual y el costo de compactación incumplen el SLO aun después de dimensionar y ajustar razonablemente.
+\end{uaanswer}
 
 \section{Criterio de autocorrección}
 
-Una solución está completa cuando explicita el problema, la falla, la garantía, el mecanismo, el costo y la evidencia que permitiría validar o refutar la respuesta. Las matrices de corrección y las preguntas de defensa se reservan para el material docente.
+Una respuesta excelente:
+
+\begin{enumerate}
+\item define el objeto exacto de la garantía;
+\item ubica la frontera física o lógica;
+\item mueve la falla por la ejecución;
+\item distingue mecanismo local de distribución;
+\item reconoce qué no resuelve;
+\item cuantifica o mide el costo;
+\item propone evidencia que podría demostrar que estaba equivocada.
+\end{enumerate}
 
 \end{document}

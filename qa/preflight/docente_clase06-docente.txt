@@ -1,0 +1,6 @@
+PDF: build/docente/clase06-docente.pdf
+Pages: 24
+Encrypted: False
+Openable (PyMuPDF): True
+Likely scanned: False
+XFA present: False

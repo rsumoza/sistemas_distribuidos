@@ -1,0 +1,6 @@
+PDF: build/apuntes/clase06-apuntes.pdf
+Pages: 23
+Encrypted: False
+Openable (PyMuPDF): True
+Likely scanned: False
+XFA present: False

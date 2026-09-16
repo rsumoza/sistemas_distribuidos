@@ -4,14 +4,14 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y procesamiento de streams}
-\title{Clase 07 --- Guía de ejercicios: historia, progreso y efectos}
+\UASetClassTitle{Logs distribuidos y procesamiento de eventos}
+\title{Clase 07 --- Guía de ejercicios: del hecho durable al efecto recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
 \section{Propósito de la guía}
-Los ejercicios exigen definir la frontera de cada garantía. No se acepta “Kafka da exactly-once” sin especificar qué estado, efecto y sistema participan.
+La guía comienza con registro, append, lector y progreso durable; luego avanza hacia particiones, fallas e idempotencia. No se acepta “Kafka da exactly-once” sin especificar qué estado, efecto y sistema participan.
 
 \section{Caso base y datos de trabajo}
 
@@ -36,6 +36,7 @@ Fallas a considerar & timeout del productor, crash del consumidor, rebalance, cl
 
 Para cada ejercicio:
 \begin{enumerate}
+\item identifique los objetos concretos: registro, secuencia, lector, estado y progreso;
 \item describa el hecho y su identidad de negocio;
 \item declare el orden requerido y la key;
 \item dibuje el timeline de éxito y el de falla;
@@ -58,9 +59,9 @@ Para una clase de 180 minutos, resolver en profundidad una selección y utilizar
 \toprule
 Momento & Ejercicios & Evidencia \\
 \midrule
-En clase & 2, 5, 6, 7, 14, 16, 19 & key, timeline, dual write, tiempo y diseño \\
-Postclase & 1, 3, 4, 8, 9, 10, 11, 15, 17 & formalización y operación \\
-Desafío & 12, 13, 18, 20 & frontera exactly-once, estado y prueba de falla \\
+En clase & 1, 2, 5, 6, 7, 14, 15, 19 & fundamentos, key, progreso, crash y outbox \\
+Consolidación & 3, 4, 8, 9, 16, 17 & capacidad, grupo, lag y tiempo \\
+Profundización & 10, 11, 12, 13, 18, 20 & réplica, exactly-once, estado y prueba de falla \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -71,9 +72,9 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 \section{Ejercicios}
 \begin{uaexercise}
 
-\textbf{1. Log, cola y base orientada a estado.} Compare las tres abstracciones para un sistema de pedidos. Explique retención, replay, orden y ownership de progreso.
+\textbf{1. Base mínima: registro, append y progreso.} Dada la secuencia de registros 416--420, un consumidor alcanzó la posición 421 pero solo persistió progreso hasta 418. Explique qué existe en memoria, qué está durable y qué reaparece después de un crash.
 
-\textit{Entregable mínimo:} una matriz comparativa de tres abstracciones y un ejemplo de replay.
+\textit{Entregable mínimo:} un diagrama con secuencia, lector, posición actual, progreso durable y punto de reinicio.
 \end{uaexercise}
 \begin{uaexercise}
 
@@ -190,5 +191,5 @@ Toda respuesta debe distinguir \textbf{historia, entrega, procesamiento y efecto
 \textit{Entregable mínimo:} el marco completo y un protocolo experimental reproducible.
 \end{uaexercise}
 \section{Criterios de entrega}
-Incluya timelines, keys, offsets y escenarios de falla cuando corresponda. Una solución sólida define orden, progreso, duplicación, efecto y métricas.
+Incluya objetos concretos, timelines, keys, offsets y escenarios de falla. Una solución sólida define orden, progreso, duplicación, efecto y métricas. Producer idempotence, transacciones internas y stateful streaming son profundización: no sustituyen el dominio de los timelines básicos.
 \end{document}

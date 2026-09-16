@@ -3,96 +3,182 @@
 \input{../config/course-config}
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
-\usetikzlibrary{decorations.pathreplacing,matrix,backgrounds}
+\usetikzlibrary{positioning,arrows.meta,calc}
 
 \UASetClassNumber{06}
-\UASetClassTitle{Sistemas de almacenamiento}
+\UASetClassTitle{Storage distribuido y almacenamiento permanente}
 \UASetDocKind{Ficha de trabajo en aula}
-\title{Clase 06 --- WAL, MVCC, EXPLAIN, compaction y stalls}
+\title{Clase 06 --- Ficha de aula: persistencia, concurrencia y rendimiento bajo fallas}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
+\setlength{\emergencystretch}{2em}
 \maketitle
 
-\section{Antes del detalle: seis conceptos en una frase}
+\section{Contexto y vocabulario inicial}
 
-Complete primero de memoria y vuelva al final de la clase.
+\textbf{Pregunta central:} ¿cómo convierte un sistema distribuido una operación en estado permanente, recuperable y consultable?
+
+Complete durante la apertura:
 
 \begin{center}
-\begin{tabular}{p{0.18\textwidth}p{0.68\textwidth}}
+\begin{tabular}{p{0.25\textwidth}p{0.60\textwidth}}
 \toprule
-Concepto & En una frase \\
+Concepto & Definición en sus palabras \\
 \midrule
-WAL & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
-MVCC & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
-Índice & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
-\texttt{EXPLAIN} & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
-Compaction & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
-Write stall & \rule{0.66\textwidth}{0.4pt} \\[0.45cm]
+Capa distribuida & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+Motor de almacenamiento & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+WAL & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+MVCC & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+LSM-tree & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+COMMIT & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
+X durable & \rule{0.58\textwidth}{0.4pt} \\[0.45cm]
 \bottomrule
 \end{tabular}
 \end{center}
 
 \begin{uainfo}
-Para cada concepto, anote al final: qué problema resuelve, qué no resuelve por sí solo y dónde paga el costo.
+\textbf{Caso CampusShop.} ID lógico: 9F2A. Filas: \texttt{purchases} e \texttt{inventory}. Página didáctica: P17. Entrada de índice: I5.
 \end{uainfo}
 
 \newpage
-\section{Timeline WAL: completar durante la clase}
+\section{Timeline WAL}
 
-Ubique: request, \texttt{BEGIN}, registros de pedido e inventario, dirty pages, registro de \texttt{COMMIT}, flush, ACK, page write, checkpoint, crash y REDO.
+Ubique: request 9F2A, preparación, \texttt{WAL UPDATE}, páginas sucias, \texttt{COMMIT}, flush hasta \texttt{commitLSN}, ACK, crash y REDO.
 
 \begin{center}
-\begin{tikzpicture}[x=1.12cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
-\foreach \y/\lab in {3/Cliente,2/Backend,1/WAL,0/Página}{
-  \node[left] at (0,\y){\textbf{\lab}};
-  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(9.7,\y);
+\begin{tikzpicture}[x=1.0cm,y=1.0cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {4/Cliente,3/Servicio,2/Memoria,1/WAL,0/Páginas}{
+  \node[anchor=east] at (0.75,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.95,\y)--(10.2,\y);
 }
-\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(9.9,-0.7) node[right]{tiempo};
-\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
+\draw[->,very thick,UAIngNavy] (0.95,-0.7)--(10.4,-0.7) node[right]{tiempo};
+\foreach \x in {1.5,2.5,3.5,4.5,5.5,6.5,7.5,8.5,9.5}{
   \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
 }
 \end{tikzpicture}
 \end{center}
 
-\vspace{0.2cm}
-\textbf{Marque la frontera durable y responda:}
+\noindent\textbf{Garantía después de recovery:}\\[0.18cm]\rule{\textwidth}{0.4pt}
 
-\begin{enumerate}
-\item Crash antes del commit: \rule{0.71\textwidth}{0.4pt}
-\item Crash después del flush, antes del ACK: \rule{0.47\textwidth}{0.4pt}
-\item Crash después del ACK, antes de la página: \rule{0.42\textwidth}{0.4pt}
-\item ¿Qué debe ser repetible durante REDO? \rule{0.53\textwidth}{0.4pt}
-\end{enumerate}
+\noindent\textbf{Punto más temprano de ACK legítimo:}\\[0.18cm]\rule{\textwidth}{0.4pt}
+
+\noindent\textbf{¿El flush durable comienza con WAL UPDATE?}\\[0.18cm]\rule{\textwidth}{0.4pt}
+
+\noindent\textbf{Prefijo que debe quedar durable:}\\[0.18cm]\rule{\textwidth}{0.4pt}
 
 \newpage
-\section{Timeline MVCC: completar durante la clase}
-
-Ubique: $v_1$, inicio de $T_R$, snapshot, primera lectura, inicio de $T_W$, creación de $v_2$, commit de $T_W$, segunda lectura de $T_R$, inicio de un lector nuevo, fin de $T_R$ y elegibilidad para \texttt{VACUUM}.
+\section{Crashes y recuperación}
 
 \begin{center}
-\begin{tikzpicture}[x=1.12cm,y=1.15cm,>=Latex,every node/.style={font=\small}]
-\foreach \y/\lab in {3/Lector $T_R$,2/Escritor $T_W$,1/Versiones,0/Lectura visible}{
-  \node[left] at (0,\y){\textbf{\lab}};
-  \draw[UAIngRule,line width=0.9pt] (0.2,\y)--(9.7,\y);
+\begin{tabular}{p{0.31\textwidth}p{0.22\textwidth}p{0.31\textwidth}}
+\toprule
+Punto de crash & ¿Qué sabe el cliente? & Estado después de recovery \\
+\midrule
+Antes de COMMIT & & \\[1.2cm]
+COMMIT agregado, no flushed & & \\[1.2cm]
+Flush durable, antes de ACK & & \\[1.2cm]
+ACK, antes de P17 & & \\[1.2cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Papel de 9F2A ante un retry:}
+
+\vspace{1.0cm}
+
+\textbf{Si las páginas conservan el estado anterior, complete:}
+
+\[
+\text{estado recuperado} = \rule{3.1cm}{0.4pt} + \operatorname{REDO}(\rule{3.1cm}{0.4pt})
+\]
+
+\textbf{Registros WAL de modificación contienen:} \rule{0.48\textwidth}{0.4pt}
+
+\textbf{El registro COMMIT indica:} \rule{0.53\textwidth}{0.4pt}
+
+\vspace{0.4cm}
+
+\textbf{Diferencia entre checkpoint, réplica y backup:}
+
+\vspace{1.7cm}
+
+\newpage
+\section{Timeline MVCC}
+
+Ubique: $v_1$, inicio de $T_R$, snapshot $S_R$, primera lectura, creación de $v_2$, COMMIT de $T_W$, segunda lectura, lector nuevo, fin de $T_R$ y reclamación de $v_1$.
+
+\begin{center}
+\begin{tikzpicture}[x=1.0cm,y=1.05cm,>=Latex,every node/.style={font=\small}]
+\foreach \y/\lab in {3/{Lector $T_R$},2/{Escritor $T_W$},1/Versiones,0/{Lectura visible}}{
+  \node[anchor=east] at (0.75,\y){\textbf{\lab}};
+  \draw[UAIngRule,line width=0.9pt] (0.95,\y)--(10.2,\y);
 }
-\draw[->,very thick,UAIngNavy] (0.2,-0.7)--(9.9,-0.7) node[right]{tiempo};
-\foreach \x in {1,2,3,4,5,6,7,8,9,10}{
-  \draw[UAIngMuted] (\x,-0.58)--(\x,-0.82);
-}
+\draw[->,very thick,UAIngNavy] (0.95,-0.7)--(10.4,-0.7) node[right]{tiempo};
 \end{tikzpicture}
 \end{center}
 
-\begin{enumerate}
-\item ¿Qué versión lee $T_R$ antes y después del commit de $T_W$? \rule{0.35\textwidth}{0.4pt}
-\item ¿Qué puede leer una transacción nueva? \rule{0.51\textwidth}{0.4pt}
-\item ¿Cuándo puede reclamarse $v_1$? \rule{0.57\textwidth}{0.4pt}
-\item ¿Qué costo aparece si $T_R$ dura 90 minutos? \rule{0.42\textwidth}{0.4pt}
-\end{enumerate}
+\textbf{Snapshot no significa:} \rule{0.58\textwidth}{0.4pt}
+
+\textbf{Regla de visibilidad en una frase:}
+
+\vspace{1.0cm}
+
+\textbf{Costo de una transacción larga:}
+
+\vspace{1.0cm}
+
+\textbf{Por qué MVCC no implica serializabilidad:}
+
+\vspace{1.0cm}
 
 \newpage
-\section{Leer EXPLAIN: evidencia, no decoración}
+\section{Transición: MVCC, árbol B y ruta física}
+
+Complete las dos preguntas:
+
+\begin{center}
+\begin{tabular}{p{0.29\textwidth}p{0.58\textwidth}}
+\toprule
+Mecanismo & Pregunta que responde \\
+\midrule
+MVCC & \rule{0.55\textwidth}{0.4pt} \\[0.6cm]
+Árbol B / índice & \rule{0.55\textwidth}{0.4pt} \\[0.6cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Regla de transición:} el índice localiza \rule{0.35\textwidth}{0.4pt}; MVCC decide \rule{0.30\textwidth}{0.4pt}.
+
+\vspace{0.35cm}
+
+Dibuje una ruta desde raíz hasta hoja y marque dónde se comprueba visibilidad:
+
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm,>=Latex,every node/.style={font=\small}]
+\node[draw=UAIngNavy,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (r) at (5,3.0) {raíz};
+\node[draw=UAIngNavy,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (i1) at (2.3,1.7) {página interna};
+\node[draw=UAIngNavy,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (i2) at (7.7,1.7) {página interna};
+\node[draw=UAIngOrange,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (l1) at (1.2,0.2) {hoja};
+\node[draw=UAIngOrange,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (l2) at (3.5,0.2) {hoja};
+\node[draw=UAIngOrange,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (l3) at (6.5,0.2) {hoja};
+\node[draw=UAIngOrange,rounded corners,minimum width=2.0cm,minimum height=0.7cm] (l4) at (8.8,0.2) {hoja};
+\draw[->,UAIngNavy,thick] (r)--(i1);
+\draw[->,UAIngNavy,thick] (r)--(i2);
+\draw[->,UAIngNavy,thick] (i1)--(l1);
+\draw[->,UAIngNavy,thick] (i1)--(l2);
+\draw[->,UAIngNavy,thick] (i2)--(l3);
+\draw[->,UAIngNavy,thick] (i2)--(l4);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Fan-out significa:} \rule{0.60\textwidth}{0.4pt}
+
+\textbf{Por qué poca altura ayuda:} \rule{0.56\textwidth}{0.4pt}
+
+\newpage
+\section{EXPLAIN: comparar evidencia}
 
 Consulta:
 
@@ -105,105 +191,134 @@ ORDER BY confirmed_at DESC
 LIMIT 20;
 \end{verbatim}
 
-\subsection*{Plan A --- sin índice}
-
-\begin{verbatim}
-Limit
-  -> Sort  (Sort Key: confirmed_at DESC)
-       -> Seq Scan on purchases
-            Filter: student_id=8421 AND status='CONFIRMED'
-            Rows Removed by Filter: 998000
-Buffers: shared hit=840
-Execution Time: 13.0 ms
-\end{verbatim}
-
-\subsection*{Plan B --- con índice compuesto}
-
-\begin{verbatim}
-Limit
-  -> Index Scan using idx_purchase_student_status_date
-       Index Cond: student_id=8421 AND status='CONFIRMED'
-Buffers: shared hit=5
-Execution Time: 0.3 ms
-\end{verbatim}
-
-Complete:
-
-\begin{enumerate}
-\item El trabajo principal del Plan A fue: \rule{0.58\textwidth}{0.4pt}
-\item El índice evita: \rule{0.73\textwidth}{0.4pt}
-\item Tres evidencias a comparar: \rule{0.57\textwidth}{0.4pt}
-\item Dos costos nuevos sobre writes: \rule{0.51\textwidth}{0.4pt}
-\item Una razón por la que el tiempo puede cambiar mañana: \rule{0.35\textwidth}{0.4pt}
-\end{enumerate}
-
-\newpage
-\section{Compaction y stalls: leer una cadena causal}
-
 \begin{center}
-\begin{tabular}{p{0.39\textwidth}p{0.22\textwidth}p{0.25\textwidth}}
+\begin{tabular}{p{0.28\textwidth}p{0.25\textwidth}p{0.25\textwidth}}
 \toprule
-Señal & Valor & Tendencia \\
+Evidencia & Sin índice & Con índice compuesto \\
 \midrule
-Ingreso lógico & 145 MB/s & estable \\
-Compaction & 110 MB/s & estable \\
-Pending compaction bytes & 18 GB & +2,1 GB/min \\
-L0 files & 28 / stop 36 & +1,6/min \\
-Write amplification & $6,5\times$ & creciente \\
-Stall time & 3,4 s/min & creciente \\
+Acceso inicial & & \\[0.7cm]
+Filas descartadas & & \\[0.7cm]
+Buffers & & \\[0.7cm]
+Sort separado & & \\[0.7cm]
+Trabajo evitado & & \\[0.9cm]
+Costo agregado a writes & & \\[0.9cm]
 \bottomrule
 \end{tabular}
 \end{center}
 
-\begin{enumerate}
-\item Déficit sostenido de capacidad: \rule{0.55\textwidth}{0.4pt}
-\item Tiempo estimado hasta stop trigger: \rule{0.47\textwidth}{0.4pt}
-\item Cadena causal en cuatro pasos:
-\begin{enumerate}
-\item \rule{0.77\textwidth}{0.4pt}
-\item \rule{0.77\textwidth}{0.4pt}
-\item \rule{0.77\textwidth}{0.4pt}
-\item \rule{0.77\textwidth}{0.4pt}
-\end{enumerate}
-\item Una intervención y su costo: \rule{0.52\textwidth}{0.4pt}
-\item Métrica que demostraría mejora: \rule{0.52\textwidth}{0.4pt}
-\end{enumerate}
+\textbf{DDL del índice:}
+
+\vspace{1.1cm}
+
+\textbf{Razón válida para preferir Seq Scan:}
+
+\vspace{1.0cm}
 
 \newpage
-\section{Decisión final: CampusShop o telemetría}
+\section{LSM-tree, merge y filtro de Bloom}
 
-Complete para uno de los dos casos.
+Complete el camino de escritura:
+
+\[
+(k,v) \rightarrow \rule{1.3cm}{0.4pt} \rightarrow
+\rule{1.5cm}{0.4pt} \rightarrow \rule{2.0cm}{0.4pt}
+\rightarrow \rule{1.2cm}{0.4pt} \rightarrow \text{SSTable L0}.
+\]
 
 \begin{center}
-\begin{tabular}{p{0.24\textwidth}p{0.64\textwidth}}
+\begin{tabular}{p{0.25\textwidth}p{0.58\textwidth}}
 \toprule
-Elemento & Respuesta \\
+Término & Explicación \\
 \midrule
-Problema y carga & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Fallas relevantes & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Garantía principal & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Motor / estructura & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-WAL / recovery & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-MVCC / aislamiento & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Índice / compaction & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Trade-off aceptado & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Dos métricas & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
-Experimento refutador & \rule{0.61\textwidth}{0.4pt} \\[0.55cm]
+SSTable & \\[0.8cm]
+Merge ordenado & \\[0.8cm]
+Tombstone & \\[0.8cm]
+Compactación & \\[0.8cm]
 \bottomrule
 \end{tabular}
 \end{center}
 
-\section*{Exit ticket}
+\textbf{Filtro de Bloom:}
+
+\begin{itemize}
+\item ``definitivamente ausente'' significa: \rule{0.54\textwidth}{0.4pt}
+\item ``posiblemente presente'' significa: \rule{0.54\textwidth}{0.4pt}
+\item falso positivo: \rule{0.35\textwidth}{0.4pt}
+\item falso negativo admisible: Sí / No. Justificación: \rule{0.33\textwidth}{0.4pt}
+\end{itemize}
+
+Reemplace ``archivo imposible'' por una formulación precisa:
+
+\vspace{0.8cm}
+
+\newpage
+\section{Compactación y write stall}
+
+Datos:
+
+\begin{itemize}
+\item ingreso: 90 MB/s;
+\item capacidad de compactación: 60 MB/s;
+\item backlog: 18 GB;
+\item slowdown: 27 GB;
+\item stop: 36 GB;
+\item L0: 28/36;
+\item p99: creciente.
+\end{itemize}
+
+\textbf{Déficit:} \rule{0.28\textwidth}{0.4pt}
+
+\textbf{Tiempo ideal hasta slowdown:} \rule{0.28\textwidth}{0.4pt}
+
+\textbf{Tiempo ideal hasta stop:} \rule{0.28\textwidth}{0.4pt}
+
+\begin{center}
+\begin{tabular}{p{0.35\textwidth}p{0.43\textwidth}}
+\toprule
+Hipótesis & Métrica para verificarla \\
+\midrule
+1. & \\[0.9cm]
+2. & \\[0.9cm]
+3. & \\[0.9cm]
+4. & \\[0.9cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Un stall protege cuando:}
+
+\vspace{0.8cm}
+
+\textbf{Un stall revela incapacidad cuando:}
+
+\vspace{0.8cm}
+
+\newpage
+\section{Decisión final y exit ticket}
+
+\begin{center}
+\begin{tabular}{p{0.24\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+Dimensión & CampusShop & Telemetría del campus \\
+\midrule
+Patrón de carga & & \\[0.7cm]
+Falla crítica & & \\[0.7cm]
+Garantía & & \\[0.7cm]
+Estructura candidata & & \\[0.7cm]
+Costo desplazado & & \\[0.7cm]
+Métrica principal & & \\[0.7cm]
+Experimento & & \\[0.9cm]
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Exit ticket}
 
 \begin{enumerate}
-\item Diferencia entre escrito, committed y durable:
-\vspace{1.0cm}
-\item Costo oculto de MVCC:
-\vspace{1.0cm}
-\item Tres elementos de \texttt{EXPLAIN} que miraría antes de crear un índice:
-\vspace{1.0cm}
-\item Señal de que una LSM acumula deuda de compaction:
-\vspace{1.0cm}
+\item Diferencia entre aceptado, escrito y durable.
+\item Costo oculto de MVCC y una métrica para observarlo.
+\item Diferencia entre \texttt{EXPLAIN} y \texttt{EXPLAIN ANALYZE}.
+\item Señales de que una LSM acumula trabajo pendiente.
 \end{enumerate}
 
 \end{document}

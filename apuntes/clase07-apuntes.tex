@@ -5,8 +5,8 @@
 \UASetDate{2026}
 
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y procesamiento de streams}
-\title{Clase 07 --- Historia durable, progreso recuperable y efectos correctos}
+\UASetClassTitle{Logs distribuidos y procesamiento de eventos}
+\title{Clase 07 --- Logs distribuidos: de un hecho durable a un efecto recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -69,6 +69,48 @@ Para cada concepto conviene realizar cuatro acciones:
 \begin{uainfo}
 Las analogías ---película, carril, señalador o reloj del hecho--- son ayudas iniciales. Una explicación completa debe abandonarlas y utilizar después el modelo técnico de topic, partición, offset, transacción y estado.
 \end{uainfo}
+
+
+\section{Base mínima para esta clase}
+
+Esta unidad no presupone conocer detalles avanzados de sistemas de archivos. Trabajaremos primero con siete objetos concretos:
+
+\begin{description}
+\item[Memoria de trabajo.] Estado rápido que puede desaparecer al reiniciar el proceso.
+\item[Registro.] Unidad individual que representa un hecho, por ejemplo ``la compra 9F2A fue confirmada''.
+\item[Append.] Operación de agregar un registro al final de una secuencia sin reescribir la historia completa.
+\item[Log.] Secuencia retenida de registros que puede volver a leerse.
+\item[Lector.] Proceso que recorre esa secuencia y produce un resultado.
+\item[Posición actual.] Punto alcanzado por la instancia viva; puede existir solo en memoria.
+\item[Progreso durable.] Marca persistida desde la que una nueva instancia puede continuar después de una falla.
+\end{description}
+
+Considere el log:
+\[
+[416,417,418,419,420].
+\]
+Un consumidor alcanzó la posición 421, pero solo persistió progreso hasta 418. Si cae, la posición volátil desaparece y la recuperación utiliza la marca durable. Por eso parte del trabajo puede reaparecer.
+
+\begin{center}
+\begin{tikzpicture}[x=1.25cm,y=0.9cm,>=Latex,every node/.style={font=\small,align=center}]
+\foreach \x/\lab in {0/416,1/417,2/418,3/419,4/420}{
+  \node[draw=UAIngNavy,rounded corners,fill=white,minimum width=0.9cm,minimum height=0.52cm] at (\x,0){\lab};
+}
+\draw[very thick,UAIngOrange] (2,-0.35)--(2,-0.8);
+\node[below,font=\scriptsize] at (2,-0.8){progreso durable};
+\draw[very thick,UAIngNavy] (4,-0.35)--(4,-0.8);
+\node[below,font=\scriptsize] at (4,-0.8){posición actual};
+\end{tikzpicture}
+\end{center}
+
+También conviene comparar dos formas de integrar CampusShop:
+
+\begin{itemize}
+\item con llamadas sincrónicas, checkout espera inventario, correo y analítica, y hereda sus latencias y fallas;
+\item con un hecho durable, checkout espera la garantía de publicación y cada consumidor continúa luego con su propia política de error.
+\end{itemize}
+
+El log no elimina complejidad: la desplaza hacia orden, particiones, progreso, reintentos, idempotencia y observabilidad.
 
 \section{Contexto: del WAL local al log compartido}
 
@@ -796,6 +838,33 @@ El criterio de éxito no es ``el cluster volvió''. Es que la historia, el progr
 \item[Watermark.] Señal de progreso asumido del event time.
 \item[DLQ.] Cuarentena operada para eventos que no pudieron procesarse.
 \end{description}
+
+
+\section{Ruta esencial y profundización}
+
+Para dominar la clase, priorice esta ruta esencial:
+
+\begin{enumerate}
+\item registro, append, log y progreso durable;
+\item partición, key y orden local;
+\item consumidor, position y committed offset;
+\item timelines de at-most-once y at-least-once;
+\item event ID, idempotencia e inbox;
+\item dual write y transactional outbox;
+\item lag por partición y evidencia operacional.
+\end{enumerate}
+
+Los siguientes temas son profundización y deben estudiarse después de dominar los timelines básicos:
+
+\begin{itemize}
+\item producer idempotence e ISR;
+\item transacciones Kafka--Kafka;
+\item state store y changelog;
+\item watermarks y políticas avanzadas de late data;
+\item poison events y DLQ.
+\end{itemize}
+
+La prioridad no es memorizar configuraciones. La prioridad es poder dibujar una ejecución adversarial, localizar qué estado sobrevivió y justificar la recuperación.
 
 \section{Bibliografía guiada}
 

@@ -1,0 +1,6 @@
+PDF: build/slides/clase06.pdf
+Pages: 88
+Encrypted: False
+Openable (PyMuPDF): True
+Likely scanned: False
+XFA present: False

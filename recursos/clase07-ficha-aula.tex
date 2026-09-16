@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y procesamiento de streams}
-\title{Clase 07 --- Ficha de aula: historia, progreso y efectos}
+\UASetClassTitle{Logs distribuidos y procesamiento de eventos}
+\title{Clase 07 --- Ficha de aula: del hecho durable al efecto recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -13,23 +13,51 @@
 \section{Cómo usar esta ficha}
 Complete durante la clase. No busque definiciones perfectas al inicio: escriba una intuición, revísela después del timeline y cierre con una formulación técnica.
 
-\section{1. Intuiciones que luego formalizaremos}
+\section{Base mínima: historia y progreso recuperable}
+
+Complete antes de utilizar vocabulario de producto.
+
+\begin{tabular}{p{0.23\textwidth}p{0.29\textwidth}p{0.34\textwidth}}
+\toprule
+Objeto & Mi explicación inicial & ¿Qué ocurre después de un crash? \\
+\midrule
+Memoria de trabajo & \rule{0pt}{0.9cm} & \\
+Registro & \rule{0pt}{0.9cm} & \\
+Append & \rule{0pt}{0.9cm} & \\
+Log persistente & \rule{0pt}{0.9cm} & \\
+Progreso durable & \rule{0pt}{0.9cm} & \\
+\bottomrule
+\end{tabular}
+
+\vspace{0.4cm}
+Secuencia retenida:
+\[
+[416,417,418,419,420]
+\]
+El consumidor llegó a \texttt{position=421}, pero persistió \texttt{committed=418}.
+
+\begin{enumerate}
+\item ¿Qué marca puede estar solo en memoria? \hrulefill
+\item ¿Desde dónde reinicia? \hrulefill
+\item ¿Qué registros pueden reaparecer? \hrulefill
+\end{enumerate}
+
+\section{Intuiciones que luego formalizaremos}
 \begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
 \toprule
 Concepto & Mi intuición inicial & Definición corregida al final \\
 \midrule
-Log & \rule{0pt}{1.1cm} & \\
-Partición & \rule{0pt}{1.1cm} & \\
-Offset & \rule{0pt}{1.1cm} & \\
-Consumer group & \rule{0pt}{1.1cm} & \\
-Exactly-once & \rule{0pt}{1.1cm} & \\
-Event time & \rule{0pt}{1.1cm} & \\
+Log & \rule{0pt}{0.9cm} & \\
+Partición & \rule{0pt}{0.9cm} & \\
+Offset & \rule{0pt}{0.9cm} & \\
+Consumer group & \rule{0pt}{0.9cm} & \\
+Idempotencia & \rule{0pt}{0.9cm} & \\
+Outbox & \rule{0pt}{0.9cm} & \\
 \bottomrule
 \end{tabular}
 
-
 \newpage
-\section{2. Identidades y vocabulario del caso CampusShop}
+\section{Identidades del caso CampusShop}
 
 CampusShop confirma una compra y produce un evento. Complete sin mezclar los tres identificadores:
 
@@ -61,7 +89,7 @@ Pregunta de control: ¿dos registros ubicados en P0, offset 42 y P1, offset 42 r
 \end{uawarn}
 
 \newpage
-\section{3. Particiones y keys}
+\section{Particiones y keys}
 
 Eventos: \texttt{OrderCreated}, \texttt{PaymentAuthorized}, \texttt{OrderCancelled} para pedidos 9F2A y 1C7B.
 
@@ -84,7 +112,7 @@ Eventos: \texttt{OrderCreated}, \texttt{PaymentAuthorized}, \texttt{OrderCancell
 
 
 \newpage
-\section{4. Publicación, réplica y ACK}
+\section{Publicación, réplica y ACK --- extensión}
 
 Suponga una partición con líder A y seguidores B y C. Dibuje el recorrido de un registro y marque cuándo se respondería al productor en cada política.
 
@@ -115,7 +143,7 @@ Réplicas requeridas & \rule{0pt}{1.0cm} & \\
 \textbf{Trade-off principal:} \hrulefill
 
 \newpage
-\section{5. Timeline de offset y crash}
+\section{Timeline de offset y crash}
 
 Complete dos veces: primero commit antes del efecto; luego efecto antes del commit.
 
@@ -134,7 +162,7 @@ Complete dos veces: primero commit antes del efecto; luego efecto antes del comm
 \textbf{Dato durable para idempotencia:} \hrulefill
 
 \newpage
-\section{6. Frontera de exactly-once}
+\section{Frontera de exactly-once --- extensión}
 Marque con un rectángulo qué componentes participan en su garantía.
 
 \begin{center}
@@ -156,7 +184,7 @@ Complete:
 \end{itemize}
 
 \newpage
-\section{7. Dual write y outbox}
+\section{Dual write y outbox}
 Dibuje las dos ventanas de falla y luego la solución outbox.
 
 \begin{center}
@@ -176,7 +204,7 @@ Campos mínimos de outbox: \hrulefill\\[0.5cm]
 ¿Cómo deduplica el consumidor? \hrulefill
 
 \newpage
-\section{8. Event time, watermark y eventos tardíos}
+\section{Event time y eventos tardíos --- extensión}
 Eventos:
 \begin{center}
 \begin{tabular}{cccc}
@@ -200,7 +228,7 @@ Para ventanas de cinco minutos:
 
 
 \newpage
-\section{9. Diagnóstico de lag y operación}
+\section{Diagnóstico de lag y operación}
 
 Complete la interpretación del panel:
 
@@ -231,7 +259,7 @@ P3 & 9.800 & 10.100 & \rule{0pt}{0.9cm} \\
 \textbf{Precisión para la ficha:} el identificador del evento y la marca de deduplicación deben persistirse atómicamente con el efecto local. Registrar primero el efecto y después el ID deja una ventana de duplicación.
 \end{uainfo}
 
-\section{10. Diseño y exit ticket}
+\section{Diseño y exit ticket}
 Caso: ranking de Asteria Online.
 
 \begin{tabular}{p{0.27\textwidth}p{0.60\textwidth}}

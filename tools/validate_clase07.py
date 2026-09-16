@@ -97,6 +97,8 @@ for needle in (
     "Pregunta central",
     "Puente desde la clase 6",
     "Caso conductor: CampusShop",
+    "Base mínima I",
+    "De llamadas directas a una historia compartida",
     "Vocabulario previo",
     "Partición",
     "committed offset",
@@ -116,6 +118,7 @@ if frame_count < 55:
 notes = texts["notes"]
 for needle in (
     "Propósito y pregunta central",
+    "Base mínima para esta clase",
     "Contexto: del WAL local al log compartido",
     "CampusShop",
     "Vocabulario",
@@ -126,6 +129,7 @@ for needle in (
     "Event time",
     "Watermark",
     "Método reusable de diseño",
+    "Ruta esencial y profundización",
     "Bibliografía guiada",
     "Autoevaluación",
 ):
@@ -160,6 +164,7 @@ for needle in (
     "Dossier técnico",
     "Parte C",
     "Parte C: auditoría",
+    "Base mínima antes del vocabulario distribuido",
     "Preguntas socráticas",
     "Errores previsibles",
     "Contingencias",
@@ -176,7 +181,7 @@ if teacher_words < 4300:
 # Recursos de aula y demos.
 for needle in ("Intuiciones", "Particiones y keys", "Timeline de offset y crash", "Frontera de exactly-once", "Dual write y outbox", "Event time", "Diagnóstico de lag", "Exit ticket"):
     require(texts["worksheet"], needle, FILES["worksheet"])
-for needle in ("Particiones, keys y orden local", "Publicación, réplica y condición de ACK", "Consumo, efecto, committed offset y crash", "Dual write, outbox, relay e inbox"):
+for needle in ("Registro, append y progreso durable", "Particiones, keys y orden local", "Publicación, réplica y condición de ACK", "Consumo, efecto, committed offset y crash", "Dual write, outbox, relay e inbox"):
     require(texts["timelines"], needle, FILES["timelines"])
 for demo in (
     ROOT / "demos" / "clase07_offsets.py",

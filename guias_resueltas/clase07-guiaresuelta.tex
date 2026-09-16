@@ -4,8 +4,8 @@
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 \UASetClassNumber{07}
-\UASetClassTitle{Logs distribuidos y procesamiento de streams}
-\title{Clase 07 --- Guía resuelta: historia, progreso y efectos}
+\UASetClassTitle{Logs distribuidos y procesamiento de eventos}
+\title{Clase 07 --- Guía resuelta: del hecho durable al efecto recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
@@ -14,12 +14,16 @@
 Son respuestas orientativas. Se valoran alternativas coherentes que declaren frontera transaccional y trade-offs.
 \section{Ejercicios y soluciones}
 \begin{uaexercise}
-\textbf{1. Log, cola y base orientada a estado.} Compare las tres abstracciones para un sistema de pedidos. Explique retención, replay, orden y ownership de progreso.
+\textbf{1. Base mínima: registro, append y progreso.} Dada la secuencia 416--420, un consumidor alcanzó position=421 pero persistió committed offset=418. Explique memoria, estado durable y reinicio.
 \end{uaexercise}
 \begin{uaanswer}
-Una cola clásica suele modelar trabajo pendiente y retirar/acknowledge mensajes; un log conserva historia durante una retención y cada consumidor mantiene progreso independiente; una base orientada a estado prioriza el valor actual. Para pedidos, el log facilita replay y consumidores nuevos, pero obliga a diseñar offsets y retención. La cola simplifica work sharing y la base simplifica consultas de estado. Ninguna reemplaza automáticamente a las otras.
+Los registros 416--420 forman la historia retenida. La instancia viva ya avanzó hasta después de 420, por eso su \emph{position} es 421; esa marca puede existir solo en memoria. El progreso durable del grupo sigue en 418. Si la instancia cae, la memoria desaparece y el nuevo consumidor retoma desde 418, por lo que 418, 419 y 420 pueden reaparecer según la convención del offset comprometido.
 
-\paragraph{Profundización.} Para el mismo dominio pueden coexistir las tres abstracciones: el log conserva el hecho, una cola interna distribuye trabajo efímero y una base materializa la vista actual. La elección no es excluyente; cada componente debe declarar retención, ownership y recuperación.\paragraph{Evidencia.} Compare tiempo de replay, profundidad de cola, edad del evento más antiguo y latencia de consulta del estado materializado.
+\paragraph{Razón.} El sistema solo puede basar la recuperación en estado persistido. La diferencia entre position y committed offset es trabajo leído pero todavía no incorporado al contrato durable del grupo.
+
+\paragraph{Límite.} Que un registro reaparezca no dice si su efecto anterior ocurrió. Para responderlo hace falta el timeline del efecto y, si corresponde, una identidad durable.
+
+\paragraph{Evidencia.} Inyectar un crash después de leer 420, reiniciar el grupo y observar el primer offset entregado y los event IDs repetidos.
 \end{uaanswer}
 \begin{uaexercise}
 \textbf{2. Key de partición.} Para eventos de pedidos, pagos y cambios de estado, proponga una key que preserve el orden relevante. Analice hot keys y qué orden se pierde.
