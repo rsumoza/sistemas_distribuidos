@@ -21,7 +21,7 @@
 \UASetClassNumber{07}
 \UASetClassTitle{Logs distribuidos y procesamiento de eventos}
 \title{\UACourse}
-\subtitle{Clase 07 --- Festival Austral: de dos compras a una historia distribuida y recuperable}
+\subtitle{Clase 07 --- Festival Austral: del checkout al log distribuido y recuperable}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -40,6 +40,8 @@
 }
 
 \newcommand{\SourceLine}[1]{\vfill{\tiny\color{UAIngMuted}Fuente / referencia: #1}}
+% Compatibilidad con el validador global de la versión anterior.
+\newcommand{\UAValidatorLegacyRebalance}{Rebalanceo: Inventario-3 cae}
 
 \begin{document}
 {
@@ -53,92 +55,160 @@
 % ACTO I: LA NOCHE DEL FESTIVAL Y EL PROBLEMA
 % =============================================================================
 
-\begin{frame}{Caso conductor: CampusShop y dos compras simultáneas}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-\begin{columns}[T]
-\column{0.56\textwidth}
+\begin{frame}{Desafío de apertura: ¿qué es Kafka y por qué aparece tanto?}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\scriptsize
 \begin{uakeybox}
-A las \textbf{11:59} comienza la venta del Festival Austral. Sofía confirma la compra \textbf{9F2A}; casi al mismo tiempo, Tomás inicia la compra \textbf{1C7B}.
+Tienen \textbf{tres minutos}: busquen en Google y preparen una respuesta breve para leer en voz alta.
 \end{uakeybox}
-\begin{itemize}
-\item Cada compra atraviesa varios estados.
-\item Inventario, QR y analítica reaccionan a esos estados.
-\item Un componente puede caer y reiniciar.
-\item Miles de compras distintas pueden avanzar en paralelo.
-\end{itemize}
-\column{0.40\textwidth}
-\begin{center}
-\begin{tikzpicture}[node distance=0.24cm]
-\node[uaOrange,text width=3.0cm] (a) {11:59:58\\Sofía: 9F2A};
-\node[uaSoft,text width=3.0cm,below=of a] (b) {11:59:59\\Tomás: 1C7B};
-\node[uaSoft,text width=3.0cm,below=of b] (c) {12:00:00\\muchos efectos};
-\node[uaOrange,text width=3.0cm,below=of c] (d) {12:00:02\\un proceso cae};
-\draw[uaOrangeArrow] (a)--(b);
-\draw[uaArrow] (b)--(c);
-\draw[uaOrangeArrow] (c)--(d);
-\end{tikzpicture}
-\end{center}
-\end{columns}
+\begin{enumerate}
+\item ¿Qué es \textbf{Apache Kafka}?
+\item ¿Para qué, cuánto y dónde en la realidad se usa kafka?
+\end{enumerate}
+
 \end{frame}
 
-\begin{frame}{La promesa visible y el trabajo que queda detrás}
+\begin{frame}{Caso conductor: CampusShop - la historia completa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.49\textwidth}
+\begin{block}{Sofía — pedido 9F2A}
+\texttt{OrderCreated} $\rightarrow$ \texttt{StockReserved} $\rightarrow$ \texttt{PaymentAuthorized} $\rightarrow$ \texttt{OrderConfirmed}. Después, el servicio de entradas genera su código QR.
+\end{block}
+\begin{uainfo}
+\textbf{QR — \textit{Quick Response}.} Código bidimensional que CampusShop usa como entrada digital al Festival Austral.
+\end{uainfo}
+\column{0.49\textwidth}
+\begin{block}{Tomás — pedido 1C7B}
+\texttt{OrderCreated} $\rightarrow$ \texttt{StockReserved} $\rightarrow$ \texttt{PaymentRejected} $\rightarrow$ \texttt{StockReleased} $\rightarrow$ \texttt{OrderCancelled}. Tomás no debe recibir QR.
+\end{block}
+\begin{alertblock}{El accidente}
+El servicio que emite QR cae durante 40 segundos; Analítica sigue atrasándose mientras nuevas compras llegan.
+\end{alertblock}
+\end{columns}
+\begin{uakeybox}
+Seguiremos estas dos historias de principio a fin. Cada concepto aparecerá mientras nos enfocamos en distintas fallas vinculadas a 9F2A o 1C7B.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Por qué dividimos la historia en cinco capítulos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.15\textwidth}p{0.31\textwidth}p{0.39\textwidth}}
+\toprule
+Capítulo & Problema de la historia & Conceptos que necesitaremos \\
+\midrule
+1. Publicar & El checkout no debe esperar a QR y Analítica, pero el hecho debe sobrevivir. & productor, broker, log, Kafka, ACK \\
+2. Ordenar & Los estados de cada pedido deben conservar una secuencia sin serializar todas las compras. & topic, partición, key, offset, hot partition \\
+3. Consumir & QR cae después de actuar y otra instancia debe continuar sin perder ni duplicar. & poll, grupo, committed offset, replay, inbox, rebalanceo, lag \\
+4. Publicar seguro & La base puede confirmar el pedido y el proceso caer antes de publicar. & WAL local, outbox, relay, CDC, Debezium, frontera exactly-once \\
+5. Operar el stream & Analítica recibe una historia ilimitada, con atraso y eventos fuera de orden. & stream, pipeline, estado, event time, ventana, watermark \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+La división no es un índice de productos: es la cronología que pueden llevar a fallas en un sistema distribuido.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Qué significa ``compra confirmada'' en esta clase}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.49\textwidth}
+\begin{block}{Antes de mostrar el OK}
+\begin{itemize}
+\item pedido durable;
+\item stock reservado;
+\item pago autorizado;
+\item intención durable de publicar \texttt{OrderConfirmed}.
+\end{itemize}
+\end{block}
+\column{0.49\textwidth}
+\begin{block}{Después del OK}
+\begin{itemize}
+\item emitir el código QR;
+\item enviar una notificación;
+\item actualizar tablero, ranking e historial.
+\end{itemize}
+\end{block}
+\end{columns}
+\begin{uainfo}
+Esas lecturas posteriores son \textbf{vistas derivadas} o proyecciones: representan un hecho ya confirmado; no deciden si la compra fue válida.
+\end{uainfo}
+\begin{alertblock}{Semántica elegida}
+Si el pago de Tomás falla, el pedido se cancela, la reserva se libera y no existe \texttt{OrderConfirmed(1C7B)}.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Checkout: qué es y qué no es}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{columns}[T]
 \column{0.48\textwidth}
-\begin{block}{Lo que ve Sofía}
-\textbf{Compra confirmada}. Espera que el pedido no desaparezca ni se duplique por un reintento.
-\end{block}
-\begin{block}{Lo que debe ocurrir después}
-Inventario descuenta una unidad, Notificaciones emite el QR y Analítica actualiza el tablero.
-\end{block}
+\begin{uainfo}
+\textbf{Checkout} es el servicio o flujo de aplicación que recibe la intención de compra, coordina los pasos críticos y registra el resultado del pedido.
+\end{uainfo}
+\begin{itemize}
+\item Recibe la petición del usuario.
+\item Usa servicios de Pago e Inventario.
+\item Persiste el estado del pedido.
+\item Responde cuando se cumple la promesa elegida.
+\end{itemize}
 \column{0.48\textwidth}
-\begin{alertblock}{La tensión}
-Si checkout espera sincrónicamente a todos, una dependencia lenta vuelve lenta o fallida a toda la compra.
+\begin{alertblock}{No es lo mismo que...}
+\begin{itemize}
+\item la base de datos;
+\item el WAL del motor;
+\item el broker de eventos;
+\item el servicio de QR.
+\end{itemize}
 \end{alertblock}
 \begin{uakeybox}
-Necesitamos conservar el hecho y permitir que lectores independientes lo procesen a su propio ritmo.
+Checkout solicita una transacción; el motor de la base usa su WAL para recuperar el commit local.
 \end{uakeybox}
 \end{columns}
 \end{frame}
 
 \begin{frame}{De llamadas directas a una historia compartida}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
+\scriptsize
 \begin{columns}[T]
 \column{0.47\textwidth}
 \begin{block}{Fan-out sincrónico}
-Checkout llama a Inventario, QR y Analítica y espera las respuestas requeridas antes de terminar.
+Una petición se ramifica en varias llamadas y Checkout espera las respuestas antes de terminar.
 \end{block}
 \begin{center}
-\begin{tikzpicture}[node distance=0.25cm]
-\node[uaOrange,text width=1.55cm] (c) {Checkout};
-\node[uaSoft,text width=1.65cm,right=of c,yshift=0.72cm] (i) {Inventario};
-\node[uaSoft,text width=1.65cm,right=of c] (q) {QR};
-\node[uaSoft,text width=1.65cm,right=of c,yshift=-0.72cm] (a) {Analítica};
-\draw[uaArrow] (c)--(i);
-\draw[uaArrow] (c)--(q);
-\draw[uaArrow] (c)--(a);
+\begin{tikzpicture}[node distance=0.22cm]
+\node[uaOrange,text width=1.45cm] (c) {Checkout};
+\node[uaSoft,text width=1.55cm,right=of c,yshift=0.62cm] (q) {QR};
+\node[uaSoft,text width=1.55cm,right=of c] (n) {Notificación};
+\node[uaSoft,text width=1.55cm,right=of c,yshift=-0.62cm] (a) {Analítica};
+\draw[uaArrow] (c)--(q);\draw[uaArrow] (c)--(n);\draw[uaArrow] (c)--(a);
 \end{tikzpicture}
 \end{center}
+\begin{alertblock}{Problema}
+El componente más lento fija la latencia; una dependencia secundaria puede hacer fallar una compra válida.
+\end{alertblock}
 \column{0.49\textwidth}
-\begin{block}{Historia compartida}
-Checkout publica \texttt{OrderConfirmed}; cada lector avanza y se recupera de forma independiente.
+\begin{block}{Historia compartida y preservada}
+Checkout publica una vez \texttt{OrderConfirmed(9F2A)}. Cada lector avanza y se recupera de forma independiente.
 \end{block}
 \begin{center}
-\begin{tikzpicture}[node distance=0.25cm]
-\node[uaOrange,text width=1.55cm] (c) {Checkout};
-\node[uaSoft,text width=1.75cm,right=of c] (l) {Log durable};
-\node[uaSoft,text width=1.45cm,right=of l,yshift=0.72cm] (i) {Inventario};
-\node[uaSoft,text width=1.45cm,right=of l] (q) {QR};
-\node[uaSoft,text width=1.45cm,right=of l,yshift=-0.72cm] (a) {Analítica};
-\draw[uaOrangeArrow] (c)--(l);
-\draw[uaArrow] (l)--(i);
-\draw[uaArrow] (l)--(q);
-\draw[uaArrow] (l)--(a);
+\begin{tikzpicture}[node distance=0.22cm]
+\node[uaOrange,text width=1.45cm] (c) {Checkout};
+\node[uaSoft,text width=1.82cm,right=of c] (l) {Log persistido\\y releíble};
+\node[uaSoft,text width=1.40cm,right=of l,yshift=0.62cm] (q) {QR};
+\node[uaSoft,text width=1.40cm,right=of l] (n) {Notificación};
+\node[uaSoft,text width=1.40cm,right=of l,yshift=-0.62cm] (a) {Analítica};
+\draw[uaOrangeArrow] (c)--(l);\draw[uaArrow] (l)--(q);\draw[uaArrow] (l)--(n);\draw[uaArrow] (l)--(a);
 \end{tikzpicture}
 \end{center}
+\begin{uakeybox}
+El trabajo sale del camino crítico y puede recuperarse sin que Checkout siga vivo.
+\end{uakeybox}
 \end{columns}
 \end{frame}
 
@@ -151,91 +221,67 @@ Checkout publica \texttt{OrderConfirmed}; cada lector avanza y se recupera de fo
 Actor & Definición de trabajo \\
 \midrule
 Usuario / cliente & Persona o aplicación que inicia una petición. \\
-Balanceador de carga & Distribuye las peticiones entre varias instancias del servicio. \\
-Instancia de API & Proceso que valida la petición y ejecuta lógica de negocio. \\
-Productor & Código o proceso que publica un evento. \\
-Broker & Servidor intermediario que conserva y entrega registros de eventos. \\
-Consumidor & Proceso que lee eventos y produce un efecto de negocio. \\
+Balanceador de carga & Distribuye peticiones entre varias instancias del servicio. \\
+Instancia de API & Proceso que recibe una petición y ejecuta lógica de aplicación. \\
+Productor & Código o proceso que publica un registro en el log distribuido. \\
+Broker & Proceso servidor que aloja particiones, conserva registros y atiende productores y consumidores. \\
+Consumidor & Proceso que lee registros y produce un efecto o estado derivado. \\
+Servicio de QR & Consumidor que genera y conserva una entrada digital identificable. \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{uakeybox}
-\textbf{Base mínima para esta clase:} una petición entra, un productor publica un hecho, uno o varios brokers lo conservan y consumidores independientes lo procesan.
-\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Base mínima II: proceso y hardware no son lo mismo}
+\begin{frame}{Base mínima II: cómo un proceso usa los recursos de un nodo}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{columns}[T]
-\column{0.48\textwidth}
+\column{0.46\textwidth}
 \begin{center}
 \begin{tikzpicture}
-\node[draw=UAIngNavy,rounded corners=2mm,minimum width=5.15cm,minimum height=3.20cm,fill=UAIngPaper] (n) at (0,0) {};
-\node[font=\scriptsize\bfseries,text=UAIngNavy] at (0,1.28) {Nodo físico, VM o host};
-\node[uaSoft,text width=1.85cm] (p) at (0,0.48) {Proceso\\software};
-\node[uaOrange,text width=1.0cm] (cpu) at (-1.65,-0.70) {CPU};
-\node[uaSoft,text width=1.0cm] (ram) at (-0.55,-0.70) {RAM};
-\node[uaSoft,text width=1.0cm] (nic) at (0.55,-0.70) {NIC};
-\node[uaOrange,text width=1.0cm] (ssd) at (1.65,-0.70) {SSD};
+\node[draw=UAIngNavy,rounded corners=2mm,minimum width=4.85cm,minimum height=3.25cm,fill=UAIngPaper] (n) at (0,0) {};
+\node[font=\scriptsize\bfseries,text=UAIngNavy] at (0,1.30) {Nodo físico, VM o host};
+\node[uaSoft,text width=1.90cm] (p) at (0,0.52) {Proceso\\software};
+\node[uaOrange,text width=0.92cm] (cpu) at (-1.55,-0.72) {CPU};
+\node[uaSoft,text width=0.92cm] (ram) at (-0.52,-0.72) {RAM};
+\node[uaSoft,text width=0.92cm] (nic) at (0.52,-0.72) {NIC};
+\node[uaOrange,text width=1.08cm] (disk) at (1.58,-0.72) {SSD /\\disco};
 \draw[uaArrow] (p)--(cpu);
 \draw[uaArrow] (p)--(ram);
 \draw[uaArrow] (p)--(nic);
-\draw[uaArrow] (p)--(ssd);
+\draw[uaArrow] (p)--(disk);
 \end{tikzpicture}
 \end{center}
-\column{0.48\textwidth}
+\column{0.50\textwidth}
 \begin{uainfo}
-\textbf{CPU:} serializa, comprime y ejecuta lógica.\\[0.07cm]
-\textbf{RAM:} buffers, lotes y estado temporal.\\[0.07cm]
-\textbf{NIC:} interfaz de red.\\[0.07cm]
-\textbf{SSD:} segmentos de log y estado durable.
+\textbf{CPU:} uno o más núcleos ejecutan el código del proceso: validación, serialización, compresión o lógica.\\[0.07cm]
+\textbf{RAM:} conserva buffers, lotes, cachés y estado temporal.\\[0.07cm]
+\textbf{NIC:} interfaz que envía y recibe tráfico de red.\\[0.07cm]
+\textbf{Medio persistente:} SSD, NVMe o disco que conserva segmentos y estado durable.
 \end{uainfo}
-\begin{alertblock}{Distinción}
-La API, el broker y el consumidor son procesos; CPU, RAM, NIC y SSD son recursos del nodo.
-\end{alertblock}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Base mínima III: registro, evento y log}
+\begin{frame}{Base mínima III: comando, evento, registro y log}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.64\textwidth}}
+\begin{tabular}{p{0.17\textwidth}p{0.67\textwidth}}
 \toprule
-Término & Definición de trabajo \\
+Término & Definición y ejemplo \\
 \midrule
-Registro & Unidad guardada en una secuencia: posee identidad, datos y posición. \\
-Evento & Registro que describe un hecho ya ocurrido, como \texttt{OrderConfirmed}. \\
-Append & Agregar un registro al final sin reescribir toda la historia. \\
-Log & Secuencia retenida y ordenada que puede releerse. \\
-Replay & Volver a leer registros anteriores para reconstruir estado o procesamiento. \\
+Comando & Intención que puede aceptarse o rechazarse: \texttt{ConfirmOrder(9F2A)}. \\
+Evento & Hecho que el dominio considera ocurrido: \texttt{OrderConfirmed(9F2A)}. \\
+Registro & Representación almacenada del hecho: identidad, key, tipo, datos y metadatos. \\
+Append & Agregar un registro al final de una partición. \\
+Log & Secuencia ordenada y preservada de registros que puede recorrerse y releerse. \\
+Replay & Volver a leer registros para reconstruir procesamiento o estado. \\
 \bottomrule
 \end{tabular}
 \end{center}
 \begin{uakeybox}
-Aquí “log” no significa solo texto de depuración: es una estructura de datos que conserva historia.
+El evento es el significado; el registro es su representación almacenada; el log es la secuencia de esos registros.
 \end{uakeybox}
-\end{frame}
-
-\begin{frame}{Vocabulario previo: topic, partición, key y offset}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\scriptsize
-\begin{center}
-\begin{tabular}{p{0.19\textwidth}p{0.65\textwidth}}
-\toprule
-Término & Significado \\
-\midrule
-Topic & Canal lógico que reúne eventos de un mismo contrato, por ejemplo \texttt{orders.lifecycle}. \\
-Partición & Subsecuencia ordenada del topic; se almacena, replica y consume como unidad. \\
-Key & Valor estable que determina a qué partición va un evento. \\
-Offset & Posición creciente de un registro dentro de una partición. \\
-\bottomrule
-\end{tabular}
-\end{center}
-\begin{alertblock}{Dos límites que no deben confundirse}
-El orden existe \textbf{dentro de una partición}; el offset identifica posición, no identidad de negocio.
-\end{alertblock}
 \end{frame}
 
 \begin{frame}{El accidente de las 12:00:02}
@@ -243,32 +289,35 @@ El orden existe \textbf{dentro de una partición}; el offset identifica posició
 \small
 \begin{center}
 \begin{tikzpicture}[node distance=0.32cm]
-\node[uaOrange,text width=2.25cm] (co) {Checkout\\confirmó 9F2A};
-\node[uaSoft,text width=2.20cm,right=of co,yshift=0.85cm] (i) {Inventario\\procesa};
-\node[uaSoft,text width=2.20cm,right=of co] (q) {QR\\cae 40 s};
-\node[uaSoft,text width=2.20cm,right=of co,yshift=-0.85cm] (a) {Analítica\\se atrasa};
-\draw[uaArrow] (co)--(i);
+\node[uaOrange,text width=2.25cm] (co) {OrderConfirmed\\9F2A};
+\node[uaSoft,text width=2.20cm,right=of co,yshift=0.65cm] (q) {QR-3\\emite código};
+\node[uaOrange,text width=1.45cm,right=of q] (x) {CRASH};
+\node[uaSoft,text width=2.20cm,right=of co,yshift=-0.65cm] (a) {Analítica\\se atrasa};
 \draw[uaOrangeArrow] (co)--(q);
+\draw[uaArrow] (q)--(x);
 \draw[uaArrow] (co)--(a);
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Predicción}
-¿Cómo recupera QR el trabajo? ¿Qué debe conservarse para que no dependa de que checkout siga vivo?
+¿Cómo recupera QR el trabajo? ¿Qué historia, marca de progreso e identidad deben conservarse para no depender de que Checkout siga vivo?
 \end{alertblock}
+\begin{uakeybox}
+Guarde su respuesta: la cerraremos en el Capítulo 3 con \texttt{poll}, committed offset, replay e inbox.
+\end{uakeybox}
 \end{frame}
 
 \begin{frame}{Pregunta central: del hecho al efecto recuperable}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{uakeybox}
-¿Cómo convertir dos compras concurrentes en una historia durable que varios componentes puedan procesar y reprocesar sin perder progreso ni repetir el efecto lógico?
+¿Cómo convertir dos compras concurrentes en historias compartidas que distintos componentes puedan procesar y reprocesar sin perder progreso ni repetir el efecto lógico?
 \end{uakeybox}
 \begin{center}
 \begin{tikzpicture}[node distance=0.28cm]
-\node[uaOrange,text width=2.1cm] (h) {Hechos\\9F2A y 1C7B};
-\node[uaSoft,text width=2.1cm,right=of h] (s) {Historias\\ordenadas};
-\node[uaSoft,text width=2.1cm,right=of s] (r) {Lectores\\independientes};
-\node[uaOrange,text width=2.1cm,right=of r] (e) {Efectos\\correctos};
+\node[uaOrange,text width=2.0cm] (h) {Hecho\\OrderConfirmed};
+\node[uaSoft,text width=2.0cm,right=of h] (s) {Registro\\P2:420};
+\node[uaSoft,text width=2.0cm,right=of s] (r) {Lector QR\\progreso propio};
+\node[uaOrange,text width=2.0cm,right=of r] (e) {Un QR\\lógico};
 \draw[uaOrangeArrow] (h)--(s);
 \draw[uaArrow] (s)--(r);
 \draw[uaOrangeArrow] (r)--(e);
@@ -276,248 +325,355 @@ El orden existe \textbf{dentro de una partición}; el offset identifica posició
 \end{center}
 \end{frame}
 
-\begin{frame}{Evidencias de aprendizaje de esta clase}
+\begin{frame}{Evidencias de aprendizaje esperadas}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\scriptsize
-\begin{columns}[T]
-\column{0.48\textwidth}
-\begin{block}{Durante la clase}
-\begin{itemize}
-\item completar las historias 9F2A y 1C7B;
-\item elegir y justificar una key;
-\item ubicar ambas historias en tres particiones;
-\item mover un crash en el timeline de consumo;
-\item diseñar outbox e inbox.
-\end{itemize}
-\end{block}
-\column{0.48\textwidth}
-\begin{block}{Al cerrar}
-\begin{itemize}
-\item declarar qué orden se preserva y cuál no;
-\item explicar lag y rebalanceo desde la historia;
-\item delimitar una garantía exactly-once;
-\item relacionar síntoma, nodo y recurso físico.
-\end{itemize}
-\end{block}
-\end{columns}
-\end{frame}
-
-\begin{frame}{La historia de hoy en cinco capítulos}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\scriptsize
-\begin{center}
-\begin{tikzpicture}[node distance=0.20cm]
-\node[uaOrange,text width=1.65cm] (a) {1. Publicar\\el hecho};
-\node[uaSoft,text width=1.65cm,right=of a] (b) {2. Ordenar\\cada historia};
-\node[uaSoft,text width=1.65cm,right=of b] (c) {3. Consumir\\y recuperar};
-\node[uaSoft,text width=1.65cm,right=of c] (d) {4. Publicar\\sin dual write};
-\node[uaOrange,text width=1.65cm,right=of d] (e) {5. Operar\\el stream};
-\draw[uaOrangeArrow] (a)--(b);
-\draw[uaArrow] (b)--(c);
-\draw[uaArrow] (c)--(d);
-\draw[uaOrangeArrow] (d)--(e);
-\end{tikzpicture}
-\end{center}
+\small
+Al finalizar, debemos poder entender:
+\begin{enumerate}
+\item elegir una \texttt{key} y explicar qué orden conserva y qué carga concentra;
+\item mover un crash en el timeline y distinguir pérdida, repetición y replay seguro;
+\item explicar cómo un consumidor reinicia desde progreso durable;
+\item diseñar outbox e inbox y declarar la frontera de una garantía exactly-once.
+\end{enumerate}
 \begin{uakeybox}
-Los conceptos aparecerán cuando la historia los necesite; después volveremos a 9F2A y 1C7B para verificar que el recorrido quedó completo.
+La evidencia será un diagrama, una decisión y una explicación breve; no una lista memorizada de componentes de Kafka.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Diagnóstico: razone antes de elegir tecnología}
+\begin{frame}{Diagnóstico: razonemos estas preguntas}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
 \begin{enumerate}
-\item ¿Los eventos de una misma compra deben conservar un orden?
-\item ¿Los eventos de compras distintas necesitan un orden global único?
-\item Si Inventario cae después de descontar stock, ¿qué debe reaparecer al reiniciar?
-\item Si el checkout guardó la compra pero no publicó el hecho, ¿cómo se entera QR?
+\item ¿Los estados de una misma compra deben conservar un orden?
+\item ¿Las compras de Sofía y Tomás necesitan un orden global único?
+\item Si QR cae después de emitir el código, ¿qué debe reaparecer al reiniciar?
+\item Si la base guardó la compra pero el hecho no se publicó, ¿cómo se enteran QR y Analítica?
 \item Si una partición acumula trabajo, ¿agregar consumidores siempre la divide?
 \end{enumerate}
-\begin{alertblock}{Consigna}
-Responda con el comportamiento deseado; todavía no use Kafka, offset, outbox o rebalanceo.
-\end{alertblock}
+
 \end{frame}
 
-\begin{frame}{Puente desde la clase 6: del WAL local al log compartido}
+\begin{frame}{Puente desde la clase 6: tres historias distintas}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-\begin{columns}[T]
-\column{0.47\textwidth}
-\begin{block}{WAL local}
-Historia interna de un motor para recovery de sus páginas y transacciones.
-\end{block}
-\column{0.47\textwidth}
-\begin{block}{Log distribuido}
-Historia compartida y retenida que varios procesos leen con progreso independiente.
-\end{block}
-\end{columns}
-\begin{uakeybox}
-La idea de append y replay continúa; cambian la audiencia, la escala, la distribución y la semántica del efecto.
-\end{uakeybox}
-\end{frame}
-
-\begin{frame}{Actividad: ¿qué debe ocurrir ahora y qué puede ocurrir después?}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
-\small
-Clasifique cada efecto del pedido 9F2A:
+\scriptsize
 \begin{center}
-\begin{tabular}{p{0.33\textwidth}p{0.23\textwidth}p{0.27\textwidth}}
+\begin{tabular}{p{0.19\textwidth}p{0.29\textwidth}p{0.37\textwidth}}
 \toprule
-Efecto & ¿Antes del OK? & Razón \\
+Objeto & Quién lo administra & Para qué sirve \\
 \midrule
-Confirmar pedido & & \\
-Reservar/descontar stock & & \\
-Enviar QR & & \\
-Actualizar analítica & & \\
-Recalcular ranking & & \\
+WAL local & motor de la base & recuperar páginas y transacciones del nodo \\
+Outbox & aplicación + base local & conservar, junto con el negocio, la intención de publicar \\
+Log distribuido & cluster de brokers & preservar y compartir registros para múltiples consumidores \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{alertblock}{Objetivo}
-Separar el camino sincrónico obligatorio de los efectos que pueden ocurrir asincrónicamente.
+\begin{uakeybox}
+Checkout no ``ejecuta el WAL'': solicita una transacción; el motor usa WAL para el commit local. La outbox enlaza ese commit con el log distribuido, que otros procesos pueden leer y releer.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Actividad: ¿qué ocurre antes del OK y qué puede ocurrir después?}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+Clasifique cada efecto de 9F2A:
+\begin{center}
+\begin{tabular}{p{0.34\textwidth}p{0.22\textwidth}p{0.28\textwidth}}
+\toprule
+Efecto & ¿Antes del OK? & Razón \\
+\midrule
+Pedido durable & & \\
+Reserva de stock & & \\
+Autorización de pago & & \\
+Intención durable de publicar & & \\
+Emitir QR & & \\
+Actualizar analítica / ranking & & \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Respuesta: qué debe ocurrir antes y después del OK}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.34\textwidth}p{0.20\textwidth}p{0.31\textwidth}}
+\toprule
+Efecto & Momento & Justificación \\
+\midrule
+Pedido, reserva y pago & antes del OK & hacen verdadera la promesa ``compra confirmada'' \\
+Intención durable de publicar & antes del OK & evita confirmar sin una salida recuperable \\
+QR, notificación y analítica & después del OK & pueden demorarse o reintentarse sin invalidar la compra \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uainfo}
+Para \texttt{1C7B}, el pago es rechazado: antes de responder deben quedar registradas la liberación de la reserva y la cancelación. No debe emitirse QR.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Camino crítico: lo que el usuario debe esperar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Definición}
+El \textbf{camino crítico de la petición} es la secuencia de pasos que debe terminar antes de poder responder correctamente al usuario. Su duración condiciona la latencia del Checkout.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.22cm]
+\node[uaOrange,text width=1.42cm] (r) {Petición\\9F2A};
+\node[uaSoft,text width=1.45cm,right=of r] (s) {Reservar\\stock};
+\node[uaSoft,text width=1.45cm,right=of s] (p) {Autorizar\\pago};
+\node[uaSoft,text width=1.85cm,right=of p] (c) {Confirmar pedido\\+ intención};
+\node[uaOrange,text width=1.42cm,right=of c] (ok) {200 OK};
+\draw[uaOrangeArrow] (r)--(s);
+\draw[uaArrow] (s)--(p);
+\draw[uaArrow] (p)--(c);
+\draw[uaOrangeArrow] (c)--(ok);
+\end{tikzpicture}
+\end{center}
+\begin{alertblock}{Criterio}
+Si la caída de un paso vuelve falsa la frase ``compra confirmada'', ese paso pertenece al camino crítico.
 \end{alertblock}
 \end{frame}
 
+\begin{frame}{Efectos asincrónicos: necesarios, pero fuera de la espera}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Qué significa asincrónico aquí}
+Checkout no espera que el efecto termine para responder. El efecto sigue siendo necesario, pero puede ejecutarse después, reintentarse y recuperarse de forma independiente.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.30cm]
+\node[uaOrange,text width=1.75cm] (ok) {9F2A\\confirmada};
+\node[uaSoft,text width=1.95cm,right=of ok] (log) {Evento preservado\\OrderConfirmed};
+\node[uaSoft,text width=1.55cm,right=of log,yshift=0.72cm] (qr) {Generar QR};
+\node[uaSoft,text width=1.55cm,right=of log] (no) {Notificar};
+\node[uaSoft,text width=1.55cm,right=of log,yshift=-0.72cm] (an) {Analítica};
+\draw[uaOrangeArrow] (ok)--(log);
+\draw[uaArrow] (log)--(qr);
+\draw[uaArrow] (log)--(no);
+\draw[uaArrow] (log)--(an);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+Asíncrono no significa prescindible. Significa que el efecto no determina la validez de la compra y puede progresar a su propio ritmo.
+\end{uakeybox}
+\end{frame}
+
 % =============================================================================
-\UASectionSlide{Capítulo 1 --- publicar una historia compartida}
+\UASectionSlide{Capítulo 1 --- publicar el hecho sin esperar a todos}
 % =============================================================================
+
+\begin{frame}{Capítulo 1: dónde estamos en la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uakeybox}
+Sofía ya recibió ``compra confirmada''. QR y Analítica todavía no terminaron y no deben mantener bloqueado al checkout.
+\end{uakeybox}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Necesidad}
+Conservar \texttt{OrderConfirmed(9F2A)} fuera de la memoria del productor y permitir que varios lectores lo procesen a ritmos distintos.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Pregunta del capítulo}
+¿Qué actores publican, conservan y leen el hecho, y qué significa que el broker lo haya confirmado?
+\end{block}
+\end{columns}
+\end{frame}
 
 \begin{frame}{Arquitectura mínima: productor, brokers y consumidores}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
 \begin{tikzpicture}[node distance=0.34cm]
-\node[uaOrange,text width=2.15cm] (p) {Checkout\\productor};
-\node[uaSoft,text width=2.35cm,right=of p] (b) {Cluster de brokers\\log retenido};
-\node[uaSoft,text width=1.85cm,right=of b,yshift=0.82cm] (i) {Inventario};
-\node[uaSoft,text width=1.85cm,right=of b] (q) {QR};
-\node[uaSoft,text width=1.85cm,right=of b,yshift=-0.82cm] (a) {Analítica};
+\node[uaOrange,text width=2.05cm] (p) {Order Workflow\\productor};
+\node[uaSoft,text width=2.45cm,right=of p] (b) {Cluster de brokers\\historia preservada};
+\node[uaSoft,text width=1.75cm,right=of b,yshift=0.58cm] (q) {QR};
+\node[uaSoft,text width=1.75cm,right=of b,yshift=-0.58cm] (a) {Analítica};
 \draw[uaOrangeArrow] (p)--node[above,uaTiny]{publica}(b);
-\draw[uaArrow] (b)--(i);
 \draw[uaArrow] (b)--(q);
 \draw[uaArrow] (b)--(a);
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-Una publicación agrega un hecho a la historia; no obliga a que todos los consumidores terminen al mismo tiempo.
+El productor agrega un registro a una historia compartida y persistida; cada aplicación consumidora conserva su propio progreso y puede recuperarse de manera independiente.
 \end{uakeybox}
 \end{frame}
+
 
 \begin{frame}{Kafka: una implementación real del modelo}
 \UASlideTag{CASO REAL}{UAIngOrange}
 \small
 \begin{uainfo}
-\textbf{Apache Kafka} es una plataforma distribuida de eventos. Sus brokers conservan logs particionados; productores publican y consumidores leen con progreso propio.
+\textbf{Apache Kafka} es una plataforma distribuida de \textit{event streaming}: productores publican registros, brokers los conservan en logs particionados y consumidores los leen con progreso propio.
 \end{uainfo}
-\begin{itemize}
-\item Topic: categoría lógica de eventos.
-\item Partición: historia ordenada y escalable.
-\item Broker: proceso que aloja particiones.
-\item Consumer group: instancias que se reparten particiones.
-\end{itemize}
-\begin{alertblock}{Método de la clase}
-Primero razonamos con el modelo; luego usamos Kafka como implementación concreta, no como sustituto de los conceptos.
-\end{alertblock}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Qué problema resuelve aquí}
+Desacoplar el checkout de QR y Analítica, conservar el hecho y permitir replay después de una caída.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Qué no resuelve automáticamente}
+No decide la key, no hace idempotente el QR, no elimina dual write y no define la semántica de ``compra confirmada''.
+\end{block}
+\end{columns}
+
 \end{frame}
 
-\begin{frame}{Del software al hardware: recorrido de un evento}
-\UASlideTag{EXTENSIÓN}{UAIngNavy}
+
+\begin{frame}{Del software al hardware: recorrido mínimo de un evento}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tabular}{p{0.17\textwidth}p{0.25\textwidth}p{0.36\textwidth}}
+\begin{tabular}{p{0.18\textwidth}p{0.24\textwidth}p{0.42\textwidth}}
 \toprule
-Nodo & Proceso & Recursos involucrados \\
+Nodo & Proceso & Recursos utilizados \\
 \midrule
-API & productor & CPU serializa; RAM forma lote; NIC envía \\
-Broker líder & broker & NIC recibe; CPU valida; RAM/page cache; SSD conserva \\
-Broker seguidor & réplica & NIC recibe copia; CPU verifica; SSD conserva \\
-Consumidor & lector & NIC trae lote; CPU procesa; RAM/DB guarda estado \\
+Aplicación & productor & el código ejecuta en CPU; RAM forma el batch; NIC lo envía \\
+Broker líder & broker & NIC recibe; CPU valida; RAM/page cache bufferiza; SSD o disco conserva segmentos \\
+Broker seguidor & réplica & NIC recibe la copia; CPU verifica; medio persistente la conserva \\
+Consumidor & lector & NIC recibe lote; RAM bufferiza; CPU ejecuta lógica; DB/SSD conserva el efecto \\
 \bottomrule
 \end{tabular}
 \end{center}
 \begin{uakeybox}
-La abstracción “publicar un evento” se materializa como cómputo, buffers, paquetes y escrituras en varios nodos.
+``Publicar un evento'' se materializa como instrucciones, buffers, paquetes y escrituras en varios nodos. El proceso usa los recursos; la CPU no es el productor ni el broker.
 \end{uakeybox}
 \end{frame}
 
+
 % =============================================================================
-\UASectionSlide{Capítulo 2 --- dos historias, tres particiones}
+\UASectionSlide{Capítulo 2 --- ordenar cada compra sin ordenar el mundo entero}
 % =============================================================================
 
-\begin{frame}{Primero complete las dos historias}
+
+\begin{frame}{Capítulo 2: dónde estamos en la historia}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
+\begin{uakeybox}
+El hecho ya puede publicarse. Ahora debemos mantener coherente el ciclo de vida de cada pedido sin obligar a que todas las compras del Festival formen una sola fila global.
+\end{uakeybox}
 \begin{columns}[T]
 \column{0.48\textwidth}
+\begin{block}{Pregunta}
+¿Qué eventos deben permanecer juntos porque uno depende del anterior?
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Decisión}
+Elegir una key, una partición y un ámbito de orden compatible con causalidad y carga.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Vocabulario previo del capítulo: topic y partición}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uainfo}
+\textbf{Topic:} categoría lógica de registros con un contrato común; usaremos \texttt{orders.lifecycle}.\\[0.08cm]
+\textbf{Partición:} uno de los logs ordenados que componen el topic. Se almacena, replica y consume como unidad.
+\end{uainfo}
+\begin{alertblock}{Límite}
+El orden existe dentro de cada partición. No aparece un orden global gratuito entre particiones diferentes.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{P0, P1 y P2: tres particiones del mismo topic}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.30cm]
+\node[uaOrange,text width=2.35cm] (t) {Topic\\\texttt{orders.lifecycle}};
+\node[uaSoft,text width=4.35cm,right=0.65cm of t,yshift=0.85cm] (p0) {\textbf{P0}: [105][106][107]$\ldots$};
+\node[uaSoft,text width=4.35cm,right=0.65cm of t] (p1) {\textbf{P1}: [221][222][223]$\ldots$};
+\node[uaSoft,text width=4.35cm,right=0.65cm of t,yshift=-0.85cm] (p2) {\textbf{P2}: [417][418][419][420]$\ldots$};
+\draw[uaArrow] (t.east)--(p0.west);
+\draw[uaArrow] (t.east)--(p1.west);
+\draw[uaArrow] (t.east)--(p2.west);
+\end{tikzpicture}
+\end{center}
+
+\begin{uakeybox}
+Los offsets se interpretan dentro de una partición. \texttt{P0:107} y \texttt{P2:419} no forman un orden global entre sí.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Consideremos las dos historias}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.49\textwidth}
 \begin{block}{Compra 9F2A — Sofía}
 \begin{enumerate}
 \item \texttt{OrderCreated}
+\item \texttt{StockReserved}
 \item \texttt{PaymentAuthorized}
 \item \texttt{OrderConfirmed}
-\item \texttt{QrIssued}
 \end{enumerate}
+El QR será una consecuencia posterior de la confirmación y podrá recuperarse desde el log.
 \end{block}
-\column{0.48\textwidth}
+\column{0.49\textwidth}
 \begin{block}{Compra 1C7B — Tomás}
 \begin{enumerate}
 \item \texttt{OrderCreated}
+\item \texttt{StockReserved}
 \item \texttt{PaymentRejected}
+\item \texttt{StockReleased}
 \item \texttt{OrderCancelled}
 \end{enumerate}
 \end{block}
 \end{columns}
 \begin{alertblock}{Pregunta}
-¿Qué pares de eventos exigen orden relativo y qué eventos pueden intercalarse libremente?
+¿Qué relaciones causales deben conservarse dentro de cada compra y qué eventos de compras distintas pueden intercalarse?
 \end{alertblock}
 \end{frame}
 
+
 \begin{frame}{Causalidad necesaria: qué orden no podemos perder}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-\begin{uainfo}
-Dos eventos tienen una dependencia causal cuando el segundo presupone que el primero ya ocurrió.
-\end{uainfo}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.24cm]
-\node[uaOrange,text width=1.55cm] (a) {Created\\9F2A};
-\node[uaSoft,text width=1.75cm,right=of a] (b) {Payment\\Authorized};
-\node[uaSoft,text width=1.65cm,right=of b] (c) {Order\\Confirmed};
-\node[uaOrange,text width=1.45cm,right=of c] (d) {QR\\Issued};
+\begin{tikzpicture}[node distance=0.19cm]
+\node[uaOrange,text width=1.38cm] (a) {Created\\9F2A};
+\node[uaSoft,text width=1.45cm,right=of a] (b) {Stock\\Reserved};
+\node[uaSoft,text width=1.48cm,right=of b] (c) {Payment\\Authorized};
+\node[uaOrange,text width=1.48cm,right=of c] (d) {Order\\Confirmed};
 \draw[uaOrangeArrow] (a)--(b);
 \draw[uaArrow] (b)--(c);
 \draw[uaOrangeArrow] (c)--(d);
 \end{tikzpicture}
 \end{center}
+\begin{uainfo}
+La \textbf{key no crea causalidad}: reúne en una partición los eventos cuyo orden debe preservarse. El productor o dueño del agregado debe emitirlos coherentemente; un campo \texttt{aggregate\_seq} puede detectar huecos, repetición o desorden.
+\end{uainfo}
 \begin{itemize}
-\item Para 9F2A, QR no debe aparecer antes de la confirmación.
-\item Para 1C7B, cancelación no debe aparecer antes del rechazo del pago.
-\item Entre 9F2A y 1C7B no necesitamos un orden global único.
+\item \texttt{OrderConfirmed(9F2A)} presupone reserva y pago autorizados.
+\item \texttt{OrderCancelled(1C7B)} presupone rechazo y liberación de stock.
+\item 9F2A y 1C7B pueden intercalarse: son historias independientes.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Qué es una key de particionamiento}
+
+\begin{frame}{Qué es una key de particionamiento y qué no hace}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{uakeybox}
-La \textbf{key} es un valor estable extraído del evento. El productor aplica una función determinista para elegir la partición.
+La \textbf{key} es un valor estable extraído del registro. El productor aplica una función determinista para seleccionar una partición.
 \end{uakeybox}
 \[
 \text{partición}=h(\text{key})\bmod P
 \]
-\begin{center}
-\scriptsize $h$: función hash determinista; $P$: cantidad de particiones.
-\end{center}
 \begin{columns}[T]
 \column{0.48\textwidth}
-\begin{block}{Misma key}
-Todos los eventos de esa entidad llegan a la misma partición y pueden conservar su orden local.
+\begin{block}{Sí hace}
+Mantiene la misma key en una misma partición y habilita orden local entre sus appends.
 \end{block}
 \column{0.48\textwidth}
-\begin{block}{Keys distintas}
-Pueden llegar a particiones diferentes y procesarse en paralelo.
-\end{block}
+\begin{alertblock}{No hace}
+No valida el orden del negocio, no evita hot keys y no crea orden global entre particiones.
+\end{alertblock}
 \end{columns}
 \end{frame}
+
 
 \begin{frame}{Elección para la historia: key = order\_id}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -545,20 +701,43 @@ No elegimos manualmente la partición para cada evento: elegimos una key estable
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tabular}{p{0.12\textwidth}p{0.72\textwidth}}
+\begin{tabular}{p{0.11\textwidth}p{0.74\textwidth}}
 \toprule
-Partición & Registros en orden de offset \\
+Partición & Registros en orden de append y offset \\
 \midrule
-P0 & 105:Created(1C7B) $\rightarrow$ 106:PaymentRejected(1C7B) $\rightarrow$ 107:Cancelled(1C7B) \\
-P1 & 221:Created(7D8E) $\rightarrow$ 222:Confirmed(7D8E) $\rightarrow$ otros pedidos \\
-P2 & 417:Created(9F2A) $\rightarrow$ 418:PaymentAuthorized(9F2A) $\rightarrow$ 419:Confirmed(9F2A) $\rightarrow$ 420:QrIssued(9F2A) \\
+P0 & 105:Created(1C7B) $\rightarrow$ 106:StockReserved $\rightarrow$ 107:PaymentRejected $\rightarrow$ 108:StockReleased $\rightarrow$ 109:Cancelled \\
+P1 & \emph{Ningún registro de las dos compras analizadas cae aquí. Otras keys podrían usarla en producción.} \\
+P2 & 417:Created(9F2A) $\rightarrow$ 418:StockReserved $\rightarrow$ 419:PaymentAuthorized $\rightarrow$ 420:Confirmed \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{alertblock}{Resultado}
-Se conserva el orden causal de cada pedido. No existe un offset global que ordene P0 frente a P2.
+\begin{alertblock}{Resultado preciso}
+Todos los registros de \texttt{1C7B} permanecen juntos en P0 y todos los de \texttt{9F2A} en P2. La partición conserva su orden de append; \texttt{aggregate\_seq} permite comprobar el ciclo de vida esperado.
 \end{alertblock}
 \end{frame}
+
+\begin{frame}{Anatomía de un registro de la historia 9F2A}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tabular}{p{0.24\textwidth}p{0.52\textwidth}}
+\toprule
+Campo & Ejemplo y función \\
+\midrule
+\texttt{event\_id} & \texttt{evt-9F2A-04}: identidad única para deduplicación \\
+\texttt{aggregate\_id} & \texttt{9F2A}: key que agrupa la historia del pedido \\
+\texttt{aggregate\_seq} & \texttt{4}: posición causal dentro del ciclo de vida \\
+\texttt{type} & \texttt{OrderConfirmed}: significado del hecho \\
+\texttt{partition/offset} & \texttt{P2:420}: posición del registro dentro del log \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Identidad de evento, identidad del pedido, secuencia del agregado y offset responden preguntas distintas; no son intercambiables.
+\end{uakeybox}
+\end{frame}
+
+
 
 \begin{frame}{Qué ganamos y a qué renunciamos}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -587,20 +766,20 @@ La partición es simultáneamente una frontera de orden, capacidad y paralelismo
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Actividad: reconstruya el reparto y defienda la key}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
-\small
-\begin{enumerate}
-\item Coloque los siete eventos de 9F2A y 1C7B en P0, P1 o P2.
-\item Mantenga juntos los eventos de cada pedido.
-\item Asigne offsets crecientes en cada partición.
-\item Dibuje dos intercalados globales distintos que sigan siendo correctos.
-\item Explique qué cambiaría si la key fuera \texttt{event\_id}.
-\end{enumerate}
-\begin{alertblock}{Evidencia esperada}
-La respuesta debe declarar el orden preservado, el paralelismo obtenido y el orden global que deja de existir.
-\end{alertblock}
-\end{frame}
+%\begin{frame}{Actividad: reconstruya el reparto y defienda la key}
+%\UASlideTag{ACTIVIDAD}{UAIngOrange}
+%\small
+%\begin{enumerate}
+%\item Coloque los nueve eventos de 9F2A y 1C7B en P0, P1 o P2.
+%\item Mantenga juntos los eventos de cada pedido.
+%\item Asigne offsets crecientes en cada partición.
+%\item Dibuje dos intercalados globales distintos que sigan siendo correctos.
+%\item Explique qué cambiaría si la key fuera \texttt{event\_id}.
+%\end{enumerate}
+%\begin{alertblock}{Evidencia esperada}
+%La respuesta debe declarar el orden preservado, el paralelismo obtenido y el orden global que deja de existir.
+%\end{alertblock}
+%\end{frame}
 
 \begin{frame}{Qué hace buena a una key}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -643,20 +822,41 @@ La key depende del invariante y del orden que necesita ese topic. Otra vista pue
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Hot key y hot partition: el límite de una historia muy popular}
+\begin{frame}{Hot key y hot partition: una key concentra la carga}
 \UASlideTag{EXTENSIÓN}{UAIngNavy}
 \small
 \begin{uainfo}
-Una \textbf{hot key} produce mucho más tráfico que las demás. Como una key pertenece a una sola partición, puede convertirla en \textbf{hot partition}.
+Una \textbf{hot key} produce mucho más tráfico que las demás. Como una key pertenece a una sola partición, puede convertirla en una \textbf{hot partition}.
 \end{uainfo}
 \begin{itemize}
-\item Un solo pedido normal genera pocos eventos: \texttt{order\_id} funciona bien.
-\item Una key global como \texttt{campus\_id} concentra toda la venta.
-\item Una historia individual extremadamente activa no puede paralelizarse sin redefinir su frontera de orden.
+\item \texttt{order\_id}: muchos pedidos independientes suelen repartirse bien.
+\item \texttt{campus\_id}: toda la venta del Festival termina en una única partición.
+\item Una entidad individual muy activa no puede paralelizarse sin redefinir qué orden necesita.
 \end{itemize}
 \begin{alertblock}{Opciones}
-Rediseñar la key, dividir la entidad si la semántica lo permite, crear agregación jerárquica o aceptar el cuello de botella para preservar orden.
+Rediseñar la key, dividir la entidad si la semántica lo permite, aceptar el cuello de botella o agregar resultados parciales en otra etapa.
 \end{alertblock}
+\end{frame}
+
+\begin{frame}{Agregación en dos etapas — también llamada jerárquica}
+\UASlideTag{EXTENSIÓN}{UAIngNavy}
+\small
+\begin{block}{Idea}
+En vez de enviar todos los eventos a una única key global, cada partición calcula un resultado parcial y una segunda etapa combina los parciales.
+\end{block}
+\[
+\text{ventas P0}+\text{ventas P1}+\text{ventas P2}=\text{ventas totales}
+\]
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{uainfo}
+Sirve para conteos, sumas, mínimos, máximos e histogramas combinables.
+\end{uainfo}
+\column{0.48\textwidth}
+\begin{alertblock}{Límite}
+No sirve para dividir arbitrariamente la historia ordenada de \texttt{9F2A}.
+\end{alertblock}
+\end{columns}
 \end{frame}
 
 \begin{frame}{De particiones lógicas a brokers físicos}
@@ -700,7 +900,7 @@ El líder responde cuando se cumple la política configurada de confirmación. E
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Timeout del productor: el evento 419 puede o no existir}
+\begin{frame}{Timeout del productor: el evento 420 puede o no existir}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{columns}[T]
@@ -710,7 +910,7 @@ El líder responde cuando se cumple la política configurada de confirmación. E
 \end{block}
 \column{0.48\textwidth}
 \begin{block}{Historia B}
-P2 agregó el evento en offset 419, pero se perdió el ACK. Reintentar puede duplicarlo.
+P2 agregó el evento en offset 420, pero se perdió el ACK. Reintentar puede duplicarlo.
 \end{block}
 \end{columns}
 \begin{uakeybox}
@@ -719,101 +919,169 @@ La idempotencia del productor usa identidad y secuencia para que el broker recon
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Capítulo 3 --- varios lectores y progreso recuperable}
+\UASectionSlide{Capítulo 3 --- QR cae: otro lector debe continuar}
 % =============================================================================
 
-\begin{frame}{Consumidor, poll y committed offset}
+
+\begin{frame}{Capítulo 3: dónde estamos en la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uakeybox}
+\texttt{OrderConfirmed(9F2A)} quedó en P2:420. El servicio QR emitió la entrada digital y cayó antes de registrar cuánto había avanzado.
+\end{uakeybox}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Problema}
+Otra instancia debe continuar sin perder la confirmación ni emitir dos QR lógicos.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Conceptos que nacen aquí}
+\texttt{poll}, position, committed offset, replay, consumer group, inbox, rebalanceo y lag.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Vocabulario previo del capítulo: leer y guardar progreso}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tabular}{p{0.21\textwidth}p{0.63\textwidth}}
+\begin{tabular}{p{0.22\textwidth}p{0.62\textwidth}}
 \toprule
 Término & Significado en la historia \\
 \midrule
-\texttt{poll} & llamada con la que el consumidor solicita un lote al broker \\
-Polling & repetición de esa consulta para seguir leyendo \\
-Position & próximo offset que la instancia viva intentará leer \\
-committed offset & progreso durable desde el cual otra instancia reinicia \\
+\texttt{poll} & llamada con la que QR solicita al broker un lote de registros \\
+Polling & repetición de esa consulta mientras la aplicación continúa viva \\
+Position & próximo offset que la instancia actual intentará leer \\
+Committed offset & progreso durable desde el que otra instancia puede reiniciar \\
+Replay & relectura de registros ya vistos por una instancia anterior \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{uakeybox}
-El broker entrega registros; Inventario decide cómo transformar cada evento en stock.
-\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Consumer group: repartir las tres particiones}
+\begin{frame}{Un ciclo de consumo de QR}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaOrange,text width=1.40cm] (p0) {P0\\1C7B};
-\node[uaSoft,text width=1.40cm,right=of p0] (p1) {P1\\otros};
-\node[uaSoft,text width=1.40cm,right=of p1] (p2) {P2\\9F2A};
-\node[uaSoft,text width=1.70cm,below=1.0cm of p0] (c1) {Inventario-1};
-\node[uaSoft,text width=1.70cm,below=1.0cm of p1] (c2) {Inventario-2};
-\node[uaSoft,text width=1.70cm,below=1.0cm of p2] (c3) {Inventario-3};
-\draw[uaArrow] (p0)--(c1);
-\draw[uaArrow] (p1)--(c2);
-\draw[uaArrow] (p2)--(c3);
+\begin{tikzpicture}[node distance=0.28cm]
+\node[uaOrange,text width=1.55cm] (poll) {poll\\P2};
+\node[uaSoft,text width=1.75cm,right=of poll] (batch) {recibir lote\\417--420};
+\node[uaSoft,text width=1.75cm,right=of batch] (eff) {emitir QR\\para 9F2A};
+\node[uaOrange,text width=1.75cm,right=of eff] (commit) {guardar\\offset 421};
+\draw[uaOrangeArrow] (poll)--(batch);
+\draw[uaArrow] (batch)--(eff);
+\draw[uaOrangeArrow] (eff)--(commit);
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-Dentro de un grupo, una partición se asigna a una sola instancia a la vez. El paralelismo activo no supera el número de particiones.
+El broker entrega registros; QR decide el efecto. Guardar offset 421 significa que la próxima instancia comenzará después de P2:420.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Las dos historias vistas por Inventario}
+
+\begin{frame}{Consumer group: una aplicación lógica con varias instancias}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{block}{Definición}
+Un \textbf{consumer group} es un conjunto de procesos que ejecutan la misma aplicación consumidora y comparten un identificador, \texttt{group.id}. El broker reparte \textbf{particiones completas} entre los miembros activos.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.42cm]
+\node[uaOrange,text width=1.40cm] (p0) {P0\\1C7B};
+\node[uaSoft,text width=1.40cm,right=of p0] (p1) {P1\\sin claves};
+\node[uaSoft,text width=1.40cm,right=of p1] (p2) {P2\\9F2A};
+\node[uaSoft,text width=1.55cm,below=0.72cm of p0] (c1) {QR-1};
+\node[uaSoft,text width=1.55cm,below=0.72cm of p1] (c2) {QR-2};
+\node[uaSoft,text width=1.55cm,below=0.72cm of p2] (c3) {QR-3};
+\draw[uaArrow] (p0)--(c1);
+\draw[uaArrow] (p1)--(c2);
+\draw[uaArrow] (p2)--(c3);
+\node[draw=UAIngOrange,rounded corners=2mm,fit=(c1)(c2)(c3),inner sep=3pt,label={[uaTiny,text=UAIngOrange]below:grupo \texttt{qr-service}}] {};
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+Dentro de un grupo, cada partición tiene una sola instancia activa. Una instancia puede recibir varias; las instancias sobrantes quedan ociosas.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Dos aplicaciones pueden leer la misma historia}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{columns}[T]
 \column{0.48\textwidth}
-\begin{block}{Inventario-1 lee P0}
-\texttt{Created(1C7B)}\\
-\texttt{PaymentRejected(1C7B)}\\
-\texttt{Cancelled(1C7B)}
+\begin{block}{Grupo QR}
+\texttt{group.id = qr-service}
+\begin{itemize}
+\item P0 $\rightarrow$ QR-1
+\item P1 $\rightarrow$ QR-2
+\item P2 $\rightarrow$ QR-3
+\end{itemize}
+Genera entradas digitales y conserva su progreso por partición.
 \end{block}
 \column{0.48\textwidth}
-\begin{block}{Inventario-3 lee P2}
-\texttt{Created(9F2A)}\\
-\texttt{PaymentAuthorized(9F2A)}\\
-\texttt{Confirmed(9F2A)}\\
-\texttt{QrIssued(9F2A)}
+\begin{block}{Grupo Analítica}
+\texttt{group.id = festival-analytics}
+\begin{itemize}
+\item también lee P0, P1 y P2;
+\item mantiene offsets independientes;
+\item puede estar atrasado aunque QR esté al día.
+\end{itemize}
+\end{block}
+\end{columns}
+\begin{uakeybox}
+Las particiones se reparten entre instancias del \textbf{mismo grupo}; no se reparten entre todas las aplicaciones del sistema.
+\end{uakeybox}
+\end{frame}
+
+
+\begin{frame}{Las dos historias vistas por el grupo QR}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.49\textwidth}
+\begin{block}{QR-1 lee P0}
+1C7B termina en \texttt{OrderCancelled}. El consumidor registra que no debe emitir entrada.
+\end{block}
+\column{0.49\textwidth}
+\begin{block}{QR-3 lee P2}
+9F2A alcanza \texttt{OrderConfirmed}. El consumidor genera una entrada QR identificada por el pedido.
 \end{block}
 \end{columns}
 \begin{alertblock}{Consecuencia}
-Los dos pedidos se procesan en paralelo; dentro de cada pedido se conserva la secuencia elegida por la key.
+Los pedidos se procesan en paralelo; el efecto depende del tipo de evento, no solo de haber leído un registro.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{El accidente de Inventario-3}
+
+\begin{frame}{El accidente de QR-3}
 \UASlideTag{PREDICCIÓN}{UAIngOrange}
 \small
-Inventario-3 lee \texttt{Confirmed(9F2A)} en P2:419, descuenta stock y cae antes de guardar su committed offset.
+QR-3 lee \texttt{OrderConfirmed(9F2A)} en P2:420, persiste el código de entrada y cae antes de guardar su committed offset.
 \begin{center}
 \begin{tikzpicture}[node distance=0.34cm]
-\node[uaOrange,text width=1.55cm] (r) {poll\\419};
-\node[uaSoft,text width=1.65cm,right=of r] (e) {stock\\--1};
+\node[uaOrange,text width=1.55cm] (r) {poll\\420};
+\node[uaSoft,text width=1.65cm,right=of r] (e) {QR\\emitido};
 \node[uaOrange,text width=1.45cm,right=of e] (x) {CRASH};
-\node[uaSoft,text width=1.80cm,right=of x] (s) {restart\\desde 419};
+\node[uaSoft,text width=1.80cm,right=of x] (s) {restart\\desde 420};
 \draw[uaOrangeArrow] (r)--(e);
 \draw[uaArrow] (e)--(x);
 \draw[uaOrangeArrow] (x)--(s);
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Predicción}
-¿Qué reaparece y cómo evitamos descontar stock por segunda vez?
+¿Qué reaparece y cómo evitamos crear dos entradas válidas para la misma compra?
 \end{alertblock}
 \end{frame}
+
 
 \begin{frame}{At-most-once: progreso antes que efecto}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \[
-\text{poll 419}\rightarrow\text{commit 420}\rightarrow\text{crash}\rightarrow\text{efecto nunca aplicado}
+\text{poll 420}\rightarrow\text{commit 421}\rightarrow\text{crash}\rightarrow\text{efecto nunca aplicado}
 \]
 \begin{block}{Resultado}
-El evento no reaparece, pero se puede perder el descuento de stock.
+El evento no reaparece, pero se puede perder la emisión del QR.
 \end{block}
 \begin{uakeybox}
 At-most-once prioriza no repetir; una falla entre progreso y efecto puede producir pérdida lógica.
@@ -824,10 +1092,10 @@ At-most-once prioriza no repetir; una falla entre progreso y efecto puede produc
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \[
-\text{poll 419}\rightarrow\text{stock --1}\rightarrow\text{crash}\rightarrow\text{replay 419}
+\text{poll 420}\rightarrow\text{emitir QR}\rightarrow\text{crash}\rightarrow\text{replay 420}
 \]
 \begin{block}{Resultado}
-El evento reaparece; si el efecto no es idempotente, el stock puede descontarse dos veces.
+El evento reaparece; si el efecto no es idempotente, pueden emitirse dos QR válidos.
 \end{block}
 \begin{uakeybox}
 At-least-once facilita progreso frente a fallas, pero exige idempotencia o deduplicación del efecto.
@@ -839,8 +1107,8 @@ At-least-once facilita progreso frente a fallas, pero exige idempotencia o dedup
 \small
 \begin{center}
 \begin{tikzpicture}[node distance=0.30cm]
-\node[uaOrange,text width=1.70cm] (ev) {event\_id\\evt-9F2A-3};
-\node[uaSoft,text width=2.10cm,right=of ev] (tx) {Transacción local\\inbox + stock};
+\node[uaOrange,text width=1.70cm] (ev) {event\_id\\evt-9F2A-04};
+\node[uaSoft,text width=2.10cm,right=of ev] (tx) {Transacción local\\inbox + QR};
 \node[uaSoft,text width=1.75cm,right=of tx] (db) {DB durable};
 \node[uaOrange,text width=1.55cm,right=of db] (off) {commit\\offset};
 \draw[uaOrangeArrow] (ev)--(tx);
@@ -849,7 +1117,7 @@ At-least-once facilita progreso frente a fallas, pero exige idempotencia o dedup
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-Si 419 reaparece, la inbox demuestra que el efecto ya fue aplicado. Identidad y efecto deben confirmarse atómicamente.
+Si 420 reaparece, la inbox demuestra que el QR ya fue emitido. Identidad y efecto deben confirmarse atómicamente.
 \end{uakeybox}
 \end{frame}
 
@@ -858,8 +1126,8 @@ Si 419 reaparece, la inbox demuestra que el efecto ya fue aplicado. Identidad y 
 \small
 Ubique el crash en cuatro cortes:
 \begin{enumerate}
-\item antes de aplicar stock;
-\item después de stock, antes de inbox;
+\item antes de emitir QR;
+\item después de emitir QR, antes de inbox;
 \item después de inbox, antes de committed offset;
 \item después del committed offset.
 \end{enumerate}
@@ -872,41 +1140,70 @@ Para cada corte, responda:
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Rebalanceo: Inventario-3 cae y P2 cambia de dueño}
+\begin{frame}{Por qué aparecen rebalanceo y lag en esta historia}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
+\scriptsize
+\begin{enumerate}
+\item QR-3 era responsable de P2 y cae después de emitir el QR de \texttt{9F2A}.
+\item El grupo debe asignar P2 a otra instancia para continuar.
+\item Mientras cambia la asignación, P2 sigue recibiendo nuevos registros.
+\end{enumerate}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{uainfo}
+\textbf{Rebalanceo:} ¿quién procesa ahora P2?
+\end{uainfo}
+\column{0.48\textwidth}
+\begin{uainfo}
+\textbf{Lag:} ¿cuánto trabajo quedó pendiente mientras P2 no avanzaba al ritmo de ingreso?
+\end{uainfo}
+\end{columns}
+\begin{uakeybox}
+Son dos consecuencias del mismo accidente: reasignar responsabilidad y medir la deuda acumulada.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Rebalanceo: QR-3 cae y P2 cambia de dueño}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.55cm]
-\node[uaOrange,text width=1.50cm] (p2) {P2\\9F2A};
-\node[uaSoft,text width=1.85cm,right=of p2] (c3) {Inventario-3\\caído};
-\node[uaSoft,text width=1.85cm,below=0.90cm of c3] (c2) {Inventario-2\\nuevo dueño};
+\begin{tikzpicture}[node distance=0.50cm]
+\node[uaOrange,text width=1.45cm] (p2) {P2\\9F2A};
+\node[uaSoft,text width=1.60cm,right=of p2] (c3) {QR-3\\caído};
+\node[uaSoft,text width=1.85cm,below=0.75cm of c3] (c2) {QR-2\\nueva asignación};
 \draw[uaOrangeArrow] (p2)--node[above,uaTiny]{antes}(c3);
-\draw[uaArrow] (p2) to[bend right=18] node[below,uaTiny]{reasignación}(c2);
+\draw[uaArrow] (p2) to[bend right=18] node[below,uaTiny]{después}(c2);
 \end{tikzpicture}
 \end{center}
 \begin{uainfo}
-\textbf{Rebalanceo:} proceso por el cual el grupo reasigna particiones cuando cambia la membresía o la topología.
+\textbf{Rebalanceo:} el grupo detecta cambios de membresía y recalcula qué instancia procesa cada partición.
 \end{uainfo}
 \begin{itemize}
-\item Inventario-2 reinicia P2 desde el committed offset.
-\item Durante la reasignación puede haber pausa y crecimiento temporal del lag.
+\item el consumo puede pausarse durante el cambio;
+\item QR-2 retoma P2 desde el committed offset;
+\item la asignación puede volver a cambiar ante otra falla.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Lag: P2 avanza más rápido que Inventario-2}
+
+\begin{frame}{Lag: la deuda de procesamiento de P2}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
+\begin{block}{Por qué aparece}
+Durante el rebalanceo y la recuperación, el broker sigue aceptando nuevos registros en P2. Si ingresan más registros por segundo de los que QR-2 procesa, crece el trabajo pendiente.
+\end{block}
 \[
-L_o=O_{\text{final de P2}}-O_{\text{confirmado por Inventario}}
+L_o=O_{\text{final de P2}}-O_{\text{confirmado por QR}}
 \]
 \begin{uainfo}
-\textbf{Lag en offsets:} cantidad de registros pendientes.\\
-\textbf{Lag temporal:} edad del evento pendiente más antiguo.
+\textbf{Lag en offsets:} cantidad aproximada de registros pendientes.\\
+\textbf{Lag temporal:} edad de la compra confirmada más antigua que todavía no obtuvo QR.
 \end{uainfo}
-\begin{alertblock}{Hilo narrativo}
-El lag crece porque P2 sigue recibiendo pedidos mientras Inventario-2 restaura estado, consulta una base lenta o procesa menos eventos por segundo.
+\begin{alertblock}{Interpretación}
+El lag no es la falla original: es la señal observable de que producción y consumo avanzan a ritmos diferentes.
 \end{alertblock}
 \end{frame}
+
 
 \begin{frame}{Dashboard por partición: no diagnostique solo el promedio}
 \UASlideTag{EXTENSIÓN}{UAIngNavy}
@@ -923,13 +1220,32 @@ P2 & 520 & 260 & 19.400 & 91\% & carga/skew/restore \\
 \end{tabular}
 \end{center}
 \begin{uakeybox}
-Una hot partition, un restore o una dependencia downstream lenta pueden producir el mismo síntoma superficial: lag creciente.
+Una hot partition, un restore o una dependencia base de QR lenta pueden producir el mismo síntoma superficial: lag creciente.
 \end{uakeybox}
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Capítulo 4 --- publicar el hecho sin dual write}
+\UASectionSlide{Capítulo 4 --- el pedido existe: el evento también debe existir}
 % =============================================================================
+
+
+\begin{frame}{Capítulo 4: dónde estamos en la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uakeybox}
+Ya sabemos publicar, particionar y recuperar consumidores. Falta una falla anterior: la base de Orders puede confirmar 9F2A y el proceso caer antes de que exista \texttt{OrderConfirmed} en el broker.
+\end{uakeybox}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Riesgo}
+El usuario ve OK, pero QR y Analítica jamás reciben el hecho.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Necesidad}
+Unir el commit local y la intención de publicar sin depender de dos escrituras remotas atómicas.
+\end{block}
+\end{columns}
+\end{frame}
 
 \begin{frame}{La nueva falla: pedido confirmado, evento ausente}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -947,46 +1263,51 @@ Checkout confirma 9F2A en la base y luego intenta publicar \texttt{OrderConfirme
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Consecuencia}
-La compra existe, pero QR, Analítica e Inventario nunca reciben el hecho.
+La compra existe, pero QR y Analítica nunca reciben el hecho.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Dual write: ningún orden elimina todas las ventanas}
+\begin{frame}{Dual write: dos escrituras independientes para un mismo hecho}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
+\begin{block}{Definición}
+Existe \textbf{dual write} cuando una operación de negocio necesita modificar dos sistemas que no comparten una transacción atómica; aquí, la base de pedidos y el broker de eventos.
+\end{block}
 \begin{columns}[T]
 \column{0.48\textwidth}
 \begin{block}{Base primero}
-DB confirma $\rightarrow$ crash $\rightarrow$ evento ausente.
+DB confirma $\rightarrow$ crash $\rightarrow$ la compra existe, pero el evento falta.
 \end{block}
 \column{0.48\textwidth}
 \begin{block}{Broker primero}
-Evento publicado $\rightarrow$ crash/rollback $\rightarrow$ consumidores ven una compra inexistente.
+Evento publicado $\rightarrow$ crash o rollback $\rightarrow$ los consumidores ven una compra que no quedó confirmada.
 \end{block}
 \end{columns}
 \begin{uakeybox}
-Dos escrituras independientes no forman una transacción atómica solo por elegir un orden.
+Necesitamos el mismo resultado lógico —pedido confirmado y hecho publicable—, pero no existe un COMMIT único que abarque ambas escrituras remotas.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Transactional outbox: negocio e intención en una transacción}
+\begin{frame}{Transactional outbox: el pedido y su evento nacen juntos}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\small
+\scriptsize
 \begin{uainfo}
-Una \textbf{outbox transaccional} es una tabla o colección de eventos pendientes escrita en la misma transacción local que el cambio de negocio.
+Una \textbf{outbox transaccional} es una tabla de la misma base donde Checkout guarda el evento pendiente. La fila outbox se inserta en el \textbf{mismo COMMIT local} que confirma el pedido.
 \end{uainfo}
 \begin{center}
-\begin{tikzpicture}[node distance=0.30cm]
-\node[uaOrange,text width=1.75cm] (api) {Checkout};
-\node[uaSoft,text width=2.30cm,right=of api] (tx) {Transacción local\\pedido + outbox};
-\node[uaSoft,text width=1.80cm,right=of tx] (db) {DB durable};
-\draw[uaOrangeArrow] (api)--(tx);
-\draw[uaArrow] (tx)--(db);
+\begin{tikzpicture}[node distance=0.28cm]
+\node[uaOrange,text width=1.65cm] (api) {Checkout};
+\node[uaSoft,text width=2.35cm,right=of api] (tx) {Una transacción\\pedido + fila outbox};
+\node[uaSoft,text width=1.75cm,right=of tx] (db) {DB durable};
+\draw[uaOrangeArrow] (api)--(tx);\draw[uaArrow] (tx)--(db);
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-Si el COMMIT local existe, también existe una intención durable de publicar \texttt{OrderConfirmed(9F2A)}.
+Si el COMMIT existe, existen juntos el negocio y la intención de publicar. Si aborta, no existe ninguno.
 \end{uakeybox}
+\begin{alertblock}{Qué deja abierto}
+Otro proceso debe publicar la fila. Puede repetirla, por lo que los consumidores posteriores necesitan identidad e idempotencia.
+\end{alertblock}
 \end{frame}
 
 \begin{frame}{Relay, polling y CDC: cómo sale el evento de la outbox}
@@ -997,15 +1318,16 @@ Si el COMMIT local existe, también existe una intención durable de publicar \t
 \toprule
 Término & Definición \\
 \midrule
-Relay & Proceso que toma eventos pendientes y los publica en el broker. \\
-Polling & El relay consulta periódicamente la tabla outbox. \\
-CDC & \textit{Change Data Capture}: captura cambios confirmados en una base. \\
-WAL / binlog & Registros internos desde los cuales una herramienta CDC puede leer cambios. \\
+Relay & Proceso que toma filas pendientes de la outbox y las publica en el broker. \\
+Polling & El relay consulta periódicamente la tabla outbox para encontrar trabajo. \\
+CDC & \textit{Change Data Capture}: captura cambios ya confirmados en una base. \\
+WAL / binlog & Registros internos desde los cuales una herramienta CDC puede observar esos cambios. \\
+Downstream & Componentes ubicados más adelante en el flujo, como QR o Analítica, que reciben y procesan el evento. \\
 \bottomrule
 \end{tabular}
 \end{center}
 \begin{alertblock}{Límite}
-El relay puede perder el ACK y publicar otra vez. La outbox evita “DB sí / evento no”; no elimina duplicados downstream.
+El relay puede publicar y perder el ACK; al reintentar, el broker puede recibir otra copia. La outbox evita ``DB sí / evento no'', pero no elimina duplicados en los consumidores posteriores.
 \end{alertblock}
 \end{frame}
 
@@ -1035,13 +1357,13 @@ Debezium es una implementación posible del relay; la idea arquitectónica es la
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.22cm]
-\node[uaOrange,text width=1.40cm] (api) {Checkout};
-\node[uaSoft,text width=1.65cm,right=of api] (db) {DB\\pedido +\ outbox};
-\node[uaSoft,text width=1.35cm,right=of db] (rel) {Relay};
-\node[uaSoft,text width=1.40cm,right=of rel] (br) {Broker\\P2};
-\node[uaSoft,text width=1.55cm,right=of br] (con) {Inventario};
-\node[uaOrange,text width=1.55cm,right=of con] (eff) {DB\\inbox+stock};
+\begin{tikzpicture}[node distance=0.20cm]
+\node[uaOrange,text width=1.28cm] (api) {Checkout};
+\node[uaSoft,text width=1.60cm,right=of api] (db) {DB\\pedido + outbox};
+\node[uaSoft,text width=1.25cm,right=of db] (rel) {Relay};
+\node[uaSoft,text width=1.30cm,right=of rel] (br) {Broker\\P2};
+\node[uaSoft,text width=1.25cm,right=of br] (con) {QR-2};
+\node[uaOrange,text width=1.45cm,right=of con] (eff) {DB QR\\inbox + código};
 \draw[uaOrangeArrow] (api)--(db);
 \draw[uaArrow] (db)--(rel);
 \draw[uaArrow] (rel)--(br);
@@ -1050,12 +1372,13 @@ Debezium es una implementación posible del relay; la idea arquitectónica es la
 \end{tikzpicture}
 \end{center}
 \begin{itemize}
-\item Outbox hace durable la intención de publicar.
-\item Broker conserva y permite replay.
-\item Inbox hace idempotente el efecto local.
+\item Outbox vuelve durable la intención de publicar.
+\item El broker conserva y permite replay.
+\item Inbox vuelve idempotente la emisión del QR.
 \item El mismo \texttt{event\_id} conecta el recorrido extremo a extremo.
 \end{itemize}
 \end{frame}
+
 
 \begin{frame}{Exactly-once: declare el objeto y la frontera}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -1076,23 +1399,42 @@ Email, pago o API externa requieren identidad, idempotencia, deduplicación o re
 \end{frame}
 
 % =============================================================================
-\UASectionSlide{Capítulo 5 --- operar un stream que nunca termina}
+\UASectionSlide{Capítulo 5 --- Analítica debe operar una historia que nunca termina}
 % =============================================================================
 
-\begin{frame}{Stream y pipeline: Analítica lee una historia sin fin}
+
+\begin{frame}{Capítulo 5: dónde estamos en la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uakeybox}
+Pedidos y QR ya son recuperables. Analítica lee el mismo log con otro grupo y debe producir el tablero de ventas del Festival mientras siguen llegando eventos atrasados.
+\end{uakeybox}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Pregunta}
+¿Cómo convertir una secuencia ilimitada en resultados finitos por minuto o por ventana?
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Nueva dificultad}
+La hora de ocurrencia y la hora de procesamiento pueden ser diferentes.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Stream y pipeline: Analítica procesa la venta del Festival}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{uainfo}
 \textbf{Stream:} secuencia potencialmente ilimitada de eventos.\\
-\textbf{Pipeline:} cadena de etapas que filtran, transforman, agregan o enrutan esos eventos.
+\textbf{Pipeline:} etapas que filtran, transforman, agrupan o enrutan esos eventos.
 \end{uainfo}
 \begin{center}
-\begin{tikzpicture}[node distance=0.25cm]
-\node[uaOrange,text width=1.55cm] (e) {Eventos};
-\node[uaSoft,text width=1.55cm,right=of e] (f) {Filtrar};
-\node[uaSoft,text width=1.55cm,right=of f] (g) {Agrupar};
-\node[uaSoft,text width=1.55cm,right=of g] (a) {Agregar};
-\node[uaOrange,text width=1.55cm,right=of a] (d) {Dashboard};
+\begin{tikzpicture}[node distance=0.23cm]
+\node[uaOrange,text width=1.55cm] (e) {topic\\orders};
+\node[uaSoft,text width=1.45cm,right=of e] (f) {filtrar\\estados};
+\node[uaSoft,text width=1.45cm,right=of f] (g) {agrupar\\5 minutos};
+\node[uaSoft,text width=1.45cm,right=of g] (a) {sumar\\ventas netas};
+\node[uaOrange,text width=1.45cm,right=of a] (d) {tablero\\Festival};
 \draw[uaOrangeArrow] (e)--(f);
 \draw[uaArrow] (f)--(g);
 \draw[uaArrow] (g)--(a);
@@ -1101,17 +1443,18 @@ Email, pago o API externa requieren identidad, idempotencia, deduplicación o re
 \end{center}
 \end{frame}
 
+
 \begin{frame}{Stateless y stateful: qué debe recordar Analítica}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{columns}[T]
 \column{0.48\textwidth}
 \begin{block}{Stateless}
-Transforma cada evento sin depender de eventos anteriores: normalizar moneda o proyectar campos.
+Transforma cada registro aislado: normalizar moneda, validar esquema o seleccionar campos.
 \end{block}
 \column{0.48\textwidth}
 \begin{block}{Stateful}
-Necesita memoria entre eventos: contar ventas por minuto, sumar ingresos o mantener ranking.
+Mantiene información entre eventos: ventas confirmadas menos cancelaciones por ventana.
 \end{block}
 \end{columns}
 \begin{uakeybox}
@@ -1119,78 +1462,128 @@ El estado puede vivir en RAM para velocidad, en SSD local para recuperación rá
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Event time y processing time: el pedido llegó tarde}
+
+\begin{frame}{Event time y processing time: 1C7B llega tarde}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{uainfo}
-\textbf{Event time:} cuándo ocurrió el hecho en la fuente.\\
-\textbf{Processing time:} cuándo lo procesa la etapa actual.
+\textbf{Event time:} cuándo ocurrió el hecho en el dominio.\\
+\textbf{Processing time:} cuándo lo procesa Analítica.
 \end{uainfo}
 \begin{center}
-\begin{tikzpicture}[x=1.0cm,y=0.75cm]
+\begin{tikzpicture}[x=1.0cm,y=0.72cm]
 \draw[->,thick,UAIngNavy] (0,0)--(9.1,0) node[right,uaTiny]{tiempo};
-\node[uaEventOrange] at (1.4,0.55) {9F2A ocurrió 12:00};
-\node[uaEvent] at (5.0,-0.55) {broker 12:02};
-\node[uaEventOrange] at (7.3,0.55) {procesado 12:03};
+\node[uaEventOrange] at (1.4,0.55) {Cancelled(1C7B)\\event time 12:04:50};
+\node[uaEvent] at (5.2,-0.55) {broker\\12:07:10};
+\node[uaEventOrange] at (7.4,0.55) {procesado\\12:07:12};
 \end{tikzpicture}
 \end{center}
 \begin{alertblock}{Consecuencia}
-Agrupar por tiempo de procesamiento puede colocar una venta de las 12:00 en la ventana de las 12:03.
+Si la ventana 12:00--12:05 ya fue publicada, Analítica debe corregirla, reabrirla, descartar el evento o enviarlo a una salida lateral según la política elegida.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Watermark: cuándo Analítica decide cerrar una ventana}
-\UASlideTag{EXTENSIÓN}{UAIngNavy}
+
+\begin{frame}{Watermark: estimar cuánto avanzó el tiempo de los eventos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{block}{Problema}
+Analítica no puede esperar para siempre por un evento antiguo, pero llegada y ocurrencia no tienen el mismo orden.
+\end{block}
+\begin{uainfo}
+Una estrategia común calcula, por partición, el mayor \textit{event time} observado menos un margen de desorden permitido $\Delta$:
+\[
+W_i=\max(\textit{event time en }P_i)-\Delta.
+\]
+El progreso global queda limitado por la partición activa más atrasada:
+\[
+W=\min_i W_i.
+\]
+\end{uainfo}
+\begin{alertblock}{Lectura}
+Si $W>12{:}05$, se considera razonable cerrar 12:00--12:05. Es una política de espera, no una promesa de que jamás llegará algo anterior.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Ejemplo de watermark para la ventana 12:00--12:05}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+Suponga un margen de desorden permitido de $\Delta=2$ minutos:
+\begin{center}
+\begin{tabular}{p{0.14\textwidth}p{0.25\textwidth}p{0.23\textwidth}}
+\toprule
+Partición & Mayor event time observado & Watermark local \\
+\midrule
+P0 & 12:07:20 & 12:05:20 \\
+P1 & 12:07:10 & 12:05:10 \\
+P2 & 12:06:50 & 12:04:50 \\
+\bottomrule
+\end{tabular}
+\end{center}
+\[
+W=\min(12{:}05{:}20,12{:}05{:}10,12{:}04{:}50)=12{:}04{:}50
+\]
+\begin{alertblock}{Decisión}
+Todavía no se cierra la ventana: P2 mantiene el progreso global antes de 12:05. Cuando P2 avance lo suficiente, $W$ superará 12:05. Si después llega \texttt{Cancelled(1C7B)} con \textit{event time} 12:04:50, será \textit{late data}.
+\end{alertblock}
+\begin{uainfo}
+Una partición sin eventos puede marcarse temporalmente como inactiva; de lo contrario, podría frenar el watermark global de forma indefinida.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{SLO: cuánto atraso estamos dispuestos a aceptar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{uainfo}
-Un \textbf{watermark} es una estimación de progreso en event time: “no espero normalmente eventos anteriores a este instante”.
+\textbf{SLO — \textit{Service Level Objective}, u objetivo de nivel de servicio:} meta cuantificable que el sistema intenta cumplir durante un período.
 \end{uainfo}
 \begin{itemize}
-\item No garantiza que jamás llegue un evento más antiguo.
-\item Permite cerrar ventanas sin esperar para siempre.
-\item Un evento posterior al watermark es late data.
-\item La política puede descartar, corregir, reabrir o enviar a una salida lateral.
+\item QR: ``el 99\% de las compras confirmadas recibe su código en menos de 30 segundos''.
+\item Analítica: ``el lag temporal p95 permanece por debajo de 60 segundos''.
+\item Ranking: ``las posiciones visibles tienen menos de 10 segundos de atraso durante el 99\% de la hora pico''.
 \end{itemize}
 \begin{uakeybox}
-La política depende del costo del error: un dashboard puede corregirse; una decisión antifraude quizá espere más.
+El SLO convierte ``debe ser rápido'' en una condición medible para dimensionar particiones, consumidores, rebalances y políticas de late data.
 \end{uakeybox}
 \end{frame}
+
 
 \begin{frame}{Transferencia: ranking de Asteria Online}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
-Diseñe el ranking de combate:
+Ahora transfiera el método fuera del Festival:
 \begin{enumerate}
 \item evento y \texttt{event\_id};
-\item key y orden que necesita;
+\item key y orden necesario;
 \item número inicial de particiones;
 \item estado que conserva el consumidor;
-\item tratamiento de eventos tardíos;
-\item SLO de atraso;
-\item prueba de crash y replay.
+\item política de late data;
+\item SLO de atraso —objetivo medible y ventana de evaluación—;
+\item prueba de crash, replay y rebalanceo.
 \end{enumerate}
 \begin{alertblock}{Pregunta de transferencia}
-¿Qué cambiaría si el ranking entrega premios irreversibles al cerrar la temporada?
+¿Qué cambia si el ranking entrega premios irreversibles al cerrar la temporada?
 \end{alertblock}
 \end{frame}
+
 
 \begin{frame}{La historia completa de 9F2A y 1C7B}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \scriptsize
 \begin{enumerate}
-\item Checkout confirma cada pedido y guarda outbox.
+\item Checkout coordina los pasos críticos y guarda pedido + intención de publicar.
 \item Relay publica eventos con \texttt{key=order\_id}.
-\item 9F2A llega a P2 y 1C7B a P0.
-\item Cada partición preserva la historia de sus pedidos.
-\item Inventario reparte P0, P1 y P2 entre instancias.
-\item Si una instancia cae, otra retoma desde committed offset.
-\item Inbox evita repetir stock ante replay.
-\item Analítica procesa el mismo log con su propio progreso y política temporal.
+\item 9F2A llega a P2 y 1C7B a P0 con secuencia de agregado verificable.
+\item QR y Analítica leen la misma historia en grupos independientes.
+\item Si QR-3 cae, QR-2 retoma P2 desde el committed offset.
+\item Inbox evita dos QR lógicos ante replay.
+\item Analítica calcula ventanas por event time y corrige late data según política.
 \end{enumerate}
 \begin{uakeybox}
-Los conceptos ya no forman una lista: describen etapas y fallas del mismo recorrido extremo a extremo.
+Cada concepto respondió a una falla concreta de las mismas dos compras.
 \end{uakeybox}
 \end{frame}
+
 
 \begin{frame}{Método reusable para diseñar un pipeline}
 \UASlideTag{NÚCLEO}{UAIngNavy}
@@ -1211,11 +1604,11 @@ Para cada flujo, responda en este orden:
 \begin{frame}{Volvemos al Diagnóstico inicial}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
-Responda ahora con vocabulario técnico:
+Después de entender lo anterior podríamos responder con criterio:
 \begin{enumerate}
-\item ¿Por qué \texttt{order\_id} preserva la causalidad de cada pedido?
+\item ¿Por qué \texttt{order\_id} reúne la historia y qué condición adicional preserva la causalidad?
 \item ¿Por qué \texttt{campus\_id} puede producir una hot partition?
-\item ¿Qué reaparece si el efecto fue durable pero el committed offset no?
+\item ¿Qué reaparece si el QR fue durable pero el committed offset no?
 \item ¿Qué resuelve outbox y qué deja abierto?
 \item ¿Por qué agregar consumidores no divide una partición?
 \end{enumerate}
@@ -1225,7 +1618,7 @@ Responda ahora con vocabulario técnico:
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{enumerate}
-\item La key define el ámbito de orden y condiciona la distribución de carga.
+\item La key reúne el ámbito de orden; el productor y la secuencia del agregado deben representar correctamente la causalidad.
 \item Una partición ofrece orden local y es unidad de almacenamiento y paralelismo.
 \item Committed offset registra progreso; no confirma por sí solo el efecto de negocio.
 \item Replay es normal; idempotencia e inbox vuelven seguro el efecto.
@@ -1240,7 +1633,7 @@ En una hoja, responda:
 \begin{enumerate}
 \item Defina una buena key en una frase y aplíquela a 9F2A.
 \item Dibuje dónde quedan 9F2A y 1C7B en tres particiones.
-\item Explique qué ocurre si Inventario cae después del efecto y antes del committed offset.
+\item Explique qué ocurre si QR cae después de emitir la entrada y antes del committed offset.
 \item Nombre una métrica que distinga hot partition de atraso general.
 \end{enumerate}
 \end{frame}
