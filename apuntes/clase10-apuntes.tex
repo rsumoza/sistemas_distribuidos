@@ -18,14 +18,21 @@
 
 Una vez que un sistema distribuido está desplegado en producción, el problema central deja de ser únicamente diseñarlo o codificarlo correctamente: pasa a ser también \emph{entenderlo mientras opera}.
 
-En sistemas locales o monolíticos, el debugging suele ser reactivo e intuitivo (examinar un stack trace local, colocar un breakpoint o revisar un archivo de log). En sistemas distribuidos modernos, este enfoque colapsa por cuatro razones estructurales:
-
+En una aplicación que ejecuta sobre un único servidor físico o máquina virtual (como un monolito tradicional en producción), el diagnóstico cuenta con sólidas garantías del sistema operativo y del hardware:
 \begin{itemize}
-\item La ejecución se fragmenta entre múltiples procesos y servicios autónomos.
-\item Las fallas son parciales y degradaciones progresivas, no simples estados binarios (up/down).
-\item No existe un reloj físico global y confiable entre nodos (\emph{clock drift/skew}).
-\item La narrativa causal de una única solicitud se dispersa a través de la red.
+\item \textbf{Stack trace completo:} el hilo de ejecución transcurre en un mismo espacio de direcciones de memoria. Si una excepción escapa, el runtime imprime el árbol de llamadas exacto, con archivo y número de línea.
+\item \textbf{Reloj físico unificado:} existe una única fuente de tiempo de hardware (TSC o cuarzo del procesador). Dos eventos registrados en el log local tienen una relación temporal estricta y verificable; el tiempo físico actúa como serializador de causalidad.
+\item \textbf{Llamadas en memoria:} la invocación entre funciones toma nanosegundos. Prácticamente todo el tiempo transcurre ejecutando código o esperando I/O local; no existen demoras invisibles de red.
 \end{itemize}
+
+Cuando el sistema se distribuye a través de múltiples servidores y microservicios comunicados por red, este modelo colapsa por cuatro razones estructurales de fondo:
+
+\begin{enumerate}
+\item \textbf{Destrucción del stack trace en la frontera de red:} El hilo de ejecución termina abruptamente en el socket TCP (\texttt{http.Client.Do} o llamada gRPC). El llamante solo observa un error genérico (\texttt{500 Internal Server Error} o \texttt{DeadlineExceeded}); la cadena causal queda mutilada y es imposible inferir qué falló cuatro saltos aguas abajo sin un mecanismo explícito de correlación.
+\item \textbf{Pérdida del orden temporal por \emph{clock drift}:} Entre distintos servidores no existe un reloj global confiable. Los desvíos de NTP superan a menudo la latencia de red. Si se combinan logs de múltiples nodos ordenándolos por timestamp, los eventos aparecen desordenados: la recepción de un mensaje puede figurar con una hora anterior a su despacho. El tiempo físico ya no sirve para deducir causalidad.
+\item \textbf{Invisibilidad del tiempo ``fuera del código'':} En una red asincrónica, gran parte de la latencia no ocurre ejecutando lógica de negocio, sino esperando en colas intermedias: buffers de socket, colas de conexión en balanceadores, proxies y pools de workers. Un log local solo mide desde que el worker toma la solicitud; es ciego al tiempo de tránsito y encolamiento previo.
+\item \textbf{Fallas combinatorias y acumulación de latencia de cola:} Las degradaciones en sistemas distribuidos rara vez son fallos binarios (up/down). Por el contrario, suelen ser el resultado de la acumulación de latencias a lo largo de la cadena o de combinaciones emergentes de atributos de negocio (por ejemplo, el caso del ``Cliente Elefante'', donde un tenant corporativo con carritos de 30\,000 ítems genera micro-demoras en cada servicio downstream). En este escenario, \textbf{los dashboards y métricas locales de cada servidor individual se muestran 100\% saludables (en verde)}, pero la suma acumulativa excede el timeout en el API Gateway y el usuario experimenta una falla total.
+\end{enumerate}
 
 Por estas razones, la observabilidad no es un agregado opcional al final del desarrollo. Es una \textbf{propiedad arquitectónica estructural} del sistema.
 
@@ -92,6 +99,39 @@ Para que las herramientas puedan calcular correlaciones automáticas en la trenz
 \item \textbf{Soft Context (Contexto Blando):} Correlaciones implícitas o agregadas basadas en ventanas de tiempo o etiquetas genéricas (como \texttt{service\_name} o \texttt{environment}). Es frágil porque exige que un operador humano deduzca manualmente la relación causa-efecto.
 \item \textbf{Hard Context (Contexto Duro):} Enlaces explícitos, estructurales e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id}, cabeceras W3C Trace Context). Define la topología causal exacta de una solicitud individual, permitiendo conectar logs y métricas (vía \emph{exemplars}) directamente con su traza correspondiente.
 \end{itemize}
+
+\subsection{La arquitectura de la Trenza Única: OTLP, Collector y Correlación Automática}
+
+Para comprender cómo la ``Trenza Única de Datos'' supera en la práctica el aislamiento de los tres pilares tradicionales, es necesario examinar su implementación técnica en dos niveles: la unificación del transporte y los mecanismos de correlación automática calculados por software.
+
+\subsubsection{Unificación de transporte: De la proliferación de agentes a OTLP}
+
+Históricamente, incorporar telemetría completa a un servicio exigía instalar y mantener múltiples bibliotecas y procesos demonio en el host:
+\begin{itemize}
+\item un cliente de métricas (ej: cliente de Prometheus) que exponía un puerto de \emph{scraping};
+\item una biblioteca de logs que volcaba texto a disco y un agente secundario (ej: Filebeat o Fluentd) que parseaba los archivos con expresiones regulares;
+\item un SDK de tracing especializado (ej: Jaeger o Zipkin) que enviaba spans por UDP en formatos binarios propietarios.
+\end{itemize}
+
+Esta proliferación generaba sobrecarga de memoria en la aplicación, competencia por recursos y un fuerte acoplamiento: cambiar de proveedor de almacenamiento obligaba a reescribir código de instrumentación.
+
+El estándar OpenTelemetry (Young \& Parker, 2024) resuelve esta fragmentación mediante una arquitectura desacoplada:
+\begin{enumerate}
+\item \textbf{Un único SDK en la aplicación:} El código del servicio se instrumenta contra una API neutral y unificada, sin importar qué backend de almacenamiento se utilice.
+\item \textbf{Un protocolo común (\emph{OpenTelemetry Protocol} - OTLP):} Formato binario serializado con Protocol Buffers sobre gRPC o HTTP/2, diseñado para emitir métricas, logs y trazas de forma compacta y en lotes (\emph{batches}) a través de un único canal de red.
+\item \textbf{El OpenTelemetry Collector:} Un proceso intermediario independiente (desplegado típicamente como \emph{sidecar} o agente de nodo) que recibe telemetría en formato OTLP, aplica transformaciones, filtros o muestreo, y la encamina concurrentemente hacia múltiples destinos (Prometheus, Jaeger, Elasticsearch, etc.) mediante configuración declarativa, sin intervención del código de la aplicación.
+\end{enumerate}
+
+\subsubsection{Mecanismos de correlación automática por software}
+
+Afirmar que las computadoras calculan correlaciones automáticas significa que el análisis entre métricas, logs y trazas deja de basarse en la memoria visual del operador y pasa a operar mediante mecanismos determinísticos:
+
+\begin{description}
+\item[1. Contexto activo en memoria:] Al recibir una solicitud, el framework de instrumentación aloja en la memoria del hilo o corutina (\texttt{Context} en Go, \texttt{ThreadLocal} en Java) los identificadores inmutables de la traza activa (\texttt{trace\_id} y \texttt{span\_id}).
+\item[2. Correlación Log--Trace (Inyección automática de metadatos):] Cuando el desarrollador invoca el logger de la aplicación, el SDK intercepta la llamada, extrae automáticamente el \texttt{trace\_id} y \texttt{span\_id} del contexto activo y los estampa como campos estructurales del evento JSON. Como consecuencia, las herramientas de análisis pueden ejecutar un \emph{JOIN} relacional exacto entre un span y todos los logs generados durante su ejecución, eliminando las búsquedas manuales por aproximación temporal.
+\item[3. Correlación Métrica--Trace (\emph{Exemplars}):] En sistemas de métricas basados en series temporales (como Prometheus y el estándar OpenMetrics), los histogramas agrupan la latencia en cubos (\emph{buckets}) agregados. Un \textbf{Exemplar} es una muestra representativa que asocia el \texttt{trace\_id} de una petición individual a un punto de datos específico dentro del histograma. En los paneles de control (Grafana), esto se visualiza como un enlace directo sobre la curva de latencia: al hacer clic en un pico del percentil p99, la interfaz abre de inmediato la traza individual que generó esa degradación.
+\item[4. Análisis diferencial multidimensional (\emph{BubbleUp}):] Dado que métricas, trazas y eventos anchos comparten las mismas etiquetas de infraestructura y de negocio (\texttt{Resource Attributes}), el motor de observabilidad puede comparar estadísticamente la distribución de todos los atributos entre las solicitudes que fallaron y las que operaron con éxito, aislando cuantitativamente la dimensión causante de la anomalía sin requerir hipótesis previas.
+\end{description}
 
 \section{¿Qué debe responder un buen monitor?}
 
@@ -183,6 +223,26 @@ El tracing distribuido responde a la pregunta: \emph{¿Cómo atravesó esta soli
 \end{itemize}
 
 Un Span contiene cinco elementos obligatorios: Trace ID, Span ID, Parent Span ID (ausente en el root span), Timestamp de inicio y Duración.
+
+\subsection{Semántica y roles de un Span: SpanKind}
+
+Un span no es únicamente un intervalo de tiempo genérico. Sin conocer el rol del componente que lo emite, las herramientas de observabilidad no pueden distinguir si un intervalo prolongado responde a cómputo intensivo local, espera de red o encolamiento asincrónico.
+
+Para resolver esto, el estándar de OpenTelemetry (Young \& Parker, 2024) define el atributo \texttt{SpanKind}, que establece el rol semántico del span dentro de la topología distribuida:
+
+\begin{description}
+\item[\texttt{CLIENT}:] Representa una llamada síncrona saliente hacia un servicio remoto o recurso externo (por ejemplo, una solicitud HTTP saliente, una invocación gRPC o una consulta SQL a una base de datos). El span se inicia al comenzar a preparar el envío y finaliza cuando se recibe la respuesta completa.
+\item[\texttt{SERVER}:] Representa la recepción y atención de una solicitud síncrona entrante en el lado del servidor (por ejemplo, un handler HTTP o un método de servicio gRPC). Inicia al recibir el pedido y finaliza cuando la respuesta es despachada al cliente.
+\item[\texttt{PRODUCER}:] Modela el despacho asincrónico de un mensaje hacia un broker o intermediario de mensajería (como Kafka, RabbitMQ o AWS SQS). A diferencia de un span \texttt{CLIENT}, finaliza tan pronto como el broker confirma la recepción del mensaje, sin esperar a que un consumidor lo procese.
+\item[\texttt{CONSUMER}:] Modela la recepción y el procesamiento asincrónico de un mensaje extraído de una cola o tópico. A diferencia de \texttt{SERVER}, el procesamiento ocurre de forma desacoplada en el tiempo respecto del despacho del productor.
+\item[\texttt{INTERNAL}:] Modela operaciones internas dentro del mismo proceso o servicio que no cruzan límites de red ni interactúan con colas externas (por ejemplo, un cálculo matemático complejo, un algoritmo de renderizado o procesamiento en memoria).
+\end{description}
+
+\paragraph{Aislamiento de latencia de red (Simetría CLIENT--SERVER):}
+En llamadas síncronas entre dos servicios instrumentados, el span \texttt{CLIENT} del llamante y el span \texttt{SERVER} del receptor forman un par acoplado. Siguiendo el modelo Dapper (Sigelman et al., 2010), el span \texttt{CLIENT} engloba temporalmente al span \texttt{SERVER}. La diferencia de duración entre ambos permite aislar cuantitativamente el tiempo de tránsito de red y el encolamiento en el receptor (\emph{network flight time}), sin necesidad de asumir relojes físicos sincronizados entre ambos extremos.
+
+\paragraph{El límite de la jerarquía simple: Span Links:}
+En flujos síncronos, la causalidad se expresa limpiamente como un árbol jerárquico mediante \texttt{parent\_span\_id}. Sin embargo, en arquitecturas basadas en eventos con procesamiento por lotes (\emph{batch processing}), un trabajador \texttt{CONSUMER} puede procesar simultáneamente múltiples mensajes provenientes de trazas independientes. Dado que un span solo admite un único padre directo, el modelo incorpora \textbf{Span Links} (\emph{enlaces entre spans}): referencias causales que conectan el span actual con múltiples trazas antecedentes sin forzar una jerarquía estricta de padre e hijo.
 
 \subsection{Conexión teórica con la Clase 03: Causalidad de Lamport vs. Clock Drift}
 
