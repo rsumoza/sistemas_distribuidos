@@ -3,20 +3,13 @@
 \input{../config/course-config}
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
+\usetikzlibrary{decorations.pathreplacing,matrix,backgrounds,shapes.multipart,fit,positioning,arrows.meta,calc}
 
-\tikzset{
-  uaBox/.style={draw=UAIngNavy,rounded corners=1.5mm,thick,fill=white,
-    minimum height=0.75cm,align=center,font=\scriptsize,inner sep=4pt},
-  uaBoxO/.style={uaBox,draw=UAIngOrange,fill=UAIngPaper},
-  uaSoft/.style={uaBox,draw=UAIngRule,fill=UAIngPaper},
-  uaArrow/.style={->,very thick,>=Latex,draw=UAIngNavy},
-  uaArrowO/.style={->,very thick,>=Latex,draw=UAIngOrange},
-  uaLane/.style={draw=UAIngRule,line width=0.9pt}
-}
+\hyphenpenalty=9000
+\exhyphenpenalty=9000
+\tolerance=1800
+\emergencystretch=1.3em
 
-
-% Etiqueta pedagógica visible. Se define localmente para no modificar el .sty
-% compartido ni el build de GitHub.
 \newcommand{\UASlideTag}[2]{%
   \begin{tikzpicture}[remember picture,overlay]
     \node[anchor=north east,rounded corners=1mm,inner xsep=3pt,inner ysep=1.5pt,
@@ -24,15 +17,40 @@
       at ([xshift=-0.72cm,yshift=-1.08cm]current page.north east) {#1};
   \end{tikzpicture}%
 }
+\newcommand{\FrameID}[1]{\note{Frame ID: #1}}
+\newcommand{\SourceLine}[1]{\vfill{\tiny\color{UAIngMuted}Fuente / referencia: #1}}
 
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real}
+\UASetClassTitle{Causalidad, consenso y consistencia distribuida}
 \title{\UACourse}
-\subtitle{Clase 08 --- CAP, PACELC, Dynamo y Spanner: decidir qué error aceptar}
+\subtitle{Clase 08 --- De Kafka y causalidad a consenso, CAP, Dynamo y Spanner}
 \author{\UAProfessor}
 \date{\UADate}
 
+\tikzset{
+  uaBox/.style={draw=UAIngNavy,rounded corners=1.5mm,thick,fill=white,
+    minimum height=0.70cm,align=center,font=\scriptsize,inner sep=4pt},
+  uaBoxO/.style={uaBox,draw=UAIngOrange,fill=UAIngPaper},
+  % Alias de compatibilidad usados por los diagramas de la clase.
+  uaOrange/.style={uaBoxO},
+  uaSoft/.style={uaBox,draw=UAIngRule,fill=UAIngPaper},
+  uaArrow/.style={->,very thick,>=Latex,draw=UAIngNavy},
+  uaArrowO/.style={->,very thick,>=Latex,draw=UAIngOrange},
+  uaOrangeArrow/.style={uaArrowO},
+  uaDashed/.style={->,thick,dashed,>=Latex,draw=UAIngMuted},
+  uaLane/.style={draw=UAIngRule,line width=0.9pt},
+  uaEvent/.style={circle,fill=UAIngNavy,inner sep=2.2pt},
+  uaEventO/.style={circle,fill=UAIngOrange,inner sep=2.4pt},
+  uaDot/.style={circle,fill=UAIngNavy,inner sep=2.2pt},
+  uaTiny/.style={font=\tiny,align=center,text=UAIngText},
+  uaSmall/.style={font=\scriptsize,align=center,text=UAIngText},
+  uaState/.style={draw=UAIngNavy,rounded corners=1mm,fill=white,
+    minimum width=1.45cm,minimum height=0.48cm,font=\tiny,align=center},
+  uaStateO/.style={uaState,draw=UAIngOrange,fill=UAIngPaper}
+}
+
 \begin{document}
+
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -40,694 +58,1641 @@
 \end{frame}
 }
 
-\begin{frame}{Cómo vamos a trabajar hoy}
+% ID: C08-00
+\begin{frame}{La historia que guiará toda la clase}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.7cm] (a) {Intuición\\dos réplicas aisladas};
-\node[uaBox,text width=2.7cm,right=of a] (b) {CAP / PACELC\\decisiones distintas};
-\node[uaBoxO,text width=2.7cm,right=of b] (c) {Dynamo\\disponibilidad y repair};
-\node[uaBox,text width=2.7cm,right=of c] (d) {Spanner\\orden global y tiempo};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Dos casos conductores}
-Una última entrada no puede venderse dos veces; un carrito de compras puede aceptar cambios en dos regiones y reconciliarlos después. El costo del error no es el mismo.
+\scriptsize
+\begin{uakeybox}
+En esta clase seguiremos el destino de una única entrada VIP que Sofía y Tomás intentan comprar casi al mismo tiempo desde regiones diferentes.
+\end{uakeybox}
+\vspace{0.15cm}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Lo que necesitamos comprender}
+\begin{itemize}
+\item qué eventos están relacionados y cuáles son concurrentes;
+\item cómo varias réplicas acuerdan una decisión;
+\item qué ocurre cuando la red impide coordinar;
+\item qué costo paga cada garantía.
+\end{itemize}
 \end{block}
+\column{0.48\textwidth}
+\begin{block}{La pregunta transversal}
+¿Qué error es inaceptable y qué costo aceptamos para evitarlo?
+\end{block}
+\begin{center}
+\textbf{latencia · indisponibilidad · coordinación · reparación}
+\end{center}
+\end{columns}
 \end{frame}
 
-\begin{frame}{Evidencias de aprendizaje que produciremos}
+% ID: C08-00B
+\begin{frame}{Evidencias de aprendizaje}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{columns}[T]
 \column{0.48\textwidth}
 \begin{block}{Durante la clase}
 \begin{itemize}
-\item resolver una partición sin usar el slogan ``dos de tres'';
-\item construir quorums y explicar sus límites;
-\item ordenar versiones por causalidad o concurrencia.
+\item construir \textit{happened-before} y reconocer concurrencia;
+\item completar relojes de Lamport y vectoriales;
+\item seguir una entrada Raft y predecir un crash o una partición.
 \end{itemize}
 \end{block}
 \column{0.48\textwidth}
 \begin{block}{Al cerrar}
 \begin{itemize}
-\item contrastar Dynamo y Spanner por requisito;
-\item explicar TrueTime y commit wait;
-\item definir una política distinta por subsistema.
+\item distinguir mayoría de consenso de quorum Dynamo-like;
+\item decidir cuándo un conflicto puede fusionarse;
+\item explicar TrueTime y defender una política con falla, costo y métrica.
 \end{itemize}
 \end{block}
 \end{columns}
 \begin{uakeybox}
-La evidencia esperada es una decisión por operación: invariante, respuesta bajo partición, costo normal y reparación.
+La evidencia será reconstruir una ejecución y justificar por qué el sistema confirma, espera, rechaza, conserva versiones o repara.
 \end{uakeybox}
 \end{frame}
 
+\UASectionSlide{Puente desde Kafka}
 
-\UASectionSlide{De la partición del log\\a la partición de la red}
-
-\begin{frame}{Puente desde la clase 7}
+% ID: C08-KF01
+\begin{frame}{Repaso visual: un Mundial en tiempo real}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Particionar un log elimina un orden global gratuito.
-\item Replicar un dato crea copias que pueden avanzar a ritmos diferentes.
-\item Coordinar esas copias reduce ambigüedad, pero agrega comunicación y latencia.
-\end{itemize}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm and 0.60cm]
+\node[uaOrange,text width=2.0cm] (match) {Partido A\\eventos};
+\node[uaSoft,text width=1.8cm,right=of match] (prod) {Productor};
+\node[uaSoft,text width=2.0cm,right=of prod] (kafka) {Kafka\\log preservado};
+\node[uaSoft,text width=1.8cm,right=of kafka] (cons) {Consumidor};
+\node[uaOrange,text width=1.8cm,right=of cons] (score) {Marcador\\web};
+\draw[uaOrangeArrow] (match)--node[above,uaTiny]{GoalScored}(prod);
+\draw[uaArrow] (prod)--(kafka);
+\draw[uaArrow] (kafka)--node[above,uaTiny]{poll}(cons);
+\draw[uaOrangeArrow] (cons)--(score);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Idea recuperada}
+Kafka preserva una secuencia de registros para que productores y consumidores avancen de manera desacoplada y recuperable.
+\end{block}
+\end{frame}
+
+% ID: C08-KF02
+\begin{frame}{Una única secuencia no alcanza para muchos partidos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{alertblock}{Problema de capacidad}
+Muchos partidos compiten por la CPU, red y almacenamiento de una única secuencia.
+\end{alertblock}
+\column{0.48\textwidth}
+\begin{alertblock}{Problema de orden}
+Distribuir eventos al azar puede mostrar un gol antes de que comience su partido.
+\end{alertblock}
+\end{columns}
+\vspace{0.3cm}
+\begin{center}
+\begin{tikzpicture}[node distance=0.42cm]
+\node[uaSoft,text width=1.45cm] (a) {Partido A};
+\node[uaSoft,text width=1.45cm,below=of a] (b) {Partido B};
+\node[uaSoft,text width=1.45cm,below=of b] (c) {Partido C};
+\node[uaOrange,text width=3.5cm,right=1.1cm of b] (q) {una sola secuencia\\y un consumidor};
+\draw[uaArrow] (a.east)--(q.west);
+\draw[uaArrow] (b.east)--(q.west);
+\draw[uaArrow] (c.east)--(q.west);
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+% ID: C08-KF03
+\begin{frame}{La key define el ámbito de orden}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{block}{Decisión}
+Usamos \texttt{game\_id} como key: todos los eventos de un partido permanecen en la misma partición.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.38cm]
+\node[uaOrange,text width=1.25cm] (p0) {P0};
+\node[uaSoft,text width=6.2cm,right=of p0] {A: Started $\rightarrow$ YellowCard};
+\node[uaOrange,text width=1.25cm,below=0.40cm of p0] (p1) {P1};
+\node[uaSoft,text width=6.2cm,right=of p1] {B: Started $\rightarrow$ Substitution };
+\node[uaOrange,text width=1.25cm,below=0.40cm of p1] (p2) {P2};
+\node[uaSoft,text width=6.2cm,right=of p2] {C: Started $\rightarrow$ Goal};
+\end{tikzpicture}
+\end{center}
 \begin{uakeybox}
-La pregunta de hoy no es ``¿CAP o no CAP?'', sino ``¿qué responde cada operación cuando las réplicas no pueden comunicarse?''.
+Ganamos orden local por partido y paralelismo entre partidos. No obtenemos un offset global gratuito entre P0, P1 y P2.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Diagnóstico de entrada: vote antes de discutir}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
+% ID: C08-KF04
+\begin{frame}{Consumer groups: repartir trabajo y releer la misma historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Grupo \texttt{live-score}}
+\begin{itemize}
+\item P0 $\rightarrow$ Score-1
+\item P1 $\rightarrow$ Score-2
+\item P2 $\rightarrow$ Score-3
+\end{itemize}
+Las particiones se reparten dentro del grupo.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Grupo \texttt{analytics}}
+Lee nuevamente P0, P1 y P2, pero conserva sus propios offsets.
+\end{block}
+\end{columns}
+\begin{uakeybox}
+Una partición tiene una sola instancia activa dentro de un grupo; grupos diferentes pueden leer la misma partición con progreso independiente.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-KF05
+\begin{frame}{Crash, replay e idempotencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.48cm]
+\node[uaSoft,text width=1.55cm] (poll) {poll\\P2:420};
+\node[uaSoft,text width=1.75cm,right=of poll] (effect) {actualiza\\marcador};
+\node[uaOrange,text width=1.45cm,right=of effect] (crash) {CRASH};
+\node[uaSoft,text width=1.70cm,right=of crash] (replay) {reinicia\\desde 420};
+\node[uaSoft,text width=1.65cm,right=of replay] (dedup) {deduplica\\event\_id};
+\draw[uaArrow] (poll)--(effect);
+\draw[uaOrangeArrow] (effect)--(crash);
+\draw[uaArrow] (crash)--(replay);
+\draw[uaArrow] (replay)--(dedup);
+\end{tikzpicture}
+\end{center}
+\begin{alertblock}{Límite}
+At-least-once permite que el registro reaparezca; no garantiza por sí solo que el efecto lógico ocurra una única vez.
+\end{alertblock}
+\end{frame}
+
+% ID: C08-KF06
+\begin{frame}{Algunas métricas a considerar en Kafka}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.52\textwidth}
+\begin{block}{Definiciones}
+\begin{itemize}
+\item \textbf{RF=3}: líder + dos seguidores configurados.
+\item \textbf{ISR}: réplicas suficientemente sincronizadas.
+\item \textbf{minISR=2}: hacen falta al menos dos réplicas en ISR.
+\item \textbf{acks=all}: todas las réplicas del ISR actual confirman el batch.
+\end{itemize}
+\end{block}
+\begin{uainfo}
+Si Réplica3 sale del ISR, pero Réplica1 y Réplica2 siguen sincronizadas, la escritura continúa. Si solo queda Réplica1, se rechaza: no se reconoce éxito con una sola copia sincronizada.
+\end{uainfo}
+\column{0.45\textwidth}
+\begin{tabular}{p{0.50\textwidth}p{0.38\textwidth}}
+\toprule
+\textbf{Guardrail docente} & \textbf{Referencia}\\
+\midrule
+mensaje habitual & $<1$ MB\\
+datos retenidos/broker & $\sim1$ TB\\
+ingreso conservador/broker & $<10$ MB/s\\
+\bottomrule
+\end{tabular}
+\vspace{0.15cm}
+\begin{uawarn}
+Son presupuestos docentes, no máximos universales. Deben validarse con hardware, tamaño de registros, replicación y pruebas de carga.
+\end{uawarn}
+\end{columns}
+\end{frame}
+
+% ID: C08-KF07
+\begin{frame}{Puente: Kafka ordena registros; no elige por sí solo una decisión autoritativa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Kafka aporta}
+\begin{itemize}
+\item orden dentro de cada partición;
+\item replay y progreso por grupo;
+\item replicación líder--seguidor;
+\item desacoplamiento productor--consumidor.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{alertblock}{La nueva pregunta}
+Si dos regiones intentan reservar la única entrada VIP, ¿qué comando debe convertirse en la decisión autoritativa?
+\end{alertblock}
+\end{columns}
+\begin{uakeybox}
+Pasamos de preservar una historia a acordar qué historia será válida.
+\end{uakeybox}
+\end{frame}
+
+\UASectionSlide{Por qué estos conceptos se usan hoy}
+
+% ID: C08-R01
+\begin{frame}{Sistema real 1: Kubernetes y etcd}
+\UASlideTag{CASO REAL}{UAIngOrange}
+\small
+\begin{block}{Qué es Kubernetes}
+Plataforma que administra aplicaciones en contenedores y mantiene un estado deseado del cluster.
+\end{block}
+\begin{block}{Qué es etcd}
+Almacén clave--valor distribuido donde el control plane conserva objetos y configuración autoritativa.
+\end{block}
+\begin{uakeybox}
+etcd utiliza Raft para acordar un log; sin mayoría no puede confirmar nuevos cambios del control plane.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-R02
+\begin{frame}{Sistema real 2: Amazon Dynamo}
+\UASlideTag{CASO REAL}{UAIngOrange}
+\small
+\begin{block}{Qué fue Dynamo}
+Almacén clave--valor altamente disponible diseñado por Amazon para servicios que debían continuar respondiendo durante fallas.
+\end{block}
+\begin{block}{Decisión de diseño}
+Conservar versiones concurrentes, responder con quórums flexibles y reparar después, en vez de bloquear siempre por coordinación global.
+\end{block}
+\begin{uakeybox}
+La disponibilidad se paga con versiones, reconciliación, hints y trabajo de reparación.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-R03
+\begin{frame}{Sistema real 3: Google Spanner}
+\UASlideTag{CASO REAL}{UAIngOrange}
+\small
+\begin{block}{Qué es Spanner}
+Base de datos distribuida globalmente que ofrece transacciones entre grupos de datos y un orden compatible con lo observado por los clientes.
+\end{block}
+\begin{block}{Decisión de diseño}
+Combinar consenso localizado, coordinación transaccional y TrueTime, una abstracción que expone incertidumbre temporal.
+\end{block}
+\begin{uakeybox}
+Spanner paga coordinación y espera temporal para ofrecer garantías globales más fuertes.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-R04
+\begin{frame}{Lo que un ingeniero decide realmente}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.18\textwidth}p{0.22\textwidth}p{0.22\textwidth}p{0.18\textwidth}}
+\toprule
+\textbf{Operación} & \textbf{Invariante} & \textbf{Error tolerable} & \textbf{Evidencia}\\
+\midrule
+última entrada & confirmaciones $\le 1$ & rechazo temporal & doble venta, p99\\
+carrito & no perder intención & ramas fusionables & conflictos, convergencia\\
+ranking & atraso acotado & vista anterior & lag temporal\\
+ledger (registros contables) & no crear dinero & espera o rechazo & anomalías, abortos\\
+\bottomrule
+\end{tabular}
+\begin{uakeybox}
+La pregunta no es «¿qué tecnología es mejor?», sino «¿qué error es inaceptable para esta operación?».
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-MAP
+\begin{frame}{Mapa de la clase}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{enumerate}
-\item CAP significa que un sistema debe elegir permanentemente dos de tres propiedades.
-\item Bajo partición, responder error rápidamente cuenta como disponibilidad CAP.
-\item Si $R+W>N$, toda lectura es automáticamente linearizable.
-\item Dynamo elimina conflictos mediante last-write-wins.
-\item TrueTime devuelve una hora exacta y sin incertidumbre.
+\item \textbf{Observar}: fallas parciales y conocimiento local.
+\item \textbf{Describir}: causalidad y relojes lógicos.
+\item \textbf{Decidir}: máquinas de estado, Raft y Paxos.
+\item \textbf{Elegir durante una partición}: CAP y PACELC.
+\item \textbf{Conservar o evitar conflictos}: Dynamo y Spanner.
 \end{enumerate}
-\begin{block}{Consigna}
-Vote V/F. Volveremos al final con una ejecución concreta para cada afirmación.
-\end{block}
 \end{frame}
 
-\begin{frame}{Caso A: queda una sola entrada}
+\UASectionSlide{Modelo mínimo y caso conductor}
+
+% ID: C08-M01
+\begin{frame}{Modelo mínimo: qué contiene una réplica}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO,text width=2.3cm] (ba) {Región Buenos Aires\\stock=1};
-\node[uaBox,text width=2.3cm,right=3.2cm of ba] (ma) {Región Madrid\\stock=1};
-\draw[very thick,dashed,UAIngOrange] ($(ba.east)!0.5!(ma.west)+(0,1.0)$)--($(ba.east)!0.5!(ma.west)+(0,-1.0)$) node[below]{PARTICIÓN};
-\node[uaSoft,below=0.75cm of ba,text width=2.4cm] (c1) {Cliente A\\``comprar''};
-\node[uaSoft,below=0.75cm of ma,text width=2.4cm] (c2) {Cliente B\\``comprar''};
-\draw[uaArrow] (c1)--(ba); \draw[uaArrowO] (c2)--(ma);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Invariante}
-Como máximo una venta puede confirmar. Si ambas regiones responden éxito, el sistema preserva disponibilidad local pero viola la propiedad de negocio.
-\end{block}
-\end{frame}
-
-\begin{frame}{Caso B: un carrito admite reconciliación}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO,text width=2.6cm] (ba) {Región BA\\agrega libro};
-\node[uaBox,text width=2.6cm,right=3.0cm of ba] (ma) {Región Madrid\\agrega auriculares};
-\draw[very thick,dashed,UAIngOrange] ($(ba.east)!0.5!(ma.west)+(0,0.9)$)--($(ba.east)!0.5!(ma.west)+(0,-0.9)$) node[below]{PARTICIÓN};
-\node[uaBoxO,text width=3.3cm,below=1.2cm of $(ba)!0.5!(ma)$] (merge) {Al reconectar: unir ambos artículos};
-\draw[uaArrow] (ba)--(merge); \draw[uaArrowO] (ma)--(merge);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Idea}
-La misma decisión AP puede ser razonable para un carrito y peligrosa para una última entrada, un saldo o la propiedad de un castillo.
-\end{block}
-\end{frame}
-
-\begin{frame}{Predicción individual antes del formalismo}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
-\begin{uainfo}
-Durante 60 segundos, complete para cada caso: \textbf{qué responde cada región durante la partición}, \textbf{qué invariante puede romperse} y \textbf{qué costo acepta}.
-\end{uainfo}
-\vspace{0.25cm}
-No use todavía las etiquetas CP/AP. Primero describa comportamiento observable; luego pondremos nombre al modelo.
-\end{frame}
-
-
-\begin{frame}{Cuatro preguntas antes de elegir tecnología}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
 \begin{tikzpicture}[node distance=0.35cm]
-\node[uaBoxO,text width=2.7cm] (q1) {¿Qué invariante\\no puede romperse?};
-\node[uaBox,text width=2.7cm,right=of q1] (q2) {¿Qué debe responder\\durante partición?};
-\node[uaBoxO,text width=2.7cm,right=of q2] (q3) {¿Cuánta latencia cuesta\\coordinar normalmente?};
-\node[uaBox,text width=2.7cm,right=of q3] (q4) {¿Quién repara\\la divergencia?};
-\draw[uaArrow] (q1)--(q2); \draw[uaArrowO] (q2)--(q3); \draw[uaArrow] (q3)--(q4);
-\end{tikzpicture}
-\end{center}
-\end{frame}
-
-\UASectionSlide{Primero la intuición:\\un puente cortado}
-
-\begin{frame}{Consistencia CAP: una sola historia observable}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO] (w) {write(x=1)};
-\node[uaBox,right=of w] (r) {read(x)};
-\node[uaBoxO,right=of r] (ans) {debe ver 1\\si el write terminó antes};
-\draw[uaArrow] (w)--(r); \draw[uaArrowO] (r)--(ans);
+\node[uaOrange,text width=2.0cm] (node) {Réplica N1};
+\node[uaSoft,text width=1.65cm,right=of node,yshift=1.05cm] (proc) {proceso};
+\node[uaSoft,text width=1.65cm,right=of node,yshift=0.35cm] (ram) {RAM};
+\node[uaSoft,text width=1.65cm,right=of node,yshift=-0.35cm] (disk) {estado persistente};
+\node[uaSoft,text width=1.65cm,right=of node,yshift=-1.05cm] (nic) {red};
+\draw[uaArrow] (node.east)--(proc.west);
+\draw[uaArrow] (node.east)--(ram.west);
+\draw[uaArrow] (node.east)--(disk.west);
+\draw[uaArrow] (node.east)--(nic.west);
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-En el modelo clásico, consistencia significa comportamiento equivalente a una copia única y compatible con el orden real de operaciones completadas.
+Un nodo puede estar sano localmente y, aun así, ignorar qué ocurrió en otra región.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Disponibilidad CAP: todo nodo no fallado debe responder}
+% ID: C08-M02
+\begin{frame}{Tres situaciones que no debemos confundir}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Toda request recibida por un nodo no fallado debe terminar con una respuesta; en la formulación clásica, responder con un error que niega el servicio no preserva availability.
-\item No alcanza con responder rápido ``no sé'' o ``intente más tarde''.
-\item Es una definición teórica estricta, distinta de ``99.99\% uptime''.
-\end{itemize}
-\begin{uawarn}
-Bajo la definición CAP, rechazar una compra para proteger consistencia sacrifica disponibilidad aunque el proceso siga vivo.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Partición: mensajes entre grupos pueden no llegar}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO,text width=2.2cm] (a1) {Réplica A1};
-\node[uaBoxO,below=0.45cm of a1,text width=2.2cm] (a2) {Réplica A2};
-\node[uaBox,text width=2.2cm,right=4.0cm of a1] (b1) {Réplica B1};
-\node[uaBox,below=0.45cm of b1,text width=2.2cm] (b2) {Réplica B2};
-\draw[uaArrow,dashed] (a1)--(b1);
-\draw[uaArrowO,dashed] (a2)--(b2);
-\node[fill=white,font=\bfseries\small] at ($(a1)!0.5!(b2)$){mensajes perdidos o retrasados sin cota};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Intuición}
-Si cada lado debe responder sin hablar con el otro, no puede saber qué operación concurrente está aceptando el otro lado.
+\small
+\begin{columns}[T]
+\column{0.31\textwidth}
+\begin{block}{Sano y comunicado}
+Ejecuta y recibe mensajes.
 \end{block}
-\end{frame}
-
-\begin{frame}{CAP: bajo partición, dos respuestas posibles}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO,text width=2.7cm] (p) {Partición activa};
-\node[uaBox,text width=3.0cm,below left=1.0cm and 1.0cm of p] (c) {Preservar consistencia\\rechazar o esperar};
-\node[uaBoxO,text width=3.0cm,below right=1.0cm and 1.0cm of p] (a) {Preservar disponibilidad\\responder con vista local};
-\draw[uaArrow] (p)--(c); \draw[uaArrowO] (p)--(a);
-\end{tikzpicture}
-\end{center}
-\begin{block}{No es una preferencia estética}
-La decisión depende del invariante: doble venta, saldo negativo, carrito fusionable, feed atrasado.
+\column{0.31\textwidth}
+\begin{block}{Sano pero aislado}
+Ejecuta, pero sus mensajes no cruzan a tiempo.
 \end{block}
-\end{frame}
-
-\begin{frame}{PACELC: incluso con el puente abierto hay un costo}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO,text width=2.1cm] (start) {¿Hay partición?};
-\node[uaBox,text width=2.4cm,above right=0.5cm and 1.0cm of start] (yes) {Sí: A vs C};
-\node[uaBoxO,text width=2.4cm,below right=0.5cm and 1.0cm of start] (no) {No: L vs C};
-\node[uaSoft,text width=2.8cm,right=1.0cm of yes] (pa) {Responder local\\o coordinar};
-\node[uaSoft,text width=2.8cm,right=1.0cm of no] (elc) {Baja latencia\\o confirmar remoto};
-\draw[uaArrow] (start)--node[above,font=\scriptsize]{P}(yes);
-\draw[uaArrowO] (start)--node[below,font=\scriptsize]{Else}(no);
-\draw[uaArrow] (yes)--(pa); \draw[uaArrowO] (no)--(elc);
-\end{tikzpicture}
-\end{center}
-\begin{uakeybox}
-CAP describe el límite durante partición. PACELC recuerda que la coordinación también cuesta latencia en operación normal.
-\end{uakeybox}
-\end{frame}
-
-\begin{frame}{PACELC es una taxonomía, no otro teorema CAP}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item CAP expresa una imposibilidad bajo un modelo y una partición concretos.
-\item PACELC organiza decisiones arquitectónicas también cuando no hay partición.
-\item No demuestra que toda base pertenezca para siempre a una sola casilla.
-\item Un mismo producto puede ofrecer modos o garantías diferentes por operación.
-\end{itemize}
-\begin{block}{Uso correcto}
-Emplear PACELC para formular preguntas sobre coordinación y latencia, no como etiqueta comercial definitiva.
+\column{0.31\textwidth}
+\begin{block}{Caído}
+No ejecuta pasos ni responde.
 \end{block}
+\end{columns}
+\begin{uainfo}
+Desde otro nodo, un timeout puede ser compatible con cualquiera de estas historias.
+\end{uainfo}
 \end{frame}
 
-
-\begin{frame}{Quorum: dos jurados que deben compartir al menos un miembro}
+% ID: C08-M03
+\begin{frame}{Timeout: observación local, no diagnóstico}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}
-\draw[fill=UAIngPaper,draw=UAIngOrange,thick] (0,0) circle (1.35cm);
-\draw[fill=white,draw=UAIngNavy,thick] (1.85,0) circle (1.35cm);
-\node at (-0.40,0.65){W};
-\node at (2.30,0.65){R};
-\node[font=\bfseries\scriptsize] at (0.93,0){intersección};
-\node[below,font=\small] at (0.93,-1.48){Si $R+W>N$, los conjuntos deben cruzarse.};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Intuición}
-La intersección crea una oportunidad de observar una escritura; no garantiza por sí sola orden total, frescura absoluta ni ausencia de versiones concurrentes.
-\end{block}
-\end{frame}
-
-\begin{frame}{Version vector: árbol genealógico de versiones}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
+\small
 \begin{center}
 \begin{tikzpicture}[node distance=0.8cm]
-\node[uaBoxO] (v0) {$v_0=[A:1,B:1]$};
-\node[uaBox,below left=0.8cm and 1.1cm of v0] (va) {$v_A=[A:2,B:1]$};
-\node[uaBoxO,below right=0.8cm and 1.1cm of v0] (vb) {$v_B=[A:1,B:2]$};
-\node[uaSoft,below=1.0cm of v0] (merge) {$v_M=[A:2,B:2]$};
-\draw[uaArrow] (v0)--(va); \draw[uaArrowO] (v0)--(vb);
-\draw[uaArrow] (va)--(merge); \draw[uaArrowO] (vb)--(merge);
+\node[uaOrange,text width=1.4cm] (a) {A};
+\node[uaSoft,text width=1.4cm,right=6.8cm of a] (b) {B};
+\draw[uaArrow] (a.east)--node[above,uaTiny]{request}(b.west);
+\draw[uaArrow,dashed] (b.west)--node[below,uaTiny]{¿respuesta?}(a.east);
 \end{tikzpicture}
 \end{center}
 \begin{itemize}
-\item $v_A$ y $v_B$ son concurrentes: ninguna domina a la otra.
-\item El sistema puede conservar ambas y pedir o aplicar un merge semántico.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{TrueTime: un reloj que admite lo que no sabe}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\[
-TT.now() = [earliest, latest], \qquad \epsilon = latest-earliest
-\]
-\begin{center}
-\begin{tikzpicture}[x=1.05cm,y=0.9cm]
-\draw[->,thick] (0,0)--(9.0,0) node[right]{tiempo real};
-\draw[line width=5pt,UAIngOrange] (2.2,0.5)--(4.4,0.5);
-\node[above] at (3.3,0.5){intervalo A};
-\draw[line width=5pt,UAIngNavy] (5.6,-0.5)--(7.5,-0.5);
-\node[below] at (6.55,-0.5){intervalo B};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Intuición}
-El sistema no finge conocer un instante perfecto: expone un intervalo de incertidumbre y espera cuando necesita demostrar orden externo.
-\end{block}
-\end{frame}
-
-\UASectionSlide{CAP formal: una ejecución\\adversarial mínima}
-
-\begin{frame}{Prueba intuitiva por indistinguibilidad}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{columns}[T]
-\column{0.48\textwidth}
-\begin{block}{Lado A}
-Recibe \texttt{write(x=1)}. No puede comunicarse con B. Para ser disponible debe responder.
-\end{block}
-\column{0.48\textwidth}
-\begin{block}{Lado B}
-Recibe \texttt{read(x)}. No sabe si A recibió una escritura. Para ser disponible debe responder.
-\end{block}
-\end{columns}
-\vspace{0.35cm}
-\begin{uawarn}
-Si B devuelve 0 puede violar consistencia después de un write completado; si espera o devuelve error, viola disponibilidad CAP. La partición hace indistinguibles historias relevantes.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Qué no dice CAP}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item No dice que un sistema elija permanentemente dos letras.
-\item No dice que todas las operaciones deban tomar la misma decisión.
-\item No clasifica latencia normal: para eso PACELC es más útil.
-\item No afirma que consistencia eventual sea ``datos incorrectos''.
-\item No reemplaza el análisis de invariantes, repair, SLO o probabilidad de partición.
-\end{itemize}
-\begin{block}{Regla de uso}
-Aplicar CAP a una operación, un dato, un invariante y una falla concretos.
-\end{block}
-\end{frame}
-
-\begin{frame}{PACELC cuantitativo: una lectura global}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[x=1.05cm,y=1cm]
-\node[uaBoxO,text width=2.5cm] at (1.4,0){Lectura local\\8 ms};
-\node[uaBox,text width=2.5cm] at (4.6,0){Confirmar región remota\\+90 ms};
-\node[uaBoxO,text width=2.5cm] at (7.8,0){Respuesta fuerte\\98+ ms};
-\draw[uaArrow] (2.7,0)--(3.3,0); \draw[uaArrowO] (5.9,0)--(6.5,0);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Decisión Else}
-Sin partición, la pregunta sigue siendo si el dato exige esperar coordinación remota o si puede responderse localmente con menor frescura.
-\end{block}
-\end{frame}
-
-\UASectionSlide{Dynamo: disponibilidad y\\reconciliación explícita}
-
-\begin{frame}{Por qué nació Dynamo}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-El paper de Amazon describe un key-value store para servicios que necesitaban una experiencia ``always-on''. Bajo ciertos escenarios, prioriza disponibilidad y acepta versiones que deben reconciliarse.
-\begin{itemize}
-\item Particionamiento mediante consistent hashing.
-\item Replicación configurable con $N$, $R$ y $W$.
-\item Versionado y resolución de conflictos asistida por la aplicación.
-\item Sloppy quorum, hinted handoff y anti-entropy.
-\end{itemize}
-{\scriptsize Referencia: DeCandia et al., \emph{Dynamo: Amazon's Highly Available Key-value Store}.}
-\end{frame}
-
-\begin{frame}{Consistent hashing: mover pocos rangos cuando cambia el cluster}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[scale=0.86]
-\draw[thick,UAIngNavy] (0,0) circle (1.9cm);
-\foreach \a/\lab in {20/A,95/B,165/C,235/D,305/E}{
-  \node[uaBoxO,minimum width=0.6cm] at ({1.9*cos(\a)},{1.9*sin(\a)}) {\lab};
-}
-\foreach \a/\lab in {50/k1,130/k2,210/k3,280/k4}{
-  \fill[UAIngNavy] ({1.28*cos(\a)},{1.28*sin(\a)}) circle (2pt);
-  \node[font=\scriptsize] at ({1.02*cos(\a)},{1.02*sin(\a)}) {\lab};
-}
-\node[align=center] at (0,0){hash ring\\rangos y réplicas};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Intuición}
-Una clave se asigna al siguiente nodo del anillo y a una lista de preferencia. Nodos virtuales ayudan a distribuir carga y heterogeneidad.
-\end{block}
-\end{frame}
-
-\begin{frame}{Quórums $N$, $R$ y $W$}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.5cm]
-\foreach \x/\lab in {0/N1,1/N2,2/N3,3/N4,4/N5}{\node[uaSoft] (n\x) at (\x*1.6,0){\lab};}
-\draw[rounded corners,thick,UAIngOrange] (-0.55,-0.6) rectangle (3.75,0.6);
-\node[above,UAIngOrange] at (1.6,0.7){write quorum $W=3$};
-\draw[rounded corners,thick,UAIngNavy] (1.05,-0.9) rectangle (7.0,0.9);
-\node[below,UAIngNavy] at (4.0,-1.0){read quorum $R=4$};
-\end{tikzpicture}
-\end{center}
-\[
-R+W>N \Rightarrow \text{intersección de conjuntos}
-\]
-\begin{uawarn}
-La intersección no convierte por sí sola una implementación Dynamo-style en linearizable: hay concurrencia, sloppy quorums, versiones y políticas de lectura.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Sloppy quorum: disponibilidad con nodos temporales}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.55cm]
-\node[uaBoxO] (owner) {Owner N2\\no disponible};
-\node[uaBox,text width=2.3cm,right=1.5cm of owner] (temp) {Nodo N6\\guarda temporal};
-\node[uaBoxO,text width=2.3cm,right=1.5cm of temp] (back) {N2 vuelve\\recibe el dato};
-\draw[uaArrow] (owner)--node[above,font=\scriptsize]{fallback}(temp);
-\draw[uaArrowO] (temp)--node[above,font=\scriptsize]{hinted handoff}(back);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Trade-off}
-Se mantiene escritura disponible, pero el conjunto real que confirmó puede no coincidir con la preferencia normal; repair y seguimiento del hint se vuelven esenciales.
-\end{block}
-\end{frame}
-
-\begin{frame}{Conflicto concurrente: LWW puede perder intención}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.75cm]
-\node[uaBoxO] (v0) {carrito = \{\}};
-\node[uaBox,below left=0.8cm and 1.2cm of v0] (a) {A agrega libro};
-\node[uaBoxO,below right=0.8cm and 1.2cm of v0] (b) {B agrega auriculares};
-\node[uaSoft,below=1.0cm of v0,text width=3.5cm] (lww) {LWW conserva una versión\\y puede perder un artículo};
-\draw[uaArrow] (v0)--(a); \draw[uaArrowO] (v0)--(b); \draw[uaArrow] (a)--(lww); \draw[uaArrowO] (b)--(lww);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Alternativa semántica}
-Conservar siblings y unir conjuntos puede respetar la intención de ``agregar''. El merge depende del dominio, no solo de timestamps.
-\end{block}
-\end{frame}
-
-\begin{frame}{Read repair y anti-entropy: converger exige trabajo}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO] (c) {Cliente};
-\node[uaBox,right=1.2cm of c] (r1) {R1 v5};
-\node[uaBox,above right=0.35cm and 1.1cm of r1] (r2) {R2 v5};
-\node[uaBox,below right=0.35cm and 1.1cm of r1] (r3) {R3 v3};
-\draw[uaArrow] (c)--(r1); \draw[uaArrow] (c)--(r2); \draw[uaArrow] (c)--(r3);
-\draw[uaArrowO,dashed] (r1)--node[below,font=\scriptsize]{repair v5}(r3);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Read repair corrige réplicas observadas durante una lectura.
-\item Anti-entropy compara regiones periódicamente, incluso sin lecturas.
-\item Merkle trees permiten localizar diferencias por hashes jerárquicos.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Métricas de un diseño Dynamo-style}
-\UASlideTag{RESPALDO}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.25cm] (a) {p99 read\\18 ms};
-\node[uaBox,text width=2.25cm,right=of a] (b) {siblings\\0.8\%};
-\node[uaBoxO,text width=2.25cm,right=of b] (c) {hints pending\\42 k};
-\node[uaBox,text width=2.25cm,right=of c] (d) {repair lag\\11 min};
-\node[uaBoxO,text width=2.25cm,right=of d] (e) {stale reads\\1.4\%};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Lectura causal}
-Alta disponibilidad puede parecer saludable en uptime mientras crecen conflicto, hints y deuda de repair. La convergencia también necesita SLO.
-\end{block}
-\end{frame}
-
-\UASectionSlide{Spanner: consistencia externa\\con coordinación localizada}
-
-\begin{frame}{Qué problema intenta resolver Spanner}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-Spanner fue diseñado como una base global, multi-versión y sincrónicamente replicada, capaz de ofrecer transacciones distribuidas externamente consistentes.
-\begin{itemize}
-\item Datos particionados en grupos de replicación.
-\item Consenso localizado dentro de cada grupo.
-\item Coordinación transaccional entre grupos cuando una operación cruza shards.
-\item TrueTime expone incertidumbre temporal.
-\end{itemize}
-{\scriptsize Referencia: Corbett et al., \emph{Spanner: Google's Globally-Distributed Database}.}
-\end{frame}
-
-\begin{frame}{No hay un consenso global único}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.55cm]
-\node[uaBoxO,text width=2.5cm] (g1) {Grupo G1\\cuentas A--M};
-\node[uaBox,text width=2.5cm,right=1.2cm of g1] (g2) {Grupo G2\\cuentas N--Z};
-\node[uaBoxO,text width=2.5cm,right=1.2cm of g2] (g3) {Grupo G3\\histórico};
-\node[uaSoft,text width=3.2cm,below=0.9cm of g2] (tx) {Transacción multi-shard\\coordina solo grupos implicados};
-\draw[uaArrow] (g1)--(tx); \draw[uaArrowO] (g2)--(tx); \draw[uaArrow] (g3)--(tx);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Escalabilidad}
-Particionar limita el dominio de consenso. Las operaciones multi-shard pagan coordinación adicional solo cuando la semántica lo exige.
-\end{block}
-\end{frame}
-
-\begin{frame}{TrueTime formaliza incertidumbre}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\[
-TT.now()=[t_{earliest},t_{latest}], \qquad \epsilon=t_{latest}-t_{earliest}
-\]
-\begin{itemize}
-\item El reloj real se encuentra dentro del intervalo declarado.
-\item Un intervalo más ancho implica mayor incertidumbre.
-\item La infraestructura reduce $\epsilon$, pero no lo reemplaza por cero.
+\item la solicitud nunca llegó;
+\item B está lento o pausado;
+\item B ejecutó y la respuesta se perdió;
+\item la red está particionada.
 \end{itemize}
 \begin{uakeybox}
-El aporte conceptual es exponer la incertidumbre como dato del protocolo, no esconderla detrás de un timestamp aparentemente exacto.
+El timeout solo prueba que A no obtuvo respuesta dentro de su plazo.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Commit wait: esperar hasta que el timestamp quede en el pasado}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[x=1.0cm,y=0.9cm]
-\draw[->,thick] (0,0)--(9.0,0) node[right]{tiempo real};
-\draw[line width=5pt,UAIngOrange] (2.0,0.55)--(4.2,0.55);
-\node[above] at (3.1,0.55){elige commit ts};
-\draw[very thick,UAIngNavy] (4.2,-0.3)--(4.2,1.2);
-\node[below] at (4.2,-0.35){commit ts};
-\draw[<->,very thick,UAIngOrange] (4.2,-0.8)--(6.1,-0.8) node[midway,below]{commit wait};
-\draw[very thick,UAIngNavy] (6.1,-0.3)--(6.1,1.2);
-\node[above] at (6.1,1.2){respuesta};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Garantía}
-Antes de responder, el sistema espera hasta poder asegurar que el timestamp de commit quedó definitivamente en el pasado del reloj real.
-\end{block}
-\end{frame}
-
-\begin{frame}{External consistency: orden visible compatible con el mundo}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO,text width=2.6cm] (t1) {$T_1$ termina\\antes de iniciar $T_2$};
-\node[uaBox,text width=2.6cm,right=of t1] (serial) {Orden serial\\debe poner $T_1<T_2$};
-\node[uaBoxO,text width=2.6cm,right=of serial] (obs) {Clientes observan\\un orden coherente};
-\draw[uaArrow] (t1)--(serial); \draw[uaArrowO] (serial)--(obs);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Es más fuerte que convergencia eventual.
-\item Requiere consenso, control de concurrencia y un protocolo temporal apropiado.
-\item El costo aparece en latencia y disponibilidad bajo ciertas particiones.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Métricas de un diseño Spanner-style}
-\UASlideTag{RESPALDO}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.25cm] (a) {p99 commit\\145 ms};
-\node[uaBox,text width=2.25cm,right=of a] (b) {TrueTime $\epsilon$\\2.8 ms};
-\node[uaBoxO,text width=2.25cm,right=of b] (c) {multi-shard\\17\%};
-\node[uaBox,text width=2.25cm,right=of c] (d) {abort rate\\0.6\%};
-\node[uaBoxO,text width=2.25cm,right=of d] (e) {unavailable\\0.02\%};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Lectura}
-Consistencia externa no se evalúa solo con throughput: importa commit latency, incertidumbre temporal, proporción multi-shard, aborts y disponibilidad del quorum.
-\end{block}
-\end{frame}
-
-\UASectionSlide{Comparar sistemas\\por el costo del error}
-
-\begin{frame}{Dynamo y Spanner no responden la misma pregunta}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tabular}{p{0.22\textwidth}p{0.32\textwidth}p{0.32\textwidth}}
-\toprule
-Dimensión & Dynamo & Spanner \\
-\midrule
-Prioridad & disponibilidad y latencia & consistencia externa \\
-Conflicto & conservar/reconciliar & prevenir mediante orden \\
-Partición & responder más operaciones & rechazar si falta quorum \\
-Costo normal & repair y complejidad cliente & coordinación y commit wait \\
-Caso típico & carrito / preferencias & ledger / reserva única \\
-\bottomrule
-\end{tabular}
-\end{center}
-\end{frame}
-
-\begin{frame}{Matriz por subsistema: Asteria Online}
+% ID: C08-M04
+\begin{frame}{Caso conductor: Festival Austral Global}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \small
-\begin{center}
-\begin{tabular}{p{0.19\textwidth}p{0.23\textwidth}p{0.24\textwidth}p{0.22\textwidth}}
-\toprule
-Subsistema & Invariante & Durante partición & Modelo razonable \\
-\midrule
-Castillo & un propietario & rechazar captura ambigua & CP / consenso local \\
-Inventario & no duplicar ítem & limitar transferencias & fuerte por shard \\
-Ranking & atraso tolerable & seguir con vistas locales & eventual + repair \\
-Chat & orden por canal & continuar localmente & causal / eventual \\
-\bottomrule
-\end{tabular}
-\end{center}
-\begin{block}{Lección}
-Una empresa no es AP o CP en bloque. Las decisiones se toman por dato, operación e invariante.
-\end{block}
-\end{frame}
-
-\begin{frame}{Pruebas adversariales que vuelven verificable la decisión}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Cortar comunicación entre regiones durante una venta única.
-\item Inyectar escrituras concurrentes y observar siblings/merge.
-\item Acumular hints y medir tiempo de convergencia posterior.
-\item Aumentar latencia interregional y medir p99 de commit.
-\item Ampliar $\epsilon$ de reloj y observar commit wait.
-\item Forzar una transacción multi-shard y medir abort/retry.
-\end{itemize}
-\begin{uakeybox}
-Una clasificación CAP/PACELC sin comportamiento medido bajo falla es una descripción incompleta.
-\end{uakeybox}
-\end{frame}
-
-\begin{frame}{Actividad de 15 minutos: cuatro datos, cuatro decisiones}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{columns}[T]
-\column{0.48\textwidth}
-\begin{block}{Elegir comportamiento}
-\begin{itemize}
-\item última entrada;
-\item carrito de compras;
-\item ranking de juego;
-\item saldo de billetera.
-\end{itemize}
+\column{0.45\textwidth}
+\begin{block}{Recurso}
+\texttt{VIP-01}, stock = 1.
 \end{block}
-\column{0.48\textwidth}
-\begin{block}{Defender con evidencia}
-\begin{itemize}
-\item invariante;
-\item respuesta bajo partición;
-\item costo normal PACELC;
-\item repair/consenso;
-\item SLO y experimento.
-\end{itemize}
+\begin{block}{Clientes}
+Sofía compra en Buenos Aires; Tomás compra en Madrid.
 \end{block}
+\column{0.50\textwidth}
+\begin{block}{Servicio replicado}
+Cinco réplicas: N1, N2, N3, N4 y N5.
+\end{block}
+\begin{alertblock}{Invariante}
+\[
+\text{reservas confirmadas para VIP-01}\le 1
+\]
+\end{alertblock}
 \end{columns}
 \end{frame}
 
-\begin{frame}{Método reusable para decidir consistencia}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.35cm]
-\node[uaBoxO,text width=2.1cm] (i) {1. Invariante\\y error};
-\node[uaBox,text width=2.1cm,right=of i] (p) {2. Partición\\y respuesta};
-\node[uaBoxO,text width=2.1cm,right=of p] (l) {3. Latencia\\normal};
-\node[uaBox,text width=2.1cm,right=of l] (m) {4. Mecanismo\\y repair};
-\node[uaBoxO,text width=2.1cm,right=of m] (e) {5. SLO y\\experimento};
-\draw[uaArrow] (i)--(p); \draw[uaArrowO] (p)--(l); \draw[uaArrow] (l)--(m); \draw[uaArrowO] (m)--(e);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Marco del curso}
-$D=(P,F,G,S,T)$ evita clasificar por marca: parte del problema, la falla y la garantía.
+% ID: C08-M05
+\begin{frame}{Predicción inicial}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+La red se divide:
+\[
+\{N1,N2,N3\}\;|\;\{N4,N5\}
+\]
+Sofía compra desde el lado de tres nodos y Tomás desde el lado de dos.
+\vspace{0.3cm}
+\begin{block}{Elija antes de conocer el algoritmo}
+¿Qué debería responder el lado minoritario a Tomás?
+\begin{enumerate}[A.]
+\item Confirmada.
+\item Rechazada temporalmente.
+\item Pendiente hasta recuperar coordinación.
+\end{enumerate}
 \end{block}
 \end{frame}
 
-\begin{frame}{Volvemos al diagnóstico inicial}
-\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\UASectionSlide{Causalidad y relojes lógicos}
+
+% ID: C08-C01
+\begin{frame}{Happened-before: tres reglas}
+\UASlideTag{NÚCLEO}{UAIngNavy}
 \small
 \begin{enumerate}
-\item \textbf{Falso:} CAP restringe el comportamiento durante partición; no es una elección permanente de dos letras.
-\item \textbf{Falso:} una respuesta errónea sacrifica availability en el modelo CAP estricto.
-\item \textbf{Falso:} la intersección no elimina concurrencia, sloppy quorum ni decisiones de lectura.
-\item \textbf{Falso:} Dynamo conserva versiones y puede requerir reconciliación; LWW no es su única semántica.
-\item \textbf{Falso:} TrueTime devuelve un intervalo que explicita incertidumbre.
+\item Si dos eventos ocurren en el mismo proceso, su orden local induce causalidad.
+\item El envío de un mensaje ocurre antes que la recepción de ese mensaje.
+\item La relación es transitiva.
+\end{enumerate}
+\[
+a \rightarrow b \wedge b \rightarrow c \Rightarrow a \rightarrow c
+\]
+significa que existe una cadena de influencia posible desde $a$ hasta $c$.
+\end{frame}
+
+% ID: C08-C02
+
+\begin{frame}{Las dos reservas nacen en ramas independientes y llegan al líder}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+
+\begin{center}
+\begin{tikzpicture}[x=1.05cm,y=0.86cm]
+
+% ---------------------------------------------------------------------------
+% Líneas de proceso
+% ---------------------------------------------------------------------------
+\draw[thick,draw=UAIngNavy] (0,2)--(8.4,2);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,2)
+  {BA};
+
+\draw[thick,draw=UAIngNavy] (0,0)--(8.4,0);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,0)
+  {Líder N1};
+
+\draw[thick,draw=UAIngNavy] (0,-2)--(8.4,-2);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,-2)
+  {Madrid};
+
+% ---------------------------------------------------------------------------
+% Eventos de Buenos Aires
+% ---------------------------------------------------------------------------
+\node[uaDot] (a1) at (0.9,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.07cm]a1.north)
+  {Sofía hace click\\$(a_1)$};
+
+\node[uaDot] (a2) at (2.7,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.07cm]a2.north)
+  {envía reserva\\$(a_2)$};
+
+% ---------------------------------------------------------------------------
+% Eventos de Madrid
+% ---------------------------------------------------------------------------
+\node[uaDot] (m1) at (1.3,-2) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]m1.south)
+  {Tomás hace click\\$(m_1)$};
+
+\node[uaDot] (m2) at (4.7,-2) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]m2.south)
+  {envía reserva\\$(m_2)$};
+
+% ---------------------------------------------------------------------------
+% Eventos del líder
+% ---------------------------------------------------------------------------
+\node[uaDot,fill=UAIngOrange] (l1) at (3.7,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l1.south)
+  {recibe a Sofía\\$(l_1)$};
+
+\node[uaDot,fill=UAIngOrange] (l2) at (5.0,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l2.south)
+  {append local\\$(l_2)$};
+
+\node[uaDot,fill=UAIngOrange] (l3) at (6.7,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l3.south)
+  {recibe a Tomás\\$(l_3)$};
+
+% ---------------------------------------------------------------------------
+% Mensajes
+% ---------------------------------------------------------------------------
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (a2) --
+  node[uaTiny,fill=white,inner sep=1.2pt,
+       pos=0.48,sloped,above]
+       {\texttt{Reserve(Sofía)}}
+  (l1);
+
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (m2) --
+  node[uaTiny,fill=white,inner sep=1.2pt,
+       pos=0.50,sloped,below]
+       {\texttt{Reserve(Tomás)}}
+  (l3);
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.08cm}
+
+\begin{columns}[T]
+\column{0.47\textwidth}
+
+\begin{block}{Relaciones causales}
+\[
+a_1\rightarrow a_2\rightarrow l_1
+\]
+
+\[
+m_1\rightarrow m_2\rightarrow l_3
+\]
+\end{block}
+
+\column{0.49\textwidth}
+
+\begin{block}{Concurrencia inicial}
+\[
+a_2\parallel m_2
+\]
+
+Cuando ambas reservas se envían, ninguna contiene información sobre la otra.
+\end{block}
+\end{columns}
+
+\begin{uakeybox}
+El líder ordena sus propios eventos
+\(l_1\rightarrow l_2\rightarrow l_3\), pero ese orden de recepción
+no convierte a \(a_2\) en causa de \(m_2\), ni a \(m_2\) en causa de \(a_2\).
+\end{uakeybox}
+
+\end{frame}
+
+% ID: C08-C03
+\begin{frame}{Lamport: convertir relaciones causales en números crecientes}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Variables}
+$L$ es el contador lógico local. $t_m$ es la marca lógica incluida por el emisor en el mensaje.
+\end{block}
+Al recibir:
+\[
+L\leftarrow \max(L,t_m)+1
+\]
+
+\begin{itemize}
+\item $\max$ conserva la historia local y la comunicada;
+\item $+1$ coloca la recepción estrictamente después del envío.
+\end{itemize}
+\begin{uainfo}
+Ejemplo: $L=4$, $t_m=7$ $\Rightarrow$ nuevo $L=8$.
+\end{uainfo}
+\end{frame}
+
+
+% =============================================================================
+% Insertar después de la explicación de la regla de Lamport
+% =============================================================================
+
+\begin{frame}{La misma ejecución con relojes de Lamport}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+
+\begin{center}
+\begin{tikzpicture}[x=1.05cm,y=0.86cm]
+
+% ---------------------------------------------------------------------------
+% Líneas de proceso
+% ---------------------------------------------------------------------------
+\draw[thick,draw=UAIngNavy] (0,2)--(8.4,2);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,2)
+  {BA};
+
+\draw[thick,draw=UAIngNavy] (0,0)--(8.4,0);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,0)
+  {Líder N1};
+
+\draw[thick,draw=UAIngNavy] (0,-2)--(8.4,-2);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy] at (0,-2)
+  {Madrid};
+
+% ---------------------------------------------------------------------------
+% Buenos Aires: L = 1, 2
+% ---------------------------------------------------------------------------
+\node[uaDot] (a1) at (0.9,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.07cm]a1.north)
+  {click \(a_1\)\\\(L=1\)};
+
+\node[uaDot] (a2) at (2.7,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.07cm]a2.north)
+  {send \(a_2\)\\\(L=2\)};
+
+% ---------------------------------------------------------------------------
+% Madrid: L = 1, 2
+% ---------------------------------------------------------------------------
+\node[uaDot] (m1) at (1.3,-2) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]m1.south)
+  {click \(m_1\)\\\(L=1\)};
+
+\node[uaDot] (m2) at (4.7,-2) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]m2.south)
+  {send \(m_2\)\\\(L=2\)};
+
+% ---------------------------------------------------------------------------
+% Líder: recibe 2, evento local, recibe 2
+% ---------------------------------------------------------------------------
+\node[uaDot,fill=UAIngOrange] (l1) at (3.7,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l1.south)
+  {receive \(l_1\)\\\(L=3\)};
+
+\node[uaDot,fill=UAIngOrange] (l2) at (5.0,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l2.south)
+  {append \(l_2\)\\\(L=4\)};
+
+\node[uaDot,fill=UAIngOrange] (l3) at (6.7,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.07cm]l3.south)
+  {receive \(l_3\)\\\(L=5\)};
+
+% ---------------------------------------------------------------------------
+% Mensajes con timestamp t_m = 2
+% ---------------------------------------------------------------------------
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (a2) --
+  node[uaTiny,fill=white,inner sep=1.2pt,
+       pos=0.48,sloped,above]
+       {\(t_m=2\)}
+  (l1);
+
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (m2) --
+  node[uaTiny,fill=white,inner sep=1.2pt,
+       pos=0.50,sloped,below]
+       {\(t_m=2\)}
+  (l3);
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{0.08cm}
+
+\begin{uainfo}
+El líder comienza con \(L=0\):
+
+\[
+\begin{aligned}
+L(l_1) &= \max(0,2)+1 = 3,\\
+L(l_2) &= 3+1 = 4,\\
+L(l_3) &= \max(4,2)+1 = 5.
+\end{aligned}
+\]
+\end{uainfo}
+
+\begin{uakeybox}
+Los dos mensajes salen con \(L=2\). La igualdad de timestamps no significa
+que sean el mismo evento ni que exista causalidad entre ellos.
+Lamport garantiza que \(x\rightarrow y\) implica \(L(x)<L(y)\),
+pero el recíproco no es necesariamente cierto.
+\end{uakeybox}
+
+\end{frame}
+
+
+% ID: C08-C04
+\begin{frame}{Ejemplo Lamport sobre las dos reservas}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{tabular}{p{0.33\textwidth}p{0.25\textwidth}p{0.25\textwidth}}
+\toprule
+\textbf{Evento} & \textbf{Proceso} & \textbf{Lamport}\\
+\midrule
+Sofía presiona comprar & BA & 1\\
+BA envía reserva & BA & 2\\
+Tomás presiona comprar & Madrid & 1\\
+Madrid envía reserva & Madrid & 2\\
+Líder recibe a Sofía & líder & 3\\
+Líder hace append & líder & 4\\
+Líder recibe a Tomás & líder & 5\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ID: C08-C05
+\begin{frame}{Límite de Lamport}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\[
+a\rightarrow b \Longrightarrow L(a)<L(b)
+\]
+pero:
+\[
+L(a)<L(b) \not\Longrightarrow a\rightarrow b.
+\]
+\begin{block}{Por qué}
+Los números de Lamport permiten respetar causalidad y construir un desempate total convencional, pero no distinguen por sí solos una dependencia real de una simple concurrencia.
+\end{block}
+\end{frame}
+
+% ID: C08-C06
+\begin{frame}{Relojes vectoriales: registrar conocimiento por actor}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Usamos el orden:
+\[
+[\text{BA},\ \text{Madrid},\ \text{Líder}]
+\]
+Cada proceso incrementa su componente y, al recibir, toma el máximo componente a componente antes de incrementar el suyo.
+\begin{block}{Comparación}
+$V_a<V_b$ si todos los componentes de $V_a$ son menores o iguales y al menos uno es estrictamente menor. Si ninguno domina al otro, son concurrentes.
+\end{block}
+\end{frame}
+
+% =============================================================================
+% Insertar después de las reglas de relojes vectoriales
+% Orden de componentes: [BA, Madrid, Líder]
+% =============================================================================
+
+% =============================================================================
+% La misma ejecución con relojes vectoriales
+% =============================================================================
+
+\begin{frame}{La misma ejecución con relojes vectoriales}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+
+\begin{center}
+\begin{tikzpicture}[x=1.02cm,y=0.72cm]
+
+% ---------------------------------------------------------------------------
+% Líneas de proceso
+% ---------------------------------------------------------------------------
+\draw[thick,draw=UAIngNavy] (0,1.35)--(8.1,1.35);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy]
+  at (0,1.65) {BA};
+
+\draw[thick,draw=UAIngNavy] (0,0)--(8.1,0);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy]
+  at (0,0) {Líder N1};
+
+\draw[thick,draw=UAIngNavy] (0,-1.35)--(8.1,-1.35);
+\node[left,font=\scriptsize\bfseries,text=UAIngNavy]
+  at (0,-1.65) {Madrid};
+
+% ---------------------------------------------------------------------------
+% Eventos de Buenos Aires
+% ---------------------------------------------------------------------------
+\node[circle,fill=UAIngNavy,inner sep=2.2pt] (a1) at (0.9,1.35) {};
+\node[font=\tiny,align=center,anchor=south]
+  at ([yshift=0.06cm]a1.north)
+  {\(a_1\): click\\\([1,0,0]\)};
+
+\node[circle,fill=UAIngNavy,inner sep=2.2pt] (a2) at (3.0,1.35) {};
+\node[font=\tiny,align=center,anchor=south]
+  at ([yshift=0.06cm]a2.north)
+  {\(a_2\): send\\\([2,0,0]\)};
+
+% ---------------------------------------------------------------------------
+% Eventos de Madrid
+% ---------------------------------------------------------------------------
+\node[circle,fill=UAIngNavy,inner sep=2.2pt] (m1) at (1.3,-1.35) {};
+\node[font=\tiny,align=center,anchor=north]
+  at ([yshift=-0.06cm]m1.south)
+  {\(m_1\): click\\\([0,1,0]\)};
+
+\node[circle,fill=UAIngNavy,inner sep=2.2pt] (m2) at (6.5,-1.35) {};
+\node[font=\tiny,align=center,anchor=north]
+  at ([yshift=-0.06cm]m2.south)
+  {\(m_2\): send\\\([0,2,0]\)};
+
+% ---------------------------------------------------------------------------
+% Eventos del líder
+% ---------------------------------------------------------------------------
+\node[circle,fill=UAIngOrange,inner sep=2.4pt] (l1) at (3.0,0) {};
+\node[font=\tiny,align=center,anchor=north]
+  at ([yshift=-0.08cm]l1.south)
+  {\(l_1\): recibe a Sofía\\\([2,0,1]\)};
+
+\node[circle,fill=UAIngOrange,inner sep=2.4pt] (l2) at (4.7,0) {};
+\node[font=\tiny,align=center,anchor=north]
+  at ([yshift=-0.08cm]l2.south)
+  {\(l_2\): append\\\([2,0,2]\)};
+
+\node[circle,fill=UAIngOrange,inner sep=2.4pt] (l3) at (6.5,0) {};
+\node[font=\tiny,align=center,anchor=south]
+  at ([yshift=0.08cm]l3.north)
+  {\(l_3\): recibe a Tomás\\\([2,2,3]\)};
+
+% ---------------------------------------------------------------------------
+% Mensajes
+% ---------------------------------------------------------------------------
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (a2)--(l1);
+
+\draw[->,very thick,>=Latex,draw=UAIngOrange]
+  (m2)--(l3);
+
+\end{tikzpicture}
+\end{center}
+
+\vspace{-0.12cm}
+
+\begin{columns}[T,onlytextwidth]
+
+\column{0.47\textwidth}
+
+\begin{uainfo}
+\textbf{Orden de componentes}
+
+\[
+[\text{BA},\text{Madrid},\text{Líder}]
+\]
+
+Cada proceso incrementa solamente su propio componente.
+\end{uainfo}
+
+\column{0.49\textwidth}
+
+\begin{uakeybox}
+\[
+[2,0,0]\parallel[0,2,0]
+\]
+
+Los vectores de las dos reservas son incomparables: ninguna reserva contiene
+conocimiento causal de la otra.
+\end{uakeybox}
+
+\end{columns}
+
+\end{frame}
+
+% =============================================================================
+% Cálculo paso a paso del vector del líder
+% =============================================================================
+
+\begin{frame}{Cómo actualiza su reloj vectorial el líder}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\footnotesize
+
+\begin{block}{Regla de recepción}
+Al recibir un mensaje, el proceso:
+
+\begin{enumerate}
+\item calcula el máximo componente a componente entre su vector y el recibido;
+\item incrementa su propio componente para representar el nuevo evento local.
+\end{enumerate}
+\end{block}
+
+\vspace{-0.25cm}
+
+\[
+\begin{aligned}
+V(l_1)
+  &= \max\bigl([0,0,0],[2,0,0]\bigr)+[0,0,1] = [2,0,1],
+\\
+V(l_2)
+  &= [2,0,1]+[0,0,1]= [2,0,2],
+\\
+V(l_3)
+  &= \max\bigl([2,0,2],[0,2,0]\bigr)+[0,0,1]= [2,2,3].
+\end{aligned}
+\]
+
+\vspace{-0.15cm}
+
+\begin{columns}[T,onlytextwidth]
+
+\column{0.47\textwidth}
+
+\begin{uainfo}
+\footnotesize
+\textbf{¿Qué expresa \([2,2,3]\)? El líder conoce:}
+
+\begin{itemize}
+\item dos eventos de Buenos Aires;
+\item dos eventos de Madrid;
+\item tres eventos locales propios.
+\end{itemize}
+\end{uainfo}
+
+\column{0.49\textwidth}
+\begin{uakeybox}
+\footnotesize
+El resultado es \([2,2,3]\), no \([2,2,5]\).
+
+El valor \(5\) pertenece al reloj escalar de Lamport. En el reloj vectorial,
+el tercer componente cuenta solamente los eventos locales del líder.
+\end{uakeybox}
+
+\end{columns}
+
+\end{frame}
+
+% ID: C08-C07
+\begin{frame}{Vector clocks en la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{tabular}{p{0.43\textwidth}p{0.35\textwidth}}
+\toprule
+\textbf{Evento} & \textbf{Vector}\\
+\midrule
+BA envía reserva de Sofía & $[2,0,0]$\\
+Madrid envía reserva de Tomás & $[0,2,0]$\\
+Líder recibe a Sofía & $[2,0,1]$\\
+Líder hace append & $[2,0,2]$\\
+Líder recibe a Tomás & $[2,2,3]$\\
+\bottomrule
+\end{tabular}
+\begin{uawarn}
+El reloj escalar del líder termina en $L=5$, pero el tercer componente vectorial es 3 porque cuenta sus tres eventos locales. No se mezclan ambos relojes.
+\end{uawarn}
+\end{frame}
+
+% ID: C08-C08
+\begin{frame}{Tres relojes, tres preguntas}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.22\textwidth}p{0.30\textwidth}p{0.34\textwidth}}
+\toprule
+\textbf{Reloj} & \textbf{Pregunta} & \textbf{Uso}\\
+\midrule
+pared & ¿qué fecha y hora civil es? & auditoría, timestamps humanos\\
+monotónico & ¿cuánto duró una espera? & timeouts, latencias, leases\\
+lógico & ¿qué orden causal debe respetarse? & causalidad, versiones, logs\\
+\bottomrule
+\end{tabular}
+\begin{uakeybox}
+Los relojes describen relaciones. Todavía no deciden quién obtiene VIP-01.
+\end{uakeybox}
+\end{frame}
+
+\UASectionSlide{Máquinas de estado y consenso}
+
+% ID: C08-S01
+\begin{frame}{Máquina de estados: una regla determinista}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\[
+(estado,comando)\longrightarrow(nuevo\ estado,respuesta)
+\]
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaOrange,text width=2.0cm] (avail) {AVAILABLE};
+\node[uaSoft,text width=2.25cm,right=2.2cm of avail,yshift=0.75cm] (sof) {RESERVED\\BY SOFÍA};
+\node[uaSoft,text width=2.25cm,right=2.2cm of avail,yshift=-0.75cm] (tom) {RESERVED\\BY TOMÁS};
+\draw[uaOrangeArrow] (avail.east)--node[above,uaTiny]{Reserve(Sofía)}(sof.west);
+\draw[uaArrow] (avail.east)--node[below,uaTiny]{Reserve(Tomás)}(tom.west);
+\end{tikzpicture}
+\end{center}
+Una reserva posterior sobre un estado ya reservado se rechaza sin cambiar el estado.
+\end{frame}
+
+% ID: C08-S02
+\begin{frame}{Máquina de estados replicada}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Cada réplica contiene:
+\begin{itemize}
+\item una copia del log de comandos;
+\item el mismo código determinista;
+\item una copia local del estado.
+\end{itemize}
+\begin{uakeybox}
+Si todas aplican los mismos comandos comprometidos en el mismo orden, convergen al mismo estado.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-S03
+\begin{frame}{Safety y liveness}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Safety: nada incorrecto ocurre}
+\begin{itemize}
+\item no hay dos comandos distintos comprometidos en el mismo índice;
+\item una entrada committed no se reemplaza;
+\item VIP-01 no se confirma para dos personas.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Liveness: el sistema vuelve a progresar}
+Requiere mayoría comunicada, líder estable, procesos activos y entrega eventual de los mensajes necesarios.
+\end{block}
+\end{columns}
+\end{frame}
+
+% ID: C08-S04
+\begin{frame}{Raft: término, índice y entrada de log}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{itemize}
+\item \textbf{Término}: número creciente que identifica una ronda de elección y liderazgo.
+\item \textbf{Índice}: posición estable de una entrada dentro del log.
+\item \textbf{Entrada}: par $(term,command)$ en una posición.
+\end{itemize}
+\begin{block}{Ejemplo}
+Los índices 1--86 ya existen. El líder del término 12 agrega:
+\[
+index=87,\quad term=12,\quad command=\operatorname{Reserve}(\text{VIP-01},\text{Sofía})
+\]
+\end{block}
+\end{frame}
+
+% ID: C08-S05
+\begin{frame}{Mensaje o líder obsoleto}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Un mensaje es obsoleto cuando contiene un término menor que el término ya conocido por el receptor.
+\begin{center}
+\begin{tikzpicture}[node distance=1.1cm]
+\node[uaSoft,text width=2.1cm] (n1) {N1 despierta\\term 12};
+\node[uaOrange,text width=2.1cm,right=of n1] (n2) {N2 líder\\term 13};
+\draw[uaArrow] (n1)--node[above,uaTiny]{AppendEntries term 12}(n2);
+\node[below=0.5cm of n2,uaTiny,text=UAIngOrange] {rechazado};
+\end{tikzpicture}
+\end{center}
+\end{frame}
+
+% ID: C08-S06
+\begin{frame}{Raft paso 1: la propuesta existe solo en N1}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{tabular}{p{0.13\textwidth}p{0.58\textwidth}p{0.18\textwidth}}
+\toprule
+\textbf{Nodo} & \textbf{Última entrada} & \textbf{Estado}\\
+\midrule
+N1 & 87 / term 12 / Reserve(Sofía) & local\\
+N2 & hasta 86 & ---\\
+N3 & hasta 86 & ---\\
+N4 & hasta 86 & ---\\
+N5 & hasta 86 & ---\\
+\bottomrule
+\end{tabular}
+\begin{alertblock}{Todavía no}
+Una propuesta local no autoriza responder «compra confirmada».
+\end{alertblock}
+\end{frame}
+
+% ID: C08-S07
+\begin{frame}{Raft paso 2: dos copias todavía no son mayoría}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{tabular}{p{0.13\textwidth}p{0.58\textwidth}p{0.18\textwidth}}
+\toprule
+\textbf{Nodo} & \textbf{Última entrada} & \textbf{Estado}\\
+\midrule
+N1 & 87 / term 12 / Reserve(Sofía) & local\\
+N2 & 87 / term 12 / Reserve(Sofía) & local\\
+N3 & hasta 86 & ---\\
+N4 & hasta 86 & ---\\
+N5 & hasta 86 & ---\\
+\bottomrule
+\end{tabular}
+N2 persiste la entrada y responde al líder.
+\[
+2/5<3/5
+\]
+\begin{uakeybox}
+La seguridad no proviene solo del número de copias, sino de una mayoría intersectante y de las reglas del protocolo.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-S08
+\begin{frame}{Raft paso 3: la tercera réplica cambia la situación}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{tabular}{p{0.13\textwidth}p{0.58\textwidth}p{0.18\textwidth}}
+\toprule
+\textbf{Nodo} & \textbf{Última entrada} & \textbf{Estado}\\
+\midrule
+N1 & 87 / term 12 / Reserve(Sofía) & local\\
+N2 & 87 / term 12 / Reserve(Sofía) & local\\
+N3 & 87 / term 12 / Reserve(Sofía) & local\\
+N4 & hasta 86 & ---\\
+N5 & hasta 86 & ---\\
+\bottomrule
+\end{tabular}
+N3 persiste la misma entrada.
+\[
+3/5
+\]
+Toda mayoría futura de tres nodos debe compartir al menos un nodo con $\{N1,N2,N3\}$.
+\begin{uakeybox}
+La entrada puede avanzar a committed porque alcanzó la mayoría exigida por el protocolo.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-S09
+\begin{frame}{Raft paso 4: quién compromete, aplica y responde}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{enumerate}
+\item N2 y N3 confirman al líder que persistieron la entrada.
+\item N1 detecta mayoría y actualiza \texttt{commitIndex=87}.
+\item N1 aplica la entrada en \textbf{su propia} máquina de estados.
+\item N1 responde «compra confirmada» a Sofía.
+\item N2 y N3 reciben \texttt{leaderCommit=87}, avanzan y aplican localmente.
+\end{enumerate}
+\begin{uawarn}
+Replicada $\neq$ committed $\neq$ aplicada $\neq$ confirmada al cliente.
+\end{uawarn}
+\end{frame}
+
+% ID: C08-S10
+\begin{frame}{Crash antes y después de la mayoría}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Antes de mayoría}
+N1 contiene la entrada y cae. No estaba committed y puede desaparecer. Sofía no debió recibir éxito.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Después de mayoría}
+N1, N2 y N3 persistieron; N1 confirmó y cae. N2 o N3 conserva la decisión comprometida.
+\end{block}
+\end{columns}
+\end{frame}
+
+% ID: C08-S11
+\begin{frame}{Total-order broadcast: por qué aparece aquí}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Necesidad}
+Máquinas deterministas solo convergen si reciben los mismos comandos comprometidos y los aplican en el mismo orden.
+\end{block}
+\begin{block}{Relación con consenso}
+Consenso elige un valor para una posición. Repetir consenso para 87, 88, 89, ... construye un log ordenado; ese servicio implementa total-order broadcast.
+\end{block}
+\begin{uainfo}
+Un timestamp Lamport etiqueta eventos, pero no garantiza que todas las réplicas reciban el mismo conjunto de comandos ni que no existan huecos.
+\end{uainfo}
+\end{frame}
+
+% ID: C08-S12
+\begin{frame}{Pausa de proceso, GC y fencing}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{itemize}
+\item \textbf{GC}: pausa del runtime para recuperar memoria; el proceso puede dejar de ejecutar sin estar muerto.
+\item \textbf{Fencing token}: número creciente que un recurso externo usa para rechazar operaciones de una autoridad antigua.
+\end{itemize}
+\begin{center}
+N1 líder term 12 $\rightarrow$ pausa $\rightarrow$ N2 líder term 13 $\rightarrow$ N1 despierta obsoleto
+\end{center}
+\begin{uakeybox}
+El término protege al cluster; un recurso externo puede requerir además un token de fencing.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-S13
+\begin{frame}{Paxos: misma meta, organización diferente}
+\UASlideTag{EXTENSIÓN}{UAIngOrange}
+\scriptsize
+\begin{tabular}{p{0.20\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\toprule
+\textbf{Paso} & \textbf{Raft} & \textbf{Multi-Paxos}\\
+\midrule
+liderazgo & líder, term 12 & proposer estable, ballot 12\\
+posición & index 87 & slot 87\\
+propuesta & AppendEntries & Accept\\
+réplicas & followers & acceptors\\
+decisión & mayoría replica y commit & mayoría acepta, valor elegido\\
+aplicación & máquina de estados & learner y máquina de estados\\
+\bottomrule
+\end{tabular}
+\begin{uakeybox}
+Ambos impiden decisiones incompatibles para la misma posición, aunque organizan roles y mensajes de forma diferente.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-S14
+\begin{frame}{Caso real: dónde aparecen estas ideas en Kubernetes}
+\UASlideTag{CASO REAL}{UAIngOrange}
+\small
+\begin{center}
+\texttt{kubectl} $\rightarrow$ API server $\rightarrow$ líder etcd $\rightarrow$ seguidores etcd
+\end{center}
+\begin{tabular}{p{0.30\textwidth}p{0.57\textwidth}}
+\toprule
+\textbf{Concepto} & \textbf{Aplicación en etcd}\\
+\midrule
+líder y término & un líder Raft atiende escrituras y rechaza términos viejos\\
+log e índice & cada cambio ocupa una posición del log replicado\\
+mayoría y commit & se confirma tras alcanzar quorum\\
+máquina de estados & todos obtienen el mismo key--value store\\
+WAL/snapshot & cada miembro recuerda decisiones tras reiniciar\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ID: C08-S15
+\begin{frame}{Tres logs que no debemos confundir}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.24\textwidth}p{0.30\textwidth}p{0.34\textwidth}}
+\toprule
+\textbf{Log} & \textbf{Pregunta} & \textbf{Ejemplo}\\
+\midrule
+consenso & ¿qué comando se acordó y en qué orden? & log Raft\\
+WAL local & ¿qué recuerda físicamente el nodo tras un crash? & WAL de la DB/etcd\\
+eventos & ¿qué hechos pueden leer y reprocesar otros componentes? & Kafka\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\UASectionSlide{CAP, PACELC y garantías}
+
+% ID: C08-P01
+\begin{frame}{La partición ocurre después del commit de Sofía}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\[
+\{N1,N2,N3\}\;|\;\{N4,N5\}
+\]
+La mayoría conoce la reserva committed de Sofía. La minoría está sana localmente, pero no recibe ese hecho. Tomás intenta comprar desde Madrid.
+\end{frame}
+
+% ID: C08-P02
+\begin{frame}{Dos historias indistinguibles para la minoría}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{H1}
+Sofía ya fue confirmada, pero el mensaje no cruza la partición.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{H2}
+Sofía nunca fue confirmada.
+\end{block}
+\end{columns}
+N4 y N5 observan lo mismo en ambas historias. Una respuesta local idéntica puede ser correcta en una e incorrecta en la otra.
+\end{frame}
+
+% ID: C08-P03
+\begin{frame}{CAP: la decisión durante una partición}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{itemize}
+\item \textbf{Consistencia fuerte}: una sola historia compatible con una copia autoritativa.
+\item \textbf{Disponibilidad CAP}: cada solicitud a un nodo no fallado termina con una respuesta válida de la operación.
+\item \textbf{Partición}: grupos de nodos vivos no pueden intercambiar los mensajes necesarios a tiempo.
+\end{itemize}
+\begin{uakeybox}
+Durante la partición, confirmar localmente a Tomás arriesga doble venta; esperar o rechazar preserva el invariante, pero sacrifica disponibilidad CAP para esa operación.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-P04
+\begin{frame}{Uptime, disponibilidad CAP y disponibilidad semántica}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.25\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{Concepto} & \textbf{Qué mide}\\
+\midrule
+uptime & fracción de una ventana mensual, trimestral o anual en que el proceso estuvo alcanzable\\
+disponibilidad CAP & si la operación termina con respuesta válida durante una partición\\
+disponibilidad semántica & fracción de intentos válidos que cumplen la promesa de negocio\\
+\bottomrule
+\end{tabular}
+\begin{uainfo}
+Un 503 rápido demuestra que el proceso está vivo, pero no satisface disponibilidad CAP para la compra.
+\end{uainfo}
+\end{frame}
+
+% ID: C08-P05
+\begin{frame}{PACELC: el costo continúa cuando la red funciona}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Lectura local}
+15 ms, pero puede observar una réplica atrasada.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Lectura coordinada}
+180 ms, con garantía más fuerte.
+\end{block}
+\end{columns}
+\begin{uakeybox}
+PACELC organiza dos preguntas: durante una partición, consistencia o disponibilidad; en régimen normal, latencia o consistencia.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-P06
+\begin{frame}{Recencia, linearizabilidad y serializabilidad}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.22\textwidth}p{0.68\textwidth}}
+\toprule
+\textbf{Concepto} & \textbf{Definición breve}\\
+\midrule
+recencia & qué tan nuevo es el estado observado\\
+linearizabilidad & cada operación parece atómica entre invocación y respuesta y respeta el orden real de operaciones no superpuestas\\
+serializabilidad & el resultado de transacciones equivale a algún orden serial, sin exigir orden real externo\\
+consistencia externa & serializabilidad más respeto del orden observado por los clientes\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+\UASectionSlide{Quórums, versiones y Dynamo}
+
+% ID: C08-D01
+\begin{frame}{Mayoría en consenso y quorum Dynamo-like no son sinónimos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.22\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
+\toprule
+ & \textbf{Consenso} & \textbf{Dynamo-like}\\
+\midrule
+pregunta & qué entrada autoritativa se elige & cuántas réplicas participan\\
+unidad & posición/slot del log & lectura o escritura de una key\\
+concurrencia & protocolo impide commits incompatibles & puede conservar versiones concurrentes\\
+resultado & orden autoritativo & conjunto de versiones y política de merge\\
+intersección & parte de reglas de seguridad & propiedad combinatoria de $R,W,N$\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ID: C08-D02
+\begin{frame}{Por qué necesitamos intersección}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Con $N=5$, una escritura llega a $\{N1,N2\}$ y una lectura posterior consulta $\{N4,N5\}$. Los conjuntos son disjuntos: la lectura puede no encontrar ninguna copia actualizada.
+\begin{uakeybox}
+Queremos que todo conjunto ideal de lectura comparta al menos un nodo con todo conjunto ideal de escritura.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-D03
+\begin{frame}{N, R y W: construir la intersección}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+\begin{itemize}
+\item $N$: réplicas preferidas para la key.
+\item $W$: respuestas requeridas para aceptar la escritura.
+\item $R$: respuestas requeridas para completar la lectura.
+\end{itemize}
+\[
+R+W>N
+\]
+Con $N=5$, $W=3$, $R=3$, los conjuntos ideales deben intersectarse.
+\begin{uawarn}
+La intersección no crea automáticamente linearizabilidad, líder, orden total ni resolución semántica.
+\end{uawarn}
+\end{frame}
+
+% ID: C08-D04
+\begin{frame}{Contraejemplo 1: escrituras concurrentes}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Dos clientes escriben versiones distintas sin conocer la otra. El nodo de intersección puede conservar ambas ramas.
+\begin{block}{Por qué contradice la conclusión ingenua}
+$R+W>N$ permite descubrir que existen versiones distintas, pero no decide cuál es posterior si fueron concurrentes.
+\end{block}
+\end{frame}
+
+% ID: C08-D05
+\begin{frame}{Contraejemplo 2: sloppy quorum}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Durante una falla, la escritura se almacena temporalmente en nodos fuera del conjunto preferido. Antes del hinted handoff, una lectura sobre las réplicas preferidas puede no cruzarse con el conjunto efectivo de escritura.
+\begin{block}{Lección}
+La fórmula usa conjuntos ideales; la implementación real debe considerar dónde quedaron efectivamente las copias.
+\end{block}
+\end{frame}
+
+% ID: C08-D06
+\begin{frame}{Contraejemplo 3: last-write-wins y relojes desalineados}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Una actualización causalmente posterior recibe un timestamp físico menor por desalineación del reloj y puede ser descartada como «más vieja».
+\begin{block}{Lección}
+Intersección y timestamps físicos no sustituyen un modelo correcto de causalidad.
+\end{block}
+\end{frame}
+
+% ID: C08-D07
+\begin{frame}{Vector clocks reaparecen como genealogía del carrito}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Partimos de:
+\[
+v_0=[0,0]
+\]
+Durante la partición:
+\[
+\text{BA agrega libro}\rightarrow[1,0]
+\]
+\[
+\text{Madrid agrega auriculares}\rightarrow[0,1]
+\]
+Ninguna versión domina a la otra: son ramas concurrentes.
+\end{frame}
+
+% ID: C08-D08
+\begin{frame}{Carrito fusionable; entrada VIP no fusionable}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Carrito}
+Puede conservar libro y auriculares y producir una versión descendiente que incluya ambas intenciones.
+\end{block}
+\column{0.48\textwidth}
+\begin{alertblock}{VIP-01}
+No existe un merge válido «Sofía + Tomás». El invariante exige una única decisión autoritativa.
+\end{alertblock}
+\end{columns}
+\end{frame}
+
+% ID: C08-D09
+\begin{frame}{Dynamo: localizar, escribir, conservar y reparar}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{enumerate}
+\item aplicar hash a la key y construir una preference list;
+\item escribir en réplicas hasta reunir $W$ respuestas;
+\item conservar versiones concurrentes en vez de perderlas;
+\item responder según la política de disponibilidad;
+\item reparar la divergencia en segundo plano o durante lecturas.
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{Síntesis visual: decidir qué error aceptar}
+% ID: C08-D10
+\begin{frame}{Sloppy quorum, hint y hinted handoff}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.35cm]
-\node[uaBoxO,text width=2.1cm] (a) {Dato e\\invariante};
-\node[uaBox,text width=2.1cm,right=of a] (b) {Partición y\\respuesta};
-\node[uaBoxO,text width=2.1cm,right=of b] (c) {Latencia de\\coordinación};
-\node[uaBox,text width=2.1cm,right=of c] (d) {Repair o\\consenso};
-\node[uaBoxO,text width=2.1cm,right=of d] (e) {Métricas y\\prueba};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d); \draw[uaArrowO] (d)--(e);
-\end{tikzpicture}
-\end{center}
+\small
+\begin{itemize}
+\item \textbf{Sloppy quorum}: aceptar temporalmente la copia en un nodo alternativo.
+\item \textbf{Hint}: metadato que recuerda cuál era el propietario preferido.
+\item \textbf{Hinted handoff}: devolver la copia al propietario cuando se recupera.
+\end{itemize}
 \begin{uakeybox}
-La consistencia real no es una etiqueta de producto: es un contrato operativo sobre qué se responde, qué se espera y quién repara.
+La disponibilidad desplaza costo hacia almacenamiento temporal, red, I/O y reparación posterior.
 \end{uakeybox}
 \end{frame}
 
+% ID: C08-D11
+\begin{frame}{Read repair, anti-entropy y tasa de divergencia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{itemize}
+\item \textbf{Read repair}: corrige las réplicas consultadas al detectar versiones atrasadas.
+\item \textbf{Anti-entropy}: compara rangos en background para reparar datos fríos.
+\item \textbf{Tasa de divergencia}: diferencias nuevas creadas por unidad de tiempo.
+\item \textbf{Capacidad de reparación}: diferencias corregidas por unidad de tiempo.
+\end{itemize}
+\[
+D_{nuevo}>R_{resuelto}\Rightarrow\text{la deuda crece}
+\]
+\end{frame}
+
+% ID: C08-D12
+\begin{frame}{Por qué Dynamo aceptó esa complejidad}
+\UASlideTag{CASO REAL}{UAIngOrange}
+\small
+El Dynamo original incorporó consistent hashing, preference lists, quórums, versionado, sloppy quorum, hinted handoff, read repair y anti-entropy para sostener la prioridad \emph{always-on} de algunos servicios de Amazon.
+\begin{uakeybox}
+No son sinónimos de «complejidad»; cada mecanismo paga una parte concreta de la disponibilidad durante fallas.
+\end{uakeybox}
+\end{frame}
+
+\UASectionSlide{Spanner, TrueTime y orden externo}
+
+% ID: C08-G01
+\begin{frame}{Por qué aparece Spanner en la misma historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+La compra de VIP-01 puede involucrar:
+\begin{itemize}
+\item grupo de entradas;
+\item grupo de pagos;
+\item grupo de derechos del usuario.
+\end{itemize}
+La operación debe ser atómica entre grupos y, si Madrid inicia una acción después de observar la confirmación de Buenos Aires, el orden externo debe respetarse.
+\end{frame}
+
+% ID: C08-G02
+\begin{frame}{Spanner: consenso localizado y transacción multi-grupo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Cada grupo de datos mantiene replicación y consenso propios. Una transacción que toca varios grupos coordina solo los grupos necesarios y asigna un timestamp de commit común.
+\begin{uakeybox}
+El objetivo no es un único líder global para toda la base, sino coordinación localizada con una garantía transaccional global.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-G03
+\begin{frame}{TrueTime: intervalo de tiempo con incertidumbre explícita}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Spanner sincroniza servidores con referencias como GPS y relojes atómicos mediante time masters. Entre sincronizaciones existe deriva.
+\[
+TT.now()=[earliest,latest]
+\]
+Conceptualmente:
+\[
+earliest=\widehat{t}-\epsilon,\qquad latest=\widehat{t}+\epsilon
+\]
+\begin{uainfo}
+TrueTime no afirma conocer un instante exacto: expone una cota que incluye error de sincronización y deriva.
+\end{uainfo}
+\end{frame}
+
+% ID: C08-G04
+\begin{frame}{Quién asigna el timestamp de commit}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+El coordinador de la transacción elige $s$ respetando:
+\begin{itemize}
+\item timestamps de preparación de los grupos;
+\item la cota superior de TrueTime;
+\item dependencias y restricciones de la transacción.
+\end{itemize}
+Ejemplo:
+\[
+TT.now()=[4,16]\text{ ms},\qquad s=16\text{ ms}
+\]
+\end{frame}
+
+% ID: C08-G05
+\begin{frame}{Commit wait: esperar hasta demostrar que $s$ quedó en el pasado}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+El sistema espera hasta observar:
+\[
+TT.now().earliest>s
+\]
+Por ejemplo:
+\[
+TT.now()=[17,29]\text{ ms}\Rightarrow 17>16
+\]
+\begin{uakeybox}
+La espera convierte incertidumbre temporal acotada en una garantía de orden externo.
+\end{uakeybox}
+\end{frame}
+
+% ID: C08-G06
+\begin{frame}{Por qué se llama consistencia externa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Si un cliente recibe el commit de $T_1$ y después inicia $T_2$, toda serialización válida debe respetar:
+\[
+T_1<T_2
+\]
+Se llama externa porque respeta el orden observado por clientes fuera del motor, no solo algún orden serial internamente válido.
+\end{frame}
+
+\UASectionSlide{Integración y cierre}
+
+% ID: C08-I01
+\begin{frame}{Cada mecanismo responde una pregunta distinta}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{tabular}{p{0.23\textwidth}p{0.63\textwidth}}
+\toprule
+\textbf{Mecanismo} & \textbf{Pregunta}\\
+\midrule
+Lamport/vector & ¿qué eventos están relacionados o son concurrentes?\\
+Raft/Paxos & ¿qué comando se convierte en decisión autoritativa?\\
+WAL local & ¿qué recuerda cada nodo después de un crash?\\
+Kafka & ¿qué hechos pueden leer y reprocesar otros componentes?\\
+CAP/PACELC & ¿qué error y qué costo aceptamos bajo red imperfecta?\\
+Dynamo & ¿cómo seguir respondiendo y reparar divergencia?\\
+Spanner & ¿cómo sostener transacciones globales y orden externo?\\
+\bottomrule
+\end{tabular}
+\end{frame}
+
+% ID: C08-I02
+\begin{frame}{Actividad integradora: cuatro operaciones, cuatro decisiones}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+Para cada operación declare invariante, mecanismo, comportamiento bajo partición, costo normal y prueba de falla:
+\begin{enumerate}
+\item última entrada VIP;
+\item carrito compartido;
+\item líder del control plane;
+\item ranking global que entrega premios.
+\end{enumerate}
+\end{frame}
+
+% ID: C08-I03
 \begin{frame}{Exit ticket}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
-Responda en cuatro líneas cada punto:
+\small
+Responda en una frase cada punto:
 \begin{enumerate}
-\item ¿Por qué ``dos de tres'' es una explicación insuficiente de CAP?
-\item ¿Qué agrega PACELC cuando no hay partición?
-\item ¿Qué garantiza $R+W>N$ y qué no garantiza?
-\item ¿Por qué TrueTime expone un intervalo y cómo aparece su costo en commit?
+\item ¿Por qué $L(a)<L(b)$ no prueba causalidad?
+\item ¿Cómo detecta un vector que dos eventos son concurrentes?
+\item ¿Cuándo queda committed la entrada 87 en Raft?
+\item ¿Qué diferencia hay entre log de consenso, WAL y Kafka?
+\item ¿Por qué $R+W>N$ no implica linearizabilidad?
+\item ¿Qué costo paga Spanner para obtener orden externo?
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{Fuentes para profundizar}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+% ID: C08-I04
+\begin{frame}{Bibliografía guiada}
+\UASlideTag{RESPALDO}{UAIngNavy}
+\footnotesize
 \begin{itemize}
-\item Gilbert y Lynch, \emph{Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services}.
-\item Abadi, \emph{Consistency Tradeoffs in Modern Distributed Database System Design}.
-\item DeCandia et al., \emph{Dynamo: Amazon's Highly Available Key-value Store}.
-\item Corbett et al., \emph{Spanner: Google's Globally-Distributed Database}.
-\item Kleppmann, \emph{Designing Data-Intensive Applications}: replicación, particiones y consistencia.
+\item Kleppmann, \emph{Designing Data-Intensive Applications}, caps. 5, 8 y 9.
+\item Lamport, \emph{Time, Clocks, and the Ordering of Events}.
+\item Ongaro y Ousterhout, \emph{In Search of an Understandable Consensus Algorithm}.
+\item Lamport, \emph{Paxos Made Simple}.
+\item DeCandia et al., \emph{Dynamo}.
+\item Corbett et al., \emph{Spanner}.
 \end{itemize}
 \end{frame}
 

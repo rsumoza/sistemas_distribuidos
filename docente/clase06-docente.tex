@@ -20,7 +20,7 @@
 
 \section{Parte A: guion operativo para 180 minutos}
 
-\subsection{Propósito pedagógico profundo}
+\subsection{Objetivo pedagógico profundo}
 
 Esta clase inaugura el bloque de storage y debe producir dos efectos simultáneos:
 
@@ -66,6 +66,10 @@ Al terminar, el estudiante debería poder:
 \item interpretar conjuntamente ingreso, capacidad de compactación, archivos L0 y p99;
 \item comparar una solución para CampusShop y otra para telemetría del campus.
 \end{itemize}
+
+\section{Arquitectura didáctica v9}
+
+La clase se organiza en bloques de exposición breve, predicción, representación visual, actividad y cierre. El objetivo no es recorrer todos los términos linealmente, sino alternar explicación y evidencia para sostener la comprensión durante las tres horas.
 
 \subsection{Arquitectura temporal de 180 minutos}
 
@@ -182,6 +186,19 @@ En el extremo superior mantener visible:
 \text{problema} \rightarrow \text{mecanismo} \rightarrow
 \text{garantía} \rightarrow \text{costo} \rightarrow \text{evidencia}.
 \]
+
+\subsection{Demostraciones}
+
+Las demostraciones no son intermedios decorativos: cada una debe comprobar una afirmación concreta y terminar con una evidencia que los estudiantes puedan explicar.
+
+\begin{enumerate}
+\item \textbf{Recovery conceptual.} Entregar tarjetas \texttt{BEGIN}, \texttt{WAL UPDATE}, \texttt{COMMIT}, \texttt{ACK}, \texttt{CRASH} y \texttt{REDO}. Mover el crash antes y después de la frontera durable y pedir que indiquen qué debe aparecer tras recovery.
+\item \textbf{Plan de ejecución.} Mostrar la misma consulta con \texttt{EXPLAIN ANALYZE} antes y después de crear el índice compuesto. Comparar tipo de scan, filas, sort, buffers y costo agregado a escrituras.
+\item \textbf{MVCC humano.} Un estudiante representa un reporte con snapshot antiguo; otro confirma una nueva versión. Preguntar qué versión ve cada lector y cuándo la anterior puede reclamarse.
+\item \textbf{Compactación manual.} Fusionar dos listas ordenadas y un tombstone, contando bytes leídos y reescritos. Relacionar el resultado con amplificación, backlog y write stall.
+\end{enumerate}
+
+Para cada demostración, cierre con cuatro preguntas: qué problema resuelve, qué garantiza, qué no garantiza y qué costo desplaza.
 
 \subsection{Guion de apertura, 0--10 minutos}
 
@@ -535,7 +552,7 @@ Frase de cierre:
 ``El storage no es una caja debajo del sistema. Es donde las promesas se convierten en bytes, esperas, recovery y riesgos medibles.''
 \end{quote}
 
-\section{Parte B: dossier técnico de preparación}
+\section{Parte B: dossier técnico de preparación del docente}
 
 \subsection{Modelo mental completo}
 
@@ -781,7 +798,7 @@ La pendiente del backlog es una métrica causal:
 
 Un backlog grande pero decreciente puede ser menos preocupante que uno menor con pendiente positiva persistente.
 
-\subsection{Cómo explicar cada concepto en tres profundidades}
+\subsection{Cómo explicar los conceptos en tres profundidades}
 
 \subsubsection*{WAL}
 
@@ -814,6 +831,10 @@ Un backlog grande pero decreciente puede ser menos preocupante que uno menor con
 \textbf{2 minutos.} Recorrer write path, SSTables, read path, tombstones y falsos positivos.
 
 \textbf{5 minutos.} Agregar amplificaciones, leveled/tiered, backlog slope, archivos L0, stall y SLO.
+
+\section{Preguntas socráticas}
+
+Las siguientes preguntas se utilizan para conducir la clase y recuperar el razonamiento del estudiante antes de ofrecer una respuesta técnica. Conviene formularlas sobre el caso CampusShop, esperar una hipótesis y recién después completar la explicación.
 
 \subsection{Banco de preguntas previsibles}
 
@@ -871,6 +892,12 @@ Un backlog grande pero decreciente puede ser menos preocupante que uno menor con
 
 \section{Parte C: evaluación, auditoría y evidencias}
 
+\subsection*{Parte C: auditoría}
+
+\section{Criterios de evaluación formativa}
+
+La evaluación formativa observa si el estudiante relaciona una promesa con la falla considerada, el mecanismo que la sostiene, el costo desplazado y la evidencia que permitiría verificarla.
+
 \subsection{Alineación constructiva}
 
 \begin{center}
@@ -889,7 +916,7 @@ Diseñar & CampusShop vs telemetría & Defensa de 90 segundos & Falla, garantía
 \end{tabular}
 \end{center}
 
-\subsection{Evaluación formativa}
+\subsection{Rúbrica de logro}
 
 \begin{center}
 \begin{tabular}{p{0.18\textwidth}p{0.68\textwidth}}
@@ -903,6 +930,8 @@ Avanzado & Compara alternativas, cuantifica costo y propone experimento refutabl
 \bottomrule
 \end{tabular}
 \end{center}
+
+\section{Auditoría y evidencias}
 
 \subsection{Preguntas que puede formular un auditor pedagógico}
 
@@ -962,7 +991,25 @@ Las respuestas están desarrolladas en la Parte B. Antes de la clase, practique 
 \item ajuste para la clase 7 basado en una duda recurrente.
 \end{itemize}
 
-\subsection{Criterios de corrección de la guía}
+\subsection{Matriz de corrección y preguntas de defensa}
+
+La corrección debe evaluar razonamiento y no solo vocabulario. Use la siguiente matriz:
+
+\begin{center}
+\small
+\begin{tabular}{p{0.23\textwidth}p{0.29\textwidth}p{0.31\textwidth}}
+\toprule
+Dimensión & Evidencia mínima & Pregunta de defensa \\
+\midrule
+Problema y objeto & Identifica transacción, página, versión, consulta o SSTable & ¿Qué objeto exacto cambia o se recupera? \\
+Falla & Declara crash, pérdida de energía, timeout o sobrecarga & ¿En qué punto de la ejecución coloca la falla? \\
+Garantía & Formula el comportamiento observable correcto & ¿Qué debe seguir siendo verdadero después de la falla? \\
+Mecanismo & Explica orden, frontera o regla de visibilidad & ¿Qué parte del mecanismo sostiene esa garantía? \\
+Costo & Señala espera, I/O, espacio, mantenimiento o complejidad & ¿Dónde se paga la decisión? \\
+Evidencia & Propone métrica, plan, timeline o experimento & ¿Qué observación podría refutar su hipótesis? \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 Para cada ejercicio, una respuesta lograda debe contener:
 
@@ -989,6 +1036,21 @@ Errores graves que deben corregirse explícitamente:
 \item ``archivo imposible'' sin aclaración;
 \item ``stall aumenta capacidad'';
 \item ``LSM siempre es más rápida''.
+\end{itemize}
+
+\subsection{Errores previsibles}
+
+Los errores siguientes son diagnósticos del modelo mental del estudiante. No basta con indicar que la respuesta es incorrecta; conviene volver al caso, mover la falla y pedir evidencia.
+
+\begin{itemize}
+\item \textbf{``COMMIT significa página en SSD''.} Separar registro de commit durable de materialización posterior de páginas.
+\item \textbf{``Replicar en RAM vuelve durable''.} Distinguir cantidad de copias, persistencia y falla común.
+\item \textbf{``WAL garantiza exactamente una vez''.} Volver a la identidad 9F2A y a la atomicidad entre efecto y registro idempotente.
+\item \textbf{``MVCC elimina todos los locks y anomalías''.} Recuperar write skew, DDL e invariantes.
+\item \textbf{``Un índice siempre mejora''.} Pedir el plan, selectividad y costo sobre inserciones.
+\item \textbf{``Bloom confirma que la clave existe''.} Recordar que solo puede demostrar algunas ausencias; un positivo significa ``posiblemente presente''.
+\item \textbf{``LSM elimina el costo de escribir''.} Mostrar compaction, amplificación y backlog.
+\item \textbf{``Un stall es una falla del motor''.} Explicar que es backpressure protector; su frecuencia puede revelar falta de capacidad.
 \end{itemize}
 
 \subsection{Contingencias}
@@ -1037,6 +1099,23 @@ Antes de dictar, confirmar que puede explicar sin mirar:
 \item leveled frente a tiered;
 \item una defensa completa para CampusShop y otra para telemetría.
 \end{itemize}
+
+\subsection{Trabajo Final Integrador}
+
+La Clase 06 debe dejar una evidencia reutilizable en el Trabajo Final Integrador. Cada grupo debe incorporar, para al menos un componente de su sistema:
+
+\begin{enumerate}
+\item patrón de lectura y escritura, volumen, crecimiento y skew;
+\item dato crítico e invariante asociado;
+\item frontera de durabilidad y modelo de falla;
+\item estrategia de recuperación y pérdida máxima tolerable;
+\item elección razonada entre árbol B, LSM o una combinación;
+\item costo desplazado: WAL, índices, versiones, compactación o stalls;
+\item dos métricas y un experimento de falla o carga;
+\item condición explícita para revisar la decisión.
+\end{enumerate}
+
+No se acepta ``usaremos X porque escala''. En la defensa, el grupo debe responder qué garantiza X, ante qué falla, dónde se paga y qué evidencia mostraría que la elección fue incorrecta.
 
 \subsection{Bibliografía priorizada para el docente}
 
