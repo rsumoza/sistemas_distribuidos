@@ -2,6 +2,20 @@
 \documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
 \input{../config/course-config}
 
+% Fallback local para mantener el archivo portable entre el entorno local y CI.
+% Algunas versiones del estilo compartido no definen todavía el entorno uacase.
+\makeatletter
+\@ifundefined{uacase}{%
+  \newtcolorbox{uacase}{%
+    enhanced,breakable,
+    colback=white,colframe=UAIngOrange,
+    boxrule=0.9pt,arc=1.6mm,
+    left=3mm,right=3mm,top=2mm,bottom=2mm,
+    title=\textbf{Caso real},
+    colbacktitle=UAIngOrange,coltitle=white}%
+}{}
+\makeatother
+
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
 \title{\UACourse}
