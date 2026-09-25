@@ -1,195 +1,119 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-\UASetSemester{Segundo cuatrimestre 2026}
-\UASetDate{2026}
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real}
+\UASetClassTitle{Causalidad, consenso y consistencia distribuida}
 \title{Clase 08 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
-\section{Propósito de la guía}
-Cada ejercicio obliga a declarar el dato, operación, invariante, comportamiento bajo partición y costo en operación normal.
+\section{Propósito}
+Esta guía transforma cada concepto de la clase en una ejecución que debe reconstruirse. No se evalúa la cantidad de nombres recordados, sino la coherencia entre problema, información disponible, falla, garantía, mecanismo, costo y evidencia.
+\section{Ruta de uso}
+\subsection{Ruta recomendada de uso}
+La guía está pensada para tres pasadas. En la primera, resuelva sin consultar los apuntes y marque con un signo de interrogación cada supuesto que no pueda justificar. En la segunda, compare su timeline, conjuntos o genealogía con el material de clase y corrija únicamente aquello que pueda explicar. En la tercera, redacte una defensa breve que incluya garantía, falla, costo y evidencia. No convierta la guía en un glosario: cada respuesta debe reconstruir una ejecución.
 
-\section{Caso base y datos de trabajo}
+\begin{itemize}
+\item \textbf{Durante la clase:} 1, 2, 3, 4, 7, 8, 13, 16 y 20.
+\item \textbf{Consolidación:} 5, 6, 9, 10, 11, 12, 14 y 15.
+\item \textbf{Desafío/Trabajo Final:} 17, 18 y 19.
+\end{itemize}
+En ejercicios temporales incluya timeline; en quórums, conjuntos; en versiones, genealogía; en Spanner, intervalo y condición de espera.
 
-Se utilizarán dos dominios para evitar respuestas automáticas:
-
-\begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
-\toprule
-Dimensión & GlobalTickets & Asteria Online \\
-\midrule
-Dato crítico & último asiento & castillo / inventario / ranking \\
-Regiones & Buenos Aires, Virginia, Frankfurt & tres regiones de juego \\
-Latencia interregional & 140--220 ms & 120--190 ms \\
-Partición de prueba & 90 s & 60 s \\
-Error intolerable & doble reserva & doble propiedad / objeto duplicado \\
-Error tolerable & feed de disponibilidad atrasado & ranking o presencia atrasados \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\section{Método esperado de resolución}
-
-Para cada operación:
+\section{Formato esperado de cada respuesta}
+Cada ejercicio debe resolverse con una estructura mínima común:
 \begin{enumerate}
-\item declare el invariante;
-\item especifique qué observa el cliente;
-\item describa la partición o latencia relevante;
-\item elija qué se rechaza, permite divergir o coordina;
-\item calcule quorum o compare versiones cuando corresponda;
-\item indique cómo se repara y qué métrica demuestra convergencia;
-\item explicite el costo durante operación normal mediante PACELC.
+\item \textbf{Actores y estado inicial:} qué sabe cada nodo antes del primer mensaje.
+\item \textbf{Operación e invariante:} qué intenta hacer el cliente y qué historia está prohibida.
+\item \textbf{Falla o concurrencia:} timeout, crash, pausa, partición o escrituras simultáneas.
+\item \textbf{Mecanismo:} regla de reloj, mayoría, quórum, versión, repair o espera.
+\item \textbf{Frontera de respuesta:} evento exacto que vuelve legítimo el ACK o resultado visible.
+\item \textbf{Costo y límite:} latencia, indisponibilidad, metadatos, conflicto o deuda operativa.
+\item \textbf{Evidencia:} timeline, métrica, consulta, prueba de falla o contraejemplo.
 \end{enumerate}
-
-\begin{uawarn}
-No se aceptan etiquetas ``AP'' o ``CP'' aplicadas a todo el producto sin analizar dato y operación.
-\end{uawarn}
-
-
-\section{Ruta recomendada de uso}
-
-La clase debe privilegiar decisiones por operación, no una cobertura apresurada de etiquetas:
-
-\begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.23\textwidth}p{0.46\textwidth}}
-\toprule
-Momento & Ejercicios & Evidencia \\
-\midrule
-En clase & 1, 2, 3, 6, 9, 17, 19 & ejecución CAP, quorums, versiones y diseño híbrido \\
-Postclase & 4, 5, 7, 10--13, 15, 16 & mecanismos y reparación \\
-Desafío & 8, 14, 18, 20 & límites de intersección, Merkle, consenso y partición \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-La unidad de análisis es siempre \textbf{dato + operación + invariante + partición}. No se considera suficiente clasificar una base completa como AP o CP.
-
+Una respuesta que solo nombra ``Raft'', ``CAP'' o ``Dynamo'' se considera incompleta. Debe explicar cómo cambia la observación del usuario al mover un mensaje o una falla. Cuando haya varias alternativas correctas, declare el supuesto que hace válida su elección y la condición bajo la cual la revisaría.
 
 \section{Ejercicios}
 \begin{uaexercise}
-
-\textbf{1. CAP sin slogan.} Explique la condición exacta en la que aparece el trade-off CAP y por qué 'elegir dos de tres' es una formulación engañosa.
-
-\textit{Entregable mínimo:} una ejecución mínima con dos réplicas y una corrección del slogan.
+\textbf{1. Timeout e indistinguibilidad.} Buenos Aires envía una reserva a Madrid y recibe timeout. Enumere cuatro historias compatibles con esa observación. Para cada una, indique qué evidencia adicional permitiría distinguirla.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{2. Disponibilidad CAP.} Un nodo responde 'no puedo operar sin quorum'. ¿Es disponible en el sentido CAP? Justifique y distinga de uptime general.
-
-\textit{Entregable mínimo:} una comparación explícita entre availability CAP, uptime y respuesta de error.
+\textbf{2. Happened-before.} Dibuje tres líneas de proceso ---BA, líder y Madrid--- para click, send, receive y append. Marque dos relaciones causales, una relación transitiva y un par concurrente.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{3. Partición bancaria.} Dos regiones con saldo 100 reciben retiros de 80 durante una partición. Diseñe una respuesta CP y una AP y analice el resultado.
-
-\textit{Entregable mínimo:} dos timelines y el invariante final en cada política.
+\textbf{3. Lamport.} Asigne timestamps de Lamport a la ejecución anterior. Justifique la regla $L\leftarrow\max(L,t_m)+1$ y construya un par con $L(a)<L(b)$ pero sin $a\rightarrow b$.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{4. PACELC.} Compare una lectura local de 15 ms potencialmente atrasada con una lectura coordinada de 180 ms. Identifique la decisión PACELC.
-
-\textit{Entregable mínimo:} una tabla latencia/garantía y una decisión por operación.
+\textbf{4. Relojes vectoriales.} Con componentes [BA, Madrid, Líder], calcule los vectores hasta que el líder recibe ambas reservas. Explique por qué el resultado del líder es [2,2,3] y no [2,2,5].
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{5. Consistent hashing.} Explique qué remapeo evita consistent hashing al agregar un nodo y por qué no elimina hot keys.
-
-\textit{Entregable mínimo:} un anillo antes/después, porcentaje aproximado de remapeo y hot key.
+\textbf{5. Máquina de estados.} Defina estados y transiciones para VIP-01. Incluya reserva de Sofía, reserva de Tomás y repetición idempotente de un comando ya aplicado.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{6. Quórum intersectante.} Para N=5, proponga dos pares R,W con intersección y compare latencia y disponibilidad.
-
-\textit{Entregable mínimo:} dos configuraciones numéricas, tolerancia a fallas y costo de latencia.
+\textbf{6. Safety y liveness.} Formule dos propiedades de safety y dos condiciones de liveness para el cluster de cinco réplicas. Muestre una ejecución que conserva safety pero pierde liveness.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{7. Quórum no intersectante.} Para N=3,R=1,W=1, construya un stale read después de una escritura exitosa.
-
-\textit{Entregable mínimo:} una historia con conjuntos de réplicas y valor leído.
+\textbf{7. Raft y frontera de commit.} Complete los logs de N1--N5 cuando N1 propone la entrada 87 en term 12. Marque cuándo está local, replicada, committed, aplicada y confirmada.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{8. Límite de R+W>N.} Explique por qué la intersección combinatoria no garantiza por sí sola linearizabilidad en un sistema Dynamo-like.
-
-\textit{Entregable mínimo:} una lista de supuestos adicionales necesarios para linearizabilidad.
+\textbf{8. Crash móvil.} Analice dos crashes del líder: uno después del append local y otro después de la mayoría pero antes del ACK. Indique qué puede responder el nuevo líder y qué debería observar Sofía.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{9. Version vectors.} Dadas versiones [A:2,B:1], [A:2,B:3] y [A:4,B:1], determine dominación o concurrencia y proponga reconciliación.
-
-\textit{Entregable mínimo:} comparaciones componente a componente y regla de merge.
+\textbf{9. Total-order broadcast.} Explique por qué una máquina de estados replicada necesita los mismos comandos en el mismo orden. Dé un contraejemplo donde timestamps Lamport no basten.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{10. Last-write-wins.} Construya un caso donde LWW pierda una actualización válida por relojes desalineados o concurrencia.
-
-\textit{Entregable mínimo:} un timeline con relojes o concurrencia y actualización perdida.
+\textbf{10. Pausa, GC y fencing.} N1 se pausa; N2 es elegido en un término mayor; N1 despierta y escribe sobre un recurso externo. Diseñe una protección mediante término y otra mediante fencing token.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{11. Sloppy quorum.} Explique cómo una escritura aceptada en un nodo alternativo mejora disponibilidad y complica lecturas y reparación.
-
-\textit{Entregable mínimo:} un diagrama de preferencias, nodo temporal, lectura y deuda de reparación.
+\textbf{11. Raft y Multi-Paxos.} Mapee term, index, leader y followers a ballot, slot, proposer y acceptors para la decisión 87. Identifique la abstracción común y una diferencia operacional.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{12. Hinted handoff.} Diseñe estados y métricas para controlar hints acumulados durante una falla prolongada.
-
-\textit{Entregable mínimo:} una máquina de estados de hints y cuatro métricas.
+\textbf{12. Tres logs.} Para log de consenso, WAL local y log Kafka, indique productor, unidad, garantía, recovery y una confusión frecuente.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{13. Read repair.} Construya una lectura que descubre una réplica atrasada. Explique cuándo reparar sin bloquear demasiado al cliente.
-
-\textit{Entregable mínimo:} un timeline de lectura y decisión entre reparación síncrona o asíncrona.
+\textbf{13. CAP sin slogan.} Durante una partición 3|2, Sofía ya fue committed en la mayoría y Tomás llega a la minoría. Compare responder éxito, rechazo y pendiente. Identifique qué propiedad se sacrifica.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{14. Merkle trees.} Explique cómo dos réplicas localizan un rango divergente sin intercambiar todas las claves.
-
-\textit{Entregable mínimo:} un árbol de hashes pequeño con el rango divergente identificado.
+\textbf{14. PACELC y recencia.} Compare una lectura local de 15 ms posiblemente atrasada con una coordinada de 180 ms. Proponga dos operaciones que elijan políticas distintas y métricas para evaluarlas.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{15. Dynamo y carrito.} Diseñe una regla de merge para carritos concurrentes. Identifique un caso donde la unión simple no sea suficiente.
-
-\textit{Entregable mínimo:} una regla de merge, contraejemplo y prueba de propiedades.
+\textbf{15. Consistencia.} Diferencie recencia, linearizabilidad, serializabilidad y consistencia externa mediante cuatro historias mínimas.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{16. TrueTime.} Explique por qué un intervalo de tiempo puede ser más útil que un timestamp aparentemente exacto.
-
-\textit{Entregable mínimo:} un intervalo TrueTime con cálculo de incertidumbre y explicación.
+\textbf{16. Mayoría vs quorum.} Compare mayoría Raft con N=5,R=3,W=3 en un sistema Dynamo-like. Explique por qué tres respuestas no significan lo mismo.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{17. Commit wait.} Construya dos transacciones T1 y T2 y explique cómo commit wait preserva el orden externo observable.
-
-\textit{Entregable mínimo:} dos transacciones con tiempos, timestamps y espera necesaria.
+\textbf{17. Límites de R+W>N.} Construya tres contraejemplos: escrituras concurrentes, sloppy quorum y last-write-wins con reloj desalineado. En cada uno explique qué intersección existe y qué garantía falta.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{18. Consenso localizado.} Explique por qué Spanner no puede usar un consenso global único para cada operación y cómo particiona la coordinación.
-
-\textit{Entregable mínimo:} un diagrama de grupos de consenso y coordinación entre grupos.
+\textbf{18. Versiones y merge.} Modele un carrito con dos versiones concurrentes y diseñe un merge. Luego aplique la misma estrategia a VIP-01 y explique por qué falla.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{19. Arquitectura híbrida.} Diseñe garantías distintas para perfil, feed, reserva de asiento, inventario y ledger en una misma plataforma.
-
-\textit{Entregable mínimo:} una matriz por subsistema con invariante, política y métrica.
+\textbf{19. Dynamo y reparación.} Diseñe una ejecución con nodo preferido caído, sloppy quorum, hint, hinted handoff, read repair y anti-entropy. Defina cuatro métricas de deuda de reparación.
 \end{uaexercise}
+
 \begin{uaexercise}
-
-\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma global de entradas y proponga una prueba de partición interregional.
-
-\textit{Entregable mínimo:} D=(P,F,G,S,T), timeline de partición y criterios de éxito.
+\textbf{20. Spanner y TrueTime.} Una transacción multi-grupo recibe $TT.now()=[4,16]$ ms y el coordinador elige $s=16$ ms. Muestre cuándo puede hacerse visible, explique external consistency y analice qué cambia si aumenta la incertidumbre.
 \end{uaexercise}
 \section{Criterios de entrega}
-No se aceptan clasificaciones AP/CP sin análisis por operación. Incluya timeline, quorum o versión cuando corresponda.
+Toda respuesta debe declarar supuestos, frontera de garantía, falla cubierta, costo desplazado y una observación que permitiría refutar la explicación.
 \end{document}

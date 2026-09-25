@@ -1,557 +1,569 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{ua-engineering-v6-article}
+\usepackage{longtable,array}
 \input{../config/course-config}
-\UASetSemester{Segundo cuatrimestre 2026}
-\UASetDate{2026}
 
 \UASetClassNumber{08}
-\UASetClassTitle{Consistencia real}
-\title{Clase 08 --- CAP, PACELC, Dynamo y Spanner}
+\UASetClassTitle{Causalidad, consenso y consistencia distribuida}
+\title{Clase 08 --- Una entrada VIP, cinco réplicas y una sola historia}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
 \maketitle
 
-\section{Propósito de la clase}
+\section{Propósito y pregunta transversal}
 
-Esta clase toma conceptos que a menudo se enseñan como etiquetas y los vuelve decisiones de arquitectura. CAP, PACELC, Dynamo y Spanner no deben memorizarse como siglas o productos; deben usarse para responder una pregunta concreta: \emph{qué error es más costoso para este dominio y qué costo está dispuesto a pagar el sistema para evitarlo}.
+En esta clase seguiremos el destino de una única entrada VIP que Sofía y Tomás intentan comprar casi al mismo tiempo desde regiones diferentes. Como los nodos no comparten una visión instantánea del sistema ni pueden confiar en un reloj global perfecto, primero utilizaremos causalidad y relojes lógicos para comprender qué eventos están relacionados y cuáles son concurrentes. Luego veremos cómo Raft y Paxos permiten que varias réplicas acuerden una sola decisión autoritativa, y cómo CAP y PACELC obligan a decidir entre esperar, rechazar, responder con información potencialmente atrasada o reparar más tarde. Finalmente, compararemos dos estrategias reales: Dynamo, que favorece disponibilidad conservando versiones y pagando reconciliación, y Spanner, que utiliza consenso y TrueTime para sostener transacciones globales con un orden compatible con lo observado por los usuarios. La pregunta que une toda la clase será: qué error resulta inaceptable para cada operación y qué costo ---latencia, indisponibilidad, coordinación o reparación--- estamos dispuestos a pagar para evitarlo.
 
-Las clases previas ya mostraron que:
-\begin{itemize}
-\item la red puede partirse;
-\item las réplicas pueden divergir;
-\item el consenso impone un orden a costa de coordinación;
-\item los logs y particiones ofrecen orden local, no global;
-\item la aplicación debe definir qué significa un efecto correcto.
-\end{itemize}
+El objetivo no es memorizar una colección de nombres. Para cada mecanismo responderemos:
+
+\begin{center}
+\begin{tabular}{p{0.23\textwidth}p{0.65\textwidth}}
+\toprule
+\textbf{Pregunta} & \textbf{Qué debe quedar explícito}\\
+\midrule
+¿Qué problema aparece? & operación, actores, información disponible y modelo de falla.\\
+¿Qué garantía necesitamos? & observación permitida, invariante o propiedad de progreso.\\
+¿Qué mecanismo la sostiene? & reloj, mayoría, protocolo, versión, reparación o espera.\\
+¿Qué no garantiza? & frontera de la abstracción y supuestos que quedan fuera.\\
+¿Qué cuesta? & latencia, rechazo, metadatos, espacio, operación o complejidad.\\
+¿Cómo lo comprobamos? & timeline, métrica, prueba de falla o contraejemplo.\\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \begin{uakeybox}
-La consistencia real no es una propiedad única del sistema. Es una política por dato y operación, condicionada por fallas, latencia y costo del error.
+La unidad de razonamiento será siempre una ejecución concreta. Dibuje primero qué sabe cada nodo y recién después nombre la propiedad o el algoritmo.
 \end{uakeybox}
 
+\section{Método de estudio: Cómo estudiar este capítulo}
+Use siempre la secuencia problema--falla--garantía--mecanismo--costo--evidencia. Primero reconstruya la ejecución normal; luego mueva un timeout, crash o partición; finalmente indique qué observación permitiría verificar o refutar la explicación. No memorice siglas sin asociarlas con el caso VIP-01.
 
-
-\section{Cómo estudiar este capítulo}
-
-Este capítulo está organizado en tres pasadas. La primera construye una intuición con un caso real; la segunda formaliza el mecanismo y sus supuestos; la tercera somete la solución a una falla o a una medición. Para estudiar de manera eficaz:
-
-\begin{enumerate}
-\item explique primero el problema sin mencionar una tecnología;
-\item dibuje la ejecución normal y mueva el punto de falla;
-\item identifique la garantía exacta y su frontera;
-\item anote qué costo se desplaza hacia latencia, almacenamiento, reparación u operación;
-\item cierre proponiendo una métrica o un experimento que podría refutar su diseño.
-\end{enumerate}
-
-\begin{uainfo}
-Las analogías del capítulo son puertas de entrada, no definiciones finales. Una respuesta completa debe poder abandonar la analogía y utilizar el vocabulario técnico correspondiente.
-\end{uainfo}
 
 \section{Mapa intuitivo antes del formalismo}
 
-CAP y PACELC suelen convertirse en siglas memorizadas. Para evitarlo, partimos de ocho imágenes mentales:
+Antes de usar ecuaciones o nombres de protocolos, conserve cinco imágenes mentales. No reemplazan la definición técnica: preparan la pregunta que la definición deberá responder.
+
+\begin{longtable}{p{0.23\textwidth}p{0.31\textwidth}p{0.34\textwidth}}
+\toprule
+\textbf{Idea} & \textbf{Imagen mental} & \textbf{Pregunta que habilita}\\
+\midrule
+Falla parcial & Un teléfono que deja de contestar sin revelar si la otra persona está ausente, ocupada o si se cortó la línea. & ¿Qué sabe realmente el emisor después de un timeout?\\
+Causalidad & Dos ramas de una conversación que todavía no intercambiaron información. & ¿Un evento pudo influir sobre el otro o son concurrentes?\\
+Consenso & Cinco escribanos que deben asentar una única decisión en la misma posición del libro. & ¿Qué comando queda autorizado y qué mayoría permite recordarlo?\\
+Dynamo & Varias libretas que aceptan cambios durante el aislamiento y luego comparan genealogías. & ¿El conflicto puede conservarse, fusionarse y repararse?\\
+Spanner & Un reloj que no finge exactitud: entrega una ventana donde sabe que se encuentra el tiempo real. & ¿Cuánto debe esperar una transacción para respetar el orden externo?\\
+\bottomrule
+\end{longtable}
+
+\begin{uakeybox}
+La intuición útil siempre debe terminar en una ejecución verificable. Si la imagen mental no permite ubicar actores, mensajes, estado durable y punto de falla, todavía no alcanza para defender una garantía.
+\end{uakeybox}
+
+\section{Puente desde Kafka}
+
+\subsection{El ejemplo del Mundial}
+
+Un productor observa eventos de un partido y publica registros como \texttt{MatchStarted}, \texttt{GoalScored}, \texttt{YellowCard} o \texttt{Substitution}. Kafka los conserva en un log particionado; un consumidor los lee y actualiza el marcador. Cuando hay muchos partidos, una única secuencia concentra red, CPU, almacenamiento y consumo. La solución consiste en particionar por una clave estable, por ejemplo \texttt{game\_id}.
+
+Si todos los eventos del partido A usan la misma clave, quedan en la misma partición y conservan su orden de append:
+
+\[
+\texttt{Started(A)}\rightarrow\texttt{Goal(A)}\rightarrow\texttt{YellowCard(A)}.
+\]
+
+Los partidos A, B y C pueden avanzar en paralelo porque están en particiones distintas. Sin embargo, no existe un offset global gratuito entre esas particiones.
+
+\subsection{Consumer groups, replay e idempotencia}
+
+Un consumer group distribuye particiones completas entre instancias de la misma aplicación. Una partición tiene una sola instancia activa dentro del grupo en un momento dado. Grupos diferentes pueden recorrer la misma historia con offsets independientes.
+
+Si un consumidor produce un efecto y cae antes de confirmar su progreso, el mismo registro puede reaparecer. Esa semántica \emph{at-least-once} exige que el efecto sea idempotente o que efecto e identidad procesada se registren de manera atómica.
+
+\subsection{RF, ISR, minISR y acks}
+
+Una configuración frecuente es:
+
+\[
+RF=3,\qquad \texttt{min.insync.replicas}=2,\qquad \texttt{acks=all}.
+\]
+
+\begin{itemize}
+\item \textbf{RF=3}: la partición tiene un líder y dos seguidores configurados.
+\item \textbf{ISR}: conjunto de réplicas suficientemente sincronizadas con el líder.
+\item \textbf{minISR=2}: con \texttt{acks=all}, la escritura solo se acepta si al menos dos réplicas están en ISR.
+\item \textbf{acks=all}: el productor recibe éxito cuando todas las réplicas del ISR actual confirman el batch.
+\end{itemize}
+
+Con dos miembros en ISR se puede seguir produciendo y quedan dos copias sincronizadas. Si solo queda una, la escritura se rechaza en vez de reconocerse con una única copia.
+
+Como guardrails docentes ---no como máximos universales--- usaremos mensajes habituales menores a 1 MB, alrededor de 1 TB retenido por broker y un presupuesto conservador menor a 10 MB/s de ingreso por broker para ejercicios. La capacidad real depende de tamaño de batch, compresión, almacenamiento, red, número de particiones, replicación y patrón de consumo.
+
+\subsection{El límite que motiva la clase}
+
+Kafka preserva y distribuye registros. No decide por sí solo cuál de dos comandos incompatibles se convierte en la decisión autoritativa sobre un recurso indivisible. Si Buenos Aires y Madrid intentan vender la única \texttt{VIP-01}, conservar ambas solicitudes no alcanza: el sistema debe seleccionar una única transición válida.
+
+\section{Por qué importa en sistemas reales}
+
+\subsection{Kubernetes y etcd}
+
+Kubernetes administra el estado deseado y observado de un cluster. El API server utiliza etcd como almacén consistente de ese estado. etcd replica un log mediante Raft: un líder propone cambios, una mayoría los compromete y cada miembro aplica el mismo orden a su máquina de estados clave--valor.
+
+\subsection{Amazon Dynamo}
+
+Dynamo fue un almacén clave--valor diseñado para servicios que priorizaban continuar respondiendo. Bajo determinadas fallas podía conservar ramas concurrentes y resolverlas posteriormente. El carrito de compras ilustra un conflicto que puede fusionarse: agregar un libro en una región y auriculares en otra puede terminar en un carrito con ambos ítems.
+
+\subsection{Google Spanner}
+
+Spanner es una base de datos distribuida globalmente. Divide los datos en grupos replicados, usa consenso dentro de esos grupos y coordina transacciones que abarcan varios grupos. TrueTime expone un intervalo de incertidumbre temporal, lo que permite pagar una espera explícita para ofrecer consistencia externa.
+
+\section{Modelo mínimo de réplica, red y falla}
+
+Una réplica combina:
+
+\begin{itemize}
+\item un proceso que ejecuta código;
+\item estado temporal en RAM;
+\item estado persistente recuperable después de un reinicio;
+\item una interfaz de red para enviar y recibir mensajes.
+\end{itemize}
+
+Debemos distinguir tres situaciones:
+
+\begin{enumerate}
+\item \textbf{sana y comunicada}: procesa y recibe mensajes dentro del plazo esperado;
+\item \textbf{sana pero aislada}: sigue ejecutando localmente, pero no puede coordinar con otro grupo;
+\item \textbf{caída o pausada}: deja de ejecutar pasos durante cierto período.
+\end{enumerate}
+
+Un timeout solo prueba que el emisor no recibió una respuesta antes de su plazo. Es compatible con varias historias: el request no llegó, el receptor está lento o pausado, la operación se ejecutó y la respuesta se perdió, o la red está particionada. Esta indistinguibilidad explica por qué aparecen IDs idempotentes, términos, mayorías, fencing y logs durables.
+
+\section{Caso conductor: una entrada y cinco réplicas}
+
+El recurso es \texttt{VIP-01} y el estado inicial es \texttt{stock=1}. Sofía compra desde Buenos Aires y Tomás desde Madrid. Las réplicas son \(N_1,\ldots,N_5\). El invariante es:
+
+\[
+\text{reservas confirmadas para VIP-01}\leq 1.
+\]
+
+La dificultad no es almacenar dos requests. La dificultad es garantizar que solo una transición autoritativa cambie la máquina de estados de \texttt{AVAILABLE} a un único propietario.
+
+\section{Causalidad y concurrencia}
+
+\subsection{Happened-before}
+
+La relación \(\rightarrow\) se define mediante tres reglas:
+
+\begin{enumerate}
+\item si dos eventos ocurren en el mismo proceso, su orden local induce causalidad;
+\item el envío de un mensaje ocurre antes que su recepción;
+\item la relación es transitiva.
+\end{enumerate}
+
+Si \(a_1\) es el click de Sofía, \(a_2\) el envío desde Buenos Aires y \(l_1\) la recepción en el líder:
+
+\[
+a_1\rightarrow a_2\rightarrow l_1.
+\]
+
+De modo análogo, \(m_1\rightarrow m_2\rightarrow l_3\) para Tomás. Antes de que exista un mensaje que conecte ambas ramas, \(a_2\) y \(m_2\) son concurrentes:
+
+\[
+a_2\parallel m_2.
+\]
+
+Concurrencia no significa simultaneidad física exacta; significa que ninguna rama contiene evidencia causal de la otra.
+
+\subsection{Relojes de Lamport}
+
+Cada proceso mantiene un contador lógico \(L\). Antes de un evento local lo incrementa; al enviar un mensaje adjunta \(t_m=L\); al recibir actualiza:
+
+\[
+L\leftarrow\max(L,t_m)+1.
+\]
+
+El máximo conserva tanto la historia local como la comunicada; el incremento coloca la recepción estrictamente después del envío.
+
+Una ejecución posible es:
 
 \begin{center}
-\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.36\textwidth}}
+\begin{tabular}{lll}
 \toprule
-Concepto & Intuición & Pregunta técnica \\
+Proceso & Evento & Lamport\\
 \midrule
-Consistencia & cajas registradoras cuentan una historia compatible & ¿qué observación se permite? \\
-Disponibilidad & toda caja alcanzable responde & ¿puede rechazar por falta de coordinación? \\
-Partición & el puente entre regiones está cortado & ¿se detiene o deja divergir? \\
-CAP & decisión obligada mientras el puente sigue cortado & ¿A o C para esta operación? \\
-PACELC & incluso con puente sano, coordinar demora & ¿latencia local o consistencia? \\
-Quorum & dos jurados que comparten al menos un miembro & ¿qué intersección se obtiene? \\
-Version vector & genealogía de una versión & ¿posterior o concurrente? \\
-TrueTime & reloj que declara un intervalo de incertidumbre & ¿cuánto esperar para ordenar externamente? \\
+BA & click Sofía & 1\\
+BA & envía reserva & 2\\
+Madrid & click Tomás & 1\\
+Madrid & envía reserva & 2\\
+Líder & recibe Sofía & 3\\
+Líder & append local & 4\\
+Líder & recibe Tomás & 5\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\begin{uainfo}
-La pregunta central no es ``¿este sistema es AP o CP?'', sino ``para este dato y esta operación, ¿qué debe ocurrir cuando la coordinación es imposible o costosa?''.
-\end{uainfo}
+La propiedad es:
 
-\section{Dos casos que obligan a decidir}
-
-\subsection{Último asiento de una defensa pública}
-
-Queda un asiento. Dos regiones, separadas por una partición, reciben reservas simultáneas. El invariante es:
 \[
-\text{reservas confirmadas para el asiento} \leq 1.
+a\rightarrow b\Longrightarrow L(a)<L(b).
 \]
-Una respuesta CP exige quorum/autoridad y puede rechazar en una región. Una respuesta AP acepta ambas intenciones y necesita una resolución posterior que inevitablemente decepciona a un usuario. El dominio decide cuál error es más costoso.
 
-\subsection{Carrito de compras}
+El recíproco no vale. Que una etiqueta sea menor no demuestra causalidad; puede ser solo consecuencia de contadores independientes o de una regla de desempate.
 
-Dos dispositivos agregan objetos durante una partición. Perder un objeto puede ser peor que mostrar la unión de versiones. Aquí un diseño Dynamo-style puede conservar ramas concurrentes y aplicar un merge semántico. El mismo mecanismo sería incorrecto para un asiento indivisible.
+\subsection{Relojes vectoriales}
+
+Un vector mantiene un componente por actor. Con el orden \([\text{BA},\text{Madrid},\text{Líder}]\):
+
+\[
+V(a_2)=[2,0,0],\qquad V(m_2)=[0,2,0].
+\]
+
+Ningún vector domina al otro, por lo que son concurrentes. Al recibir a Sofía, hacer append y luego recibir a Tomás, el líder obtiene:
+
+\[
+[2,0,1]\rightarrow[2,0,2]\rightarrow[2,2,3].
+\]
+
+El tercer componente vale 3 porque el líder ejecutó tres eventos locales. El valor 5 pertenece al reloj escalar de Lamport y no debe copiarse dentro del vector.
+
+\begin{uakeybox}
+Lamport permite producir etiquetas compatibles con causalidad; un vector permite distinguir posterioridad de concurrencia; ninguno decide quién obtiene la entrada.
+\end{uakeybox}
+
+\section{Máquinas de estados y consenso}
+
+\subsection{Máquina de estados determinista}
+
+Una máquina de estados aplica una función:
+
+\[
+(estado,comando)\longrightarrow(nuevo\ estado,respuesta).
+\]
+
+Para la entrada:
+
+\[
+\texttt{AVAILABLE}+\texttt{Reserve(Sofía)}\rightarrow\texttt{RESERVED\_BY\_SOFIA}.
+\]
+
+Una nueva reserva sobre un estado ya reservado devuelve rechazo sin crear un segundo propietario. Si varias réplicas aplican los mismos comandos en el mismo orden, convergen en el mismo estado.
+
+\subsection{Safety y liveness}
+
+\textbf{Safety} significa que nada incorrecto ocurre: dos réplicas correctas no comprometen comandos incompatibles para el mismo índice, una entrada committed no se reemplaza y \texttt{VIP-01} no termina confirmada para dos personas.
+
+\textbf{Liveness} significa que el sistema vuelve a progresar cuando existen las condiciones necesarias: una mayoría comunicada, un líder estable, procesos que continúan ejecutando pasos y entrega eventual de los mensajes requeridos. Un protocolo puede preservar safety durante una partición permanente y perder liveness en la minoría.
+
+\section{Raft paso a paso}
+
+\subsection{Término, índice y entrada}
+
+Un término es un número creciente que identifica una ronda de elección y liderazgo. Un índice identifica una posición del log. La entrada didáctica:
+
+\[
+(\textit{index}=87,\ \textit{term}=12,\ \textit{command}=\texttt{Reserve(VIP-01,Sofía)})
+\]
+
+usa 87 porque las posiciones 1--86 ya estaban ocupadas y 12 porque el cluster se encuentra en su duodécima ronda electoral. Un mensaje con término menor al conocido por el receptor es obsoleto y se rechaza.
+
+\subsection{Replicación y commit}
+
+\begin{enumerate}
+\item \(N_1\), líder, agrega la entrada localmente. Aún no es una decisión committed.
+\item \(N_2\) persiste la entrada. Dos copias de cinco todavía no forman mayoría.
+\item \(N_3\) persiste la entrada. Tres de cinco forman mayoría.
+\item \(N_1\) actualiza \texttt{commitIndex=87}, aplica el comando en su máquina local y responde a Sofía.
+\item \(N_2\) y \(N_3\) reciben el nuevo \texttt{leaderCommit}, avanzan su commitIndex y aplican localmente.
+\end{enumerate}
+
+Deben distinguirse estos estados:
+
+\[
+recibida\neq agregada\neq replicada\neq committed\neq aplicada\neq confirmada.
+\]
+
+\subsection{Mover el crash}
+
+Si \(N_1\) cae cuando solo él posee la entrada, esta no estaba committed y puede desaparecer al elegir un nuevo líder; Sofía no debe haber recibido confirmación. Si cae después de que \(N_1,N_2,N_3\) la persistieron y comprometieron, una mayoría futura intersecta con esa decisión y la conserva.
+
+\subsection{Total-order broadcast}
+
+Las máquinas deterministas convergen si reciben los mismos comandos committed en el mismo orden. Acordar un valor para el índice 87, luego para 88, 89 y así sucesivamente construye un log con orden total. Un timestamp Lamport no basta: etiqueta eventos, pero no garantiza que todas las réplicas entreguen el mismo conjunto sin huecos.
+
+\subsection{Pausas, GC y fencing}
+
+Una pausa de garbage collection puede hacer que un líder deje de emitir heartbeats sin estar muerto. Otro nodo puede ser elegido en un término superior. Cuando el líder antiguo despierta, sus mensajes internos se rechazan por término obsoleto.
+
+Un recurso externo que no conoce los términos de Raft puede necesitar un \textbf{fencing token}: número creciente que acompaña cada operación y permite rechazar órdenes de una autoridad antigua.
+
+\subsection{Paxos y Multi-Paxos}
+
+Paxos básico acuerda un valor; para construir un log se repite por slot. Multi-Paxos estabiliza un proposer/líder para muchos slots. En la misma posición 87, Raft habla de término, índice y followers; Multi-Paxos de ballot, slot y acceptors. La meta común es impedir que dos valores incompatibles queden elegidos para la misma posición.
+
+\section{Tres logs que no deben confundirse}
 
 \begin{center}
-\begin{tikzpicture}[node distance=12mm,>=Latex,every node/.style={font=\small,align=center}]
-\node[draw=UAIngOrange,rounded corners,thick,fill=UAIngPaper,text width=3cm] (seat) {Asiento único\\conflicto no fusionable};
-\node[draw=UAIngNavy,rounded corners,thick,right=of seat,text width=3cm] (cart) {Carrito\\conflicto fusionable};
-\node[draw=UAIngOrange,rounded corners,thick,right=of cart,text width=3cm] (rank) {Ranking\\atraso tolerable};
-\draw[->,very thick] (seat)--node[above,font=\scriptsize]{garantía fuerte}(cart);
-\draw[->,very thick,UAIngOrange] (cart)--node[above,font=\scriptsize]{eventual}(rank);
-\end{tikzpicture}
+\begin{tabular}{p{0.24\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{Log} & \textbf{Pregunta que responde}\\
+\midrule
+Log de consenso & ¿Qué comandos fueron acordados y en qué orden autoritativo?\\
+WAL local & ¿Qué puede reconstruir cada nodo después de un crash?\\
+Log de eventos & ¿Qué hechos pueden leer y reprocesar otros componentes?\\
+\bottomrule
+\end{tabular}
 \end{center}
 
-\section{CAP: formulación correcta}
+Que una entrada esté committed en Raft no elimina la necesidad de persistencia local correcta; publicar un evento no sustituye el acuerdo sobre el estado autoritativo.
 
-El resultado CAP se aplica a sistemas de datos replicados cuando existe una partición de red. La formulación práctica es:
-\begin{quote}
-Durante una partición, no es posible garantizar simultáneamente una semántica de consistencia fuerte y disponibilidad para todas las solicitudes a nodos no fallados.
-\end{quote}
+\section{CAP, disponibilidad y PACELC}
 
-\subsection{Consistencia}
+\subsection{Dos historias indistinguibles}
 
-En este contexto, consistencia suele interpretarse como una semántica fuerte comparable a linearizabilidad: las operaciones parecen ocurrir sobre una única copia y respetan el orden temporal observable.
-
-No significa “los datos no están corruptos” ni “la aplicación es correcta” en un sentido general.
-
-\subsection{Disponibilidad}
-
-Disponibilidad CAP exige que cada solicitud a un nodo no fallado obtenga una respuesta no errónea, sin esperar indefinidamente la reconexión de otra partición.
-
-Responder “no puedo atender ahora porque no tengo quorum” preserva corrección, pero renuncia a disponibilidad CAP para esa operación.
-
-\subsection{Partición}
-
-Una partición implica que grupos de procesos correctos no pueden intercambiar mensajes a tiempo para coordinar. No es simplemente “una máquina cayó”. Dos regiones pueden seguir sanas localmente y, aun así, quedar incapaces de sostener una historia única sin sacrificar respuestas.
-
-\section{CAP como dos decisiones}
-
-Ante una partición:
-\begin{itemize}
-\item una operación CP puede bloquear/rechazar para impedir historias incompatibles;
-\item una operación AP puede responder en ambos lados y aceptar conflicto o inconsistencia temporal.
-\end{itemize}
-
-Ejemplo de saldo: dos regiones ven saldo 100. Durante una partición, cada una recibe un retiro de 80. Si ambas aceptan, el invariante puede romperse. Si una o ambas rechazan por falta de quorum, se preserva el invariante a costa de disponibilidad.
-
-No hay una respuesta universal. Para un feed social, aceptar divergencia temporal puede ser razonable. Para un ledger, no.
-
-\section{Qué no dice CAP}
+Supongamos que \(N_1,N_2,N_3\) comprometieron la reserva de Sofía y la red se divide entre \(\{N_1,N_2,N_3\}\) y \(\{N_4,N_5\}\). Tomás llega a la minoría. Para \(N_4,N_5\) son compatibles dos historias:
 
 \begin{itemize}
-\item No dice que el sistema deba elegir una única letra para toda su vida.
-\item No dice que las particiones estén siempre presentes.
-\item No describe por sí solo la latencia cuando la red funciona.
-\item No dice que todo modelo eventual sea equivalente.
-\item No reemplaza el análisis de invariantes del dominio.
+\item Sofía ya fue confirmada, pero el mensaje no cruza;
+\item Sofía nunca fue confirmada.
 \end{itemize}
 
-Un sistema puede ser CP para reservas y AP para analytics; puede ofrecer lecturas locales y escrituras coordinadas; puede degradar garantías explícitamente.
+Si la minoría debe responder éxito en la segunda historia para permanecer disponible, dará la misma respuesta en la primera y puede vender dos veces. Si espera o rechaza, preserva el invariante y sacrifica disponibilidad CAP para esa operación.
 
-\section{PACELC}
+\subsection{Uptime y disponibilidad CAP}
 
-PACELC amplía la conversación:
-\begin{quote}
-Si hay Partición, elegir entre Availability y Consistency; Else, elegir entre Latency y Consistency.
-\end{quote}
+\textbf{Uptime} es la fracción de una ventana durante la cual un proceso o endpoint estuvo levantado y alcanzable. La ventana puede ser mensual o anual por decisión de medición.
 
-Incluso sin partición, coordinar regiones remotas agrega tiempo de red, colas y disponibilidad de participantes. Una lectura local de perfil puede tardar 15 ms y estar atrasada; una lectura coordinada puede tardar 180 ms y ofrecer una garantía más fuerte.
+\textbf{Disponibilidad CAP} exige que una solicitud recibida por un nodo no fallado termine con una respuesta no errónea. Un \texttt{503 sin quorum} rápido puede demostrar que el proceso está vivo, pero no cumple disponibilidad CAP para la compra.
 
-PACELC obliga a preguntar por la ruta normal, no solo por el desastre. Esta perspectiva es especialmente útil en sistemas geodistribuidos.
+\textbf{Disponibilidad semántica} mide cuántas operaciones cumplen la promesa de negocio. Es otra métrica y debe definirse por dominio.
 
-\section{Dynamo: disponibilidad como requisito primario}
+\subsection{PACELC}
 
-\subsection{Motivación real}
+CAP estudia la decisión durante una partición. PACELC agrega la ruta normal: incluso sin partición, coordinar regiones remotas aumenta latencia y dependencia. Una lectura local de 15 ms puede estar atrasada; una lectura coordinada de 180 ms puede ofrecer una garantía más fuerte. El dominio decide cuándo paga esa diferencia.
 
-Dynamo fue diseñado para servicios de Amazon que necesitaban una experiencia “always-on”. El paper describe un key-value store altamente disponible que sacrifica consistencia en ciertos escenarios, usa versionado de objetos y permite resolución de conflictos asistida por la aplicación.
+\section{Recencia, linearizabilidad y serializabilidad}
 
-El carrito de compras es un caso emblemático: ante versiones concurrentes, perder un producto puede ser peor que mostrar la unión y permitir reconciliación posterior.
+\textbf{Recencia} describe cuán nuevo es el estado observado; puede medirse como antigüedad o lag.
 
-\subsection{Consistent hashing}
+\textbf{Linearizabilidad} exige que cada operación parezca ocurrir atómicamente entre su invocación y respuesta y respete el orden real de operaciones no superpuestas. Si una escritura terminó antes de comenzar una lectura, esa lectura debe verla o ver algo posterior.
 
-El espacio de claves se mapea a un anillo lógico. Los nodos poseen rangos y las claves se asignan según hash. Ventajas:
-\begin{itemize}
-\item incorporación/remoción de nodos con remapeo limitado;
-\item particionamiento descentralizado;
-\item posibilidad de virtual nodes para balancear capacidad.
-\end{itemize}
+\textbf{Serializabilidad} exige que el resultado de varias transacciones sea equivalente a algún orden serial, pero no necesariamente al orden temporal externo.
 
-Limitaciones:
-\begin{itemize}
-\item distribución uniforme de claves no garantiza distribución uniforme de acceso;
-\item hot keys siguen existiendo;
-\item la topología física y la diversidad de fallas requieren una estrategia de réplica.
-\end{itemize}
+\textbf{Consistencia externa} combina un orden serial con respeto del orden observado por clientes fuera del motor.
 
-\subsection{N, R y W}
+\section{Mayoría de consenso y quórums Dynamo-like}
 
-\begin{itemize}
-\item $N$: número de réplicas preferidas;
-\item $W$: respuestas requeridas para aceptar escritura;
-\item $R$: respuestas requeridas para completar lectura.
-\end{itemize}
+En consenso, una mayoría participa en una prueba de safety que elige una única entrada autoritativa para un índice. En un sistema Dynamo-like, \(N,R,W\) describen cuántas réplicas preferidas existen y cuántas respuestas completan lecturas y escrituras de una clave.
 
-Si $R+W>N$, cualquier conjunto de lectura y escritura del tamaño indicado intersecta. Esa propiedad aumenta la posibilidad de observar una versión actualizada, pero no garantiza automáticamente linearizabilidad.
+Si:
 
-¿Por qué no basta?
-\begin{itemize}
-\item las escrituras pueden ser concurrentes;
-\item sloppy quorums pueden usar nodos fuera del conjunto preferido;
-\item la lectura debe reconciliar versiones y elegir una política;
-\item “última escritura” puede depender de relojes no confiables;
-\item pueden existir respuestas parciales y timeouts.
-\end{itemize}
+\[
+R+W>N,
+\]
 
-\subsection{Ejemplo de intersección}
+cualquier conjunto ideal de lectura y escritura de esos tamaños intersecta. La intersección no crea por sí sola un líder, un orden total ni linearizabilidad.
 
-Con $N=3$, $W=2$, $R=2$, una escritura a A,B y una lectura a B,C comparten B. Sin embargo, si existen versiones concurrentes o B aún no expone la nueva versión según la política, la intersección combinatoria no define por sí sola toda la semántica.
+\subsection{Tres contraejemplos}
 
-Con $W=1$, $R=1$, la escritura puede quedar solo en A y la lectura ir a C: se obtiene una versión anterior con baja latencia y alta disponibilidad.
+\begin{enumerate}
+\item \textbf{Escrituras concurrentes:} el nodo de intersección puede conservar dos versiones hermanas; sabe que hay conflicto, pero no inventa un orden.
+\item \textbf{Sloppy quorum:} la escritura efectiva puede realizarse en nodos alternativos fuera del conjunto preferido; una lectura temprana sobre propietarios puede no cruzar ese conjunto antes del handoff.
+\item \textbf{Last-write-wins:} un reloj adelantado puede hacer que una actualización causalmente anterior parezca más nueva y descarte información válida.
+\end{enumerate}
 
-\section{Version vectors y conflicto}
+\section{Version vectors y conflictos fusionables}
 
-Un version vector registra conocimiento causal por réplica/actor. Una versión domina a otra si contiene todo su conocimiento y algún avance. Si ninguna domina, las versiones son concurrentes.
+Un version vector registra conocimiento causal por actor. Una versión domina a otra si todos sus componentes son mayores o iguales y al menos uno es mayor. Si ninguna domina, son concurrentes.
 
-Esto permite distinguir:
-\begin{itemize}
-\item actualización posterior: puede reemplazar una versión anterior;
-\item actualización concurrente: requiere merge, política o intervención.
-\end{itemize}
+Para el carrito:
 
-Last-write-wins es simple, pero puede perder información si usa relojes desalineados o si el dominio no admite descartar una rama. Un carrito puede fusionarse por unión de ítems; un asiento único o saldo no admite ese merge ingenuo.
+\[
+v_{BA}=[1,0]\quad\text{libro},\qquad v_{MAD}=[0,1]\quad\text{auriculares}.
+\]
 
-\section{Sloppy quorum y hinted handoff}
+Las ramas pueden fusionarse por una regla de dominio. Para \texttt{VIP-01}, fusionar \texttt{RESERVED\_BY\_SOFIA} con \texttt{RESERVED\_BY\_TOMAS} violaría el invariante. Detectar concurrencia no implica que exista un merge válido.
 
-Para mantener disponibilidad, Dynamo puede aceptar una escritura en nodos alternativos si los preferidos están inaccesibles. El nodo temporal guarda un hint para reenviar el dato al propietario cuando se recupere.
+\section{Dynamo: disponibilidad y deuda de reparación}
 
-Beneficios:
-\begin{itemize}
-\item disponibilidad de escritura durante fallas;
-\item menor dependencia de una lista rígida de réplicas.
-\end{itemize}
+El flujo conceptual es:
 
-Costos:
-\begin{itemize}
-\item datos temporalmente fuera de lugar;
-\item lecturas y reparaciones más complejas;
-\item mayor duración de divergencia;
-\item riesgo de acumulación de hints.
-\end{itemize}
+\begin{enumerate}
+\item calcular el hash de la key y ubicar su rango;
+\item construir la preference list de réplicas;
+\item reunir \(W\) respuestas para aceptar una escritura;
+\item conservar versiones concurrentes cuando no puede ordenarlas;
+\item usar sloppy quorum si propietarios preferidos están inaccesibles;
+\item guardar un hint que indica el propietario final;
+\item ejecutar hinted handoff cuando el propietario regresa;
+\item usar read repair y anti-entropy para corregir divergencias restantes.
+\end{enumerate}
 
-\section{Read repair, anti-entropy y Merkle trees}
+\textbf{Hinted handoff} reubica escrituras desplazadas. \textbf{Read repair} corrige réplicas atrasadas descubiertas durante una lectura. \textbf{Anti-entropy} compara rangos en background para encontrar diferencias, incluso en datos fríos.
 
-Eventual consistency necesita trabajo de convergencia.
+Podemos pensar la deuda mediante:
 
-\subsection{Read repair}
-Durante una lectura, el coordinador detecta versiones atrasadas y escribe la versión reconciliada en las réplicas.
+\[
+D_{nuevo}>R_{resuelto}\Longrightarrow\text{divergencia acumulada creciente}.
+\]
 
-\subsection{Anti-entropy}
-Procesos de background comparan rangos y reparan diferencias aunque no haya lecturas.
+Los costos son versiones hermanas, hints pendientes, espacio adicional, red e I/O de reparación, frescura variable y semántica de merge en la aplicación.
 
-\subsection{Merkle trees}
-Un árbol de hashes resume rangos de claves. Si las raíces difieren, se desciende hasta localizar rangos divergentes y transferir solo lo necesario.
+\section{Spanner y TrueTime}
 
-La reparación consume red, CPU y disco. Si la tasa de divergencia supera la capacidad de repair, “eventual” puede volverse operacionalmente demasiado tarde.
+\subsection{Por qué aparece en la historia}
 
-\section{Spanner: consistencia externa a escala global}
+Supongamos que una compra debe modificar el grupo de entradas, el grupo de pagos y el grupo de derechos del usuario. Además, una operación en Madrid comienza después de que un cliente observó la confirmación en Buenos Aires. Ya no alcanza con consistencia eventual: necesitamos una transacción multi-grupo y un orden compatible con el tiempo real observado.
 
-\subsection{Objetivo real}
+\subsection{Consenso localizado}
 
-Spanner fue diseñado como una base multi-versión, globalmente distribuida y replicada sincrónicamente, capaz de ofrecer transacciones externamente consistentes.
+Spanner divide datos en grupos o rangos replicados. Cada grupo usa consenso para mantener su estado. Una transacción que abarca varios grupos coordina solamente esos participantes; no existe una única votación planetaria para todas las operaciones.
 
-No intenta maximizar disponibilidad bajo toda partición. Su prioridad es una historia global fuerte para aplicaciones que necesitan transacciones y SQL distribuidos.
+\subsection{TrueTime}
 
-\subsection{Particionamiento y consenso localizado}
+TrueTime devuelve un intervalo:
 
-Spanner particiona datos y replica cada grupo mediante consenso. No existe un único consenso planetario para cada operación. Las transacciones que abarcan varios grupos coordinan participantes.
-
-Este punto es crucial: escalar consistencia fuerte requiere localizar consenso y evitar que toda operación contacte a todo el sistema.
-
-\section{TrueTime}
-
-TrueTime expone un intervalo:
 \[
 TT.now()=[earliest,latest]
 \]
-que garantiza contener la hora real. La anchura del intervalo representa incertidumbre.
 
-En lugar de asumir relojes perfectos, Spanner construye una infraestructura para medir y acotar incertidumbre mediante múltiples fuentes y monitoreo.
+que declara una cota de incertidumbre. Los servidores se sincronizan con referencias y time masters; la amplitud refleja error de sincronización, deriva y tiempo desde la última sincronización. Conceptualmente, si la estimación es \(t\) y la cota es \(\epsilon\):
 
-La lección conceptual es amplia:
-\begin{quote}
-Una buena abstracción distribuida no siempre elimina incertidumbre; puede exponerla con una garantía útil.
-\end{quote}
-
-\section{External consistency y commit wait}
-
-External consistency exige que si una transacción termina antes de que otra comience, ese orden se refleje en la serialización.
-
-Spanner asigna un timestamp de commit y espera hasta que TrueTime garantice que ese timestamp quedó en el pasado antes de hacer visible el commit. Esta espera se conoce como commit wait.
-
-Beneficio:
-\begin{itemize}
-\item orden externo fuerte y lecturas consistentes con tiempo real.
-\end{itemize}
-
-Costo:
-\begin{itemize}
-\item latencia adicional incluso sin partición;
-\item infraestructura temporal compleja;
-\item dependencia de consenso y conectividad suficiente.
-\end{itemize}
-
-Este es un ejemplo claro de PACELC: en operación normal, se paga latencia para consistencia.
-
-\section{Dynamo y Spanner: preguntas distintas}
-
-\begin{tabular}{p{0.22\textwidth}p{0.34\textwidth}p{0.34\textwidth}}
-\toprule
-Dimensión & Dynamo & Spanner \\
-\midrule
-Objetivo & disponibilidad y baja latencia & transacciones globales fuertes \\
-Partición & responde y reconcilia & puede rechazar por falta de quorum \\
-Conflicto & versiona/merge & evita mediante orden/transacción \\
-Operación normal & favorece local y configurable & paga consenso y commit wait \\
-Costo principal & reparación y semántica de aplicación & coordinación e infraestructura \\
-\bottomrule
-\end{tabular}
-
-No deben evaluarse como si uno fuera “mejor”. Cada uno es coherente con un dominio distinto.
-
-\section{Diseño por operación}
-
-Un sistema real puede combinar:
-\begin{itemize}
-\item feed eventual y local;
-\item perfil con read-your-writes para el dueño;
-\item reserva de asiento serializable;
-\item cache con stale-while-revalidate;
-\item analytics por log;
-\item ledger con consenso fuerte.
-\end{itemize}
-
-La arquitectura madura elige la garantía mínima suficiente por operación. Esto reduce coordinación innecesaria sin sacrificar invariantes críticos.
-
-\section{Casos de dominio}
-
-\subsection{Carrito de compras}
-
-Prioridad: disponibilidad. Conflictos fusionables. Dynamo-like puede ser razonable.
-
-\subsection{Reserva de asiento}
-
-Prioridad: unicidad. No se puede vender dos veces el mismo asiento. Se necesita coordinación fuerte o partición de autoridad con fencing.
-
-\subsection{Feed social}
-
-Prioridad: latencia y disponibilidad. Un orden aproximado y frescura eventual son aceptables, con excepciones para privacidad/bloqueos.
-
-\subsection{Ledger financiero}
-
-Prioridad: invariantes, auditabilidad y serialización. Se acepta mayor latencia y rechazo durante pérdida de quorum.
-
-\section{Método de decisión}
-
-Para cada dato y operación:
-\begin{enumerate}
-\item definir el invariante;
-\item medir costo de inconsistencia;
-\item definir comportamiento bajo partición;
-\item definir costo de coordinación sin partición;
-\item elegir autoridad, quorum, merge o reparación;
-\item definir SLI/SLO;
-\item ensayar falla y recuperación.
-\end{enumerate}
-
-
-\section{Precisiones técnicas indispensables}
-
-\subsection{CAP se aplica a una operación y a un modelo de consistencia}
-
-No clasifica a una empresa ni obliga a usar una sola política para todos los datos. Debe declararse la operación, el invariante, la partición considerada y la semántica fuerte que se intenta preservar.
-
-\subsection{Un rechazo rápido no es disponibilidad CAP para esa operación}
-
-El proceso puede seguir vivo y responder un error, pero la solicitud no obtuvo una respuesta no errónea de la operación pedida. Esa elección puede ser correcta para proteger el negocio; simplemente sacrifica disponibilidad en el sentido estricto del teorema.
-
-\subsection{PACELC es una taxonomía de diseño}
-
-PACELC recuerda que, aun sin partición, la coordinación puede intercambiar latencia por consistencia. No es otro teorema de imposibilidad equivalente a CAP ni obliga a encerrar permanentemente un producto en una única casilla.
-
-\subsection{$R+W>N$ garantiza intersección, no linearizabilidad}
-
-La desigualdad no ordena escrituras concurrentes, no define qué versión gana, no corrige relojes y puede dejar de representar el conjunto real con sloppy quorums. Una garantía fuerte necesita reglas adicionales de autoridad, versiones y lectura.
-
-\subsection{Dynamo original no es sinónimo de DynamoDB}
-
-El paper de Dynamo describe un diseño y un conjunto de mecanismos para servicios internos de Amazon. Los productos actuales inspirados por esas ideas pueden ofrecer APIs y garantías diferentes. En clase se analiza el diseño del paper, no se atribuyen automáticamente esas propiedades a un servicio comercial actual.
-
-\subsection{TrueTime no sustituye al consenso}
-
-TrueTime expone una cota de incertidumbre temporal. Spanner combina esa información con replicación por consenso y protocolos transaccionales. El commit wait usa la cota para preservar orden externo; no convierte un reloj en un protocolo de acuerdo.
-
-\section{Errores frecuentes}
-
-\begin{itemize}
-\item repetir “dos de tres”;
-\item clasificar una empresa entera como AP o CP;
-\item confundir availability CAP con uptime genérico;
-\item asumir linearizabilidad por $R+W>N$;
-\item usar LWW para datos no descartables;
-\item no dimensionar anti-entropy;
-\item diseñar consenso global único;
-\item ignorar latencia normal entre regiones;
-\item comparar sistemas sin declarar dominio e invariante.
-\end{itemize}
-
-\section{Bibliografía guiada y casos reales}
-
-\begin{itemize}
-\item Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 5, 8 y 9.
-\item DeCandia et al., \href{https://www.amazon.science/publications/dynamo-amazons-highly-available-key-value-store}{Dynamo: Amazon's Highly Available Key-value Store}.
-\item Corbett et al., \href{https://research.google/pubs/spanner-googles-globally-distributed-database-2/}{Spanner: Google's Globally-Distributed Database}.
-\item Gilbert y Lynch, \emph{Brewer's Conjecture and the Feasibility of Consistent, Available, Partition-Tolerant Web Services}.
-\item Abadi, trabajos y notas sobre PACELC para extender el análisis a latencia sin partición.
-\end{itemize}
-
-\section{Conexión con el Trabajo Final Integrador}
-
-Cada grupo debe presentar una matriz por subsistema:
-\begin{itemize}
-\item invariante;
-\item decisión bajo partición;
-\item decisión latency/consistency normal;
-\item mecanismo: quorum, líder, merge, saga o cache;
-\item reparación;
-\item SLO y prueba de falla.
-\end{itemize}
-
-No se acepta “nuestro sistema es CP” como análisis completo. Deben discutir operaciones concretas.
-
-
-\section{Derivación intuitiva de CAP por indistinguibilidad}
-
-Suponga dos réplicas A y B. La red se parte. Un cliente escribe $x=1$ en A y otro lee desde B. B no puede distinguir entre estas historias:
-
-\begin{enumerate}
-\item A recibió y confirmó la escritura, pero el mensaje de replicación no cruza la partición;
-\item A nunca recibió la escritura;
-\item el mensaje simplemente está muy demorado.
-\end{enumerate}
-
-Si B debe responder siempre, alguna ejecución lo obliga a devolver un valor incompatible con una historia linealizable. Si espera coordinación, deja de ser disponible en el sentido CAP. La imposibilidad no proviene de una base de datos concreta, sino de información que la partición vuelve inaccesible.
-
-\section{Ejemplos cuantitativos de quorum}
-
-Para $N=5$:
-
-\begin{center}
-\begin{tabular}{p{0.06\textwidth}p{0.06\textwidth}p{0.13\textwidth}p{0.25\textwidth}p{0.31\textwidth}}
-\toprule
-$R$ & $W$ & $R+W>N$ & Perfil & Lectura \\
-\midrule
-1 & 5 & sí & lecturas rápidas, escrituras frágiles & toda escritura requiere todos \\
-3 & 3 & sí & balanceado & ambas rutas esperan mayoría \\
-5 & 1 & sí & escrituras rápidas, lecturas costosas & lectura consulta todas \\
-1 & 1 & no & máxima respuesta local & stale read muy probable \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-La intersección es una propiedad combinatoria, no una semántica completa. Para obtener una lectura fuerte hacen falta reglas adicionales sobre versiones, coordinación, orden y qué respuestas son válidas.
-
-\section{Ejemplo trabajado de version vectors}
-
-Sean:
 \[
-v_1=[A:2,B:1],\qquad v_2=[A:2,B:3],\qquad v_3=[A:4,B:1].
+earliest=t-\epsilon,\qquad latest=t+\epsilon.
 \]
-$v_2$ domina a $v_1$ porque es mayor o igual en todos los componentes y mayor en B. $v_3$ también domina a $v_1$. En cambio, $v_2$ y $v_3$ son concurrentes: una avanzó en B y la otra en A.
 
-El sistema no puede declarar una ``última'' versión causal entre $v_2$ y $v_3$ sin una política adicional. Para carrito, puede fusionar; para saldo o asiento, debe impedir la concurrencia o escalar el conflicto.
+\subsection{Timestamp de commit y commit wait}
 
-\section{TrueTime y commit wait con números}
+El coordinador de la transacción elige un timestamp \(s\) compatible con los grupos participantes y la cota temporal. Después espera hasta poder demostrar:
 
-Suponga que al asignar timestamp de commit $s=12{:}00{:}00.010$, TrueTime devuelve:
 \[
-TT.now()=[12{:}00{:}00.004,\ 12{:}00{:}00.016].
+TT.now().earliest>s.
 \]
-El sistema aún no puede asegurar que $s$ está definitivamente en el pasado, porque el límite superior es posterior. Espera hasta que una lectura de TrueTime tenga $earliest>s$. Si eso ocurre a 12:00:00.018, el commit wait agregó aproximadamente 8 ms desde $s$.
 
-Esta espera compra una propiedad: una transacción que comienza después de observar el commit no recibe un timestamp anterior. El costo depende de la incertidumbre temporal y de la coordinación, no de una afirmación abstracta de ``usar relojes precisos''.
+En ese momento, \(s\) quedó definitivamente en el pasado. La espera convierte una cota explícita de incertidumbre en una garantía de orden externo.
 
-\section{Caso integrado: Asteria Online por subsistema}
+\subsection{Consistencia externa}
 
-Un único juego puede combinar garantías:
+Se llama externa porque respeta el orden observado por clientes fuera del motor. Si el cliente recibe el commit de \(T_1\) y después inicia \(T_2\), toda serialización válida debe cumplir:
 
-\begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.28\textwidth}p{0.38\textwidth}}
+\[
+T_1<T_2.
+\]
+
+\section{Mapa final: qué pregunta responde cada mecanismo}
+
+\begin{longtable}{p{0.24\textwidth}p{0.63\textwidth}}
 \toprule
-Subsistema & Garantía razonable & Razón \\
+\textbf{Mecanismo} & \textbf{Pregunta}\\
 \midrule
-Propiedad de castillo & fuerte / autoridad única & dos gremios no pueden poseerlo \\
-Inventario y oro & transaccional e idempotente & evitar duplicación y doble gasto \\
-Combate de zona & orden autoritativo local & baja latencia con historia coherente \\
-Ranking & eventual con cierre de premios & atraso visible tolerable \\
-Chat y presencia & disponible, causal/best effort & no debe detener el mundo \\
-Telemetría & AP y replayable & pérdida/retraso acotados por SLO \\
+Kafka & ¿Qué registros pueden preservarse, particionarse y releerse?\\
+Happened-before & ¿Qué evento pudo influir sobre otro?\\
+Lamport & ¿Cómo etiquetar eventos respetando causalidad?\\
+Vector clocks & ¿Una versión es posterior o concurrente?\\
+Raft/Paxos & ¿Qué comando se convierte en decisión autoritativa?\\
+WAL local & ¿Qué recuerda cada nodo después de reiniciar?\\
+CAP & ¿Qué se sacrifica durante una partición?\\
+PACELC & ¿Qué costo pagamos normalmente por coordinar?\\
+Quórums Dynamo & ¿Con cuántas réplicas completamos una operación?\\
+Dynamo & ¿Cómo seguir respondiendo y reparar divergencia?\\
+Spanner/TrueTime & ¿Cómo sostener transacciones globales y orden externo?\\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{longtable}
 
-La clasificación se hace por operación. Decir ``Asteria es CP'' o ``Asteria es AP'' oculta decisiones esenciales.
+\section{Síntesis final}
 
-\section{Métricas y pruebas que vuelven verificable la garantía}
+La clase puede resumirse como una cadena de preguntas. Kafka preserva registros y orden local, pero no elige por sí solo una transición autoritativa sobre un recurso indivisible. La causalidad y los relojes lógicos describen relaciones y conocimiento, pero no sustituyen un protocolo de acuerdo. Raft y Paxos convierten propuestas en una secuencia comprometida; el WAL local permite que cada réplica recuerde lo prometido. CAP obliga a decidir qué hacer durante una partición y PACELC recuerda que coordinar también cuesta cuando la red funciona. Dynamo acepta versiones y deuda de reparación cuando el dominio admite reconciliación. Spanner paga consenso, infraestructura temporal y espera para sostener transacciones globales con orden externo.
 
-\begin{itemize}
-\item latencia local y coordinada p50/p95/p99;
-\item tasa de rechazos por falta de quorum;
-\item antigüedad máxima de una lectura;
-\item número y edad de versiones concurrentes;
-\item hints pendientes y tiempo de handoff;
-\item bytes/rangos reparados por anti-entropy;
-\item anchura de incertidumbre de reloj y commit wait;
-\item RPO/RTO frente a pérdida de réplica o región.
-\end{itemize}
+El criterio transversal es el mismo: identificar el error intolerable, declarar la falla, ubicar la frontera de confirmación y medir el costo de la garantía elegida. Ningún nombre de producto reemplaza esa argumentación.
 
-Una prueba de partición útil declara de antemano qué operaciones seguirán, cuáles fallarán y qué reconciliación se espera al sanar la red.
+\section{Errores frecuentes y cómo corregirlos}
+
+\begin{longtable}{p{0.37\textwidth}p{0.51\textwidth}}
+\toprule
+\textbf{Error} & \textbf{Corrección operativa}\\
+\midrule
+``Timeout significa que el servidor cayó.'' & Construir al menos cuatro historias compatibles y buscar evidencia durable o una consulta idempotente.\\
+``Lamport menor implica causa.'' & Dibujar dos procesos sin mensajes: las etiquetas pueden ordenarse sin relación causal.\\
+``Tres copias significan commit.'' & Exigir término, índice, regla de mayoría y relación con mayorías futuras.\\
+``Un rechazo rápido es disponibilidad CAP.'' & Separar uptime del proceso de una respuesta válida de la operación solicitada.\\
+``Si $R+W>N$, la lectura es linearizable.'' & Probar escrituras concurrentes, sloppy quorum y una política de reconciliación insuficiente.\\
+``Eventual significa que se arregla solo.'' & Pedir tasa de divergencia, capacidad de repair, edad máxima y SLO de convergencia.\\
+``TrueTime elimina la incertidumbre.'' & Mostrar el intervalo $[earliest,latest]$ y hacer crecer su amplitud.\\
+\bottomrule
+\end{longtable}
 
 \section{Glosario operativo}
 
 \begin{description}
-\item[Linearizabilidad.] Operaciones parecen ocurrir en un punto entre invocación y respuesta y respetan tiempo real.
-\item[Disponibilidad CAP.] Toda solicitud a un nodo no fallado obtiene respuesta no errónea.
-\item[Sloppy quorum.] Conjunto de nodos disponibles que puede no coincidir con réplicas preferidas.
-\item[Hint.] Registro temporal que debe entregarse al propietario recuperado.
-\item[Anti-entropy.] Reparación de divergencias en background.
-\item[External consistency.] Serialización compatible con el orden externo observable.
+\item[ACK] Respuesta que declara cumplida una condición del protocolo; debe decir qué condición.
+\item[Commit] Frontera a partir de la cual una decisión tiene la propiedad declarada por el sistema.
+\item[Concurrente] Sin relación causal en ninguno de los dos sentidos.
+\item[Fencing token] Número creciente que permite rechazar a una autoridad antigua.
+\item[ISR] Réplicas Kafka suficientemente sincronizadas con el líder.
+\item[Linearizabilidad] Una sola copia aparente compatible con tiempo real de operaciones no superpuestas.
+\item[Quorum] Conjunto de participantes cuya respuesta permite completar una etapa definida.
+\item[Safety] Nada incorrecto ocurre.
+\item[Liveness] El sistema progresa bajo condiciones especificadas.
+\item[Sloppy quorum] Operación aceptada temporalmente en nodos alternativos.
+\item[TrueTime] API que devuelve un intervalo acotado de tiempo, no un instante perfecto.
 \end{description}
 
-\section{Autoevaluación ampliada}
+\section{Autoevaluación}
 
 \begin{enumerate}
-\item ¿En qué condición exacta aparece el trade-off CAP?
-\item ¿Por qué ``elegir dos de tres'' es engañoso?
-\item ¿Qué significa disponibilidad en CAP?
-\item ¿Qué debe hacer una operación CP durante partición?
-\item ¿Qué costo acepta una operación AP?
-\item ¿Qué agrega PACELC a la discusión?
-\item ¿Qué problema resuelve consistent hashing y cuál no?
-\item ¿Qué significan $N$, $R$ y $W$?
-\item ¿Qué garantiza $R+W>N$ y qué no garantiza?
-\item ¿Cómo se construye un stale read con $R=1,W=1$?
-\item ¿Cómo reconoce un version vector concurrencia?
-\item ¿Por qué LWW puede perder una actualización válida?
-\item ¿Qué gana sloppy quorum?
-\item ¿Qué deuda crea hinted handoff?
-\item ¿Qué diferencia hay entre read repair y anti-entropy?
-\item ¿Cómo reducen tráfico los Merkle trees?
-\item ¿Qué representa el intervalo de TrueTime?
-\item ¿Qué propiedad compra commit wait?
-\item ¿Por qué Spanner localiza consenso por grupo?
-\item ¿Cómo diseñaría garantías distintas dentro de una misma aplicación?
+\item ¿Qué demuestra un timeout y qué no demuestra?
+\item ¿Por qué \(L(a)<L(b)\) no prueba \(a\rightarrow b\)?
+\item ¿Cómo demuestra un vector que dos eventos son concurrentes?
+\item ¿Por qué \([2,2,3]\) es correcto para el líder?
+\item ¿Qué diferencia existe entre replicated, committed y applied en Raft?
+\item ¿Qué falla tolera una mayoría de cinco y qué ocurre en la minoría?
+\item ¿Por qué total-order broadcast no se obtiene solo con timestamps?
+\item ¿Qué protege un término y qué protege un fencing token?
+\item ¿En qué sentido Paxos y Raft resuelven el mismo problema?
+\item ¿Por qué un \texttt{503} rápido no es disponibilidad CAP?
+\item ¿Qué agrega PACELC?
+\item ¿Qué garantiza \(R+W>N\) y qué no?
+\item ¿Cómo produce un sloppy quorum un contraejemplo a una lectura fresca?
+\item ¿Cuándo un conflicto es fusionable?
+\item ¿Qué deuda crea Dynamo al seguir escribiendo durante fallas?
+\item ¿Qué mide la tasa de divergencia?
+\item ¿Por qué TrueTime usa un intervalo?
+\item ¿Quién elige \(s\) y qué espera commit wait?
+\item ¿Por qué la consistencia de Spanner se llama externa?
+\item Para ranking, carrito, ledger y entrada VIP: ¿qué error es inaceptable en cada caso?
 \end{enumerate}
 
-\section{Síntesis final}
+\section{Trabajo Final Integrador}
 
-\begin{uakeybox}
-Dynamo hace visible el costo de responder durante fallas: versiones, merge y repair. Spanner hace visible el costo de una historia global fuerte: consenso, tiempo acotado y espera. Diseñar consistencia es elegir conscientemente cuál de esos costos paga cada operación.
-\end{uakeybox}
+Para cada subsistema del Trabajo Final Integrador, complete una ficha con el marco
+\[
+D=(P,F,G,S,T),
+\]
+donde $P$ es el problema, $F$ las fallas consideradas, $G$ las garantías observables, $S$ la solución y $T$ los trade-offs. La ficha debe identificar además:
+
+\begin{itemize}
+\item la unidad de autoridad o el dato cuyo invariante se protege;
+\item la clave, partición o grupo de consenso relevante;
+\item el evento exacto después del cual se responde al cliente;
+\item el estado que debe sobrevivir a un reinicio;
+\item el comportamiento durante una partición;
+\item una métrica de costo normal y otra de recuperación;
+\item una prueba adversarial capaz de refutar el diseño.
+\end{itemize}
+
+No se aceptan frases como ``usaremos consenso'' o ``la consistencia será eventual'' sin indicar operación, frontera y condición de éxito. Dos subsistemas del mismo proyecto pueden justificar políticas distintas.
+
+\section{Bibliografía guiada}
+
+
+\begin{itemize}
+\item Martin Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 5, 8 y 9.
+\item Leslie Lamport, \emph{Time, Clocks, and the Ordering of Events in a Distributed System}.
+\item Diego Ongaro y John Ousterhout, \emph{In Search of an Understandable Consensus Algorithm}.
+\item Leslie Lamport, \emph{Paxos Made Simple}.
+\item Giuseppe DeCandia et al., \emph{Dynamo: Amazon's Highly Available Key-value Store}.
+\item James Corbett et al., \emph{Spanner: Google's Globally-Distributed Database}.
+\end{itemize}
 
 \end{document}
