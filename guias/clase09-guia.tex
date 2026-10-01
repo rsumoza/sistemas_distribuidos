@@ -1,196 +1,96 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-\UASetSemester{Segundo cuatrimestre 2026}
-\UASetDate{2026}
+\usepackage{longtable,array}
 \UASetClassNumber{09}
-\UASetClassTitle{Arquitecturas distribuidas reales}
+\UASetClassTitle{Fronteras de arquitectura}
 \title{Clase 09 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
+
 \section{Propósito de la guía}
-Los ejercicios se evalúan por la coherencia entre dominio, ownership, comunicación, datos y operación. No por cantidad de servicios.
+La guía entrena decisiones arquitectónicas, no la memorización de patrones. Cada respuesta debe conectar necesidad, regla de negocio, dato autoritativo, comunicación, falla, recuperación y evidencia.
 
-\section{Caso base y restricciones de trabajo}
-
-La guía utiliza \textbf{Asteria Online}, un mundo virtual medieval con 30.000 jugadores concurrentes. El sistema contiene cuentas, mundo, combate, inventario, mercado, pagos, ranking y chat.
-
-\begin{center}
-\begin{tabular}{p{0.28\textwidth}p{0.57\textwidth}}
-\toprule
-Restricción & Consecuencia arquitectónica a discutir \\
-\midrule
-Combate p95 menor a 120 ms & autoridad y datos cercanos a la zona \\
-Objeto indivisible con un dueño & invariante local de inventario \\
-Ranking tolera 30 s de atraso & proyección/eventos posibles \\
-Pagos auditables & identidad, outbox y saga \\
-Equipos actuales: 3 equipos de 6 & no existe capacidad ilimitada de ownership \\
-Deploy actual: 2 por semana & medir si una extracción mejora lead time \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\section{Método esperado de resolución}
-
-Toda frontera propuesta debe responder:
-\begin{enumerate}
-\item ¿qué capacidad e invariante contiene?;
-\item ¿quién es owner técnico y operacional?;
-\item ¿qué dato puede modificar exclusivamente?;
-\item ¿qué interacción será RPC y cuál evento?;
-\item ¿qué falla nueva introduce la red?;
-\item ¿cómo se resuelve dual write o workflow distribuido?;
-\item ¿qué métrica demostrará autonomía, escala o aislamiento?;
-\item ¿qué alternativa más simple fue descartada y por qué?
-\end{enumerate}
-
-\begin{uawarn}
-La cantidad de servicios no forma parte de la nota. Sí se evalúan coherencia, ownership, fallas y evidencia.
-\end{uawarn}
-
+\section{Caso base}
+Sofía intenta comprar la pieza única \texttt{EspadaSolar\#17} en Asteria Online. Mercado conserva la oferta, Inventario conserva reserva y propiedad, Pagos decide el cobro y Ranking/Notificaciones reaccionan después. La pieza no puede tener dos propietarios, el intento no debe cobrarse dos veces y una compra confirmada no puede desaparecer.
 
 \section{Ruta recomendada de uso}
+\begin{enumerate}
+\item \textbf{Primera pasada, intuición:} ejercicios 1--7, sin elegir tecnologías.
+\item \textbf{Segunda pasada, ejecuciones:} ejercicios 8--16, dibujando mensajes, estados y puntos de crash.
+\item \textbf{Tercera pasada, decisión:} ejercicios 17--20, defendiendo costos, operación y métricas.
+\end{enumerate}
 
-La guía entrena decisiones de frontera. Para una clase de tres horas:
+\section{Método esperado}
+Para cada ejercicio, cuando corresponda, incluya: actores, estado inicial, invariante, dato autoritativo, falla, conocimiento de cada actor, mecanismo, frontera de confirmación, costo, métrica y condición de revisión.
 
-\begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.23\textwidth}p{0.46\textwidth}}
-\toprule
-Momento & Ejercicios & Evidencia \\
-\midrule
-En clase & 1, 2, 5, 8, 11, 12, 14, 20 & módulos, prima, lenguaje, timeline y saga \\
-Postclase & 3, 4, 6, 7, 9, 10, 13, 15--17 & comparación y formalización \\
-Desafío & 18, 19 & migración reversible y readiness operacional \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Cada frontera debe completar este canvas: \textbf{capacidad, invariante, owner, datos, contrato, falla nueva, SLO, alternativa simple y condición de revisión}.
-
+\begin{uawarn}
+No se califica por cantidad de servicios. Se califica la coherencia entre capacidad, autoridad, integridad, fallas y evidencia.
+\end{uawarn}
 
 \section{Ejercicios}
 \begin{uaexercise}
-
-\textbf{1. Monolito modular.} Explique por qué una unidad de despliegue no implica ausencia de modularidad. Proponga reglas internas para evitar una bola de barro.
-
-\textit{Entregable mínimo:} un diagrama modular, reglas de dependencia y prueba de arquitectura.
+\textbf{1. Dominio, capacidad e invariante.} Para la compra de \texttt{EspadaSolar\#17}, distinga dominio, capacidad, operaciones concretas e invariante. Explique por qué \emph{reservar} no es por sí solo una capacidad arquitectónica.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{2. Prima de microservicios.} Enumere los costos distribuidos que aparecen al extraer un módulo y diseñe un criterio para decidir si el beneficio compensa.
-
-\textit{Entregable mínimo:} una tabla beneficio/costo, métrica y umbral de extracción.
+\textbf{2. Mapa de fronteras.} Dibuje Mercado e Inventario separados por una frontera. Indique qué datos quedan de cada lado, cuál es el dato autoritativo y por qué puertas se permite interactuar.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{3. Señales de separación.} Dado un sistema con catálogo, pagos y recomendaciones, decida qué separar primero y qué mantener junto. Justifique por dominio, carga y equipo.
-
-\textit{Entregable mínimo:} una decisión por componente con owner, carga y alternativa simple.
+\textbf{3. Autoridad y responsabilidad.} Asigne autoridad y equipo responsable a Mercado, Inventario y Pagos. Para cada uno indique una decisión que puede tomar, una métrica que debe observar y un incidente que debe atender.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{4. Monolito distribuido.} Construya una arquitectura con cinco servicios que conserve despliegue coordinado, base compartida y cadenas RPC. Explique por qué es peor que un monolito modular.
-
-\textit{Entregable mínimo:} un diagrama del monolito distribuido y una refactorización propuesta.
+\textbf{4. Monolito modular.} Proponga reglas internas para implementar Mercado, Inventario, Pagos y Ranking dentro de una sola aplicación sin convertirla en una maraña de dependencias. Incluya APIs internas, acceso a datos y pruebas de arquitectura.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{5. Bounded contexts.} Defina tres significados distintos de 'curso' o 'pedido' en contextos de negocio y diseñe traducciones entre ellos.
-
-\textit{Entregable mínimo:} un glosario por contexto y contratos de traducción.
+\textbf{5. Necesidad observable.} Asteria publica toda la aplicación una vez por semana. Ranking cambia a diario y sus picos consumen CPU durante torneos. Formule una hipótesis de separación con problema, evidencia, alternativa simple y métrica de éxito.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{6. Ownership de datos.} Explique qué significa database per service y cómo resolvería una consulta global sin permitir acceso directo a tablas ajenas.
-
-\textit{Entregable mínimo:} un modelo de ownership y dos opciones para consulta global.
+\textbf{6. Contextos delimitados.} Defina qué significa \emph{Objeto} en Catálogo, Inventario, Mercado y Combate. Diseñe una traducción entre Mercado e Inventario sin crear un objeto universal compartido.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{7. Conway.} Analice una organización donde dos equipos deben aprobar cada cambio del otro. ¿Qué revela sobre la frontera de servicios?
-
-\textit{Entregable mínimo:} un mapa equipo-servicio y una propuesta de reducción de coordinación.
+\textbf{7. Módulo, proceso, servicio y microservicio.} Clasifique cuatro ejemplos propuestos por usted y justifique por qué exponer un módulo por HTTP no alcanza para llamarlo microservicio.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{8. RPC vs eventos.} Para validación de pago, notificación, actualización de ranking y consulta de perfil, elija RPC o evento y justifique.
-
-\textit{Entregable mínimo:} una tabla de cuatro interacciones con timeout, atraso y falla.
+\textbf{8. Cadena sincrónica.} Modele la compra como Mercado $\rightarrow$ Inventario $\rightarrow$ Pagos. Si cada componente tiene disponibilidad 0,999, calcule la aproximación idealizada del flujo. Explique por qué el resultado es optimista y qué trabajo movería fuera del camino crítico.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{9. Cadena sincrónica.} Diseñe una cadena API->A->B->C y calcule disponibilidad compuesta si cada servicio tiene 99.9%. Analice además latencia y timeouts.
-
-\textit{Entregable mínimo:} el cálculo, sus supuestos y dos mecanismos para sacar dependencias del camino.
+\textbf{9. Timeout ambiguo e idempotencia.} Mercado envía \texttt{Reserve(17,Sofía)}, Inventario reserva y se pierde la respuesta. Construya las historias compatibles con el timeout y diseñe la clave y el estado durable necesarios para un retry seguro.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{10. Comando, evento y consulta.} Clasifique ReserveSeat, SeatReserved y GetSeatAvailability. Construya un ejemplo de evento mal modelado como comando oculto.
-
-\textit{Entregable mínimo:} una clasificación justificada y un ejemplo de comando oculto.
+\textbf{10. Comando, evento y consulta.} Clasifique \texttt{ReserveItem}, \texttt{ItemReserved}, \texttt{GetOwner}, \texttt{AuthorizePayment} y \texttt{OwnershipTransferred}. Identifique un evento que en realidad sería un comando oculto.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{11. Dual write.} Un servicio actualiza Enrollment y publica StudentEnrolled. Dibuje las ventanas de falla para ambos órdenes.
-
-\textit{Entregable mínimo:} dos timelines con crash y estados inconsistentes.
+\textbf{11. Contrato de evento.} Diseñe \texttt{OwnershipTransferred v1}: identidad, significado, campos, key/orden y política de entrega. Proponga una evolución compatible a v2 y otra que rompería consumidores.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{12. Transactional outbox.} Diseñe schema mínimo, relay, deduplicación y política de retención para una outbox de inscripciones.
-
-\textit{Entregable mínimo:} un schema, relay, inbox, retención, métricas y replay.
+\textbf{12. Dual write.} Inventario debe actualizar el propietario y publicar un evento. Dibuje los órdenes DB primero y broker primero. Coloque un crash en cada ventana y describa la inconsistencia visible.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{13. Evolución de eventos.} Proponga una evolución compatible de StudentEnrolled v1 a v2 y una evolución que rompería consumidores.
-
-\textit{Entregable mínimo:} esquemas v1/v2, matriz de compatibilidad y plan de transición.
+\textbf{13. Transactional outbox.} Diseñe el esquema mínimo de una outbox para \texttt{OwnershipTransferred}: columnas, transacción local, estados del relay, reintentos, retención y métricas.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{14. Saga de inscripción.} Diseñe pasos, timeouts, reintentos y compensaciones para inscripción, cupo, pago, acceso y comprobante.
-
-\textit{Entregable mínimo:} una máquina de estados durable con retries y compensaciones.
+\textbf{14. Relay, inbox y al menos una vez.} Mueva el crash después de publicar y antes de marcar la outbox. Explique por qué aparece un duplicado y diseñe una inbox o operación idempotente en Ranking.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{15. Compensación imperfecta.} Dé tres efectos que no pueden revertirse perfectamente y proponga una compensación de negocio razonable.
-
-\textit{Entregable mínimo:} una tabla de efectos irreversibles y compensaciones honestas.
+\textbf{15. Saga durable.} Modele la compra con estados normales e inciertos. Incluya reserva, autorización, transferencia, notificación, timeouts, retries y revisión manual.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{16. Coreografía.} Diseñe una saga coreografiada con tres participantes y explique cómo evitar ciclos y pérdida de visibilidad.
-
-\textit{Entregable mínimo:} un diagrama de eventos, riesgo de ciclos y trazabilidad.
+\textbf{16. Rollback y compensación.} Distinga rollback transaccional, vuelta atrás de versión y compensación de negocio. Proponga compensaciones para pago autorizado con transferencia imposible y explique qué no puede borrarse de la historia.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{17. Orquestación.} Diseñe el mismo flujo con un orquestador durable. Defina estado, recuperación y riesgo de centralización.
-
-\textit{Entregable mínimo:} un estado de orquestador, protocolo de recovery y SLO.
+\textbf{17. Coreografía u orquestación.} Diseñe la compra una vez como coreografía y otra como orquestación. Compare visibilidad, acoplamiento, recuperación, intervención humana y complejidad operativa.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{18. Strangler Fig.} Proponga una migración incremental desde un monolito de e-commerce. Defina primer servicio, routing, rollback y métricas.
-
-\textit{Entregable mínimo:} un plan por etapas con baseline, routing, rollback y stop criteria.
+\textbf{18. Migración Strangler de Ranking.} Proponga una migración gradual de Ranking: coexistencia, doble cálculo, comparación, canary, enrutamiento, vuelta atrás y criterio para retirar la versión anterior.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{19. Capacidad operativa.} Construya una checklist de capacidades mínimas antes de operar 30 microservicios en producción.
-
-\textit{Entregable mínimo:} una checklist priorizada con owner y evidencia de cumplimiento.
+\textbf{19. Preparación operativa.} Construya una checklist antes de poner Ranking como servicio independiente. Debe incluir CI/CD, guardia, procedimientos, SLI/SLO, trazas, secretos, backup, capacidad y pruebas de falla.
 \end{uaexercise}
 \begin{uaexercise}
-
-\textbf{20. Integración D=(P,F,G,S,T).} Aplique el marco a una plataforma de cursos y defienda qué permanece monolítico, qué se extrae y qué trade-offs se aceptan.
-
-\textit{Entregable mínimo:} un canvas completo de frontera y defensa de la alternativa descartada.
+\textbf{20. Defensa integral de una frontera.} Aplique $D=(P,F,G,S,T)$ a una capacidad de Asteria. Defienda qué permanece en el monolito modular, qué se separa, qué falla nueva aparece, cómo se preserva integridad y qué métrica podría refutar la decisión.
 \end{uaexercise}
 \section{Criterios de entrega}
-Toda respuesta debe indicar beneficio, prima distribuida, falla nueva, mecanismo de mitigación y condición para revisar la decisión.
+Toda respuesta debe identificar el beneficio buscado, el costo adicional de distribuir, la falla nueva, el mecanismo de mitigación y una condición para revisar la decisión. Los diagramas deben mostrar quién sabe qué y qué estado queda durable.
 \end{document}

@@ -1,12 +1,11 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=apuntes,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-\UASetSemester{Segundo cuatrimestre 2026}
-\UASetDate{2026}
+\usepackage{longtable,array}
 
 \UASetClassNumber{09}
-\UASetClassTitle{Arquitecturas distribuidas reales}
-\title{Clase 09 --- Monolito modular, microservicios, eventos, outbox y sagas}
+\UASetClassTitle{Fronteras de arquitectura}
+\title{Clase 09 --- Monolito modular, servicios, eventos, outbox y sagas}
 \author{\UAProfessor}
 \date{\UADate}
 
@@ -15,652 +14,717 @@
 
 \section{Propósito de la clase}
 
-Esta clase cambia el nivel de análisis. Las clases anteriores estudiaron mecanismos de almacenamiento, logs y consistencia. Ahora debemos decidir cómo agrupar responsabilidades, datos y equipos en una arquitectura completa.
+Esta clase cambia la escala del razonamiento. En las clases anteriores estudiamos mecanismos concretos: cómo un motor vuelve durable una decisión, cómo un log conserva una historia, cómo varias réplicas acuerdan un orden y qué ocurre cuando la red se parte. Ahora usaremos esas ideas para decidir \emph{dónde colocar límites dentro de una aplicación completa}.
 
-El objetivo no es defender una moda arquitectónica. Es aprender a responder:
-\begin{itemize}
-\item qué frontera de dominio justifica una frontera de despliegue;
-\item qué invariantes conviene mantener locales;
-\item qué interacciones requieren respuesta inmediata;
-\item qué procesos pueden evolucionar mediante eventos;
-\item cómo se conserva integridad de negocio cuando no existe una única transacción;
-\item si la organización puede operar lo que diseña.
-\end{itemize}
+El caso conductor es \textbf{Asteria Online}, un mundo virtual medieval multijugador. No diseñaremos todo el juego. Seguiremos una sola operación: Sofía intenta comprar la pieza única \texttt{EspadaSolar\#17}. Para completar la compra intervienen Mercado, Inventario, Pagos y, después, Ranking y Notificaciones. La pieza no puede terminar con dos propietarios, el mismo intento no debe cobrarse dos veces y una compra confirmada no puede desaparecer. En cambio, el ranking o una notificación pueden demorarse.
+
+La pregunta central es:
 
 \begin{uakeybox}
-Una arquitectura distribuida no mejora por contener más procesos. Mejora cuando sus fronteras reducen acoplamiento relevante sin ocultar los nuevos costos de red, datos y operación.
+¿Qué beneficio concreto obtiene una separación arquitectónica y qué nueva falla, latencia, duplicación de datos o responsabilidad operativa introduce?
 \end{uakeybox}
 
-
+El objetivo no es defender monolitos ni microservicios como una moda. El objetivo es aprender a identificar una necesidad observable, comparar una solución simple con una distribuida y exigir evidencia de que el costo adicional de distribuir quedó justificado.
 
 \section{Cómo estudiar este capítulo}
+\subsection{Método}
 
-Este capítulo está organizado en tres pasadas. La primera construye una intuición con un caso real; la segunda formaliza el mecanismo y sus supuestos; la tercera somete la solución a una falla o a una medición. Para estudiar de manera eficaz:
+Conviene leer cada sección con la misma secuencia:
 
 \begin{enumerate}
-\item explique primero el problema sin mencionar una tecnología;
-\item dibuje la ejecución normal y mueva el punto de falla;
-\item identifique la garantía exacta y su frontera;
-\item anote qué costo se desplaza hacia latencia, almacenamiento, reparación u operación;
-\item cierre proponiendo una métrica o un experimento que podría refutar su diseño.
+\item \textbf{Necesidad:} ¿qué problema concreto aparece en la compra de la espada?
+\item \textbf{Intuición:} ¿qué imagen mental permite comprenderlo sin jerga?
+\item \textbf{Definición:} ¿qué significa técnicamente el concepto?
+\item \textbf{Ejecución adversarial:} ¿qué ocurre si un mensaje se pierde, un proceso cae o una respuesta llega tarde?
+\item \textbf{Ventajas y costos:} ¿qué mejora y qué nueva complejidad aparece?
+\item \textbf{Evidencia:} ¿qué métrica o experimento permitiría revisar la decisión?
 \end{enumerate}
 
-\begin{uainfo}
-Las analogías del capítulo son puertas de entrada, no definiciones finales. Una respuesta completa debe poder abandonar la analogía y utilizar el vocabulario técnico correspondiente.
-\end{uainfo}
+No memorice una lista de patrones. Reconstruya la historia: quién posee cada dato, qué promesa se hizo, qué sabe cada participante en cada instante y qué estado debe sobrevivir a una falla.
 
 \section{Mapa intuitivo antes del formalismo}
 
-La arquitectura se entiende mejor si primero se piensa en responsabilidades y no en productos:
-
 \begin{center}
-\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.36\textwidth}}
+\renewcommand{\arraystretch}{1.22}
+\begin{tabular}{p{0.18\textwidth}p{0.35\textwidth}p{0.37\textwidth}}
 \toprule
-Concepto & Intuición & Pregunta técnica \\
+\textbf{Concepto} & \textbf{Idea intuitiva} & \textbf{Pregunta en Asteria} \\
 \midrule
-Monolito modular & edificio único con habitaciones y puertas & ¿las paredes internas se respetan? \\
-Microservicio & edificio autónomo conectado por caminos & ¿qué autonomía compra la separación? \\
-Bounded context & idioma local de una parte del negocio & ¿qué significa aquí ``pedido''? \\
-Ownership & escritura registral del dato & ¿quién puede modificar el invariante? \\
-RPC & llamada telefónica que espera respuesta & ¿qué ocurre si tarda o no responde? \\
-Evento & aviso publicado en un tablero durable & ¿quién lo consume y con qué retraso? \\
-Outbox & copia del aviso en el mismo libro que el cambio & ¿cómo evitar estado sin evento? \\
-Saga & itinerario con acciones compensatorias & ¿cómo continuar o reparar sin rollback global? \\
+Dominio & ámbito de la realidad con reglas y palabras propias & ¿qué significa comprar, reservar o poseer un objeto? \\
+Capacidad & responsabilidad estable que el negocio necesita sostener & ¿quién gestiona la propiedad de las piezas? \\
+Frontera & límite explícito entre responsabilidades, reglas y datos & ¿qué queda dentro de Inventario y qué queda dentro de Mercado? \\
+Autoridad & componente con la última palabra sobre un hecho & ¿quién decide el propietario válido de \texttt{\#17}? \\
+Responsabilidad & equipo que cambia, opera y recupera esa parte & ¿quién atiende una duplicación de objetos? \\
+RPC & solicitud remota que espera una respuesta & ¿qué sabe Mercado si Inventario no responde? \\
+Evento & aviso durable sobre un hecho ya confirmado & ¿cómo se enteran Ranking y Notificaciones sin bloquear la compra? \\
+Outbox & evento pendiente guardado junto con el cambio de negocio & ¿cómo evitar una transferencia sin aviso durable? \\
+Saga & proceso de negocio durable compuesto por varias transacciones locales & ¿cómo continuar o reparar reserva, pago y transferencia? \\
+Strangler Fig & migración gradual con camino viejo y nuevo coexistiendo & ¿cómo extraer Ranking sin apostar toda la plataforma? \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \begin{uainfo}
-Una arquitectura no es un dibujo de cajas. Es una distribución de autoridad, datos, fallas, comunicación y responsabilidad operacional.
+Una arquitectura no es solamente un diagrama de cajas. Es una distribución de autoridad, datos, fallas, comunicación y responsabilidad operativa.
 \end{uainfo}
 
-\section{Caso conductor: Asteria Online}
+\section{El caso conductor y su alcance}
 
-Asteria es un mundo virtual medieval. Cuenta con cuentas, zonas de mundo, combate, inventario, mercado, pagos, ranking y chat. Las presiones son distintas:
+Asteria incluye cuentas, mundo, combate, inventario, mercado, pagos, ranking, chat y muchos otros subsistemas. Esta clase se limita al flujo comercial de una pieza única:
+
+\begin{enumerate}
+\item Sofía pulsa \emph{comprar}.
+\item Mercado valida que la oferta siga activa.
+\item Inventario reserva \texttt{EspadaSolar\#17}.
+\item Pagos autoriza el cobro.
+\item Inventario transfiere el propietario.
+\item Ranking y Notificaciones reaccionan después.
+\end{enumerate}
+
+Quedan fuera el movimiento en tiempo real, la física, el renderizado, el matchmaking, el anti-cheat y la infraestructura gráfica del cliente. Acotar el caso es importante: una frontera solo puede evaluarse si sabemos qué regla protege y qué operación atraviesa.
+
+\subsection{Reglas que no pueden romperse}
 
 \begin{itemize}
-\item combate necesita baja latencia y autoridad local;
-\item inventario debe preservar propiedad única de objetos;
-\item pagos requieren auditabilidad e idempotencia;
-\item ranking tolera atraso;
-\item chat puede degradarse sin detener la partida;
-\item zonas populares necesitan escalar de forma distinta.
+\item \texttt{EspadaSolar\#17} tiene como máximo un propietario.
+\item Un mismo intento de compra no se cobra dos veces.
+\item Una compra confirmada no desaparece después de un reinicio.
 \end{itemize}
 
-La primera pregunta no es cuántos servicios crear, sino qué capacidades poseen invariantes, ritmo de cambio, carga y equipo suficientemente distintos para justificar una frontera de despliegue.
+\subsection{Efectos que pueden demorarse}
+
+\begin{itemize}
+\item actualización del ranking;
+\item notificación al jugador;
+\item vista de analítica;
+\item historial derivado para consulta.
+\end{itemize}
+
+Esta diferencia anticipa una decisión clave: no todo el trabajo pertenece al camino sincrónico de la compra.
+
+\section{Vocabulario fundamental}
+
+\subsection{Dominio, capacidad e invariante}
+
+Un \textbf{dominio} es una parte de la realidad con problemas, reglas y lenguaje propios. El comercio de objetos incluye ofertas, vendedores, compradores, precios y ventas. El inventario incluye piezas concretas, cantidades, reservas y propietarios.
+
+Una \textbf{capacidad} es una responsabilidad estable que el negocio necesita sostener. No es una única función ni un endpoint. \emph{Gestionar la propiedad de objetos} incluye reservar una pieza, transferirla, liberarla, consultar su propietario y evitar dos dueños simultáneos.
+
+Un \textbf{invariante} es una regla que debe permanecer verdadera en todo estado válido. En nuestro caso:
+
+\[
+\#\{\text{propietarios válidos de EspadaSolar\#17}\}\leq 1.
+\]
+
+Primero se identifica la capacidad y su invariante; recién después se decide si se implementarán dentro de un módulo, proceso o servicio.
+
+\subsection{Frontera y dato autoritativo}
+
+Una \textbf{frontera} es un límite explícito que separa dos ámbitos del sistema. Indica qué responsabilidades, reglas y datos quedan de cada lado y por qué puertas se permite interactuar.
+
+En Asteria, Inventario conserva la propiedad y las reservas; Mercado conserva la oferta, el vendedor y el precio. Mercado no debe modificar directamente la tabla de propietarios. Puede pedir una reserva mediante una operación permitida o reaccionar a un evento confirmado.
+
+El \textbf{dato autoritativo} es el registro reconocido como verdad oficial para decidir. Si Inventario dice:
+
+\[
+\texttt{owner(EspadaSolar\#17)=Sofía},
+\]
+
+esa es la verdad para transferir o equipar la pieza. Ranking puede mantener una vista derivada, pero no puede decidir el propietario.
+
+\subsection{Autoridad y responsabilidad}
+
+La \textbf{autoridad} es el componente con la última palabra sobre un hecho de negocio. Inventario decide quién posee la espada; Pagos decide si un cobro fue autorizado; Mercado decide el estado de la oferta.
+
+La \textbf{responsabilidad} incluye al equipo que puede modificar reglas y datos, aprobar cambios, observar métricas, responder incidentes y recuperar el componente. Autoridad responde \emph{quién decide}; responsabilidad responde \emph{quién sostiene esa decisión durante toda la vida del sistema}.
+
+\subsection{Versión, puesta en producción y vuelta atrás}
+
+Una \textbf{unidad de publicación} es el conjunto de componentes que se actualiza o retira como una misma versión. \textbf{Poner en producción} significa hacer que una versión atienda tráfico real. Una \textbf{vuelta atrás de versión} o \emph{rollback} retira una versión problemática y devuelve tráfico o software a una versión conocida.
+
+La vuelta atrás de software no deshace pagos, eventos ni transferencias ya confirmados. Los efectos de negocio requieren una compensación, no solamente cambiar binarios.
+
+\subsection{Autonomía}
+
+La autonomía es el grado en que una parte puede cambiar, publicar una versión, escalar o recuperarse sin obligar al resto a hacer lo mismo al mismo tiempo. Debe observarse mediante preguntas concretas:
+
+\begin{itemize}
+\item ¿Inventario puede cambiar su lógica sin exigir cambios simultáneos en Mercado?
+\item ¿Ranking puede poner una versión en producción o volver atrás sin volver a publicar Inventario?
+\item ¿Ranking puede agregar recursos durante un torneo sin escalar Pagos?
+\item ¿Una falla de Ranking puede resolverse sin detener la compra?
+\end{itemize}
+
+Separar procesos no crea autonomía automáticamente. Una base compartida, contratos frágiles, versiones coordinadas o un equipo sin capacidad operativa pueden conservar el acoplamiento.
+
+\section{De una regla local a un protocolo distribuido}
+
+Si una sola autoridad posee el dato, puede proteger el invariante dentro de una transacción local. Inventario puede leer la versión vigente de la pieza, verificar que esté disponible y registrar una reserva dentro de un único commit.
+
+Cuando esa decisión cruza procesos independientes, aparece un \textbf{protocolo}: una secuencia acordada de mensajes, estados durables, identificadores, timeouts, reintentos y reglas de recuperación. Mover una frontera no elimina la regla de negocio; transforma una transacción local en un protocolo que debe sobrevivir fallas parciales.
+
+\begin{uakeybox}
+Distribuir no elimina complejidad: cambia complejidad local por coordinación explícita, observabilidad y recuperación entre procesos.
+\end{uakeybox}
+
+\section{Módulo, proceso, servicio y microservicio}
+
+Estos términos no son sinónimos.
+
+\begin{description}
+\item[Módulo.] Frontera de código dentro de una aplicación. Expone una interfaz interna y oculta detalles.
+\item[Proceso.] Programa en ejecución con memoria, recursos y fallas propias.
+\item[Servicio.] Capacidad accesible mediante un contrato, normalmente a través de red o mensajería.
+\item[Microservicio.] Servicio enfocado en una capacidad coherente, con datos y responsabilidad claros, y con independencia razonable de cambio y operación.
+\end{description}
+
+Una clase expuesta por HTTP no se convierte por eso en un microservicio. Tampoco todo contexto delimitado necesita un proceso separado.
+
+\section{Monolito modular: una opción válida}
+
+Un monolito modular se publica como una unidad, pero internamente separa módulos con responsabilidades, interfaces y dependencias explícitas. Compartir un proceso simplifica la comunicación y permite transacciones locales. El problema no es publicar los módulos juntos, sino perder las fronteras internas y permitir que cualquier parte modifique datos ajenos.
+
+La analogía del edificio ayuda si se mapea con precisión:
 
 \begin{center}
-\begin{tikzpicture}[node distance=6mm,>=Latex,every node/.style={font=\small,align=center}]
-\node[draw=UAIngOrange,rounded corners,thick,fill=UAIngPaper,text width=2cm] (acc) {Cuentas};
-\node[draw=UAIngNavy,rounded corners,thick,right=of acc,text width=2cm] (world) {Mundo};
-\node[draw=UAIngOrange,rounded corners,thick,right=of world,text width=2cm] (inv) {Inventario};
-\node[draw=UAIngNavy,rounded corners,thick,right=of inv,text width=2cm] (pay) {Pagos};
-\node[draw=UAIngOrange,rounded corners,thick,right=of pay,text width=2cm] (rank) {Ranking};
-\draw[->,very thick] (acc)--(world);
-\draw[->,very thick,UAIngOrange] (world)--(inv);
-\draw[->,very thick] (inv)--(pay);
-\draw[->,very thick,UAIngOrange] (pay)--(rank);
-\end{tikzpicture}
+\begin{tabular}{p{0.24\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{Analogía} & \textbf{Significado técnico} \\
+\midrule
+Edificio & aplicación que se publica como una unidad \\
+Habitación & módulo con responsabilidades definidas \\
+Puerta & API interna permitida \\
+Pared & regla que impide acceder directamente a internals o tablas ajenas \\
+Camino entre edificios & red, serialización, contrato remoto y fallas parciales \\
+\bottomrule
+\end{tabular}
 \end{center}
-
-\section{Caso conductor: plataforma global de cursos}
-
-La plataforma ofrece catálogo, inscripción, pagos, reproducción, progreso, recomendaciones y certificados. Existen cinco equipos con ritmos de cambio distintos. Algunas propiedades:
-\begin{itemize}
-\item inscripción, cupo, pago y certificado tienen invariantes fuertes;
-\item recomendaciones y analytics aceptan atraso;
-\item video tiene una carga y SLO diferentes;
-\item el dominio de aprendizaje todavía cambia;
-\item el negocio quiere despliegues más independientes.
-\end{itemize}
-
-Una mala respuesta sería “microservicios para escalar”. Una respuesta madura analiza qué capacidades extraer, qué mantener juntas y qué mecanismos sostienen la separación.
-
-\section{Arquitectura como sistema de decisiones}
-
-Una arquitectura define:
-\begin{itemize}
-\item responsabilidades y límites;
-\item ownership de datos;
-\item contratos sincrónicos y asincrónicos;
-\item consistencia e invariantes;
-\item despliegue y escalado;
-\item modos de falla y degradación;
-\item observabilidad y operación;
-\item evolución y migración.
-\end{itemize}
-
-El diagrama es evidencia visual de esas decisiones, no la arquitectura en sí.
-
-\section{Monolito modular}
-
-\subsection{Definición}
-
-Una aplicación se despliega como unidad, pero internamente separa módulos con APIs, dependencias y ownership claros. El mismo proceso no implica modelo global desordenado.
 
 \subsection{Ventajas}
 
 \begin{itemize}
-\item llamadas locales simples y rápidas;
-\item transacciones sobre una base común;
-\item debugging y testing end-to-end más accesibles;
-\item despliegue y rollback unificados;
-\item menor superficie de red y operación;
-\item facilidad para refactorizar fronteras mientras el dominio se aprende.
+\item llamadas locales rápidas y simples;
+\item transacciones locales para invariantes críticos;
+\item debugging y pruebas extremo a extremo más accesibles;
+\item una sola puesta en producción y una sola vuelta atrás;
+\item menor superficie operativa;
+\item facilidad para refactorizar fronteras mientras el dominio todavía cambia.
 \end{itemize}
 
 \subsection{Riesgos}
 
 \begin{itemize}
 \item dependencias internas sin control;
-\item cambios que atraviesan módulos;
-\item acoplamiento por modelo de datos compartido;
-\item despliegues cada vez más grandes;
-\item dificultad de ownership si todos modifican todo.
+\item acceso directo a tablas de otros módulos;
+\item cambios que atraviesan muchas responsabilidades;
+\item tiempos de build y prueba crecientes;
+\item responsabilidad difusa si todos cambian todo.
 \end{itemize}
 
-El problema no es la unidad de despliegue, sino perder modularidad.
+Un monolito modular no es una etapa vergonzosa. Puede ser la solución correcta mientras la modularidad interna resuelva el problema.
 
-\section{Monolith First y prima de microservicios}
+\section{La necesidad concreta que podría justificar separar}
 
-Martin Fowler y otros autores han señalado que comenzar con un monolito modular puede ser razonable cuando las fronteras del dominio aún no están claras. Extraer demasiado pronto congela hipótesis equivocadas en contratos de red y pipelines operativos.
-
-La “prima de microservicios” incluye:
-\begin{itemize}
-\item timeouts, retries e idempotencia;
-\item compatibilidad de contratos;
-\item datos distribuidos y sagas;
-\item tracing y correlación;
-\item service discovery, secretos y configuración;
-\item despliegue, rollback y capacidad de plataforma;
-\item incidentes que atraviesan equipos.
-\end{itemize}
-
-La separación es racional cuando sus beneficios superan esa prima.
-
-\section{Microservicios}
-
-\subsection{Definición operacional}
-
-Un microservicio útil posee una capacidad de negocio coherente, datos y comportamiento bajo un ownership claro, y puede evolucionar con una independencia razonable.
-
-No debe definirse por cantidad de líneas, tamaño de equipo o uso de HTTP.
-
-\subsection{Señales que justifican separación}
-
-\begin{itemize}
-\item carga y escalado muy diferentes;
-\item ciclos de cambio independientes;
-\item equipos con ownership estable;
-\item necesidad de aislar fallas;
-\item requerimientos de seguridad o cumplimiento distintos;
-\item tecnología especializada con beneficio real;
-\item frontera de dominio relativamente madura.
-\end{itemize}
-
-\subsection{Caso real: Netflix}
-
-Netflix ha documentado plataformas donde componentes separados requieren escalado y despliegue independientes. El ejemplo es valioso si se entiende la causa: la escala y organización justifican la separación. Copiar la forma sin la presión original produce complejidad sin beneficio.
-
-\section{Monolito distribuido}
-
-Un sistema tiene muchos servicios, pero conserva acoplamiento de monolito:
-\begin{itemize}
-\item despliegues coordinados siempre;
-\item base compartida;
-\item cadenas sincrónicas largas;
-\item modelos y librerías compartidos rígidamente;
-\item cambios que requieren múltiples equipos;
-\item fallas locales que detienen el flujo completo.
-\end{itemize}
-
-Se paga la latencia, observabilidad y operación distribuida sin obtener autonomía.
-
-\section{Bounded contexts}
-
-Un bounded context define una frontera donde términos y reglas tienen significado coherente. La palabra “curso” puede representar catálogo, experiencia de aprendizaje o producto facturable.
-
-Intentar un modelo canónico universal aumenta acoplamiento. Traducir entre contextos mediante contratos hace explícitas las diferencias y reduce el riesgo de que una semántica local invada a otra.
-
-\section{Ownership de datos}
-
-Database per service no significa necesariamente un servidor físico por servicio. Significa que un servicio es el único que modifica directamente su modelo. Otros acceden mediante contratos.
-
-Beneficios:
-\begin{itemize}
-\item autonomía de esquema;
-\item invariantes locales claras;
-\item menor acoplamiento accidental;
-\item accountability operacional.
-\end{itemize}
-
-Costos:
-\begin{itemize}
-\item joins globales requieren proyecciones o composición;
-\item transacciones atraviesan servicios;
-\item consistencia se vuelve explícita;
-\item reporting necesita pipelines y modelos derivados.
-\end{itemize}
-
-\section{Conway y organización}
-
-La arquitectura tiende a reflejar las rutas de comunicación. Si dos equipos deben coordinar cada cambio, una frontera técnica no produce autonomía. Un servicio sin equipo dueño acumula incidentes y deuda.
-
-La pregunta no es solo “¿podemos desplegarlo aparte?”, sino “¿existe un equipo con contexto, on-call y autoridad para operarlo?”.
-
-\section{RPC y eventos}
-
-\subsection{RPC}
-
-Ventajas:
-\begin{itemize}
-\item control de flujo explícito;
-\item respuesta inmediata;
-\item errores visibles en el request;
-\item adecuado para queries y comandos críticos sincrónicos.
-\end{itemize}
-
-Costos:
-\begin{itemize}
-\item acoplamiento temporal;
-\item latencia agregada;
-\item cascadas de timeout/retry;
-\item disponibilidad compuesta;
-\item necesidad de versionado y compatibilidad.
-\end{itemize}
-
-\subsection{Eventos}
-
-Ventajas:
-\begin{itemize}
-\item desacoplamiento temporal;
-\item múltiples consumidores;
-\item replay y auditoría;
-\item extensión sin modificar productor.
-\end{itemize}
-
-Costos:
-\begin{itemize}
-\item consistencia eventual;
-\item causalidad y orden parcial;
-\item duplicados;
-\item trazabilidad más difícil;
-\item contratos durables;
-\item estados intermedios visibles.
-\end{itemize}
-
-No se debe elegir eventos por moda. Una consulta de disponibilidad que necesita respuesta inmediata puede ser mejor por RPC; una notificación o proyección puede ser evento.
-
-\section{Comandos, eventos y consultas}
-
-\begin{itemize}
-\item Un comando expresa intención a un owner: \texttt{ReserveSeat}.
-\item Un evento expresa un hecho: \texttt{SeatReserved}.
-\item Una consulta solicita información sin mutar: \texttt{GetSeatAvailability}.
-\end{itemize}
-
-Confundirlos produce contratos ambiguos. Un evento no debería ser una solicitud escondida que depende de un consumidor específico para que el sistema siga correcto.
-
-\section{Dual write y transactional outbox}
-
-El dual write aparece cuando un servicio actualiza su base y publica un evento. Ningún orden elimina todas las ventanas de falla.
-
-Transactional outbox guarda estado de negocio y evento pendiente en una transacción local. Un relay o CDC publica. Esto evita “base sí / evento no”, pero introduce entrega potencialmente repetida y exige deduplicación downstream.
-
-Un evento debería incluir:
-\begin{itemize}
-\item event ID;
-\item aggregate ID;
-\item tipo y versión de esquema;
-\item timestamp del dominio/producción;
-\item datos mínimos necesarios;
-\item metadata de tracing y causalidad cuando corresponda.
-\end{itemize}
-
-\section{Contratos y evolución}
-
-Los eventos almacenados duran más que un despliegue. Cambiar significado rompe consumidores actuales, futuros y replay histórico.
-
-Prácticas:
-\begin{itemize}
-\item cambios aditivos compatibles;
-\item campos opcionales y defaults;
-\item validación de schemas;
-\item ownership y documentación;
-\item pruebas de contrato;
-\item deprecación planificada;
-\item consumidores tolerantes a datos desconocidos.
-\end{itemize}
-
-\section{Sagas}
-
-Una saga modela un workflow como transacciones locales. Si un paso falla, el sistema puede reintentar, continuar con una alternativa o compensar pasos previos.
-
-\subsection{Compensación}
-
-No es rollback físico. Una devolución no borra el cobro histórico; un email de cancelación no desenvía el original; liberar un cupo puede no recuperar una oportunidad perdida.
-
-Las compensaciones deben diseñarse con semántica de negocio y ser idempotentes.
-
-\subsection{Ejemplo: inscripción paga}
-
-\begin{enumerate}
-\item crear inscripción pendiente;
-\item reservar cupo;
-\item autorizar pago;
-\item activar acceso;
-\item emitir comprobante.
-\end{enumerate}
-
-Si falla pago, liberar cupo y cancelar. Si falla email, no cancelar acceso: reintentar un paso secundario. Esto muestra que el flujo no tiene una única política de rollback.
-
-\section{Coreografía y orquestación}
-
-\subsection{Coreografía}
-
-Cada servicio reacciona a eventos. Adecuada para pocos participantes y flujos simples. El riesgo aumenta con ciclos, dependencias implícitas y dificultad de visualizar el estado global.
-
-\subsection{Orquestación}
-
-Un coordinador durable mantiene el estado del workflow, envía comandos y decide compensaciones. Mejora visibilidad y control, pero puede concentrar lógica y criticidad.
-
-AWS Prescriptive Guidance documenta ambas variantes y advierte sobre dual writes, ciclos, timeouts y complejidad de compensación. El patrón no elimina estos problemas; los organiza.
-
-\section{Strangler Fig y migración incremental}
-
-Una migración big-bang concentra riesgo y congela entrega. Strangler Fig permite interceptar una capacidad, implementarla fuera del monolito, migrar tráfico y retirar gradualmente la versión antigua.
-
-Una extracción debería tener hipótesis:
-\begin{itemize}
-\item qué problema de escalado/cambio resuelve;
-\item qué SLO mejora;
-\item qué blast radius reduce;
-\item qué costo operativo agrega;
-\item cómo se revierte si la hipótesis falla.
-\end{itemize}
-
-\section{Operabilidad como requisito previo}
-
-Antes de multiplicar servicios, la organización necesita:
-\begin{itemize}
-\item CI/CD y rollback;
-\item observabilidad y tracing;
-\item gestión de configuración y secretos;
-\item estándares de resiliencia;
-\item on-call y ownership;
-\item catálogo de servicios y documentación;
-\item mecanismos de compatibilidad de contratos.
-\end{itemize}
-
-Sin estas capacidades, cada servicio multiplica toil y variabilidad.
-
-\section{Matriz de decisión}
-
-\begin{tabular}{p{0.24\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
-\toprule
-Dimensión & Mantener junto & Separar \\
-\midrule
-Invariantes & transacción local frecuente & consistencia eventual/contrato estable \\
-Carga & similar & escalado/costo muy distinto \\
-Equipos & ownership compartido & equipos autónomos y maduros \\
-Falla & debe caer como unidad & conviene aislar blast radius \\
-Cambio & mismo ritmo & ciclos de despliegue distintos \\
-Datos & modelo común coherente & bounded contexts distintos \\
-\bottomrule
-\end{tabular}
-
-\section{Método de diseño}
-
-\begin{enumerate}
-\item modelar dominio e invariantes;
-\item identificar capacidades y owners;
-\item trazar flujos críticos;
-\item elegir comunicación por interacción;
-\item localizar dual writes y sagas;
-\item diseñar fallas y degradación;
-\item verificar capacidad organizacional;
-\item definir métricas y criterio de extracción;
-\item migrar incrementalmente;
-\item revisar fronteras con evidencia.
-\end{enumerate}
-
-
-\section{Precisiones técnicas indispensables}
-
-\subsection{Bounded context no implica proceso}
-
-Un bounded context es una frontera semántica dentro de la cual el modelo tiene significado coherente. Puede implementarse como módulo de un monolito. La frontera de despliegue se justifica después, cuando autonomía, escala, seguridad o aislamiento pagan la prima distribuida.
-
-\subsection{Database per service significa ownership, no una máquina por servicio}
-
-El principio esencial es que un único owner modifica el modelo. La separación puede realizarse mediante esquemas, bases o clusters distintos según el riesgo. Compartir el mismo servidor físico no invalida el patrón; permitir escrituras laterales a tablas ajenas sí destruye el ownership.
-
-\subsection{Outbox no ofrece exactly-once global}
-
-Outbox hace atómicos el cambio local y la intención de publicar. El relay puede reenviar y el broker puede entregar nuevamente. El consumidor necesita inbox o deduplicación atómica con el efecto. Para efectos físicos o proveedores externos todavía puede ser necesaria reconciliación.
-
-\subsection{Una saga es una máquina de estados durable}
-
-No basta con encadenar handlers. El estado del workflow, los IDs de paso, deadlines, intentos, resultados y compensaciones deben sobrevivir reinicios. Las transiciones deben ser idempotentes y algunas fallas requieren intervención manual, no un rollback automático.
-
-\subsection{Compensar no borra la historia}
-
-Un reembolso es otro movimiento; un email de corrección no desenvía el anterior; devolver stock no recupera el tiempo perdido. La compensación restaura una condición de negocio aceptable, puede tardar y también puede fallar.
-
-\subsection{La autonomía debe demostrarse}
-
-Una extracción se justifica con evidencia: mayor frecuencia de despliegue independiente, menor lead time, menor blast radius o escalado diferenciado. Si los equipos, esquemas y releases siguen coordinándose siempre, probablemente se creó un monolito distribuido.
-
-\section{Errores frecuentes}
-
-\begin{itemize}
-\item servicio por entidad o tabla;
-\item usar microservicios como objetivo;
-\item database sharing sin ownership;
-\item cadenas RPC profundas;
-\item event-driven sin contratos;
-\item outbox sin deduplicación;
-\item saga sin compensación idempotente;
-\item big-bang rewrite;
-\item ignorar organización y on-call;
-\item medir cantidad de servicios en vez de autonomía o SLO.
-\end{itemize}
-
-\section{Bibliografía guiada y casos reales}
-
-\begin{itemize}
-\item Kleppmann, \emph{Designing Data-Intensive Applications}, capítulos 11 y 12.
-\item Fowler y Lewis, \href{https://martinfowler.com/articles/microservices.html}{Microservices} y Fowler, \href{https://martinfowler.com/bliki/MonolithFirst.html}{Monolith First}.
-\item Fowler, \href{https://martinfowler.com/articles/microservice-trade-offs.html}{Microservice Trade-Offs}.
-\item Netflix TechBlog, \href{https://netflixtechblog.com/scaling-event-sourcing-for-netflix-downloads-episode-1-6bc1595c5595}{Scaling Event Sourcing for Netflix Downloads}.
-\item AWS Prescriptive Guidance: \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html}{Transactional Outbox}, \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/saga-patterns.html}{Saga Patterns} y \href{https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/strangler-fig.html}{Strangler Fig}.
-\end{itemize}
-
-\section{Conexión con el Trabajo Final Integrador}
-
-Cada grupo debe justificar:
-\begin{itemize}
-\item qué queda unido y por qué;
-\item qué capacidad se separa y qué presión lo exige;
-\item ownership de datos;
-\item interacciones RPC/evento;
-\item dual writes y outbox;
-\item saga y compensaciones;
-\item capacidades operativas necesarias;
-\item criterio para revisar la frontera.
-\end{itemize}
-
-
-\section{Ejemplos cuantitativos de la prima distribuida}
-
-\subsection{Disponibilidad de una cadena sincrónica}
-
-Si una request depende secuencialmente de API, A, B y C, y cada componente tiene disponibilidad independiente de 99,9\%, la disponibilidad idealizada del flujo es:
-\[
-A_{flujo}=0{,}999^4\approx0{,}996006=99{,}6006\%.
-\]
-La cuenta ignora red, timeouts y fallas correlacionadas, por lo que es optimista. Además, las latencias se suman y los percentiles de cola pueden dominar. La separación creó una cadena cuya confiabilidad debe evaluarse como flujo, no como componentes aislados.
-
-\subsection{Costo de coordinación entre equipos}
-
-Suponga que un cambio en Inventario requiere aprobación de tres equipos y cuatro repositorios. Aunque existan servicios separados, la unidad real de cambio sigue siendo conjunta. Métricas como lead time, porcentaje de despliegues independientes y cantidad de coordinaciones cruzadas revelan si la frontera compra autonomía o solo red.
-
-\section{Caso real: modularidad en Shopify}
-
-Shopify ha documentado la evolución de un gran monolito modular y herramientas para hacer explícitas dependencias entre componentes. La lección no es copiar una herramienta específica, sino observar que una única unidad de despliegue puede conservar fronteras mediante ownership, APIs internas, chequeos automatizados y reducción de dependencias cíclicas.
-
-Una organización puede elegir un monolito modular cuando:
-\begin{itemize}
-\item las transacciones locales son frecuentes;
-\item el dominio aún cambia;
-\item el equipo no tiene capacidad operacional para múltiples servicios;
-\item la separación no mejora escala, ownership o cadencia de despliegue.
-\end{itemize}
-
-\section{Dual write trabajado paso a paso}
-
-El servicio de inscripción actualiza \texttt{Enrollment} y publica \texttt{StudentEnrolled}.
+La palabra \emph{presión} suele ser ambigua. En esta clase hablaremos de una \textbf{necesidad concreta o limitación observable}: algo que impide cumplir una meta del negocio, del rendimiento o de la operación.
 
 \begin{center}
-\begin{tabular}{p{0.22\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\begin{tabular}{p{0.26\textwidth}p{0.34\textwidth}p{0.27\textwidth}}
 \toprule
-Orden & Ventana de falla & Inconsistencia \\
+\textbf{Necesidad} & \textbf{Limitación actual} & \textbf{Evidencia} \\
 \midrule
-DB luego broker & evento publicado, DB aborta & consumidor ve inscripción inexistente \\
-DB antes broker & DB confirma, proceso cae & inscripción sin evento \\
-ambos terminan, ACK se pierde & retry completo & evento o efecto duplicado \\
+Carga diferente & Ranking consume CPU y afecta la compra & CPU, cola, p99 \\
+Ritmos de cambio distintos & Ranking espera la publicación de toda Asteria & tiempo hasta producción \\
+Aislamiento de fallas & un módulo secundario bloquea checkout & alcance del incidente \\
+Seguridad o auditoría & Pagos necesita controles específicos & incidentes y auditorías \\
+Responsabilidad de equipos & todos dependen de todos & tickets, bloqueos, versiones coordinadas \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Transactional outbox convierte el primer paso en una sola transacción local: negocio y evento pendiente. El relay puede repetir, por lo que cada evento necesita identidad y el consumidor debe ser idempotente.
+Sin problema, evidencia e hipótesis de mejora, separar solo agrega complejidad. Antes de crear un servicio conviene intentar alternativas más simples: modularidad interna, índices, caché, colas, límites de recursos o un worker separado.
 
-\subsection{Schema orientativo}
+\section{Contextos delimitados y lenguaje}
+
+Un \textbf{contexto delimitado} o \emph{bounded context} es un ámbito en el cual las palabras y reglas mantienen un significado coherente. La palabra \emph{Objeto} significa cosas distintas:
+
+\begin{itemize}
+\item en Catálogo: tipo de pieza, nombre, rareza y atributos base;
+\item en Inventario: instancia concreta, propietario, cantidad y versión;
+\item en Mercado: oferta, vendedor, precio y estado de venta;
+\item en Combate: arma equipada, daño, durabilidad y tiempo de reutilización.
+\end{itemize}
+
+Forzar un objeto universal produce campos opcionales, permisos confusos, despliegues coordinados y dependencias semánticas ocultas. Es preferible traducir entre modelos mediante contratos explícitos.
+
+Un contexto delimitado no obliga a crear un microservicio. Puede implementarse como módulo dentro del mismo proceso. La frontera semántica debe preceder a la frontera de red.
+
+\section{Responsabilidad de datos y acceso global}
+
+\emph{Database per service} no significa necesariamente un servidor físico por servicio. Significa que una autoridad es la única que modifica directamente su modelo. Otros componentes consultan mediante APIs, consumen eventos o mantienen proyecciones.
+
+Para una consulta global existen varias alternativas:
+
+\begin{itemize}
+\item composición de APIs: más fresca, pero dependiente de varias respuestas;
+\item vista materializada por eventos: rápida y disponible, pero puede estar atrasada;
+\item almacén analítico: adecuado para reporting, no para decisiones transaccionales inmediatas;
+\item índice de búsqueda: optimizado para lectura, reconstruible desde la fuente.
+\end{itemize}
+
+La elección depende de frescura, latencia y disponibilidad; no de la comodidad de hacer un join sobre tablas ajenas.
+
+\section{Cadena sincrónica y continuación asíncrona}
+
+En una \textbf{cadena sincrónica}, la petición espera respuestas antes de continuar:
+
+\[
+A\rightarrow B\rightarrow C\rightarrow D.
+\]
+
+Si C tarda o falla, A todavía no puede terminar. Es apropiada cuando el siguiente paso necesita el resultado inmediato, por ejemplo autorizar un pago antes de confirmar una compra.
+
+En una \textbf{continuación asíncrona}, un hecho durable permite que otros trabajen después:
+
+\[
+A\rightarrow \text{log}\Rightarrow \{C,D,E\}.
+\]
+
+A no espera a todos los lectores. Es apropiada para ranking, notificaciones o analítica.
+
+No son estilos universales. Cada interacción debe justificarse por la promesa visible al usuario.
+
+\section{El costo adicional de distribuir}
+
+Transformar una llamada local en una interacción de red agrega:
+
+\begin{itemize}
+\item serialización y compatibilidad de formatos;
+\item latencia y variabilidad de colas;
+\item timeouts y respuestas perdidas;
+\item reintentos e idempotencia;
+\item autenticación, autorización y secretos;
+\item trazas y correlación;
+\item puesta en producción y vuelta atrás independientes;
+\item guardias y procedimientos;
+\item consistencia explícita entre datos separados.
+\end{itemize}
+
+Este es el \textbf{costo adicional de distribuir}. Se acepta si la independencia obtenida es real y medible.
+
+\subsection{Disponibilidad compuesta}
+
+Como aproximación didáctica, si un flujo necesita cuatro componentes independientes con disponibilidad 0,999 cada uno:
+
+\[
+A_{flujo}\approx 0{,}999^4\approx 0{,}996.
+\]
+
+El cálculo es optimista: supone independencia, ignora red, colas, fallas comunes y degradación. Sirve para recordar que una cadena más larga agrega dependencias, no para predecir exactamente un incidente.
+
+\section{Muchos servicios, pero una sola unidad de cambio}
+
+La expresión \emph{monolito distribuido} es una etiqueta crítica y deliberadamente paradójica. Físicamente hay varios procesos y red, pero el sistema sigue comportándose como una sola unidad inseparable:
+
+\begin{itemize}
+\item todos comparten la misma base;
+\item las versiones deben publicarse juntas;
+\item una petición atraviesa cadenas RPC largas;
+\item cambios simples requieren varios equipos;
+\item una falla local detiene el flujo completo.
+\end{itemize}
+
+Se paga latencia, observabilidad y fallas parciales sin obtener autonomía. En ese escenario, un monolito modular podría ser más simple y ofrecer la misma coordinación.
+
+\section{RPC, timeout e idempotencia}
+
+Una \textbf{RPC} o llamada a procedimiento remoto ofrece un contrato que hace parecer una interacción de red como una llamada a una función. La semejanza sintáctica no elimina la diferencia física.
+
+Supongamos:
+
+\begin{enumerate}
+\item Mercado envía \texttt{Reserve(\#17,Sofía)}.
+\item Inventario reserva la pieza.
+\item La respuesta se pierde.
+\item Mercado observa un timeout.
+\end{enumerate}
+
+Mercado no puede distinguir entre petición perdida, Inventario lento, reserva ejecutada con respuesta perdida o respuesta todavía en tránsito. Un timeout es una observación local, no un diagnóstico del estado remoto.
+
+Para reintentar con seguridad se necesita una identidad estable, por ejemplo \texttt{request\_id}. Inventario guarda durablemente la relación entre identidad, efecto y resultado. Ante un reintento devuelve el mismo resultado en vez de reservar otra vez.
+
+\section{Comando, evento y consulta}
+
+\begin{description}
+\item[Comando.] Solicitud dirigida a una autoridad para que intente cambiar estado: \texttt{ReserveItem}.
+\item[Evento.] Afirmación sobre un hecho ya confirmado: \texttt{ItemReserved}.
+\item[Consulta.] Solicitud de información sin intención de modificar estado: \texttt{GetOwner}.
+\end{description}
+
+Un evento no debería ser un comando oculto. Si el emisor espera que un único consumidor actúe obligatoriamente, debe modelarse la responsabilidad con claridad.
+
+\section{Necesidad y contrato de evento}
+
+Después de transferir la pieza, Ranking, Notificaciones y Auditoría deben enterarse sin bloquear la compra. La intuición es simple: un evento es un aviso durable sobre un hecho confirmado.
+
+Ejemplo:
 
 \begin{verbatim}
-outbox(
-  event_id UUID PRIMARY KEY,
-  aggregate_id TEXT NOT NULL,
-  event_type TEXT NOT NULL,
-  schema_version INT NOT NULL,
-  payload JSONB NOT NULL,
-  sequence_no BIGINT NOT NULL,
-  created_at TIMESTAMP NOT NULL,
-  published_at TIMESTAMP NULL
+OwnershipTransferred(
+  event_id, item_id=17,
+  from, to=Sofia,
+  occurred_at, version
 )
 \end{verbatim}
 
-Debe monitorearse edad máxima, backlog, errores del relay y duplicados detectados.
+El \textbf{contrato de evento} especifica identidad, significado, esquema, evolución, orden relevante y política de entrega. Se parece a una API porque otros componentes dependen de su interfaz y semántica. La diferencia es que queda almacenado: consumidores nuevos o atrasados pueden leer eventos producidos por versiones anteriores.
 
-\section{Saga como máquina de estados durable}
+Esto aumenta la responsabilidad sobre:
 
-Una saga de compra puede modelarse con estados:
-\[
-NEW\rightarrow STOCK\_RESERVED\rightarrow PAYMENT\_AUTHORIZED\rightarrow COMPLETED.
-\]
-Ante falla después del pago:
-\[
-PAYMENT\_AUTHORIZED\rightarrow REFUND\_PENDING\rightarrow COMPENSATED.
-\]
-Cada transición debe tener:
 \begin{itemize}
-\item identificador de saga y de paso;
-\item deadline y política de retry;
-\item comando idempotente;
-\item resultado durable;
-\item compensación o intervención manual;
-\item trazabilidad.
+\item \textbf{identidad:} cómo distinguir eventos y deduplicar;
+\item \textbf{semántica:} qué hecho exacto afirma el evento;
+\item \textbf{evolución:} cómo cambiar el esquema sin romper consumidores históricos.
 \end{itemize}
 
-No todas las fallas exigen volver atrás. Si solo falla el email, se reintenta la notificación sin cancelar el negocio ya confirmado.
+Las ventajas son desacoplamiento temporal, múltiples lectores, replay y construcción de vistas. Los costos son compatibilidad, duplicados, atraso, orden parcial y observabilidad.
 
-\section{Coreografía y orquestación con un criterio de decisión}
+\section{Dual write: una intención, dos sistemas}
+
+Inventario necesita:
+
+\begin{enumerate}
+\item actualizar el propietario en su base;
+\item publicar \texttt{OwnershipTransferred} en un broker.
+\end{enumerate}
+
+No existe un único commit que abarque ambas escrituras. Dos órdenes fallan:
+
+\subsection{Base primero}
+
+\[
+\text{DB commit}\rightarrow \text{crash}\rightarrow \text{evento ausente}.
+\]
+
+La propiedad cambió, pero Ranking y Auditoría no se enteran.
+
+\subsection{Broker primero}
+
+\[
+\text{evento publicado}\rightarrow \text{rollback/crash de DB}.
+\]
+
+Se anunció una transferencia que nunca quedó confirmada.
+
+Mover el crash muestra que no existe un orden simple que vuelva atómica la operación.
+
+\section{Transactional outbox}
+
+\subsection{Definición intuitiva}
+
+Antes de cerrar el libro contable local, Inventario guarda el cambio de propietario y un aviso pendiente dentro de la misma operación. Si la transacción confirma, ambos existen; si aborta, ninguno existe.
+
+\subsection{Definición formal}
+
+Una \textbf{transactional outbox} es una tabla o colección persistente donde el servicio inserta un evento pendiente dentro de la misma transacción local que modifica el estado de negocio.
+
+\begin{verbatim}
+BEGIN;
+UPDATE items SET owner='Sofia' WHERE item_id=17;
+INSERT INTO outbox(event_id, aggregate_id,
+                   event_type, payload, status)
+VALUES (..., 17, 'OwnershipTransferred', ..., 'PENDING');
+COMMIT;
+\end{verbatim}
+
+Un \textbf{relay} busca filas pendientes, publica con reintentos y marca progreso. También puede usarse CDC para capturar cambios. Como el relay puede caer después de publicar y antes de marcar la fila, la publicación suele ser al menos una vez.
+
+Un consumidor necesita idempotencia o una \textbf{inbox} que recuerde los \texttt{event\_id} ya procesados.
+
+\subsection{Qué resuelve}
+
+\begin{itemize}
+\item evita estado confirmado sin intención durable de publicar;
+\item permite reanudar tras un crash;
+\item mantiene la decisión de negocio y el evento pendiente en una transacción local.
+\end{itemize}
+
+\subsection{Qué deja abierto}
+
+\begin{itemize}
+\item duplicados del relay;
+\item atraso entre commit y publicación;
+\item crecimiento y limpieza de la tabla;
+\item orden entre distintas entidades;
+\item consumidores no idempotentes;
+\item observabilidad y reintentos fallidos.
+\end{itemize}
+
+\section{Por qué aparece una saga}
+
+La compra atraviesa tres autoridades independientes:
+
+\begin{itemize}
+\item Mercado decide el estado del intento y la oferta;
+\item Inventario decide la reserva y propiedad;
+\item Pagos decide la autorización o rechazo del cobro.
+\end{itemize}
+
+Son independientes porque poseen estados separados, confirman en bases distintas y pueden fallar o reiniciar por separado. No comparten un commit global.
+
+Una \textbf{saga} es un proceso de negocio durable compuesto por transacciones locales coordinadas mediante comandos y eventos. Registra dónde quedó el proceso, qué respuesta recibió y qué paso puede ejecutar, reintentar, compensar o escalar a revisión manual.
+
+Estados posibles:
+
+\[
+\text{CREATED}\rightarrow\text{RESERVED}\rightarrow\text{PAYMENT\_AUTHORIZED}
+\rightarrow\text{OWNERSHIP\_TRANSFERRED}\rightarrow\text{COMPLETED}.
+\]
+
+También deben existir estados inciertos:
+
+\[
+\text{PAYMENT\_UNKNOWN},\quad
+\text{TRANSFER\_PENDING},\quad
+\text{COMPENSATING},\quad
+\text{MANUAL\_REVIEW}.
+\]
+
+\section{Rollback y compensación}
+
+Tres mecanismos diferentes suelen confundirse:
+
+\begin{description}
+\item[Rollback transaccional.] Aborta cambios locales que aún no fueron confirmados.
+\item[Vuelta atrás de versión.] Devuelve tráfico o software a una versión anterior.
+\item[Compensación.] Ejecuta una nueva acción de negocio para reparar consecuencias ya confirmadas.
+\end{description}
+
+Si Pagos autorizó el cobro y luego Inventario no puede transferir, la historia no se borra. La saga puede solicitar reembolso, liberar la reserva, restaurar la oferta y, si no logra terminar, escalar a revisión manual.
+
+Una compensación puede fallar y debe ser idempotente. No es un rollback perfecto.
+
+\section{Coreografía y orquestación}
+
+La analogía es útil si se vincula con el caso.
+
+\subsection{Coreografía}
+
+Como en una danza, cada participante conoce las señales y decide su siguiente movimiento. No existe un coordinador central de todo el proceso:
+
+\[
+\text{ItemReserved}\Rightarrow\text{PaymentAuthorized}\Rightarrow
+\text{OwnershipTransferred}\Rightarrow\text{PurchaseCompleted}.
+\]
+
+Ventajas: bajo acoplamiento a un coordinador y autonomía local. Riesgos: flujo difícil de visualizar, ciclos, lógica repartida y compensaciones dispersas.
+
+\subsection{Orquestación}
+
+Un coordinador durable conserva el estado de la saga y envía comandos a Inventario, Pagos y Mercado. Facilita visualizar estado, timeouts, reintentos, compensaciones y revisión humana. El costo es concentrar conocimiento del proceso y operar otro componente crítico.
+
+No hay una opción universal. Un flujo corto y estable puede coreografiarse; un pago incierto con compensaciones complejas suele beneficiarse de orquestación.
+
+\section{Migración gradual: Strangler Fig}
+
+El patrón \textbf{Strangler Fig} es una migración incremental en la cual el componente viejo y el nuevo coexisten mientras una fachada o router desvía gradualmente operaciones.
+
+La secuencia es:
+
+\[
+\text{coexistir}\rightarrow\text{comparar}\rightarrow
+\text{desviar tráfico}\rightarrow\text{retirar lo anterior}.
+\]
+
+Para Ranking:
+
+\begin{enumerate}
+\item alimentar el cálculo viejo y el nuevo con los mismos eventos;
+\item comparar exactitud, atraso y costo;
+\item enviar una fracción de lecturas al nuevo servicio;
+\item ampliar solo si las métricas cumplen;
+\item conservar la posibilidad de volver el tráfico al camino anterior;
+\item retirar el código viejo después de evidencia suficiente.
+\end{enumerate}
+
+Una \textbf{prueba canary} expone una fracción pequeña de tráfico real a la versión nueva. La vuelta atrás limita el riesgo técnico, pero no deshace efectos de negocio ya confirmados.
+
+\section{Preparación operativa}
+
+Separar implica sostener otro sistema. La \textbf{preparación operativa} o \emph{readiness} es evidencia de que el equipo puede publicar, observar, recuperar y mantener la capacidad en producción.
+
+\subsection{CI y CD}
+
+\textbf{CI} o integración continua integra cambios con frecuencia y ejecuta compilación, pruebas y controles automáticos.
+
+\textbf{Entrega continua} mantiene cada cambio validado listo para producción, aunque la promoción pueda ser manual. \textbf{Despliegue continuo} pone automáticamente en producción todo cambio que supera los controles. La sigla CD es ambigua y debe aclararse.
+
+\subsection{Guardia, procedimiento, SLI y SLO}
+
+Una \textbf{guardia} es la rotación responsable de recibir alertas y coordinar incidentes. Un \textbf{runbook} o procedimiento contiene pasos para diagnosticar, mitigar y recuperar una falla repetible.
+
+Un \textbf{SLI} es un indicador medido, por ejemplo latencia p99 o porcentaje de compras correctas. Un \textbf{SLO} es una meta cuantificada para ese indicador durante una ventana, por ejemplo 99,9\% de compras correctas por mes.
+
+Las trazas distribuidas correlacionan el recorrido de una petición o evento a través de procesos.
+
+\subsection{Checklist mínima}
+
+\begin{itemize}
+\item CI y publicación de versiones;
+\item vuelta atrás probada;
+\item permisos y secretos;
+\item logs, métricas y trazas;
+\item timeouts, reintentos e idempotencia;
+\item SLO y alertas;
+\item guardia y procedimientos;
+\item backup y recuperación;
+\item pruebas de falla;
+\item capacidad y costos.
+\end{itemize}
+
+\section{Métricas que demuestran autonomía}
+
+Sin una línea base anterior no puede demostrarse que separar mejoró el sistema.
 
 \begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.32\textwidth}p{0.34\textwidth}}
+\begin{tabular}{p{0.30\textwidth}p{0.58\textwidth}}
 \toprule
-Criterio & Coreografía & Orquestación \\
+\textbf{Métrica} & \textbf{Pregunta que responde} \\
 \midrule
-Participantes & pocos y estables & muchos o workflow largo \\
-Visibilidad & reconstruida por eventos & estado explícito de proceso \\
-Cambio & local, pero contrato sensible & centraliza evolución del flujo \\
-Falla & ciclos y eventos perdidos & orquestador crítico \\
-Intervención & más difícil & natural con estados y comandos \\
+Tiempo hasta producción & ¿la frontera acelera el paso desde cambio listo hasta versión funcionando? \\
+Publicaciones sin coordinación & ¿los equipos pueden publicar sin esperar a otros? \\
+Escala independiente & ¿se agregan recursos solo donde crece la carga? \\
+Alcance del incidente & ¿cuántos usuarios, datos y capacidades afecta una falla? \\
+p99 y errores & ¿la cola lenta y la tasa de fallas cumplen el SLO? \\
+Coordinaciones entre equipos & ¿disminuyeron tickets, aprobaciones y bloqueos? \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-La elección depende de auditabilidad, duración, compensaciones, necesidad de intervención y frecuencia de cambio.
+Si el nuevo servicio sigue compartiendo base, versiones, guardias y procedimientos con la aplicación, la independencia prometida no se materializó.
 
-\section{Migración incremental y evidencia}
+\section{Método reusable para decidir una frontera}
 
-Strangler Fig usa un router/gateway para trasladar rutas gradualmente. Una extracción seria declara:
+Una propuesta madura responde cinco grupos de preguntas:
 
 \begin{enumerate}
-\item hipótesis: qué problema resolverá;
-\item baseline: latencia, lead time, costo e incidentes actuales;
-\item ruta inicial de bajo riesgo;
-\item coexistencia y sincronización de datos;
-\item rollback;
-\item criterio de éxito y condición para detener la migración.
+\item \textbf{Problema y evidencia:} ¿qué necesidad persiste y cómo se mide?
+\item \textbf{Regla, dato y autoridad:} ¿qué invariante contiene la frontera y quién decide?
+\item \textbf{Alternativa simple:} ¿por qué no alcanza mejorar la modularidad interna?
+\item \textbf{Costo, falla y mecanismo:} ¿qué agrega la red y cómo se recupera?
+\item \textbf{Métrica y revisión:} ¿qué resultado justificaría continuar o volver atrás?
 \end{enumerate}
 
-Un big-bang reemplaza demasiadas variables a la vez y dificulta aprender qué decisión produjo el resultado.
+Este método se conecta con el marco del curso:
 
-\section{Métricas para demostrar que una frontera vale}
+\[
+D=(P,F,G,S,T),
+\]
+
+con problema, fallas, garantías, solución y trade-offs declarados antes de elegir tecnología.
+
+\section{Errores frecuentes y cómo corregirlos}
+
+\begin{center}
+\begin{tabular}{p{0.39\textwidth}p{0.50\textwidth}}
+\toprule
+\textbf{Error} & \textbf{Corrección} \\
+\midrule
+``Monolito es código desordenado'' & separar forma de puesta en producción de calidad modular \\
+``HTTP convierte una clase en microservicio'' & exigir capacidad, dato, autoridad y responsabilidad operativa \\
+``Más servicios aumentan disponibilidad'' & dibujar la cadena sincrónica y mover una falla \\
+``Evento significa exactamente una vez'' & separar entrega, identidad y efecto idempotente \\
+``Outbox publica una sola vez'' & mover el crash después de publicar y antes de marcar progreso \\
+``Saga es una transacción distribuida'' & mostrar estados intermedios y compensaciones falibles \\
+``Rollback borra el pasado'' & distinguir versión de software, rollback local y compensación \\
+``Separar crea autonomía'' & medir publicaciones independientes, base compartida y guardias \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Bibliografía guiada}
 
 \begin{itemize}
-\item lead time y frecuencia de despliegue por capacidad;
-\item porcentaje de despliegues realmente independientes;
-\item blast radius y tiempo de recuperación de incidentes;
-\item p95/p99 y disponibilidad del flujo extremo a extremo;
-\item cantidad de coordinaciones entre equipos por cambio;
-\item backlog y edad de outbox;
-\item sagas abiertas, compensadas y enviadas a intervención;
-\item cambios incompatibles de contrato;
-\item costo de infraestructura y toil por servicio.
+\item \textbf{DDIA, capítulo 1:} confiabilidad, escalabilidad y mantenibilidad. Lea pensando qué evidencia justifica distribuir.
+\item \textbf{DDIA, capítulo 4:} REST, RPC y dataflow por mensajes. Observe evolución independiente de contratos.
+\item \textbf{DDIA, capítulo 7:} transacciones. Compare lo que protege una transacción local con una saga.
+\item \textbf{DDIA, capítulo 11:} CDC, event sourcing y procesamiento de streams. Relacione con outbox, replay e idempotencia.
+\item \textbf{DDIA, capítulo 12:} sistemas derivados y dataflow. Aplique a Ranking como vista reconstruible.
+\item \textbf{Evans:} contextos delimitados y lenguaje ubicuo.
+\item \textbf{Fowler:} Monolith First, trade-offs de microservicios y Strangler Fig.
+\item \textbf{Richardson/AWS:} transactional outbox, sagas y migración incremental.
 \end{itemize}
+
+\section{Trabajo Final Integrador}
+
+Para el Trabajo Final Integrador, cada equipo deberá justificar las fronteras de su sistema. No alcanza con dibujar servicios. Para una capacidad elegida, documente:
+
+\begin{enumerate}
+\item dominio, capacidad e invariante;
+\item dato autoritativo y responsable técnico-operativo;
+\item problema observable que motiva la separación;
+\item alternativa modular más simple y razón para descartarla;
+\item interacción sincrónica y asíncrona;
+\item timeout, reintento, identidad e idempotencia;
+\item dual write y estrategia outbox si corresponde;
+\item saga, estados inciertos y compensaciones;
+\item estrategia de migración y vuelta atrás;
+\item SLI, SLO y métricas de autonomía;
+\item prueba de falla;
+\item condición para revisar o revertir la decisión.
+\end{enumerate}
 
 \section{Glosario operativo}
 
 \begin{description}
-\item[Capacidad.] Responsabilidad de negocio con lenguaje e invariantes propios.
-\item[Bounded context.] Límite dentro del cual un modelo tiene significado consistente.
-\item[Ownership.] Autoridad exclusiva para modificar datos y operar una capacidad.
-\item[Monolito distribuido.] Servicios separados que conservan acoplamiento de despliegue, datos y cambio.
-\item[Outbox.] Registro transaccional de eventos pendientes junto con el cambio de negocio.
-\item[Saga.] Workflow durable compuesto por transacciones locales y acciones de continuación/compensación.
+\item[Autoridad.] Componente con la última palabra sobre un hecho.
+\item[Autonomía.] Independencia medible de cambio, publicación, escala o recuperación.
+\item[Canary.] Exposición gradual de tráfico a una versión nueva.
+\item[Capacidad.] Responsabilidad estable del negocio que agrupa reglas, datos y operaciones.
+\item[Comando.] Solicitud para que una autoridad intente cambiar estado.
+\item[Compensación.] Nueva acción que repara un efecto ya confirmado.
+\item[Contexto delimitado.] Ámbito donde lenguaje y reglas son coherentes.
+\item[Contrato de evento.] Identidad, significado, esquema y evolución de un hecho publicado.
+\item[Dato autoritativo.] Registro reconocido como verdad oficial.
+\item[Dual write.] Necesidad de escribir dos sistemas sin una transacción común.
+\item[Evento.] Hecho confirmado que puede ser consumido posteriormente.
+\item[Frontera.] Límite explícito entre responsabilidades, reglas y datos.
+\item[Guardia.] Rotación que responde alertas e incidentes.
+\item[Idempotencia.] Propiedad por la cual repetir una intención no multiplica su efecto lógico.
+\item[Inbox.] Registro local de eventos ya procesados.
+\item[Outbox.] Evento pendiente guardado con el cambio de negocio.
+\item[Relay.] Proceso que publica filas pendientes de la outbox.
+\item[RPC.] Llamada remota que espera una respuesta.
+\item[Saga.] Proceso durable compuesto por transacciones locales y compensaciones.
+\item[SLI/SLO.] Indicador medido y meta cuantificada para ese indicador.
+\item[Strangler Fig.] Migración gradual con camino viejo y nuevo coexistiendo.
+\item[Vuelta atrás.] Retorno de tráfico o software a una versión anterior.
 \end{description}
 
-\section{Autoevaluación ampliada}
+\section{Autoevaluación}
+
+Responda sin mirar las diapositivas:
 
 \begin{enumerate}
-\item ¿Qué distingue un monolito modular de una bola de barro?
-\item ¿Qué significa que un servicio compre autonomía?
-\item ¿Qué costos forman la prima distribuida?
-\item ¿Qué presión concreta justificaría extraer Inventario?
-\item ¿Por qué un servicio por tabla suele ser una mala frontera?
-\item ¿Qué es un bounded context?
-\item ¿Qué implica ownership de datos?
-\item ¿Cómo se resuelve una consulta global sin compartir tablas?
-\item ¿Qué revela Conway sobre fronteras técnicas?
-\item ¿Cuándo conviene RPC?
-\item ¿Cuándo conviene publicar un evento?
-\item ¿Qué diferencia un comando, evento y consulta?
-\item ¿Por qué ninguna orden resuelve dual write?
-\item ¿Qué resuelve outbox y qué deja abierto?
-\item ¿Cómo evoluciona un contrato de evento de forma compatible?
-\item ¿Por qué una compensación no es rollback?
-\item ¿Cuándo elegir coreografía?
-\item ¿Cuándo elegir orquestación?
-\item ¿Qué reduce el riesgo de una migración Strangler?
-\item ¿Qué métrica demostraría autonomía real después de extraer un servicio?
+\item ¿Qué diferencia existe entre una frontera semántica y una frontera de red?
+\item ¿Por qué una capacidad no es una única operación?
+\item ¿Qué sabe Mercado después de un timeout de Inventario?
+\item ¿Qué problema resuelve outbox y qué problemas permanecen?
+\item ¿Por qué una compensación no equivale a rollback?
+\item ¿Dónde está la autoridad sobre la propiedad de \texttt{\#17}?
+\item ¿Qué ventajas y riesgos tiene coreografiar la compra?
+\item ¿Qué métrica demostraría autonomía de Ranking?
+\item ¿Qué condición haría preferible mantener Inventario dentro del monolito modular?
+\item ¿Cómo migraría Ranking de forma reversible?
 \end{enumerate}
 
 \section{Síntesis final}
 
+La arquitectura de Asteria no mejora por multiplicar procesos. Mejora cuando una frontera resuelve una necesidad persistente, conserva una regla clara, asigna autoridad y responsabilidad, explicita las fallas de comunicación y produce evidencia de una mejora real.
+
+El diseño unido es preferible mientras la modularidad interna permita evolucionar, escalar y recuperar el sistema con un costo razonable. Distribuir se vuelve justificable cuando una necesidad concreta no puede resolverse de manera suficiente dentro de esa unidad y el equipo está preparado para operar la complejidad nueva.
+
 \begin{uakeybox}
-La arquitectura correcta no es la más distribuida. Es la que alinea fronteras de dominio, ownership, datos, despliegue y falla. Cada servicio debe comprar una autonomía real que justifique la prima distribuida que introduce.
+Una frontera vale cuando resuelve un problema medible, protege su invariante y el equipo puede sostener las fallas que introduce. Si las métricas no mejoran, la decisión debe revisarse.
 \end{uakeybox}
 
 \end{document}

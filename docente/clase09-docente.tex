@@ -1,634 +1,1273 @@
 % !TeX encoding = UTF-8
 \documentclass[variant=docente,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
-\UASetSemester{Segundo cuatrimestre 2026}
-\UASetDate{2026}
+\usepackage{longtable,array}
 \UASetClassNumber{09}
-\UASetClassTitle{Arquitecturas distribuidas reales}
-\title{Clase 09 --- Guía docente magistral: monolito modular, microservicios, eventos y sagas}
+\UASetClassTitle{Fronteras de arquitectura}
+\title{Clase 09 --- Guía docente}
 \author{\UAProfessor}
 \date{\UADate}
 \begin{document}
 \maketitle
-\tableofcontents
-\clearpage
 
-\section{Parte A: guion operativo para 180 minutos}
-\subsection{Objetivo pedagógico profundo}
+\section{Guion de apertura}
 
-La clase debe evitar dos caricaturas: ``monolito es anticuado'' y ``microservicios es modernidad''. El aprendizaje central es:
+En esta clase seguiremos la compra de una pieza única de Asteria Online para decidir cuándo una frontera arquitectónica ayuda y cuándo solo agrega red, fallas y operación. Primero delimitaremos dominio, capacidad, invariante, autoridad y dato autoritativo. Después compararemos una aplicación modular con procesos separados, haremos visible qué cambia cuando una llamada local cruza la red y estudiaremos cómo preservar integridad mediante contratos, eventos, transactional outbox e idempotencia. Finalmente modelaremos la compra como una saga, compararemos coreografía y orquestación, y diseñaremos una migración gradual y operable. La pregunta que une toda la clase será: qué necesidad concreta no resuelve la aplicación unida, qué costo adicional aceptamos al distribuir y qué evidencia demostraría que la separación valió la pena.
 
-\begin{center}
-\textbf{una frontera arquitectónica vale cuando compra autonomía, escala o aislamiento suficiente para pagar la prima distribuida que introduce.}
-\end{center}
-
-La secuencia será:
-\[
-\text{intuición}\rightarrow\text{capacidad}\rightarrow\text{invariante}\rightarrow\text{owner}\rightarrow\text{contrato}\rightarrow\text{falla}\rightarrow\text{operación}\rightarrow\text{evidencia}.
-\]
-
-\begin{uakeybox}
-La clase habrá funcionado si un grupo puede defender que una capacidad permanezca en un monolito modular y otro puede justificar una extracción, ambos con evidencia y trade-offs.
-\end{uakeybox}
-
-\subsection{Resultados de aprendizaje observables}
-
-El estudiante debe poder:
+\section{Resultados de aprendizaje}
+Al finalizar, el estudiante debe poder:
 \begin{itemize}
-\item explicar intuitivamente monolito modular, microservicio, bounded context y ownership;
-\item identificar la prima distribuida de una extracción;
-\item reconocer un monolito distribuido;
-\item calcular disponibilidad aproximada de una cadena sincrónica;
-\item elegir RPC, evento o consulta según la interacción;
-\item distinguir comando, evento y query;
-\item modelar dual write y transactional outbox;
-\item diseñar una saga con compensaciones y estados durables;
-\item comparar coreografía y orquestación;
-\item proponer una migración Strangler y métricas de autonomía.
+\item delimitar dominio, capacidad, invariante, frontera y dato autoritativo;
+\item distinguir módulo, proceso, servicio y microservicio;
+\item justificar cuándo conservar un monolito modular y cuándo separar;
+\item reconstruir una ejecución RPC con timeout, retry e idempotencia;
+\item diferenciar comando, evento y consulta;
+\item explicar dual write, transactional outbox, relay e inbox;
+\item modelar una saga durable con estados inciertos y compensaciones;
+\item comparar coreografía y orquestación en la compra de Asteria;
+\item proponer una migración Strangler con canary y vuelta atrás;
+\item definir preparación operativa y métricas de autonomía.
+\end{itemize}
+
+\section{Objetivo pedagógico profundo}
+La clase debe evitar dos caricaturas: ``monolito es anticuado'' y ``microservicios es modernidad''. El aprendizaje central es que una frontera vale cuando resuelve una necesidad concreta y medible, conserva reglas claras y puede operarse a pesar de las nuevas fallas. La \textbf{intuición} precede a la definición; la definición precede a la tecnología.
+
+\section{Parte A: guion operativo}
+
+\subsection{Preparación previa}
+\begin{itemize}
+\item Imprimir la ficha de aula y al menos dos timelines grandes.
+\item Dibujar en el pizarrón Sofía--Mercado--Inventario--Pagos--Ranking.
+\item Escribir los tres invariantes de la compra.
+\item Preparar tarjetas con \texttt{request\_id}, \texttt{event\_id}, \texttt{COMMIT}, \texttt{CRASH} y \texttt{TIMEOUT}.
+\item Ejecutar las demos de disponibilidad, dual write/outbox y saga.
+\item Tener una experiencia real de publicación coordinada o incidente entre equipos para contextualizar autonomía.
 \end{itemize}
 
 \subsection{Arquitectura didáctica v9 para 180 minutos}
-
 \begin{center}
-\begin{tabular}{p{0.12\textwidth}p{0.22\textwidth}p{0.56\textwidth}}
+\begin{tabular}{p{0.14\textwidth}p{0.22\textwidth}p{0.52\textwidth}}
 \toprule
-Tiempo & Bloque & Propósito \\
+\textbf{Tiempo} & \textbf{Bloque} & \textbf{Propósito} \\
 \midrule
-0--10 & Apertura & Asteria Online: ¿cuántos servicios harían y por qué? \\
-10--22 & Diagnóstico & V/F y puente desde garantías por operación de clase 8. \\
-22--45 & Intuiciones & Edificio, caminos, idiomas locales, escritura, teléfono, tablero, outbox y saga. \\
-45--72 & Fronteras & Monolito modular, prima de microservicios, bounded context, ownership y Conway. \\
-72--82 & Actividad & Detectar un monolito distribuido en un diagrama. \\
-82--92 & Pausa & Preguntas y recuperación. \\
-92--118 & Comunicación & RPC/eventos, disponibilidad compuesta, comando/evento/query. \\
-118--145 & Datos y dual write & Database per service, outbox, contratos y evolución. \\
-145--165 & Sagas & Compensación, coreografía y orquestación. \\
-165--176 & Migración/operación & Strangler, readiness y métricas de autonomía. \\
-176--180 & Defensa/exit & Una frontera defendida en 60 segundos y cuatro preguntas. \\
+0--15 & Historia y alcance & Acotar Asteria y declarar qué no puede romperse. \\
+15--35 & Vocabulario & Dominio, capacidad, frontera, autoridad, responsabilidad y autonomía. \\
+35--55 & Regla local/protocolo & Conectar Clase 08 con fronteras y transacciones locales. \\
+55--82 & Monolito modular & Necesidad observable, contextos y ownership. \\
+82--92 & Pausa & Recuperación y preguntas anónimas. \\
+92--118 & Red y contratos & RPC, timeout, comando, evento y consulta. \\
+118--142 & Integridad & Dual write, outbox, relay, inbox. \\
+142--162 & Saga & Estados, incertidumbre, compensaciones y coordinación. \\
+162--176 & Migración/operación & Strangler, canary, CI/CD, SLO y métricas. \\
+176--180 & Cierre & Defensa, diagnóstico y exit ticket. \\
 \bottomrule
 \end{tabular}
 \end{center}
-
-\subsection{Preparación previa del docente}
-
-\subsubsection*{Cuarenta y ocho horas antes}
-\begin{itemize}
-\item Imprimir el mapa de Asteria y tarjetas de capacidades.
-\item Preparar un diagrama deliberadamente malo de cinco servicios con base compartida.
-\item Ejecutar las demos de disponibilidad compuesta y saga/outbox.
-\item Seleccionar una experiencia real de modular monolith (Shopify) y una de migración incremental.
-\item Preparar datos de equipos: tres equipos, lead time, despliegues y on-call.
-\end{itemize}
-
-\subsubsection*{Treinta minutos antes}
-\begin{itemize}
-\item Dibujar un edificio grande con tres habitaciones y tres edificios conectados.
-\item Reservar una tabla para capacidad, owner, dato, comunicación, falla y métrica.
-\item Dibujar DB y broker separados para el dual write.
-\item Escribir: ``una frontera debe pagar su alquiler''.
-\end{itemize}
 
 \subsection{Plan de pizarrón}
-
 \begin{enumerate}
-\item \textbf{Izquierda: dominio.} Capacidades e invariantes de Asteria.
-\item \textbf{Centro: frontera.} Monolito/microservicio, owner y datos.
-\item \textbf{Derecha: interacción.} RPC, eventos, outbox y saga.
+\item Izquierda: dominio, capacidad, invariante y dato autoritativo.
+\item Centro: línea de frontera y secuencia Sofía--Mercado--Inventario--Pagos.
+\item Derecha: puntos de crash, outbox, saga y métricas.
 \end{enumerate}
+Mantenga visible la pregunta: ``¿qué necesidad no resuelve la aplicación unida?''.
 
-Mantenga la tabla de evaluación de fronteras visible hasta el final.
-
-\subsection{Guion de apertura}
-
-Diga:
-\begin{quote}
-``Asteria tiene cuentas, mundo, combate, inventario, mercado, pagos, ranking y chat. Dibujen cuántos servicios usarían. No hay una cantidad correcta. En diez minutos veremos si cada frontera resuelve un problema o solo agrega una red.''
-\end{quote}
-
-Dé dos minutos en parejas. Pida a tres grupos números diferentes y, para cada uno, pregunte:
+\subsection{Contingencias}
 \begin{itemize}
-\item ¿qué invariante encierra?;
-\item ¿quién lo opera?;
-\item ¿qué puede desplegarse sin coordinar?;
-\item ¿qué nueva falla aparece?
+\item Si el grupo no conoce bases de datos, explique outbox como dos filas en la misma transacción local; no profundice en CDC.
+\item Si se confunden con microservicios, vuelva a capacidad, dato autoritativo y equipo responsable.
+\item Si la participación es baja, use votos A/B, mover el crash y completar una sola frase en parejas.
+\item Si falta tiempo, preserve dual write, outbox, saga y cierre; deje DDD y métricas avanzadas como lectura.
+\item Si preguntan por 2PC, reconozca que coordina commits pero explique que la clase estudia patrones de autonomía y workflows de negocio, no reemplaza todo por una transacción global.
 \end{itemize}
 
-\subsection{Secuencia de conducción}
+\section{Guion de las diapositivas}
+Cada entrada indica la idea que debe quedar, una intervención docente y una transición. No es necesario leer el texto de la slide: use el gráfico para reconstruir la ejecución.
+\subsubsection*{Lámina 2: La historia que guiará toda la clase}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
 
-\subsubsection{Monolito modular}
+\textbf{Qué decir.} Asteria Online es un mundo virtual medieval multijugador. Hoy no diseñaremos el juego completo: seguiremos una única compra para descubrir cuándo una separación arquitectónica ayuda y cuándo solo agrega red, fallas y operación. Inventario Sofía Mercado Pagos Ranking reserva y jugadora lista la espada autoriza actualiza después transfiere
 
-Use el edificio con habitaciones. Una unidad de despliegue puede tener APIs internas, ownership, dependencias acíclicas y pruebas de arquitectura. El problema no es compartir proceso; es que cualquier parte atraviese cualquier pared.
+\textbf{Qué preguntar.} ¿Qué parte de esta compra no puede quedar ambigua?
 
-Presente el caso Shopify como evidencia de que modularidad y monolito no son opuestos. No convierta Packwerk o una herramienta específica en receta.
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
 
-\subsubsection{Prima de microservicios}
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
 
-Transforme una llamada local en red. Pregunte qué aparece: serialización, timeout, retry, identidad, observabilidad, seguridad, versionado, deployment y on-call. Escriba la prima como lista acumulativa.
+\textbf{Transición.} Conecte con la siguiente lámina: El alcance: qué entra y qué queda fuera.
 
-Pregunte qué beneficio paga esa prima: escala distinta, cadencia distinta, ownership, blast radius o tecnología especializada.
+\subsubsection*{Lámina 3: El alcance: qué entra y qué queda fuera}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
 
-\subsubsection{Bounded context y ownership}
+\textbf{Qué decir.} Analizaremos No diseñaremos hoy ▶ catálogo y publicación de la pieza; ▶ física y renderizado del mundo; ▶ reserva y propiedad en inventario; ▶ protocolo de movimiento en tiempo real; ▶ autorización del pago; ▶ emparejamiento de jugadores ▶ ranking y notificaciones posteriores; (matchmaking); ▶ equipos, puesta en producción, datos y ▶ detección de trampas (anti-cheat); fallas. ▶
 
-Use ``curso'' en catálogo, aprendizaje y facturación. Muestre que intentar un modelo universal crea acoplamiento. Luego pregunte quién puede modificar el dato. Database per service significa autoridad de escritura, no necesariamente una máquina por servicio.
+\textbf{Qué preguntar.} ¿Qué tema importante del juego estamos dejando deliberadamente fuera?
 
-\subsubsection{Conway}
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
 
-Dé el caso de dos equipos que deben aprobar cada cambio del otro. Concluya que la frontera técnica no compró autonomía. La organización forma parte del diseño.
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
 
-\subsubsection{RPC y eventos}
+\textbf{Transición.} Conecte con la siguiente lámina: La compra de EspadaSolar\#17: historia completa.
 
-Use teléfono y tablero durable. Para cada interacción de Asteria, haga elegir:
-\begin{itemize}
-\item validación de pago: respuesta sincrónica;
-\item notificación: evento;
-\item ranking: proyección eventual;
-\item consulta de perfil: query/RPC con caché;
-\item combate: protocolo de baja latencia y autoridad local.
-\end{itemize}
+\subsubsection*{Lámina 4: La compra de EspadaSolar\#17: historia completa}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
 
-Calcule $0{,}999^4$ para una cadena de cuatro componentes. Aclare que es optimista y que p99/colas no se derivan de medias.
+\textbf{Qué decir.} 5. Inventario 1. Sofía 2. Mercado 3. Inventario 4. Pagos 6. Ranking y transfiere pulsa comprar valida oferta reserva \#17 autoriza notificación propietario No puede romperse Puede demorarse ▶ la pieza tiene como máximo un propietario; ▶ el ranking; ▶ no se cobra dos veces el mismo intento; ▶ la notificación;
 
-\subsubsection{Comando, evento y consulta}
+\textbf{Qué preguntar.} ¿Qué pasos deben terminar antes del OK y cuáles pueden continuar después?
 
-Clasifique \texttt{ReserveSeat}, \texttt{SeatReserved} y \texttt{GetSeatAvailability}. Muestre un ``evento'' que en realidad exige a un único consumidor actuar; denomínelo comando oculto.
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
 
-\subsubsection{Dual write y outbox}
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
 
-Pruebe DB antes y broker antes. Mueva el crash. Cuando el curso concluya que no hay orden seguro, introduzca outbox. Marque que el relay repite y que los consumers deduplican.
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario intuitivo I: dominio, capacidad e invariante.
 
-\subsubsection{Sagas}
+\subsubsection*{Lámina 5: Vocabulario intuitivo I: dominio, capacidad e invariante}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
 
-Dibuje el camino feliz de reserva, pago y entrega. Luego falle el último paso. Pregunte qué significa compensar un cobro. Insista en que una compensación es un nuevo efecto y puede fallar.
+\textbf{Qué decir.} Concepto Idea intuitiva Ejemplo en Asteria Online Dominio Parte de la realidad con problemas, reglas El comercio de objetos incluye ofertas, y palabras propias. vendedores, compradores, precios y ventas. Capacidad Responsabilidad estable que el negocio Gestionar la propiedad: reservar, transferir, necesita sostener. Agrupa reglas, datos liberar y consultar quién posee una pieza
 
-Compare coreografía y orquestación por visibilidad, número de participantes, intervención y evolución.
+\textbf{Qué preguntar.} ¿Cuál es la diferencia entre gestionar propiedad y reservar una pieza?
 
-\subsubsection{Strangler y operabilidad}
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
 
-Presente migración por rutas, baseline, rollback y métrica. Cierre con readiness: CI/CD, observabilidad, identidad, secretos, on-call, SLOs y pruebas de falla.
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
 
-\subsection{Casos reales y cómo narrarlos}
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario intuitivo II: frontera y dato autoritativo.
 
-\subsubsection{Shopify y monolito modular}
+\subsubsection*{Lámina 6: Vocabulario intuitivo II: frontera y dato autoritativo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
 
-La enseñanza es que una gran aplicación puede reforzar límites internos y reducir dependencias sin convertir cada módulo en servicio. Use el caso para legitimar la opción simple cuando las presiones no justifican distribución.
+\textbf{Qué decir.} Frontera Límite explícito que separa dos ámbitos del sistema. Indica qué responsabilidades, reglas y datos quedan de cada lado y por qué puertas se permite interactuar. frontera Inventario API / comando Mercado propiedad y oferta, vendedor y precio reserva de \#17
 
-\subsubsection{Netflix y arquitecturas distribuidas}
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
 
-Use experiencias de servicios y event-driven para mostrar beneficios reales de escala y autonomía, pero también la necesidad de plataformas, tracing, contratos y operación madura. Evite el argumento ``Netflix lo hace'' como sustituto de requisitos.
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
 
-\subsubsection{AWS patterns}
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
 
-Transactional outbox, saga y Strangler son útiles como vocabulario de soluciones recurrentes. Preséntelos siempre después de que el problema haya aparecido en el caso.
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario intuitivo III: autoridad y responsabilidad.
+
+\subsubsection*{Lámina 7: Vocabulario intuitivo III: autoridad y responsabilidad}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Concepto Definición de trabajo En Asteria Autoridad Componente con la última palabra sobre un Inventario decide quién es el propietario hecho de negocio determinado. válido de EspadaSolar\#17. Responsabilidad (own- Equipo que puede cambiar reglas y datos El equipo de Inventario mantiene el ership) y que responde por métricas, incidentes y invariante de propiedad y atiende una re
+
+\textbf{Qué preguntar.} ¿Quién tiene la última palabra y quién atiende el incidente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario intuitivo IV: versión y puesta en producción.
+
+\subsubsection*{Lámina 8: Vocabulario intuitivo IV: versión y puesta en producción}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Término Definición de trabajo Pregunta observable Unidad de publicación Conjunto de componentes que se publica, ¿Mercado e Inventario deben salir siempre actualiza o retira como una misma versión. juntos? Puesta en producción Hacer que una versión atienda tráfico real. ¿Ranking puede publicar una versión sin volver a publicar Inventario? Vuelta atrás de versión Retirar una vers
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario intuitivo V: autonomía.
+
+\subsubsection*{Lámina 9: Vocabulario intuitivo V: autonomía}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Definición de trabajo La autonomía es el grado en que una parte puede cambiar, publicar una versión, escalar o recuperarse sin obligar al resto a hacerlo al mismo tiempo. Dimensión Pregunta observable en Asteria Cambio ¿Inventario puede modificar su lógica sin exigir cambios simultáneos en Mercado? Puesta en producción ¿Ranking puede salir o volver atrás sin volver a publicar I
+
+\textbf{Qué preguntar.} ¿Qué podría cambiar Ranking sin coordinar con Inventario?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Dos formas de ejecutar una secuencia de trabajo.
+
+\subsubsection*{Lámina 10: Dos formas de ejecutar una secuencia de trabajo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Cadena sincrónica Continuación asíncrona La petición espera una respuesta antes de Un hecho durable permite que otros continúen continuar: después: A→B→C→D A → log ⇒ {C, D, E} Si C tarda o falla, A todavía no puede terminar. A no espera a todos los lectores. No son estilos universales. Una autorización de pago puede necesitar respuesta inmediata; actualizar ranking normalmente 
+
+\textbf{Qué preguntar.} ¿Cuál de estos pasos necesita respuesta inmediata?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cómo vamos a recorrer la historia.
+
+\subsubsection*{Lámina 11: Cómo vamos a recorrer la historia}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 1. Comprender 2. Dibujar 3. Cruzar 4. Preservar 5. Migrar y el sistema actual fronteras la red integridad operar Pregunta que une la clase ¿Qué beneficio concreto obtiene cada separación y qué nueva falla, latencia, dato duplicado o responsabilidad operacional introduce?
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Evidencias de aprendizaje que produciremos.
+
+\subsubsection*{Lámina 12: Evidencias de aprendizaje que produciremos}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Durante la clase Al cerrar ▶ delimitar una capacidad y su dato ▶ justificar una frontera con evidencia; autoritativo; ▶ diseñar outbox e idempotencia; ▶ transformar una llamada local en una ▶ modelar una saga durable; cadena sincrónica; ▶ proponer una migración reversible y
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: De una regla local.
+
+\subsubsection*{Lámina 13: De una regla local}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} a una coordinación entre fronteras Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Puente desde la Clase 08: ¿cuándo hace falta un protocolo?.
+
+\subsubsection*{Lámina 14: Puente desde la Clase 08: ¿cuándo hace falta un protocolo?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Regla local Si una sola autoridad posee el dato, puede preservar el invariante dentro de una transacción local: Inventario decide quién posee EspadaSolar\#17. Regla distribuida Si la decisión atraviesa procesos independientes, hace falta un protocolo de coordinación: una secuencia acordada de mensajes, estados durables, IDs, timeouts, retries y reglas de recuperación. Mover una 
+
+\textbf{Qué preguntar.} ¿Qué información nueva necesita sobrevivir cuando la regla cruza procesos?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Diagnóstico de entrada: vote antes de discutir.
+
+\subsubsection*{Lámina 15: Diagnóstico de entrada: vote antes de discutir}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 1. Un monolito termina necesariamente como una maraña de dependencias. 2. Un microservicio es una clase de negocio expuesta por HTTP. 3. Separar procesos vuelve independientes a los equipos automáticamente. 4. Publicar un evento después de guardar en la base resuelve el dual write. 5. Una compensación de saga equivale a deshacer perfectamente la operación. Consigna Vote V/F. No
+
+\textbf{Qué preguntar.} Vote; ¿qué palabra de cada frase le genera desconfianza?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Módulo, proceso, servicio y microservicio no son sinónimos.
+
+\subsubsection*{Lámina 16: Módulo, proceso, servicio y microservicio no son sinónimos}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Término Qué es Ejemplo Módulo frontera de código dentro de una aplicación; módulo Inventario dentro del monolito. expone una interfaz interna y oculta detalles. Proceso programa en ejecución, con memoria y fallas una instancia ejecutando el servicio de propias. Inventario. Servicio capacidad accesible mediante un contrato, API —interfaz explícita de operaciones normalmente a tr
+
+\textbf{Qué preguntar.} ¿Cuál de estos términos implica necesariamente red?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Punto de partida:                           Asteria funciona como una aplicación.
+
+\subsubsection*{Lámina 17: Punto de partida:                           Asteria funciona como una aplicación}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} modular CASO CONDUCTOR una aplicación que se publica como una unidad Cuentas Mercado Inventario Pagos Ranking Chat Lo que funciona bien Señales de que empieza a quedar corto ▶ llamadas y transacciones locales; ▶ Ranking provoca picos de carga; ▶ diagnóstico y vuelta atrás unificados; ▶ Pagos exige controles propios; ▶ cambios cruzados simples; ▶ Combate crece por zonas; ▶ front
+
+\textbf{Qué preguntar.} ¿Qué ventaja perderíamos si separamos hoy sin necesidad?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Antes de separar: ¿qué problema concreto queremos resolver?.
+
+\subsubsection*{Lámina 18: Antes de separar: ¿qué problema concreto queremos resolver?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} CRITERIO DE DECISIÓN Necesidad observable Límite del diseño actual Evidencia Carga diferente el torneo de Ranking vuelve lenta la compra CPU, cola y p99 por capacidad Ritmos de cambio un cambio de Ranking espera la publicación tiempo hasta producción y coordina- global ciones Aislamiento de fallas una falla secundaria afecta el camino de alcance del incidente compra Seguridad o
+
+\textbf{Qué preguntar.} ¿Cuál necesidad puede medirse antes de separar?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: La analogía del edificio: mapeo explícito.
+
+\subsubsection*{Lámina 19: La analogía del edificio: mapeo explícito}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} edificio = una versión publicada como conjunto Mercado Inventario Pagos módulo módulo módulo Edificio Habitación Puerta Pared Aplicación que se publica como Módulo con responsabilidad API interna permitida. Regla que impide tocar una unidad. definida. internals o tablas ajenas. Compartir un proceso simplifica comunicación y transacciones. El problema no es publicar los módulos 
+
+\textbf{Qué preguntar.} ¿Qué representa una puerta y qué representa una pared?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: ¿Qué significa separar en este caso?.
+
+\subsubsection*{Lámina 20: ¿Qué significa separar en este caso?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Mercado red + contrato Inventario red + contrato Pagos proceso y autoridad de controles y versión propios propiedad proveedor Puede habilitar No lo garantiza ▶ publicar versiones por separado; ▶ una base compartida mantiene acoplamiento; ▶ escalar solo la parte exigida; ▶ versiones coordinadas eliminan independencia;
+
+\textbf{Qué preguntar.} ¿Qué nueva falla aparece al pasar de módulo a proceso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Predicción individual: ¿dónde pondría la primera frontera?.
+
+\subsubsection*{Lámina 21: Predicción individual: ¿dónde pondría la primera frontera?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Elija una capacidad de Asteria que mantendría dentro de la aplicación y una que separaría. Para cada una escriba: 1. una necesidad concreta; 2. una autonomía que espera obtener; 3. una falla nueva que aparecería. Guarde la respuesta: volveremos después de estudiar responsabilidad, comunicación, outbox y sagas.
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cinco preguntas antes de dibujar servicios.
+
+\subsubsection*{Lámina 22: Cinco preguntas antes de dibujar servicios}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 1. ¿Qué 5. ¿Qué 2. ¿Quién puede 3. ¿Qué necesita 4. ¿Qué falla capacidad independencia cambiar el dato? respuesta ahora? agrega la red? y regla contiene? podemos medir?
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Primero el significado:.
+
+\subsubsection*{Lámina 23: Primero el significado:}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} contextos y responsabili- dades Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Contexto delimitado: una misma palabra puede nombrar cosas.
+
+\subsubsection*{Lámina 24: Contexto delimitado: una misma palabra puede nombrar cosas}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} distintas NÚCLEO Palabra Contexto Significado exacto en ese contexto Objeto Catálogo tipo de pieza: nombre, rareza y atributos base de EspadaSolar Objeto Inventario instancia única \#17: propietario, estado y versión Objeto Mercado oferta de venta: vendedor, precio, moneda y estado de publicación Objeto Combate arma equipada: estadísticas efectivas, durabilidad y tiempo de reuti
+
+\textbf{Qué preguntar.} ¿Qué significa “Objeto” para Inventario y para Combate?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Por qué no conviene un único objeto universal.
+
+\subsubsection*{Lámina 25: Por qué no conviene un único objeto universal}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Catálogo referencia Mercado item\_id Inventario vista autorizada Combate plantilla oferta pieza \#17 arma equipada ▶ Catálogo puede cambiar atributos base sin modificar el historial de propiedad. ▶ Mercado puede cerrar una oferta sin borrar la instancia del inventario. ▶ Combate necesita una vista rápida, pero no debe convertirse en dueño de la pieza. Traducción explícita Los con
+
+\textbf{Qué preguntar.} ¿Qué acoplamiento produce un modelo único?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Un contexto delimitado no obliga a crear un proceso.
+
+\subsubsection*{Lámina 26: Un contexto delimitado no obliga a crear un proceso}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Dentro de un monolito Como servicio separado ▶ módulo Inventario; ▶ proceso propio; ▶ API interna; ▶ API o mensajes de red; ▶ esquema o espacio de nombres ▶ publicación de versión y escalado protegido; propios; ▶ pruebas de arquitectura; ▶ datos bajo autoridad exclusiva; ▶ transacción local. ▶ nuevas fallas parciales. Primero se descubre la frontera semántica. La separación fís
+
+\textbf{Qué preguntar.} ¿Qué significa “Objeto” para Inventario y para Combate?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Responsabilidad: quién puede decidir la verdad sobre \#17.
+
+\subsubsection*{Lámina 27: Responsabilidad: quién puede decidir la verdad sobre \#17}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Combate consulta/equipa Mercado Inventario solicita único que modifica reservar/transferir el propietario Ranking consume hechos Regla Estado Equipo
+
+\textbf{Qué preguntar.} ¿Quién puede escribir owner y quién recibe la alerta?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cuando el invariante cruza fronteras aparece un protocolo.
+
+\subsubsection*{Lámina 28: Cuando el invariante cruza fronteras aparece un protocolo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Mercado Inventario Pagos Inventario Mercado crea intento reserva \#17 autoriza transfiere confirma Qué significa protocolo aquí Secuencia explícita de mensajes, estados durables y reglas para continuar, reintentar o reparar cuando los participantes no comparten una transacción y alguno puede fallar. ▶ identidad de cada intento; ▶ significado de un timeout; ▶ autoridad de cada da
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Aplicación modular o servi-.
+
+\subsubsection*{Lámina 29: Aplicación modular o servi-}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} cios separados: simplicidad o independencia medible Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Monolito modular: una solución, no una etapa vergonzosa.
+
+\subsubsection*{Lámina 30: Monolito modular: una solución, no una etapa vergonzosa}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Dimensión Monolito modular Aplicación enmarañada Dependencias explícitas y verificables cualquier parte llama a cualquier otra Datos acceso mediante APIs internas tablas compartidas sin autoridad Cambios contratos y pruebas internas efectos laterales impredecibles Responsabilidad responsables claros todos pueden cambiar todo Publicación conjunta por decisión conjunta porque nad
+
+\textbf{Qué preguntar.} ¿Qué reglas internas evitan una maraña de dependencias?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cuándo conviene mantener Asteria modular y unida.
+
+\subsubsection*{Lámina 31: Cuándo conviene mantener Asteria modular y unida}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} ▶ El dominio todavía cambia y las fronteras no están maduras. ▶ El equipo es pequeño y modifica varios módulos en conjunto. ▶ La compra necesita invariantes que caben en una transacción local. ▶ La carga de los componentes todavía es parecida. ▶ El equipo aún no posee herramientas y guardias para operar muchos servicios. Ventaja de esperar Refactorizar una frontera dentro del p
+
+\textbf{Qué preguntar.} ¿Qué alternativa simple probaría antes de extraer?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Qué independencia puede justificar una separación.
+
+\subsubsection*{Lámina 32: Qué independencia puede justificar una separación}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Independencia buscada Evidencia concreta Publicar versiones Ranking sale o vuelve atrás sin coordinar Mercado ni Inventario Escalar Ranking absorbe un torneo sin multiplicar recursos de Pagos Aislar fallas una caída de Chat no interrumpe la compra Evolucionar datos Inventario cambia internals sin acceso directo de otros componentes Responsabilidad de equipo un grupo decide camb
+
+\textbf{Qué preguntar.} ¿Qué evidencia mostraría autonomía real?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: De llamada local a cadena sincrónica.
+
+\subsubsection*{Lámina 33: De llamada local a cadena sincrónica}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} API de espera espera espera termina Respuesta Mercado Inventario Pagos compra a Sofía Definición Una cadena sincrónica es un flujo donde la petición original no puede terminar hasta recibir las respuestas requeridas de varias dependencias sucesivas. ▶ las latencias se acumulan; ▶ un timeout remoto es ambiguo;
+
+\textbf{Qué preguntar.} ¿Qué ocurre con Sofía si Pagos tarda?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: El costo adicional de distribuir: qué aparece al cruzar la red.
+
+\subsubsection*{Lámina 34: El costo adicional de distribuir: qué aparece al cruzar la red}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Comunicación Entrega Datos Operación Seguridad Contratos latencia y retry e consistencia trazas y identidad compatibilidad timeout idempotencia y copias guardias y secretos Regla económica Aceptamos este costo solo cuando resuelve una necesidad concreta y la mejora puede medirse: menor tiempo hasta producción, escala separada, menor alcance de incidentes o reglas mejor aisladas
+
+\textbf{Qué preguntar.} ¿Cuál de estos costos no existía en la llamada local?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Disponibilidad compuesta: una aproximación útil, no una ley.
+
+\subsubsection*{Lámina 35: Disponibilidad compuesta: una aproximación útil, no una ley}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Si cuatro dependencias independientes son obligatorias y cada una está disponible el 99.9\%: Aflujo ≈ 0.9994 ≈ 0.996 Qué muestra Qué omite Cada dependencia requerida puede bloquear el Fallas correlacionadas, red, colas, retries, camino crítico. cachés, degradación y dependencia condicional. Más procesos no implican más disponibilidad. El objetivo es retirar dependencias no críti
+
+\textbf{Qué preguntar.} ¿Por qué multiplicar 0,999 es solo una aproximación?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Muchos servicios, pero una sola unidad de cambio.
+
+\subsubsection*{Lámina 36: Muchos servicios, pero una sola unidad de cambio}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} ANTIPATRÓN Mercado Inventario Pagos Ranking misma base + versiones coordinadas + modelos compartidos + cadena RPC obligatoria Por qué se usa la expresión “monolito distribuido” Es una etiqueta crítica y paradójica: físicamente hay varios procesos y red, pero los cambios, datos y operación siguen comportándose como una única pieza inseparable. Se pagan latencia, timeouts y obser
+
+\textbf{Qué preguntar.} ¿Qué independencia obtuvimos si todos deben publicar juntos?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Casos reales: la forma depende de la necesidad.
+
+\subsubsection*{Lámina 37: Casos reales: la forma depende de la necesidad}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} CASOS REALES Shopify: reforzar límites internos Netflix: servicios con plataforma Una aplicación grande puede mejorar módulos y madura dependencias dentro del mismo proceso La separación puede tener sentido cuando mientras publicar todo junto siga siendo cargas, equipos y ciclos son distintos y existen aceptable. herramientas para publicar, observar y recuperar cada servicio. C
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cruzar la frontera:.
+
+\subsubsection*{Lámina 38: Cruzar la frontera:}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} RPC, comandos, consultas y eventos Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Llamada local y RPC se parecen en el código, no en la falla.
+
+\subsubsection*{Lámina 39: Llamada local y RPC se parecen en el código, no en la falla}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} RPC Remote Procedure Call o llamada a procedimiento remoto: contrato que hace parecer una interacción de red como una llamada a una función. Simplifica la interfaz; no elimina la incertidumbre distribuida. Llamada local RPC ▶ mismo proceso; ▶ serialización y red; ▶ error inmediato y visible; ▶ petición o respuesta pueden perderse; ▶ una pila y un entorno de ejecución; ▶ el rece
+
+\textbf{Qué preguntar.} ¿Qué sabe realmente el llamador tras un timeout?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Timeout ambiguo: ¿Inventario reservó la espada?.
+
+\subsubsection*{Lámina 40: Timeout ambiguo: ¿Inventario reservó la espada?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} EJECUCIÓN ADVERSARIAL envía ReserveItem timeout Mercado respuesta perdida Inventario reserva \#17 envía OK durable
+
+\textbf{Qué preguntar.} Enumere dos historias compatibles con el mismo timeout.
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Comando, evento y consulta: tres contratos distintos.
+
+\subsubsection*{Lámina 41: Comando, evento y consulta: tres contratos distintos}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Mensaje Semántica Ejemplo Asteria Comando pedir al responsable autorita- ReserveItem(item\_17) tivo que intente una acción; puede rechazar Evento declarar un hecho que ya ItemReserved(item\_17) ocurrió Consulta pedir información sin cambiar el GetItemOwner(item\_17) estado autoritativo
+
+\textbf{Qué preguntar.} ¿Quién está autorizado a aceptar este comando?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Elegir RPC o evento desde la necesidad del flujo.
+
+\subsubsection*{Lámina 42: Elegir RPC o evento desde la necesidad del flujo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} ¿La petición necesita esta respuesta para poder terminar correctamente? camino crítico desacoplar Sí No RPC o comando evento y procesamiento con respuesta posterior Ejemplos sincrónicos Ejemplos asíncronos
+
+\textbf{Qué preguntar.} ¿Qué sabe realmente el llamador tras un timeout?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Necesidad: varios componentes deben enterarse sin bloquear.
+
+\subsubsection*{Lámina 43: Necesidad: varios componentes deben enterarse sin bloquear}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} la compra PROBLEMA Ranking Inventario hecho preservado transfiere \#17 Ownership- Notificaciones Transferred Auditoría Problema Necesidad Inventario no debería esperar a todos los Conservar un aviso que otros puedan leer,
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Intuición: un evento es un aviso durable sobre un hecho.
+
+\subsubsection*{Lámina 44: Intuición: un evento es un aviso durable sobre un hecho}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} INTUICIÓN Ejemplo OwnershipTransferred(item=17, from=Vendedor, to=Sofía) informa que Inventario ya confirmó la transferencia. Describe pasado confirmado; no ordena una acción futura. Qué permite Qué exige ▶ lectores independientes; ▶ identidad estable; ▶ replay después de una caída; ▶ significado inequívoco; ▶ nuevas vistas sin modificar Inventario. ▶ formato compatible;
+
+\textbf{Qué preguntar.} ¿Qué hecho ya ocurrió y quién puede leerlo después?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Contrato de evento: la interfaz pública que queda almacenada.
+
+\subsubsection*{Lámina 45: Contrato de evento: la interfaz pública que queda almacenada}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} FORMALIZACIÓN Definición El contrato de un evento especifica qué hecho representa, qué campos transporta, cómo se identifica, qué orden puede suponerse y cómo evoluciona sin romper consumidores. Parte En OwnershipTransferred Identidad event\_id, item\_id y secuencia/versión Semántica Inventario ya confirmó el cambio; no es una intención pendiente Esquema nombres, tipos y obligato
+
+\textbf{Qué preguntar.} ¿Qué hecho ya ocurrió y quién puede leerlo después?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Ventajas y costos de publicar un contrato de evento.
+
+\subsubsection*{Lámina 46: Ventajas y costos de publicar un contrato de evento}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} TRADE-OFF Ventajas Costos ▶ desacopla productor y lectores; ▶ duplicados y atraso; ▶ permite replay y reconstrucción; ▶ compatibilidad durante años; ▶ agrega lectores sin cambiar Inventario; ▶ observabilidad de lag y fallas; ▶ retira efectos secundarios del camino ▶ mala semántica se propaga a todos. crítico. Identidad: cuándo dos registros representan el mismo hecho. Semántica
+
+\textbf{Qué preguntar.} ¿Qué hecho ya ocurrió y quién puede leerlo después?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Preservar integridad:.
+
+\subsubsection*{Lámina 47: Preservar integridad:}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} dos escrituras, outbox e idempotencia Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Dual write: una intención, dos sistemas sin transacción común.
+
+\subsubsection*{Lámina 48: Dual write: una intención, dos sistemas sin transacción común}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} La necesidad Base de datos Mercado debe: compra 1. confirmar la compra en su base de datos (DB); CONFIRMADA 2. publicar PurchaseConfirmed para Ranking y Notificaciones. Mercado Broker Purchase Confirmed
+
+\textbf{Qué preguntar.} ¿Dónde colocaría el crash para romper la historia?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Dos órdenes, dos ventanas de falla.
+
+\subsubsection*{Lámina 49: Dos órdenes, dos ventanas de falla}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} EJECUCIÓN ADVERSARIAL Base de datos primero Broker primero 1. confirmar compra en la base; 1. publicar evento; 2. crash; 2. crash o reversión de la transacción local; 3. evento nunca publicado. 3. la base no confirma la compra. Resultado: compra autoritativa sin notificación ni ranking. Resultado: consumidores reaccionan a una compra inexistente. Cambiar el orden no elimina la 
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Intuición de outbox: dejar el aviso en la misma operación local.
+
+\subsubsection*{Lámina 50: Intuición de outbox: dejar el aviso en la misma operación local}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} cambiar propietario=Sofía Transacción local de Inventario guardar aviso pendiente en outbox Imagen mental
+
+\textbf{Qué preguntar.} ¿Qué dos cosas deben compartir la misma transacción local?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Definición formal: transactional outbox.
+
+\subsubsection*{Lámina 51: Definición formal: transactional outbox}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} FORMALIZACIÓN Definición Una transactional outbox es una tabla o colección persistente donde el servicio inserta un evento pendiente dentro de la misma transacción local que modifica el estado de negocio. Inventario fila outbox Relay Broker COMMIT local PENDING publica/reintenta evento durable ▶ el relay puede leer por polling o CDC; ▶ la publicación suele ser al menos una vez;
+
+\textbf{Qué preguntar.} ¿Qué dos cosas deben compartir la misma transacción local?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Qué resuelve outbox y qué deja abierto.
+
+\subsubsection*{Lámina 52: Qué resuelve outbox y qué deja abierto}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} TRADE-OFF Resuelve No resuelve sola ▶ estado sin intención durable de publicar; ▶ duplicados del relay; ▶ crash entre commit local y registro del ▶ orden entre entidades distintas; aviso; ▶ consumidores no idempotentes; ▶ recuperación del trabajo pendiente. ▶ atraso y crecimiento de la tabla.
+
+\textbf{Qué preguntar.} ¿Qué dos cosas deben compartir la misma transacción local?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Coordinar la compra:.
+
+\subsubsection*{Lámina 53: Coordinar la compra:}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} saga y reparación Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Tres autoridades independientes participan en la compra.
+
+\subsubsection*{Lámina 54: Tres autoridades independientes participan en la compra}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Autoridad Hecho que decide Por qué es independiente Mercado intento y estado de la oferta posee su estado, transacción y fallas Inventario reserva y propietario de \#17 confirma en su propia base y reinicia aparte Pagos autorización o rechazo del depende de un proveedor y no cobro comparte COMMIT con Inventario Independencia en esta historia Cada autoridad puede confirmar, falla
+
+\textbf{Qué preguntar.} ¿Quién tiene la última palabra y quién atiende el incidente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Por qué aparece una saga en Asteria.
+
+\subsubsection*{Lámina 55: Por qué aparece una saga en Asteria}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} NECESIDAD Problema La compra atraviesa Mercado, Inventario y Pagos. Cada autoridad confirma localmente, pero no existe un COMMIT único que abarque a las tres. Inventario Mercado Inventario Pagos propiedad intento creado pieza reservada cobro autorizado
+
+\textbf{Qué preguntar.} ¿Dónde queda durable el estado del proceso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Intuición: una saga es un itinerario durable de negocio.
+
+\subsubsection*{Lámina 56: Intuición: una saga es un itinerario durable de negocio}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} INTUICIÓN Imagen mental La compra es un viaje con varias paradas. En cada parada se anota durablemente dónde quedó, qué respuesta recibió y cuál es el próximo paso permitido. PAGO PROPIEDAD CREADA RESERVADA COMPLETADA AUTORIZADO TRANSFERIDA Si el proceso reinicia, no vuelve a empezar a ciegas: lee el estado durable y continúa, consulta
+
+\textbf{Qué preguntar.} ¿Dónde queda durable el estado del proceso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Definición formal: saga.
+
+\subsubsection*{Lámina 57: Definición formal: saga}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} FORMALIZACIÓN Definición Una saga coordina una operación mediante transacciones locales. Conserva estados durables y define reintentos, consultas, timeouts y compensaciones para resultados parciales. Registra Decide ▶ saga\_id e intento; ▶ continuar; ▶ estado y deadline; ▶ consultar o reintentar; ▶ comandos y respuestas; ▶ compensar;
+
+\textbf{Qué preguntar.} ¿Dónde queda durable el estado del proceso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Camino feliz: qué confirma cada participante.
+
+\subsubsection*{Lámina 58: Camino feliz: qué confirma cada participante}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 3. Inventario 1. Inventario 2. Pagos 4. Mercado transfiere reserva \#17 autoriza cargo confirma compra propiedad Pregunta previa ¿En qué estado puede responderse “compra confirmada” y qué evidencia durable demuestra que la pieza y el cargo quedaron coherentes?
+
+\textbf{Qué preguntar.} ¿Qué confirma cada participante, no qué desea el coordinador?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Falla realista: el pago puede quedar incierto.
+
+\subsubsection*{Lámina 59: Falla realista: el pago puede quedar incierto}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} EJECUCIÓN ADVERSARIAL Authorize payment timeout Saga respuesta perdida Pagos cargo envía OK autorizado
+
+\textbf{Qué preguntar.} ¿Timeout significa rechazo?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Falla posterior: cargo autorizado, transferencia imposible.
+
+\subsubsection*{Lámina 60: Falla posterior: cargo autorizado, transferencia imposible}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Pago OK Transferencia Reserva OK FALLA Liberar reserva Solicitar reembolso Estado global La saga pasa a COMPENSATING; solo termina cuando conoce el resultado durable de cada compensación o deriva el caso a intervención manual.
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Tres formas de “volver atrás” que no son equivalentes.
+
+\subsubsection*{Lámina 61: Tres formas de “volver atrás” que no son equivalentes}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Mecanismo Qué hace Ejemplo Rollback transaccional aborta cambios locales aún no confirmados la base revierte una transacción sin COMMIT Vuelta atrás de versión devuelve tráfico o software a una versión se retira una versión defectuosa de anterior Ranking Compensación de negocio ejecuta una nueva acción para reparar un reembolsar y liberar la reserva efecto confirmado Volver una
+
+\textbf{Qué preguntar.} ¿Cuál de estas acciones borra realmente un efecto confirmado?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Compensación: reparar el negocio sin borrar la historia.
+
+\subsubsection*{Lámina 62: Compensación: reparar el negocio sin borrar la historia}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Definición Una compensación es una nueva acción de negocio que intenta neutralizar o reparar un efecto ya confirmado. También puede fallar, duplicarse o requerir intervención humana. Transferencia Pago autorizado Solicitar reembolso Liberar reserva imposible El historial conserva pago autorizado, falla, reembolso solicitado y resultado. La auditoría necesita esa secuencia.
+
+\textbf{Qué preguntar.} ¿Qué nueva acción repara el negocio?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Intuición: coreografía y orquestación.
+
+\subsubsection*{Lámina 63: Intuición: coreografía y orquestación}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Coreografía Orquestación Como bailarines que conocen las señales: cada Como una dirección de escena: un coordinador participante observa un hecho y decide su conserva el estado del proceso y envía la próximo movimiento, sin un director que próxima instrucción. conserve todo el plan. Son dos formas de coordinar la misma saga. Ninguna elimina estados durables, idempotencia, timeo
+
+\textbf{Qué preguntar.} ¿Quién decide el siguiente paso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Coreografía en Asteria: cada servicio reacciona a hechos.
+
+\subsubsection*{Lámina 64: Coreografía en Asteria: cada servicio reacciona a hechos}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Inventario Pagos Inventario Mercado publica publica Payment- transfiere completa compra ItemReserved Authorized Ventaja Riesgo Participantes poco acoplados; nuevos lectores se agregan El proceso global queda repartido entre contratos; ciclos y con facilidad. fallas son difíciles de visualizar.
+
+\textbf{Qué preguntar.} ¿Quién decide el siguiente paso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Orquestación en Asteria: un coordinador conserva el proceso.
+
+\subsubsection*{Lámina 65: Orquestación en Asteria: un coordinador conserva el proceso}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Inventario Coordinador de compra Pagos estado durable de la saga Mercado Ventaja Riesgo
+
+\textbf{Qué preguntar.} ¿Qué estado debe persistir el coordinador?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Coreografía u orquestación: elegir por el proceso.
+
+\subsubsection*{Lámina 66: Coreografía u orquestación: elegir por el proceso}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} TRADE-OFF Dimensión Coreografía Orquestación Próximo paso cada servicio reacciona a hechos coordinador envía comandos Estado global repartido visible en el coordinador Cambio de flujo revisar varios contratos modificar el proceso coordinador Fallas largas/humanas difíciles de seguir fáciles de supervisar Riesgo ciclos y lógica emergente coordinador con demasiada responsabil- id
+
+\textbf{Qué preguntar.} ¿Quién decide el siguiente paso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Migrar y operar:.
+
+\subsubsection*{Lámina 67: Migrar y operar:}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} la frontera debe sobrevivir en producción Sistemas Distribuidos
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: ¿Qué extraer primero en Asteria?.
+
+\subsubsection*{Lámina 68: ¿Qué extraer primero en Asteria?}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Ranking: candidato inicial Inventario: extracción riesgosa ▶ carga diferente y con picos; ▶ preserva propiedad única; ▶ tolera atraso acotado; ▶ participa en el camino crítico; ▶ puede construirse como proyección; ▶ genera sagas y estados intermedios; ▶ falla sin detener la compra; ▶ exige idempotencia y operación madura; ▶ escala y despliega de forma distinta. ▶ una falla pued
+
+\textbf{Qué preguntar.} ¿Qué capacidad tiene menor riesgo sobre invariantes?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Migración gradual: patrón Strangler Fig.
+
+\subsubsection*{Lámina 69: Migración gradual: patrón Strangler Fig}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Intuición En vez de reemplazar toda la aplicación en una fecha única, una parte nueva crece al costado de la anterior. El tráfico se desvía por porciones hasta retirar el camino viejo. Definición El patrón Strangler Fig es una migración incremental donde el componente antiguo y el nuevo coexisten y una fachada decide qué camino utilizar. No significa simplemente “crear un micro
+
+\textbf{Qué preguntar.} ¿Cómo coexistirían el camino viejo y el nuevo?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Prueba gradual y vuelta atrás: limitar el riesgo.
+
+\subsubsection*{Lámina 70: Prueba gradual y vuelta atrás: limitar el riesgo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Prueba canary Vuelta atrás de versión Una fracción pequeña del tráfico real usa la Si las métricas empeoran, el router devuelve el versión nueva. Se comparan errores, latencia y tráfico al camino anterior. No deshace efectos resultados antes de ampliar. de negocio ya confirmados. La migración es reversible mientras ambos caminos coexistentes puedan recibir tráfico y los datos s
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Migración gradual aplicada a Ranking.
+
+\subsubsection*{Lámina 71: Migración gradual aplicada a Ranking}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Eventos de Ranking del compras y monolito API / router combate elige lectura Nuevo servicio de Ranking
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario operativo I: CI, CD y preparación operativa.
+
+\subsubsection*{Lámina 72: Vocabulario operativo I: CI, CD y preparación operativa}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Término Definición de trabajo CI — Integración Continua integrar cambios con frecuencia y ejecutar compilación, pruebas y controles automáticos CD — Entrega Continua mantener cada cambio validado listo para producción; la promoción puede ser manual CD — Despliegue Continuo poner automáticamente en producción todo cambio que supera los controles; hay que aclarar qué significado 
+
+\textbf{Qué preguntar.} ¿Qué diferencia hay entre listo para producción y puesto automáticamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Vocabulario operativo II: guardia, procedimiento, SLO y trazas.
+
+\subsubsection*{Lámina 73: Vocabulario operativo II: guardia, procedimiento, SLO y trazas}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Término Definición de trabajo Guardia (guardia) rotación responsable de recibir alertas y coordinar la respuesta a incidentes Procedimiento (runbook) pasos escritos para diagnosticar, mitigar y recuperar una falla repetible SLI indicador medido, por ejemplo compras correctas o latencia p99 SLO meta cuantificada para un SLI durante una ventana, por ejemplo 99,9\% de compras corre
+
+\textbf{Qué preguntar.} ¿Quién recibe la alerta a las 3 a.m. y con qué procedimiento?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Preparación operativa: separar implica sostener otro sistema.
+
+\subsubsection*{Lámina 74: Preparación operativa: separar implica sostener otro sistema}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Definición Existe preparación operativa cuando el equipo demuestra que puede publicar, observar y recuperar la capacidad en producción; no alcanza con que un chequeo /ready responda. ▶ CI y publicación de versiones; ▶ SLO y alertas; ▶ vuelta atrás probada; ▶ guardia y procedimientos; ▶ permisos y secretos; ▶ backup y recuperación; ▶ logs, métricas y trazas; ▶ pruebas de falla; 
+
+\textbf{Qué preguntar.} ¿Qué nueva falla aparece al pasar de módulo a proceso?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cómo leer las métricas de autonomía.
+
+\subsubsection*{Lámina 75: Cómo leer las métricas de autonomía}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Métrica Qué significa y qué pregunta responde Tiempo hasta producción desde que un cambio está listo hasta que funciona: ¿la frontera acelera el (tiempo hasta producción) cambio? Publicaciones sin coordinación versiones que salen sin sincronizar otros equipos Escala independiente recursos agregados solo a la capacidad que crece Alcance del incidente (alcance usuarios, regiones,
+
+\textbf{Qué preguntar.} ¿Qué podría cambiar Ranking sin coordinar con Inventario?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Métricas para comprobar que la separación valió la pena.
+
+\subsubsection*{Lámina 76: Métricas para comprobar que la separación valió la pena}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Métrica Qué mide Qué esperamos Tiempo hasta producción cambio listo a versión funcionando bajar sin aumentar incidentes Publicaciones sin versiones que no esperan a otros equipos aumentar coordinación Escala por capacidad recursos solo donde crece carga evitar escalar todo Asteria Alcance del incidente usuarios y capacidades afectados reducir p99 y errores experiencia de la col
+
+\textbf{Qué preguntar.} ¿Cuál es la línea base antes de separar?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Actividad: defender una frontera de Asteria.
+
+\subsubsection*{Lámina 77: Actividad: defender una frontera de Asteria}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Elijan una capacidad Completen el argumento ▶ inventario; 1. regla e invariante; ▶ pagos; 2. responsable y dato autoritativo; ▶ ranking; 3. alternativa simple; ▶ chat; 4. frontera propuesta; ▶ combate por zona. 5. RPC/evento; 6. falla y recuperación; 7. métrica de éxito.
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Método reusable para decidir una frontera.
+
+\subsubsection*{Lámina 78: Método reusable para decidir una frontera}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 1. Problema 2. Regla, dato 3. Alternativa 4. Costo, falla 5. Métrica y evidencia y autoridad más simple y mecanismo y revisión Marco del curso D = (P, F, G, S, T): la tecnología aparece después de declarar problema, fallas, garantías y costo aceptado.
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Cierre comparativo: por qué distribuir y cuándo no hacerlo.
+
+\subsubsection*{Lámina 79: Cierre comparativo: por qué distribuir y cuándo no hacerlo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Capacidad Límite del diseño unido Separación propuesta Prueba Ranking picos afectan la compra proyección por eventos; versión p99, atraso y tiempo propia hasta producción Pagos controles y proveedor frenan servicio propio si existe operación errores, auditoría y cambios madura coordinaciones Inventario la transacción local protege mantener unido hasta justificar duplicaciones, 
+
+\textbf{Qué preguntar.} ¿Qué necesidad no resolvía la modularidad interna?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Volvemos a la predicción inicial.
+
+\subsubsection*{Lámina 80: Volvemos a la predicción inicial}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Revise su primera respuesta y complete: 1. ¿La capacidad elegida tiene un lenguaje e invariante coherentes? 2. ¿Existe un responsable técnico y operacional? 3. ¿Qué autonomía concreta se obtendría? 4. ¿Qué falla nueva aparece al cruzar la red? 5. ¿Cómo se preserva la integridad del flujo? 6. ¿Qué métrica podría refutar su decisión? Cambiar de opinión es evidencia de aprendizaje
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Volvemos al diagnóstico inicial.
+
+\subsubsection*{Lámina 81: Volvemos al diagnóstico inicial}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} 1. Falso: un monolito puede imponer módulos, APIs y responsabilidades claras. 2. Falso: un microservicio no es una clase remota; representa una capacidad con autonomía operativa. 3. Falso: servicios separados pueden seguir acoplados por base de datos, contratos y versiones coordinadas. 4. Falso: la base de datos y el broker son dos escrituras; una caída entre ambas deja inconsi
+
+\textbf{Qué preguntar.} Vote; ¿qué palabra de cada frase le genera desconfianza?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Síntesis: una frontera debe justificar su costo.
+
+\subsubsection*{Lámina 82: Síntesis: una frontera debe justificar su costo}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Necesidad Regla, dato Contrato Falla Mejora observable y autoridad y comunicación y recuperación medida Distribuir no es progreso por sí mismo. Una frontera vale cuando resuelve una necesidad concreta, la mejora aparece en métricas y el equipo puede operar las fallas nuevas.
+
+\textbf{Qué preguntar.} ¿Qué dato no debería poder modificar Mercado directamente?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Exit ticket.
+
+\subsubsection*{Lámina 83: Exit ticket}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} Responda brevemente: 1. ¿Qué diferencia una frontera semántica de una frontera de red? 2. ¿Qué autonomía concreta justificaría separar Ranking? 3. ¿Qué sabe Mercado después de un timeout de Inventario? 4. ¿Qué resuelve outbox y qué deja abierto? 5. ¿Por qué compensar no equivale a rollback?
+
+\textbf{Qué preguntar.} Responda sin siglas ni nombres de productos.
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Conecte con la siguiente lámina: Fuentes para profundizar.
+
+\subsubsection*{Lámina 84: Fuentes para profundizar}
+\textbf{Propósito.} Ubicar esta lámina dentro de la compra de \texttt{EspadaSolar\#17} y evitar que el concepto se convierta en una definición aislada.
+
+\textbf{Qué decir.} ▶ Kleppmann, Designing Data-Intensive Applications: servicios, RPC, transacciones, streams y sistemas derivados. ▶ Evans, Domain-Driven Design: bounded contexts y lenguaje ubicuo. ▶ Fowler, Monolith First, Microservice Trade-Offs y Strangler Fig. ▶ Shopify Engineering: modular monolith, componentización y límites internos. ▶ AWS Prescriptive Guidance: transactional outbox y sag
+
+\textbf{Qué preguntar.} ¿Qué problema de la historia hace necesaria esta idea?
+
+\textbf{Respuesta esperada.} Una respuesta breve que identifique actor, dato o invariante y haga explícita la falla o el costo relevante. Si el estudiante solo nombra una tecnología, pida reconstruir la ejecución.
+
+\textbf{Error frecuente.} Confundir separación física con autonomía o suponer que una flecha de red elimina la necesidad de estado durable e idempotencia.
+
+\textbf{Transición.} Cierre: vuelva a la pregunta central y solicite una decisión defendida con evidencia.
+
+\section{Parte B: dossier técnico de preparación del docente}
+
+\subsection{Cómo explicar los conceptos en tres profundidades}
+\subsubsection*{En 30 segundos}
+Una frontera separa responsabilidades y datos; cruzarla por red agrega fallas parciales. Se distribuye solo cuando una necesidad medible justifica ese costo.
+\subsubsection*{En dos minutos}
+Identifique capacidad, invariante y dato autoritativo; compare monolito modular con servicio; describa timeout, dual write y recuperación; cierre con una métrica de autonomía.
+\subsubsection*{En cinco minutos}
+Reconstruya la compra completa, mueva crashes, explique outbox e idempotencia, modele saga y compare una migración gradual con mantener la aplicación unida.
 
 \subsection{Demostraciones guiadas}
-
-\begin{uainfo}
-\textbf{Demo 1 --- llamada local a red.} Tome una función y agregue en tarjetas latencia, timeout, retry, autenticación, contrato, tracing y despliegue. Esa es la prima distribuida.
-\end{uainfo}
-
-\begin{uainfo}
-\textbf{Demo 2 --- disponibilidad compuesta.} Calcule $0{,}999^4$ y luego agregue red. Pregunte qué ocurre con una cadena de ocho.
-\end{uainfo}
-
-\begin{uainfo}
-\textbf{Demo 3 --- dual write.} DB y broker con crash en ambos órdenes; luego outbox y replay del relay.
-\end{uainfo}
-
-\begin{uainfo}
-\textbf{Demo 4 --- saga humana.} Estudiantes representan stock, pagos y entrega. Use tarjetas OK/FALLA y ejecute compensaciones idempotentes.
-\end{uainfo}
-
-\subsection{Preguntas socráticas y respuestas esperadas}
-
-\begin{tabular}{p{0.46\textwidth}p{0.44\textwidth}}
-\toprule
-Pregunta & Núcleo esperado \\
-\midrule
-¿Qué problema compra esta frontera? & escala, cadencia, ownership o aislamiento concretos \\
-¿Qué invariante queda local? & regla que un owner puede preservar sin coordinación global \\
-¿Quién puede escribir el dato? & un servicio/contexto dueño \\
-¿Por qué no RPC aquí? & no requiere respuesta, tolera atraso, múltiples consumidores \\
-¿Qué falla deja dual write? & una escritura sin la otra \\
-¿Qué deja abierto outbox? & duplicados y operación del relay \\
-¿Por qué compensar no es rollback? & nuevo efecto, historia visible y posible fallo \\
-¿Qué demuestra autonomía? & deploy independiente, menor lead time/blast radius \\
-\bottomrule
-\end{tabular}
-
-\subsection{Errores previsibles y corrección}
-
-\begin{tabular}{p{0.37\textwidth}p{0.54\textwidth}}
-\toprule
-Error & Intervención \\
-\midrule
-``Monolito = bola de barro'' & Pedir reglas de módulos y mostrar caso modular. \\
-``Servicio por tabla'' & Preguntar capacidad e invariante de negocio. \\
-``Microservicios escalan'' & Preguntar qué componente, carga y métrica. \\
-``Database per service = DB física'' & Volver a autoridad de escritura. \\
-``Eventos desacoplan todo'' & Preguntar contrato, atraso y consumer obligatorio. \\
-``Outbox da exactly-once'' & Simular ACK perdido del relay. \\
-``Saga es rollback'' & Usar email o cobro ya visible. \\
-``Más servicios = más autonomía'' & Medir despliegues y coordinaciones reales. \\
-\bottomrule
-\end{tabular}
-
-\subsection{Criterios de evaluación formativa}
-
-Una frontera lograda incluye:
 \begin{enumerate}
-\item capacidad y lenguaje;
-\item invariante;
-\item owner/equipo;
-\item datos y contrato;
-\item comunicación;
-\item falla nueva;
-\item capacidad operativa;
-\item métrica y alternativa simple.
+\item \textbf{Local a remoto:} tome \texttt{Inventory.reserve} y agregue tarjetas: red, timeout, retry, contrato, autenticación, tracing y guardia.
+\item \textbf{Dual write:} use tres estudiantes como Inventario, DB y broker. Mueva el crash en ambos órdenes.
+\item \textbf{Outbox:} inserte cambio y evento pendiente en una misma hoja; haga caer al relay después de publicar.
+\item \textbf{Saga:} entregue tarjetas de estados y haga aparecer \texttt{PAYMENT\_UNKNOWN}.
+\item \textbf{Migración:} enrute 10\% de lecturas a Ranking nuevo y decida si ampliar o volver.
 \end{enumerate}
 
+\subsection{Preguntas socráticas}
+\begin{itemize}
+\item ¿Qué dato exacto decide esta capacidad?
+\item ¿Qué sabe el llamador y qué solo supone?
+\item ¿Qué estado debe sobrevivir al crash?
+\item ¿Qué invariante dejó de ser local al cruzar la frontera?
+\item ¿Qué métrica demostraría que la independencia es real?
+\item ¿Qué alternativa más simple todavía no probamos?
+\end{itemize}
+
+\subsection{Banco de preguntas previsibles}
+\begin{description}
+\item[¿Un microservicio debe tener su propia base física?] No. Debe tener autoridad exclusiva sobre su modelo; la infraestructura física puede compartirse con aislamiento apropiado.
+\item[¿Eventos siempre son mejores que RPC?] No. RPC sirve cuando la operación necesita respuesta inmediata; eventos sirven para hechos durables y continuidad asíncrona.
+\item[¿Outbox garantiza exactly-once?] No. Evita estado sin intención durable de publicar; el relay puede duplicar y el consumidor debe ser idempotente.
+\item[¿Saga reemplaza una transacción?] Expone varias transacciones locales, estados intermedios y compensaciones. No ofrece rollback global perfecto.
+\item[¿Por qué no usar 2PC?] Puede ser válido bajo otros requisitos, pero aumenta coordinación y acoplamiento. La clase analiza autonomía, disponibilidad y workflows de negocio.
+\item[¿Strangler duplica trabajo?] Temporalmente sí; esa coexistencia compra reversibilidad y evidencia antes del retiro.
+\item[¿Qué significa autoridad independiente?] Cada componente confirma hechos en su propio estado durable y puede fallar por separado; ninguno puede imponer un commit atómico a los otros.
+\end{description}
+
+\subsection{Errores previsibles}
 \begin{center}
-\begin{tabular}{p{0.18\textwidth}p{0.70\textwidth}}
+\begin{tabular}{p{0.42\textwidth}p{0.46\textwidth}}
 \toprule
-Nivel & Evidencia \\
+\textbf{Error} & \textbf{Intervención} \\
 \midrule
-Inicial & dibuja servicios por entidades \\
-En desarrollo & identifica dominio, sin ownership/operación \\
-Logrado & frontera coherente, falla, mecanismo y métrica \\
-Avanzado & compara con monolito y define migración reversible \\
+Monolito = desorden & mostrar módulos, puertas, paredes y pruebas \\
+Servicio = autonomía & preguntar por base, versiones, guardia y equipo \\
+Timeout = operación fallida & enumerar historias indistinguibles \\
+Evento = una sola vez & mover crash del relay \\
+Outbox = broker dentro de DB & separar commit local de publicación posterior \\
+Saga = rollback global & mostrar efectos confirmados y compensación \\
+Canary = prueba sin riesgo & recordar datos y efectos no reversibles \\
+Métrica sin baseline & exigir valor antes de la separación \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\subsection{Contingencias}
-
-\subsubsection*{Si falta tiempo}
-Preserve fronteras/ownership, RPC-eventos, outbox y saga. Strangler/readiness puede quedar como cierre guiado.
-
-\subsubsection*{Si el grupo ama microservicios}
-Pida presupuesto de on-call, disponibilidad de cadena y cantidad de equipos. Obligue a defender qué queda junto.
-
-\subsubsection*{Si el grupo rechaza distribuir}
-Introduzca una zona de Asteria con carga diez veces mayor y un equipo de pagos con compliance; pida explicar cómo escalar/desplegar sin fronteras.
-
-\subsection{Cómo favorecer una experiencia de clase excelente}
-
-\begin{itemize}
-\item Permita respuestas arquitectónicas diferentes y evalúe coherencia, no conformidad.
-\item Use un caso que los estudiantes puedan imaginar operando.
-\item Haga visible que la opción simple es legítima y profesional.
-\item Convierta cada patrón en respuesta a una falla descubierta por ellos.
-\item Incluya cálculo, diagrama y role-play, no solo exposición.
-\item Diga explícitamente qué conceptos suelen aparecer en entrevistas y trabajo real.
-\item Reserve los últimos minutos para que cada grupo defienda una frontera.
-\item Devuelva al inicio de clase 10 una duda recurrente del exit ticket.
-\end{itemize}
-
-La encuesta tenderá a reflejar positivamente una clase organizada, aplicable, participativa y honesta sobre límites.
-
-\subsection{Conexión con el Trabajo Final Integrador}
-
-Cada grupo debe completar para una frontera:
-\begin{itemize}
-\item capacidad, invariante y owner;
-\item razón para mantener junto o separar;
-\item datos y acceso;
-\item RPC/eventos;
-\item dual write/outbox;
-\item saga si corresponde;
-\item SLO y observabilidad;
-\item riesgo de migración y rollback;
-\item condición para revisar la decisión.
-\end{itemize}
-
-No acepte diagramas sin ownership ni flujos de falla.
-
-\subsection{Cierre, exit ticket y puente}
-
-Exit ticket:
-\begin{enumerate}
-\item Diferencia entre monolito modular y distribuido.
-\item Presión concreta que justifica un servicio.
-\item Qué resuelve outbox y qué deja abierto.
-\item Por qué una compensación no es rollback.
-\end{enumerate}
-
-Cierre:
-\begin{quote}
-``Hoy distribuimos autoridad y fallas. La próxima clase estudia cómo reconstruir qué ocurrió cuando esas rutas reales degradan: logs estructurados, métricas y trazas.''
-\end{quote}
-
-
-
-
-\clearpage
-\section{Parte B: dossier técnico de preparación}
-\subsection{Dossier técnico de preparación del docente}
-La arquitectura distribuida es una decisión sociotécnica: distribuye código, datos, autoridad, despliegues, fallas y responsabilidad humana. La clase debe evitar dos dogmas opuestos: ``microservicios siempre escalan'' y ``el monolito siempre es más simple''.
-
-\subsubsection{Monolito modular}
-
-Una unidad de despliegue puede contener módulos estrictos. Las propiedades deseables incluyen:
-\begin{itemize}
-\item APIs internas explícitas;
-\item dependencias acíclicas;
-\item ownership por módulo;
-\item invariantes locales;
-\item esquemas o namespaces protegidos;
-\item pruebas de arquitectura que impidan accesos laterales.
-\end{itemize}
-
-El monolito modular evita la prima distribuida cuando el dominio, equipo y carga todavía no justifican red. Se vuelve problemático cuando los módulos no pueden evolucionar o escalar con independencia, el build/deploy es un cuello de botella o una falla local afecta todo el proceso.
-
-\subsubsection{Microservicio y prima distribuida}
-
-Un servicio merece una frontera de red cuando compra autonomía verificable: despliegue independiente, ownership de datos, escalado diferente, aislamiento de falla, requisitos regulatorios o ritmo de cambio propio.
-
-La prima distribuida incluye:
-\begin{itemize}
-\item latencia, timeouts y retries;
-\item descubrimiento, balanceo y seguridad de red;
-\item observabilidad y trazas;
-\item contratos versionados;
-\item datos distribuidos y consistencia eventual;
-\item CI/CD, rollback, on-call y costo de infraestructura;
-\item pruebas de integración y fallas parciales.
-\end{itemize}
-
-Un ``monolito distribuido'' paga esa prima pero conserva base compartida, releases coordinados y cadenas sincrónicas. Es peor porque agrega fallas sin comprar autonomía.
-
-\subsubsection{Bounded context y ownership}
-
-Un bounded context delimita un modelo y un lenguaje coherentes. No obliga a crear un proceso. Puede implementarse como módulo, servicio o combinación. La frontera técnica debe seguir semántica y necesidad operacional, no sustituir análisis de dominio.
-
-Ownership de datos significa que una autoridad es responsable de escribir y validar el modelo. Otros componentes acceden mediante contrato, eventos o vistas derivadas. Database-per-service no exige necesariamente una instancia física separada, pero sí prohíbe dependencia informal de tablas internas ajenas.
-
-Las consultas globales pueden resolverse mediante:
-\begin{itemize}
-\item composición RPC, si frescura y disponibilidad lo toleran;
-\item materialized views alimentadas por eventos;
-\item search index o warehouse;
-\item replicación controlada de datos de lectura.
-\end{itemize}
-
-\subsubsection{Conway y organización}
-
-La estructura de comunicación de los equipos tiende a aparecer en el sistema. La ``inverse Conway maneuver'' intenta alinear equipos con la arquitectura deseada, pero no reemplaza contratos, capacidades ni liderazgo. Si dos equipos deben coordinar cada release, la frontera de servicios no compró independencia real.
-
-Métricas útiles: lead time, porcentaje de releases coordinados, cambios que cruzan owners, incidentes multi-equipo y tiempo de diagnóstico.
-
-\subsubsection{RPC, comandos, eventos y consultas}
-
-\begin{description}
-\item[Comando.] Solicita que una autoridad haga algo; puede aceptarse o rechazarse.
-\item[Evento.] Afirma un hecho pasado y durable; no debe llamarse \texttt{CreateOrder} si en realidad es un comando.
-\item[Consulta.] Pide información sin intención de cambiar estado.
-\end{description}
-
-RPC es adecuado cuando el llamador necesita respuesta inmediata y acepta acoplarse temporalmente. Eventos compran desacoplamiento, fan-out y replay, pero agregan orden parcial, duplicación, consistencia eventual y necesidad de contratos/observabilidad.
-
-La disponibilidad compuesta de una cadena puede ilustrarse con el producto de disponibilidades si se asume independencia. Debe aclararse que en sistemas reales las fallas están correlacionadas; el cálculo es una intuición de camino crítico, no una predicción exacta.
-
-\subsubsection{Dual write, outbox e inbox}
-
-Actualizar base y broker por separado crea ventanas inconsistentes. Transactional outbox persiste el cambio local y la intención de publicar en una misma transacción. El relay puede repetir, así que consumidores deben deduplicar o aplicar operaciones idempotentes.
-
-Outbox no proporciona atomicidad global entre servicios, no impide todas las reordenaciones y no reemplaza una saga. Resuelve una frontera local específica.
-
-Los contratos de eventos deben versionarse de forma compatible. Buenas prácticas:
-\begin{itemize}
-\item agregar campos opcionales antes de eliminar;
-\item usar nombres semánticos y event ID;
-\item declarar versión y owner;
-\item evitar exponer el esquema interno completo;
-\item probar consumidores conocidos y desconocidos;
-\item definir retención y estrategia de replay.
-\end{itemize}
-
-\subsubsection{Sagas como máquinas de estados durables}
-
-Una saga coordina transacciones locales mediante mensajes y compensaciones. No devuelve el mundo al pasado: ejecuta nuevas acciones semánticas para neutralizar efectos cuando sea posible.
-
-Conviene modelar:
-\begin{itemize}
-\item estados y transiciones durables;
-\item comandos emitidos y eventos esperados;
-\item timeout y retry por paso;
-\item idempotencia;
-\item compensaciones;
-\item pivot transaction: punto después del cual ya no es realista deshacer y debe completarse hacia adelante;
-\item observabilidad por saga ID.
-\end{itemize}
-
-\paragraph{Coreografía.}
-Cada participante reacciona a eventos. Reduce un coordinador explícito, pero el flujo global puede dispersarse, crear ciclos y ser difícil de versionar.
-
-\paragraph{Orquestación.}
-Un orquestador durable conserva estado del workflow. Facilita visibilidad, timeout y cambio del proceso, pero se vuelve componente crítico y puede concentrar lógica excesiva.
-
-\subsubsection{Strangler Fig y migración}
-
-La migración incremental intercepta rutas, delega algunas al nuevo componente, compara comportamiento y conserva rollback. Requiere definir fuente de verdad durante coexistencia y evitar dual ownership. Extraer primero el núcleo más acoplado suele ser más riesgoso que elegir una capacidad con frontera y presión verificables.
-
-\subsubsection{Readiness operacional}
-
-Antes de multiplicar servicios, la organización necesita:
-\begin{itemize}
-\item CI/CD y rollback automatizado;
-\item infraestructura como código;
-\item service discovery y gestión de secretos;
-\item logs, métricas, tracing y SLOs;
-\item catálogo de servicios y owners;
-\item on-call, runbooks y postmortems;
-\item pruebas de contratos y fallas;
-\item seguridad entre servicios;
-\item presupuesto de costo y toil.
-\end{itemize}
-
-\subsection{Cómo explicar los conceptos en tres profundidades}
-
-\subsubsection{Monolito modular y microservicio}
-\begin{description}
-\item[30 segundos.] ``Un monolito puede tener habitaciones claras; un microservicio es otro edificio y necesita caminos, seguridad y operación propia.''
-\item[2 minutos.] Compare despliegue, datos, fallas y owner para inventario y pagos de Asteria.
-\item[5 minutos.] Agregue autonomía verificable, prima distribuida, métricas y distributed monolith.
-\end{description}
-
-\subsubsection{Bounded context}
-\begin{description}
-\item[30 segundos.] ``Es el territorio donde una palabra y sus reglas significan lo mismo.''
-\item[2 minutos.] Use ``jugador'' en identidad, combate y facturación.
-\item[5 minutos.] Explique traducciones, anti-corruption layer y por qué no implica proceso.
-\end{description}
-
-\subsubsection{Outbox}
-\begin{description}
-\item[30 segundos.] ``Guardo el cambio y la notificación pendiente en la misma caja fuerte local.''
-\item[2 minutos.] Dibuje las dos ventanas de dual write y el relay repetible.
-\item[5 minutos.] Agregue orden por agregado, inbox, limpieza y contrato.
-\end{description}
-
-\subsubsection{Saga}
-\begin{description}
-\item[30 segundos.] ``Es un proceso de pasos locales; si uno falla, ejecuta nuevas acciones compensatorias.''
-\item[2 minutos.] Use reservar inventario, cobrar y despachar.
-\item[5 minutos.] Agregue state machine durable, timeout, pivot, idempotencia y observabilidad.
-\end{description}
-
-\subsection{Banco de preguntas previsibles y respuestas}
-
-\begin{enumerate}
-\item \textbf{¿Cuántas líneas de código debe tener un microservicio?} El tamaño no se define por líneas, sino por capacidad cohesiva, ownership y autonomía operacional.
-\item \textbf{¿Cada bounded context debe ser un servicio?} No. Puede ser un módulo; se distribuye cuando existe una presión que justifica la prima.
-\item \textbf{¿Database per service exige un servidor de base por servicio?} No necesariamente; exige ownership y ausencia de acceso informal a internals.
-\item \textbf{¿Microservicios escalan mejor?} Permiten escalado independiente, pero agregan overhead. Un monolito puede escalar horizontalmente; la pregunta es qué componente necesita una curva diferente.
-\item \textbf{¿Eventos eliminan acoplamiento?} Reducen acoplamiento temporal, pero conservan acoplamiento semántico mediante contratos y orden.
-\item \textbf{¿RPC es antipatrón?} No. Es adecuado para interacciones inmediatas con dependencia explícita y resiliencia diseñada.
-\item \textbf{¿Outbox es exactly-once?} No. Persiste atomicamente cambio e intención local; el relay puede publicar más de una vez y el consumidor debe deduplicar.
-\item \textbf{¿Saga reemplaza transacciones?} Reemplaza algunas transacciones globales por pasos locales y compensaciones; cambia la semántica y expone estados intermedios.
-\item \textbf{¿Compensar es hacer rollback?} No. Es una nueva operación de negocio, posiblemente imperfecta e irreversible en parte.
-\item \textbf{¿Orquestación crea un monolito?} Puede concentrar proceso, pero no necesariamente dominio; debe mantenerse como coordinador durable y no absorber toda lógica local.
-\item \textbf{¿Coreografía siempre es más desacoplada?} Puede ocultar acoplamiento y ciclos; la autonomía debe evaluarse por cambio y operación.
-\item \textbf{¿Cómo sé que una extracción funcionó?} Menor lead time coordinado, escala independiente, menor blast radius o ownership más claro, sin degradar SLO/costo de forma inaceptable.
-\end{enumerate}
-
-\subsection{Ruta esencial y profundización para 180 minutos}
-
-\begin{description}
-\item[Núcleo obligatorio.] Monolito modular, prima distribuida, bounded context/ownership, RPC frente a evento, dual write/outbox y saga.
-\item[Profundización.] Conway, contratos, choreography/orchestration, Strangler y readiness.
-\item[Evidencia.] Mapa de Asteria, cálculo de camino crítico, timeline dual write, state machine de saga y defensa de una frontera.
-\end{description}
-
-Durante una auditoría, la mayor evidencia de comprensión es que los estudiantes puedan defender tanto ``mantener junto'' como ``separar'', con una presión concreta, un owner y una métrica. No convierta la clase en una defensa ideológica de microservicios.
-
 \subsection{Checklist personal de estudio}
-
+Antes de la clase, el docente debe poder explicar sin mirar:
 \begin{itemize}
-\item ¿Puedo describir modularidad sin asumir una frontera de red?
-\item ¿Puedo enumerar la prima distribuida con ejemplos de falla?
-\item ¿Puedo distinguir bounded context, módulo, servicio y equipo?
-\item ¿Puedo proponer alternativas a consultas cross-service?
-\item ¿Puedo explicar cuándo usar RPC, evento o consulta?
-\item ¿Puedo dibujar ambas ventanas de dual write?
-\item ¿Puedo decir exactamente qué resuelve y qué no outbox?
-\item ¿Puedo modelar una saga durable con compensaciones y pivot?
-\item ¿Puedo comparar coreografía y orquestación sin slogans?
-\item ¿Puedo definir métricas de autonomía y readiness?
+\item capacidad frente a operación;
+\item frontera semántica frente a frontera de red;
+\item autoridad frente a responsabilidad;
+\item llamada local frente a RPC;
+\item comando, evento y consulta;
+\item dual write y dos ventanas de falla;
+\item outbox, relay e inbox;
+\item saga, rollback y compensación;
+\item coreografía y orquestación;
+\item Strangler, canary y vuelta atrás;
+\item SLI, SLO y métricas de autonomía.
 \end{itemize}
 
-\clearpage
-\section{Parte C: auditoría, evaluación y evidencias}
+\section{Parte C: auditoría}
+
 \subsection{Preguntas que puede formular un auditor pedagógico}
-\subsubsection{¿Por qué comenzar con intuición y no con la definición formal?}
-
-Respuesta sugerida: la intuición activa conocimientos previos y crea una necesidad cognitiva. El caso no reemplaza la definición; la prepara. Inmediatamente después se explicitan modelo, supuestos, garantía y límites de la analogía. Esta secuencia reduce la cantidad de elementos nuevos que el estudiante debe coordinar al mismo tiempo y permite que la formalización responda a una pregunta que ya comprendió.
-
-\subsubsection{¿Cómo verifica que los estudiantes aprendieron y no solo siguieron la narración?}
-
-Respuesta sugerida: cada bloque contiene una predicción individual, una representación que el estudiante debe completar, una decisión con trade-off y una evidencia breve. El diagnóstico inicial reaparece al final, y el exit ticket exige explicar el mecanismo con palabras propias. Las guías alinean los mismos resultados mediante timelines, cálculos y diseños; por tanto, la clase produce artefactos observables, no solo exposición.
-
-\subsubsection{¿Por qué usa casos reales?}
-
-Respuesta sugerida: no se usan como argumento de autoridad ni como entrenamiento de producto. Se usan para mostrar que el mecanismo responde a una restricción real y que tiene métricas, fallas y costos observables. Después del caso se abstrae un método reusable para que el alumno pueda transferirlo a otro dominio.
-
-\subsubsection{¿Cómo evita que una clase de tres horas produzca sobrecarga cognitiva?}
-
-Respuesta sugerida: se divide en ciclos de 12--18 minutos con cambio de actividad; se mantiene un caso conductor y un vocabulario estable; se separa núcleo obligatorio de profundización; se introducen pausas de recuperación y se vuelve varias veces al mapa de la clase. No se intenta ``pasar todas las slides'': se protege la comprensión del núcleo y se deja el detalle avanzado como material de estudio.
-
-\subsubsection{¿Cómo se alinea la clase con la evaluación?}
-
-Respuesta sugerida: cada resultado de aprendizaje aparece en cuatro lugares: una actividad durante la clase, un ejercicio de la guía, una solución con criterio de corrección y una evidencia en el Trabajo Final. La evaluación privilegia la cadena problema--falla--garantía--mecanismo--trade-off--evidencia, coherente con el marco $D=(P,F,G,S,T)$.
-
-\subsubsection{¿Qué hace cuando aparece una concepción errónea?}
-
-Respuesta sugerida: no la corrige únicamente con una afirmación. Solicita una predicción, mueve el punto de falla en un timeline o construye un contraejemplo. Luego pide al estudiante reformular la regla. Las guías docentes identifican errores previsibles y una intervención concreta para cada uno.
-
-\subsubsection{¿Cómo favorece participación sin perder rigor?}
-
-Respuesta sugerida: primero solicita respuesta individual breve para evitar que participen siempre los mismos; después comparación en parejas y finalmente puesta en común. Las preguntas no buscan opinión libre, sino una decisión justificada por garantía, falla y evidencia. Se admiten soluciones distintas cuando preservan los invariantes y explicitan costos.
-
-\subsubsection{¿Qué evidencia conservaría para una auditoría posterior?}
-
-Conservar:
-\begin{itemize}
-\item resultados anónimos del diagnóstico inicial y final;
-\item una muestra de timelines o matrices completadas;
-\item respuestas del exit ticket y la devolución realizada en la clase siguiente;
-\item una rúbrica aplicada a una actividad;
-\item mejoras del Trabajo Final vinculadas con los conceptos de la clase;
-\item notas de ajuste docente: qué bloque tomó más tiempo y qué se modificará.
-\end{itemize}
-
-\subsubsection{Pregunta específica: ¿la clase promueve microservicios?}
-
-Respuesta sugerida: no. Promueve una decisión de frontera basada en autonomía verificable. El monolito modular es el baseline legítimo; un servicio se extrae solo si compra independencia de cambio, escala, falla u ownership suficiente para pagar la prima distribuida.
-
-\subsubsection{Pregunta específica: ¿cómo evalúa arquitectura sin imponer una única respuesta?}
-
-Respuesta sugerida: se evalúan coherencia y evidencia: bounded context, owner, invariante, modo de comunicación, falla, SLO y condición de revisión. Dos diseños distintos pueden obtener la misma calidad si sus decisiones son internamente consistentes y operables.
-
-\subsection{Matriz de corrección y preguntas de defensa de la guía}
-La guía evalúa capacidad de decidir fronteras. Deben aceptarse diseños distintos cuando muestran cohesión, ownership, autonomía y operación. No debe premiarse la cantidad de servicios.
-
 \begin{enumerate}
-\item \textbf{Monolito modular.} Debe incluir reglas verificables de dependencia. Pregunta oral: ¿qué prueba impediría un acceso lateral?
-\item \textbf{Prima distribuida.} Debe listar costo y una hipótesis medible. Pregunta oral: ¿qué beneficio paga esa prima?
-\item \textbf{Separación.} Debe usar dominio, carga y equipo. Pregunta oral: ¿qué conservaría junto y por qué?
-\item \textbf{Monolito distribuido.} Debe mostrar red sin autonomía. Pregunta oral: ¿qué métrica revela releases coordinados?
-\item \textbf{Bounded contexts.} Debe distinguir significados y traducciones. Pregunta oral: ¿por qué esto no obliga a crear un proceso?
-\item \textbf{Ownership.} Debe evitar lectura/escritura directa de tablas ajenas. Pregunta oral: ¿cómo construye una vista global?
-\item \textbf{Conway.} Debe conectar coordinación humana con frontera. Pregunta oral: ¿qué cambio organizacional propondría?
-\item \textbf{RPC/evento.} Debe elegir por necesidad de respuesta y desacoplamiento. Pregunta oral: ¿qué falla nueva introduce cada opción?
-\item \textbf{Cadena.} Debe calcular y declarar independencia como supuesto. Pregunta oral: ¿por qué las fallas reales pueden correlacionarse?
-\item \textbf{Tipos de mensaje.} Debe distinguir intención, hecho y consulta. Pregunta oral: ¿qué nombre oculta un comando?
-\item \textbf{Dual write.} Debe mostrar ambas ventanas. Pregunta oral: ¿qué sistema contiene la fuente de verdad en cada momento?
-\item \textbf{Outbox.} Debe incluir relay e inbox. Pregunta oral: ¿qué deja abierto respecto de orden global?
-\item \textbf{Evolución.} Debe diferenciar adición compatible de cambio destructivo. Pregunta oral: ¿cómo migra consumidores lentos?
-\item \textbf{Saga.} Debe ser máquina de estados durable. Pregunta oral: ¿dónde ubica el pivot?
-\item \textbf{Compensación.} Debe reconocer irreversibilidad. Pregunta oral: ¿cómo comunica al usuario un efecto ya visible?
-\item \textbf{Coreografía.} Debe mostrar eventos, ciclos y trazabilidad. Pregunta oral: ¿cuándo deja de ser comprensible?
-\item \textbf{Orquestación.} Debe persistir progreso y versionar workflow. Pregunta oral: ¿cómo recupera luego de un crash?
-\item \textbf{Strangler.} Debe incluir baseline, routing, rollback y stop criteria. Pregunta oral: ¿quién es owner durante coexistencia?
-\item \textbf{Readiness.} Debe priorizar capacidades técnicas y humanas. Pregunta oral: ¿qué señal indica que el on-call no escala?
-\item \textbf{Integración.} Debe defender tanto lo que se separa como lo que queda junto. Pregunta oral: ¿qué evidencia cambiaría la frontera?
+\item ¿Qué evidencia muestra que los estudiantes distinguieron capacidad de operación?
+\item ¿Dónde aparece participación de bajo riesgo?
+\item ¿Cómo se recuperan conocimientos de Clases 07 y 08?
+\item ¿Qué conceptos se formalizan después de una necesidad visible?
+\item ¿Cómo se comprueba aprendizaje más allá de repetir definiciones?
+\item ¿Cómo se conecta la clase con el Trabajo Final Integrador?
 \end{enumerate}
 
-\subsection{Errores que deben penalizarse explícitamente}
+\subsection{Criterios de evaluación formativa}
+Una respuesta lograda contiene: necesidad, invariante/dato, falla concreta, mecanismo, costo y métrica. Una respuesta avanzada compara con una alternativa simple y declara cuándo revisaría la decisión.
 
-\begin{itemize}
-\item equiparar bounded context con microservicio;
-\item defender separación solo por moda o tamaño de código;
-\item permitir ownership compartido informal;
-\item tratar eventos como ausencia de acoplamiento;
-\item afirmar exactly-once global por usar outbox;
-\item llamar rollback a una compensación de negocio;
-\item presentar una saga sin estado durable, timeout o idempotencia;
-\item omitir observabilidad, on-call y rollback de migración.
-\end{itemize}
+\subsection{Matriz de corrección y preguntas de defensa}
+\begin{center}
+\begin{tabular}{p{0.25\textwidth}p{0.34\textwidth}p{0.31\textwidth}}
+\toprule
+\textbf{Dimensión} & \textbf{Evidencia} & \textbf{Pregunta de defensa} \\
+\midrule
+Problema & necesidad y baseline & ¿qué no resolvía lo unido? \\
+Regla & invariante y autoridad & ¿quién tiene la última palabra? \\
+Falla & timeout/crash concreto & ¿qué sabe cada actor? \\
+Mecanismo & estado durable y recuperación & ¿desde dónde reanuda? \\
+Costo & red, atraso, operación & ¿qué empeora? \\
+Métrica & SLI/SLO y autonomía & ¿qué dato refutaría el diseño? \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\subsection{Criterio docente de corrección}
-La respuesta excelente identifica una presión concreta para separar, conserva invariantes locales y diseña operación. Es insuficiente responder con slogans de microservicios o eventos.
-
-\subsection{Evidencias que conviene conservar}
-
-\begin{itemize}
-\item una fotografía o exportación del timeline, matriz o diagrama construido por el curso;
-\item resultados anónimos del diagnóstico inicial y del exit ticket;
-\item una respuesta estudiantil con feedback que muestre revisión conceptual;
-\item la conexión entre la actividad del aula y una decisión del Trabajo Final;
-\item un registro breve del tiempo real utilizado por bloque y del ajuste realizado para la clase siguiente.
-\end{itemize}
-
-\subsection{Checklist del día de la auditoría}
-
-\begin{enumerate}
-\item escribir la pregunta central y el mapa de la clase antes de comenzar;
-\item pedir una predicción individual antes de abrir la discusión;
-\item hacer visible una representación producida por estudiantes;
-\item formalizar después de la intuición y explicitar el límite de la analogía;
-\item cerrar cada núcleo con problema, garantía, costo y evidencia;
-\item proteger al menos ocho minutos para síntesis y exit ticket;
-\item recuperar en la clase siguiente una duda real recogida al cierre.
-\end{enumerate}
+\subsection{Trabajo Final Integrador}
+Pida que cada equipo incluya un canvas de frontera, una ejecución adversarial, un diseño de outbox/saga si corresponde, una ruta de migración y una métrica de revisión. La cantidad de servicios no se evalúa; se evalúa la coherencia de las decisiones.
 
 \end{document}
