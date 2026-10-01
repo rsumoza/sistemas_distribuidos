@@ -1,37 +1,54 @@
 % !TeX encoding = UTF-8
 \documentclass[institutional,screen,none]{ua-engineering-v6-beamer}
 \input{../config/course-config}
+\usepackage{array}
 \UASetSemester{Segundo cuatrimestre 2026}
 \UASetDate{2026}
 
+\usetikzlibrary{positioning,arrows.meta,calc,fit,backgrounds,shapes.geometric}
+
+\hyphenpenalty=9000
+\exhyphenpenalty=9000
+\tolerance=1800
+\emergencystretch=1.2em
+
 \tikzset{
   uaBox/.style={draw=UAIngNavy,rounded corners=1.5mm,thick,fill=white,
-    minimum height=0.75cm,align=center,font=\scriptsize,inner sep=4pt},
+    minimum height=0.72cm,align=center,font=\scriptsize,inner sep=4pt},
   uaBoxO/.style={uaBox,draw=UAIngOrange,fill=UAIngPaper},
   uaSoft/.style={uaBox,draw=UAIngRule,fill=UAIngPaper},
+  uaDark/.style={uaBox,draw=UAIngNavy,fill=UAIngNavy,text=white},
   uaArrow/.style={->,very thick,>=Latex,draw=UAIngNavy},
-  uaArrowO/.style={->,very thick,>=Latex,draw=UAIngOrange}
+  uaArrowO/.style={->,very thick,>=Latex,draw=UAIngOrange},
+  uaDashed/.style={->,thick,dashed,>=Latex,draw=UAIngMuted},
+  uaTiny/.style={font=\tiny,align=center,text=UAIngText},
+  uaLabel/.style={font=\scriptsize,align=center,text=UAIngText},
+  uaEvent/.style={circle,fill=UAIngNavy,inner sep=2.2pt},
+  uaEventO/.style={circle,fill=UAIngOrange,inner sep=2.4pt}
 }
 
-
-% Etiqueta pedagógica visible. Se define localmente para no modificar el .sty
-% compartido ni el build de GitHub.
+% Etiqueta pedagógica local: no modifica el estilo compartido.
 \newcommand{\UASlideTag}[2]{%
   \begin{tikzpicture}[remember picture,overlay]
-    \node[anchor=north east,rounded corners=1mm,inner xsep=3pt,inner ysep=1.5pt,
-      draw=#2,fill=#2!8,text=#2,font=\fontsize{5.8}{6.4}\selectfont\bfseries]
+    \node[anchor=north east,rounded corners=1mm,
+      inner xsep=3pt,inner ysep=1.5pt,
+      draw=#2,fill=#2!8,text=#2,
+      font=\fontsize{5.8}{6.4}\selectfont\bfseries]
       at ([xshift=-0.72cm,yshift=-1.08cm]current page.north east) {#1};
   \end{tikzpicture}%
 }
 
+\newcommand{\SourceLine}[1]{\vfill{\tiny\color{UAIngMuted}Fuente / referencia: #1}}
+
 \UASetClassNumber{09}
 \UASetClassTitle{Arquitecturas distribuidas reales}
 \title{\UACourse}
-\subtitle{Clase 09 --- Monolito modular, microservicios, eventos, outbox y sagas}
+\subtitle{Clase 09 --- Fronteras de arquitectura:\\monolito modular, servicios, eventos, outbox y sagas}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
+
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -39,59 +56,305 @@
 \end{frame}
 }
 
-\begin{frame}{Cómo vamos a trabajar hoy}
+% =============================================================================
+% APERTURA: HISTORIA, ALCANCE Y VOCABULARIO
+% =============================================================================
+
+\begin{frame}{La historia que guiará toda la clase}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{uakeybox}
+Asteria Online es un mundo virtual medieval multijugador. Hoy no diseñaremos el juego completo: seguiremos una única compra para descubrir cuándo una separación arquitectónica ayuda y cuándo solo agrega red, fallas y operación.
+\end{uakeybox}
+
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.7cm] (a) {Intuición\\edificios y caminos};
-\node[uaBox,text width=2.7cm,right=of a] (b) {Fronteras\\dominio y ownership};
-\node[uaBoxO,text width=2.7cm,right=of b] (c) {Comunicación\\RPC y eventos};
-\node[uaBox,text width=2.7cm,right=of c] (d) {Consistencia\\outbox y sagas};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
+\begin{tikzpicture}[node distance=0.38cm]
+\node[uaBoxO,text width=2.15cm] (p) {Sofía\\jugadora};
+\node[uaBox,text width=2.15cm,right=of p] (m) {Mercado\\lista la espada};
+\node[uaBoxO,text width=2.15cm,right=of m] (i) {Inventario\\reserva y transfiere};
+\node[uaBox,text width=2.15cm,right=of i] (pay) {Pagos\\autoriza};
+\node[uaBoxO,text width=2.15cm,right=of pay] (r) {Ranking\\actualiza después};
+\draw[uaArrowO] (p)--(m);
+\draw[uaArrow] (m)--(i);
+\draw[uaArrowO] (i)--(pay);
+\draw[uaArrow] (pay)--(r);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Caso conductor}
-Asteria Online debe separar cuentas, mundo, combate, inventario, pagos, ranking y chat. La pregunta no es cuántos servicios crear, sino qué frontera compra autonomía suficiente para justificar el costo distribuido.
+
+\begin{block}{Objeto concreto}
+Sofía intenta comprar la pieza única \texttt{EspadaSolar\#17}. La compra involucra mercado, inventario, pago y efectos posteriores; el objeto no puede terminar con dos propietarios.
+\end{block}
+\end{frame}
+
+\begin{frame}[shrink=3]{El alcance: qué entra y qué queda fuera}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Analizaremos}
+\begin{itemize}
+\item catálogo y publicación de la pieza;
+\item reserva y propiedad en inventario;
+\item autorización del pago;
+\item ranking y notificaciones posteriores;
+\item equipos, puesta en producción, datos y fallas.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{No diseñaremos hoy}
+\begin{itemize}
+\item física y renderizado del mundo;
+\item protocolo de movimiento en tiempo real;
+\item emparejamiento de jugadores (matchmaking);
+\item detección de trampas (anti-cheat);
+\item infraestructura gráfica del cliente.
+\end{itemize}
+\end{block}
+\end{columns}
+\begin{uakeybox}
+Acotar el caso evita usar palabras grandes sobre un sistema indefinido. Cada decisión se justificará sobre esta compra y sus fallas.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{La compra de \texttt{EspadaSolar\#17}: historia completa}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.27cm]
+\node[uaBoxO,text width=1.75cm] (a) {1. Sofía\\pulsa comprar};
+\node[uaBox,text width=1.75cm,right=of a] (b) {2. Mercado\\valida oferta};
+\node[uaBoxO,text width=1.75cm,right=of b] (c) {3. Inventario\\reserva \#17};
+\node[uaBox,text width=1.75cm,right=of c] (d) {4. Pagos\\autoriza};
+\node[uaBoxO,text width=1.75cm,right=of d] (e) {5. Inventario\\transfiere propietario};
+\node[uaBox,text width=1.75cm,right=of e] (f) {6. Ranking y\\notificación};
+\draw[uaArrow] (a)--(b);
+\draw[uaArrowO] (b)--(c);
+\draw[uaArrow] (c)--(d);
+\draw[uaArrowO] (d)--(e);
+\draw[uaArrow] (e)--(f);
+\end{tikzpicture}
+\end{center}
+
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{No puede romperse}
+\begin{itemize}
+\item la pieza tiene como máximo un propietario;
+\item no se cobra dos veces el mismo intento;
+\item una compra confirmada no desaparece.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Puede demorarse}
+\begin{itemize}
+\item el ranking;
+\item la notificación;
+\item una vista de analítica;
+\item el historial derivado.
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Vocabulario intuitivo I: dominio, capacidad e invariante}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.17}
+\begin{tabular}{p{0.18\textwidth}p{0.34\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Concepto} & \textbf{Idea intuitiva} & \textbf{Ejemplo en Asteria Online} \\
+\midrule
+\textbf{Dominio} & Parte de la realidad con problemas, reglas y palabras propias. & El comercio de objetos incluye ofertas, vendedores, compradores, precios y ventas. \\
+\textbf{Capacidad} & Responsabilidad estable que el negocio necesita sostener. Agrupa reglas, datos y varias operaciones; no es una acción aislada. & \textbf{Gestionar la propiedad}: reservar, transferir, liberar y consultar quién posee una pieza. \\
+\textbf{Invariante} & Regla que debe seguir siendo verdadera en todo estado válido. & \texttt{EspadaSolar\#17} tiene como máximo un propietario y un intento no se cobra dos veces. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Primero identificamos una responsabilidad y la regla que debe preservar. Recién después decidimos si se implementará como módulo, proceso o servicio.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}[shrink=3]{Vocabulario intuitivo II: frontera y dato autoritativo}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\small
+\begin{block}{Frontera}
+Límite explícito que separa dos ámbitos del sistema. Indica qué responsabilidades, reglas y datos quedan de cada lado y por qué puertas se permite interactuar.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=3.0cm]
+\node[uaBoxO,text width=3.1cm] (inv) {\textbf{Inventario}\\propiedad y reserva de \#17};
+\node[uaBox,text width=3.1cm,right=of inv] (market) {\textbf{Mercado}\\oferta, vendedor y precio};
+\draw[very thick,dashed,UAIngOrange] ($(inv.east)!0.5!(market.west)+(0,-1.0)$)--($(inv.east)!0.5!(market.west)+(0,1.0)$);
+\node[uaTiny,text=UAIngOrange] at ($(inv.east)!0.5!(market.west)+(0,1.17)$) {frontera};
+\draw[uaArrow] (market.west)--node[above,uaTiny]{API / comando}(inv.east);
+\draw[uaArrowO] (inv.south east) to[bend right=18] node[below,uaTiny]{evento confirmado}(market.south west);
+\end{tikzpicture}
+\end{center}
+\begin{uainfo}
+Inventario conserva el dato autoritativo sobre el propietario. Mercado no lo modifica directamente: cruza la frontera por una operación permitida o consume un hecho ya confirmado.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Vocabulario intuitivo III: autoridad y responsabilidad}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.16}
+\begin{tabular}{p{0.20\textwidth}p{0.35\textwidth}p{0.35\textwidth}}
+\toprule
+\textbf{Concepto} & \textbf{Definición de trabajo} & \textbf{En Asteria} \\
+\midrule
+\textbf{Autoridad} & Componente con la última palabra sobre un hecho de negocio determinado. & Inventario decide quién es el propietario válido de \texttt{EspadaSolar\#17}. \\
+\textbf{Responsabilidad} (ownership) & Equipo que puede cambiar reglas y datos y que responde por métricas, incidentes y recuperación. & El equipo de Inventario mantiene el invariante de propiedad y atiende una duplicación. \\
+\textbf{Dato autoritativo} & Registro reconocido como verdad oficial para decidir. & \texttt{propietario(\#17)=Sofía}; Ranking mantiene una vista derivada. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Autoridad responde \textbf{quién decide el hecho}; responsabilidad responde \textbf{quién sostiene esa decisión durante toda la vida del sistema}.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Vocabulario intuitivo IV: versión y puesta en producción}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.17}
+\begin{tabular}{p{0.22\textwidth}p{0.35\textwidth}p{0.34\textwidth}}
+\toprule
+\textbf{Término} & \textbf{Definición de trabajo} & \textbf{Pregunta observable} \\
+\midrule
+\textbf{Unidad de publicación} & Conjunto de componentes que se publica, actualiza o retira como una misma versión. & ¿Mercado e Inventario deben salir siempre juntos? \\
+\textbf{Puesta en producción} & Hacer que una versión atienda tráfico real. & ¿Ranking puede publicar una versión sin volver a publicar Inventario? \\
+\textbf{Vuelta atrás de versión} (rollback) & Retirar una versión problemática y regresar tráfico o software a una versión conocida. & ¿Podemos volver sin interrumpir las compras? \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uawarn}
+Volver el software a una versión anterior no deshace pagos, eventos ni transferencias de propiedad ya confirmadas. Esos efectos requieren reparación de negocio.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Vocabulario intuitivo V: autonomía}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\scriptsize
+\begin{block}{Definición de trabajo}
+La \textbf{autonomía} es el grado en que una parte puede cambiar, publicar una versión, escalar o recuperarse sin obligar al resto a hacerlo al mismo tiempo.
+\end{block}
+\begin{center}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{p{0.24\textwidth}p{0.63\textwidth}}
+\toprule
+\textbf{Dimensión} & \textbf{Pregunta observable en Asteria} \\
+\midrule
+Cambio & ¿Inventario puede modificar su lógica sin exigir cambios simultáneos en Mercado? \\
+Puesta en producción & ¿Ranking puede salir o volver atrás sin volver a publicar Inventario? \\
+Escalado & ¿Ranking puede agregar recursos durante un torneo sin escalar también Pagos? \\
+Recuperación & ¿Una falla de Ranking puede resolverse sin detener la compra? \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Separar no crea autonomía por sí solo: una base compartida, versiones coordinadas o un equipo sin capacidad operativa pueden mantener el acoplamiento.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Dos formas de ejecutar una secuencia de trabajo}
+\UASlideTag{VOCABULARIO PREVIO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Cadena sincrónica}
+La petición espera una respuesta antes de continuar:
+
+\[
+A\rightarrow B\rightarrow C\rightarrow D
+\]
+
+Si C tarda o falla, A todavía no puede terminar.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Continuación asíncrona}
+Un hecho durable permite que otros continúen después:
+
+\[
+A\rightarrow log\Rightarrow\{C,D,E\}
+\]
+
+A no espera a todos los lectores.
+\end{block}
+\end{columns}
+\begin{uainfo}
+No son estilos universales. Una autorización de pago puede necesitar respuesta inmediata; actualizar ranking normalmente no.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Cómo vamos a recorrer la historia}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.20cm]
+\node[uaBoxO,text width=2.02cm] (a) {1. Comprender\\el sistema actual};
+\node[uaBox,text width=2.02cm,right=of a] (b) {2. Dibujar\\fronteras};
+\node[uaBoxO,text width=2.02cm,right=of b] (c) {3. Cruzar\\la red};
+\node[uaBox,text width=2.02cm,right=of c] (d) {4. Preservar\\integridad};
+\node[uaBoxO,text width=2.02cm,right=of d] (e) {5. Migrar y\\operar};
+\draw[uaArrow] (a)--(b);
+\draw[uaArrowO] (b)--(c);
+\draw[uaArrow] (c)--(d);
+\draw[uaArrowO] (d)--(e);
+\end{tikzpicture}
+\end{center}
+
+\begin{block}{Pregunta que une la clase}
+¿Qué beneficio concreto obtiene cada separación y qué nueva falla, latencia, dato duplicado o responsabilidad operacional introduce?
 \end{block}
 \end{frame}
 
 \begin{frame}{Evidencias de aprendizaje que produciremos}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{columns}[T]
 \column{0.48\textwidth}
 \begin{block}{Durante la clase}
 \begin{itemize}
-\item evaluar una frontera con capacidad, invariante y owner;
-\item calcular la prima de una cadena sincrónica;
-\item mover un crash por el dual write.
+\item delimitar una capacidad y su dato autoritativo;
+\item transformar una llamada local en una cadena sincrónica;
+\item mover un crash por un dual write;
+\item localizar qué invariante deja de ser local.
 \end{itemize}
 \end{block}
 \column{0.48\textwidth}
 \begin{block}{Al cerrar}
 \begin{itemize}
+\item justificar una frontera con evidencia;
 \item diseñar outbox e idempotencia;
-\item modelar una saga durable y sus compensaciones;
-\item proponer una migración reversible con métricas.
+\item modelar una saga durable;
+\item proponer una migración reversible y métricas.
 \end{itemize}
 \end{block}
 \end{columns}
-\begin{uakeybox}
-Una frontera solo se aprueba si compra autonomía medible y si el equipo puede operar las fallas que introduce.
-\end{uakeybox}
 \end{frame}
 
+% =============================================================================
+% PUENTE Y SISTEMA ACTUAL
+% =============================================================================
 
-\UASectionSlide{De la consistencia del dato\\a la frontera del sistema}
+\UASectionSlide{De una regla local\\a una coordinación entre fronteras}
 
-\begin{frame}{Puente desde la clase 8}
+\begin{frame}{Puente desde la Clase 08: ¿cuándo hace falta un protocolo?}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Cada dato exige una decisión distinta de consistencia, disponibilidad y latencia.
-\item Una arquitectura distribuye esas decisiones entre módulos, servicios y equipos.
-\item Mover una frontera cambia qué invariantes son locales y cuáles requieren protocolo.
-\end{itemize}
+\small
+\begin{block}{Regla local}
+Si una sola autoridad posee el dato, puede preservar el invariante dentro de una transacción local: Inventario decide quién posee \texttt{EspadaSolar\#17}.
+\end{block}
+\begin{block}{Regla distribuida}
+Si la decisión atraviesa procesos independientes, hace falta un \textbf{protocolo de coordinación}: una secuencia acordada de mensajes, estados durables, IDs, timeouts, retries y reglas de recuperación.
+\end{block}
 \begin{uakeybox}
-La pregunta de hoy es: ``¿qué complejidad distribuida estamos comprando y qué autonomía real recibimos a cambio?''.
+Mover una frontera no elimina la regla de negocio: transforma una transacción local en un protocolo que debe sobrevivir fallas parciales.
 \end{uakeybox}
 \end{frame}
 
@@ -99,705 +362,1460 @@ La pregunta de hoy es: ``¿qué complejidad distribuida estamos comprando y qué
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
 \begin{enumerate}
-\item Un monolito es necesariamente una bola de barro.
+\item Un monolito termina necesariamente como una maraña de dependencias.
 \item Un microservicio es una clase de negocio expuesta por HTTP.
+\item Separar procesos vuelve independientes a los equipos automáticamente.
 \item Publicar un evento después de guardar en la base resuelve el dual write.
-\item Una compensación de saga equivale a un rollback perfecto.
-\item Más servicios implican automáticamente más disponibilidad.
+\item Una compensación de saga equivale a deshacer perfectamente la operación.
 \end{enumerate}
 \begin{block}{Consigna}
-Vote V/F. Volveremos al final con casos, timelines y métricas.
+Vote V/F. No busque todavía la definición perfecta: anote qué palabra le genera desconfianza.
 \end{block}
 \end{frame}
 
-\begin{frame}{Caso conductor: Asteria Online}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}[t]{Módulo, proceso, servicio y microservicio no son sinónimos}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.30cm]
-\node[uaBoxO,text width=1.75cm] (acc) {Cuentas};
-\node[uaBox,text width=1.65cm,right=of acc] (world) {Mundo};
-\node[uaBoxO,text width=1.65cm,right=of world] (combat) {Combate};
-\node[uaBox,text width=1.65cm,right=of combat] (inv) {Inventario};
-\node[uaBoxO,text width=1.75cm,right=of inv] (pay) {Pagos};
-\node[uaBox,text width=1.65cm,right=of pay] (rank) {Ranking};
+\renewcommand{\arraystretch}{1.16}
+\begin{tabular}{p{0.18\textwidth}p{0.36\textwidth}p{0.34\textwidth}}
+\toprule
+\textbf{Término} & \textbf{Qué es} & \textbf{Ejemplo} \\
+\midrule
+Módulo & frontera de código en una aplicación; expone una interfaz interna y oculta detalles. & módulo Inventario dentro del monolito. \\
+Proceso & programa en ejecución, con memoria y fallas propias. & una instancia ejecutando el servicio de Inventario. \\
+Servicio & capacidad accesible mediante un contrato, normalmente a través de red. & API —interfaz explícita de operaciones permitidas— para reservar o consultar una pieza. \\
+Microservicio & servicio de una capacidad coherente, con despliegue y operación razonablemente independientes. & Ranking separado, operado por un equipo y alimentado por eventos. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Punto de partida: Asteria funciona como una aplicación modular}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.25cm]
+\node[uaBoxO,text width=1.62cm] (acc) {Cuentas};
+\node[uaBox,text width=1.62cm,right=of acc] (market) {Mercado};
+\node[uaBoxO,text width=1.62cm,right=of market] (inv) {Inventario};
+\node[uaBox,text width=1.62cm,right=of inv] (pay) {Pagos};
+\node[uaBoxO,text width=1.62cm,right=of pay] (rank) {Ranking};
+\node[uaBox,text width=1.62cm,right=of rank] (chat) {Chat};
+\node[draw=UAIngNavy,rounded corners=2mm,fit=(acc)(market)(inv)(pay)(rank)(chat),inner sep=6pt,
+      label={[uaTiny]above:una aplicación que se publica como una unidad}] {};
 \end{tikzpicture}
 \end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Lo que funciona bien}
 \begin{itemize}
-\item Combate necesita baja latencia y autoridad por zona.
-\item Inventario debe impedir duplicación de objetos.
-\item Ranking tolera atraso.
-\item Pagos requieren trazabilidad e idempotencia.
-\item Chat puede degradarse sin detener el mundo.
+\item llamadas y transacciones locales;
+\item diagnóstico y vuelta atrás unificados;
+\item cambios cruzados simples;
+\item fronteras fáciles de refactorizar.
 \end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Señales de que empieza a quedar corto}
+\begin{itemize}
+\item Ranking provoca picos de carga;
+\item Pagos exige controles propios;
+\item Combate crece por zonas;
+\item los equipos se bloquean para publicar cambios.
+\end{itemize}
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}[t]{La escala de Asteria cambia la escena}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\small
+\begin{block}{Supuesto para seguir la historia}
+Sofía ya no compra en un mundo con pocos jugadores. Hay muchos compradores en distintas regiones, torneos que disparan consultas a Ranking y más ofertas que se publican a la vez.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Cambian las cargas}
+Catálogo y Ranking reciben muchas lecturas; las compras modifican ofertas y reservas. Esas capacidades no crecen al mismo ritmo.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{La regla sigue siendo la misma}
+Sofía y otro jugador pueden intentar comprar \texttt{\#17} a la vez. Inventario debe decidir una única reserva válida antes de transferirla.
+\end{block}
+\end{columns}
+\vspace{0.09cm}
+\noindent\textbf{Conclusión:} más usuarios exigen escalar; separar capacidades requiere un límite medido.
+\end{frame}
+
+\begin{frame}[t,shrink=2]{Primeras respuestas sin separar capacidades}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.13}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.22\textwidth}>{\raggedright\arraybackslash}p{0.31\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}}
+\toprule
+\textbf{Presión observable} & \textbf{Respuesta dentro de la aplicación modular} & \textbf{Costo y límite} \\
+\midrule
+Más solicitudes & réplicas del proceso y balanceo de tráfico & se replica toda la aplicación; la base puede seguir saturada \\
+Muchas lecturas & caché de catálogo y vistas de Ranking & invalidación y lecturas atrasadas; la compra revalida la oferta \\
+Torneos exigentes & diferir cálculos de Ranking y limitar su uso de recursos & cola, atraso y trabajo de recuperación; puede persistir la contención \\
+Compras simultáneas & reserva condicional en la base de Inventario & contención en la pieza; medir espera y conflictos \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.15cm}
+\noindent\textbf{Criterio:} separar si estas medidas no alcanzan para cumplir el p99 de compra, aislar la carga o mejorar el tiempo hasta producción.
+\end{frame}
+
+\begin{frame}{Antes de separar: ¿qué problema concreto queremos resolver?}
+\UASlideTag{CRITERIO DE DECISIÓN}{UAIngOrange}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.14}
+\begin{tabular}{p{0.28\textwidth}p{0.34\textwidth}p{0.29\textwidth}}
+\toprule
+\textbf{Necesidad observable} & \textbf{Límite del diseño actual} & \textbf{Evidencia} \\
+\midrule
+Carga diferente & el torneo de Ranking vuelve lenta la compra & CPU, cola y p99 por capacidad \\
+Ritmos de cambio & un cambio de Ranking espera la publicación global & tiempo hasta producción y coordinaciones \\
+Aislamiento de fallas & una falla secundaria afecta el camino de compra & alcance del incidente \\
+Seguridad o regulación & Pagos necesita permisos, auditoría y secretos específicos & incidentes y controles \\
+Responsabilidad de equipos & nadie opera una parte sin pedir permiso a otros & bloqueos y tickets cruzados \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Una \textbf{necesidad concreta de separación} es una limitación observable que la modularidad interna ya no resuelve suficientemente. Sin problema, evidencia e hipótesis de mejora, distribuir es solo agregar complejidad.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}[shrink=4]{La analogía del edificio: mapeo explícito}
+\UASlideTag{INTUICIÓN}{UAIngOrange}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[x=1cm,y=1cm]
+\draw[thick,UAIngNavy,rounded corners] (0,0) rectangle (8.7,2.25);
+\draw[thick,UAIngOrange] (2.9,0)--(2.9,2.25);
+\draw[thick,UAIngNavy] (5.8,0)--(5.8,2.25);
+\node[align=center] at (1.45,1.10){Mercado\\módulo};
+\node[align=center] at (4.35,1.10){Inventario\\módulo};
+\node[align=center] at (7.25,1.10){Pagos\\módulo};
+\node[above,font=\bfseries] at (4.35,2.35){edificio = una versión publicada como conjunto};
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.24\textwidth}\begin{block}{Edificio}Aplicación que se publica como una unidad.\end{block}
+\column{0.24\textwidth}\begin{block}{Habitación}Módulo con responsabilidad definida.\end{block}
+\column{0.24\textwidth}\begin{block}{Puerta}API interna permitida.\end{block}
+\column{0.24\textwidth}\begin{block}{Pared}Regla que impide tocar internals o tablas ajenas.\end{block}
+\end{columns}
+\begin{uakeybox}
+Compartir un proceso simplifica comunicación y transacciones. El problema no es publicar los módulos juntos, sino perder las fronteras internas que separan responsabilidades y regulan cómo interactúan.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}[shrink=2]{¿Qué significa separar en este caso?}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.90cm]
+\node[uaBoxO,text width=2.35cm] (m) {Mercado\\proceso y versión propios};
+\node[uaBox,text width=2.35cm,right=of m] (i) {Inventario\\autoridad de propiedad};
+\node[uaBoxO,text width=2.35cm,right=of i] (p) {Pagos\\controles y proveedor};
+\draw[uaArrow] (m)--node[above,uaTiny]{red + contrato}(i);
+\draw[uaArrowO] (i)--node[above,uaTiny]{red + contrato}(p);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Puede habilitar}
+\begin{itemize}
+\item publicar versiones por separado;
+\item escalar solo la parte exigida;
+\item limitar el alcance de una falla;
+\item asignar responsabilidad completa.
+\end{itemize}
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{No lo garantiza}
+\begin{itemize}
+\item una base compartida mantiene acoplamiento;
+\item versiones coordinadas eliminan independencia;
+\item contratos frágiles obligan a cambiar juntos;
+\item sin responsable de incidentes no hay autonomía operativa.
+\end{itemize}
+\end{block}
+\end{columns}
+\begin{uainfo}
+Separar es una hipótesis: aceptamos red y fallas parciales para intentar obtener una independencia medible. Debe comprobarse con evidencia.
+\end{uainfo}
 \end{frame}
 
 \begin{frame}{Predicción individual: ¿dónde pondría la primera frontera?}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \begin{uainfo}
-Elija una capacidad de Asteria que mantendría dentro del monolito y una que separaría. Escriba una sola razón de negocio y una sola consecuencia operativa para cada decisión.
+Elija una capacidad de Asteria que mantendría dentro de la aplicación y una que separaría. Para cada una escriba:
+\begin{enumerate}
+\item una necesidad concreta;
+\item una autonomía que espera obtener;
+\item una falla nueva que aparecería.
+\end{enumerate}
 \end{uainfo}
-\vspace{0.25cm}
-Guarde la respuesta: volveremos a ella después de estudiar ownership, prima distribuida, outbox y sagas.
+\vspace{0.2cm}
+Guarde la respuesta: volveremos después de estudiar responsabilidad, comunicación, outbox y sagas.
 \end{frame}
 
-
-\begin{frame}{Cinco preguntas antes de dibujar cajas}
+\begin{frame}{Cinco preguntas antes de dibujar servicios}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.18cm]
-\node[uaBoxO,text width=1.98cm] (q1) {¿Qué capacidad\\de negocio?};
-\node[uaBox,text width=1.98cm,right=of q1] (q2) {¿Quién posee\\el dato?};
-\node[uaBoxO,text width=1.98cm,right=of q2] (q3) {¿Qué invariante\\debe ser local?};
-\node[uaBox,text width=1.98cm,right=of q3] (q4) {¿Qué falla nueva\\aparece?};
-\node[uaBoxO,text width=1.98cm,right=of q4] (q5) {¿Qué autonomía\\se gana?};
-\draw[uaArrow] (q1)--(q2); \draw[uaArrowO] (q2)--(q3); \draw[uaArrow] (q3)--(q4); \draw[uaArrowO] (q4)--(q5);
+\begin{tikzpicture}[node distance=0.17cm]
+\node[uaBoxO,text width=2.02cm] (q1) {1. ¿Qué capacidad\\y regla contiene?};
+\node[uaBox,text width=2.02cm,right=of q1] (q2) {2. ¿Quién puede\\cambiar el dato?};
+\node[uaBoxO,text width=2.02cm,right=of q2] (q3) {3. ¿Qué necesita\\respuesta ahora?};
+\node[uaBox,text width=2.02cm,right=of q3] (q4) {4. ¿Qué falla\\agrega la red?};
+\node[uaBoxO,text width=2.02cm,right=of q4] (q5) {5. ¿Qué independencia\\podemos medir?};
+\draw[uaArrow] (q1)--(q2);
+\draw[uaArrowO] (q2)--(q3);
+\draw[uaArrow] (q3)--(q4);
+\draw[uaArrowO] (q4)--(q5);
 \end{tikzpicture}
 \end{center}
 \end{frame}
 
-\UASectionSlide{Primero la intuición: edificios,\\caminos y propietarios}
+% =============================================================================
+% SEMÁNTICA, BOUNDED CONTEXTS Y OWNERSHIP
+% =============================================================================
 
-\begin{frame}{Monolito modular: un edificio con habitaciones claras}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[x=1cm,y=1cm]
-\draw[thick,UAIngNavy,rounded corners] (0,0) rectangle (9,3.5);
-\draw[thick,UAIngOrange] (3,0)--(3,3.5);
-\draw[thick,UAIngNavy] (6,0)--(6,3.5);
-\node[align=center] at (1.5,1.75){Cuentas\\módulo};
-\node[align=center] at (4.5,1.75){Mundo\\módulo};
-\node[align=center] at (7.5,1.75){Inventario\\módulo};
-\node[above,font=\bfseries] at (4.5,3.6){una unidad de despliegue};
-\end{tikzpicture}
-\end{center}
-\begin{block}{Intuición}
-Compartir edificio simplifica transacciones, debugging y despliegue. La calidad depende de paredes internas reales, no del número de procesos.
-\end{block}
-\end{frame}
+\UASectionSlide{Primero el significado:\\contextos y responsabilidades}
 
-\begin{frame}{Microservicios: edificios separados conectados por caminos}
+\begin{frame}{Contexto delimitado: una misma palabra puede nombrar cosas distintas}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.8cm]
-\node[uaBoxO,text width=2.2cm] (a) {Cuentas\\equipo A};
-\node[uaBox,text width=2.2cm,right=1.4cm of a] (b) {Mundo\\equipo B};
-\node[uaBoxO,text width=2.2cm,right=1.4cm of b] (c) {Inventario\\equipo C};
-\draw[uaArrow] (a)--node[above,font=\scriptsize]{red}(b);
-\draw[uaArrowO] (b)--node[above,font=\scriptsize]{red}(c);
-\end{tikzpicture}
-\end{center}
-\begin{uakeybox}
-Separar compra autonomía de despliegue, escala y ownership. El precio son caminos: latencia, fallas parciales, contratos, observabilidad y seguridad.
-\end{uakeybox}
-\end{frame}
-
-\begin{frame}{Bounded context: cada barrio tiene su diccionario}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tabular}{p{0.21\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
+\begin{tabular}{p{0.15\textwidth}p{0.20\textwidth}p{0.52\textwidth}}
 \toprule
-Palabra & Contexto & Significado \\
+\textbf{Palabra} & \textbf{Contexto} & \textbf{Significado exacto en ese contexto} \\
 \midrule
-Jugador & Combate & posición, vida, cooldown \\
-Jugador & Facturación & cuenta, moneda, impuestos \\
-Objeto & Inventario & propiedad, cantidad, versión \\
-Objeto & Catálogo & nombre, rareza, precio base \\
+Objeto & Catálogo & tipo de pieza: nombre, rareza y atributos base de \texttt{EspadaSolar} \\
+Objeto & Inventario & instancia única \texttt{\#17}: propietario, estado y versión \\
+Objeto & Mercado & oferta de venta: vendedor, precio, moneda y estado de publicación \\
+Objeto & Combate & arma equipada: estadísticas efectivas, durabilidad y tiempo de reutilización \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{block}{Intuición}
-Forzar un modelo universal es como imponer un único diccionario a toda la ciudad. Traducir entre contextos hace explícitas las diferencias.
-\end{block}
+\begin{uakeybox}
+Un \textbf{bounded context} o \textbf{contexto delimitado} es una frontera dentro de la cual el vocabulario, el modelo y las reglas mantienen un significado coherente.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Un bounded context no obliga a crear un proceso}
+\begin{frame}{Por qué no conviene un único objeto universal}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Es primero una frontera semántica: vocabulario, modelo e invariantes coherentes.
-\item Puede implementarse como módulo dentro de un monolito o como servicio desplegable.
-\item La distribución física se justifica después por escala, cadencia, ownership o aislamiento.
-\end{itemize}
-\begin{alertblock}{Error de diseño}
-Convertir cada sustantivo o cada contexto en un microservicio antes de demostrar el beneficio produce fronteras costosas y frágiles.
-\end{alertblock}
-\end{frame}
-
-
-\begin{frame}{Ownership: una oficina firma la verdad}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO,text width=2.5cm] (owner) {Inventario\\owner de items};
-\node[uaBox,text width=2.2cm,right=1.2cm of owner] (combat) {Combate\\consulta/equipa};
-\node[uaBox,text width=2.2cm,above right=0.4cm and 1.0cm of combat] (market) {Mercado\\reserva/transfiere};
-\node[uaBox,text width=2.2cm,below right=0.4cm and 1.0cm of combat] (rank) {Ranking\\solo observa};
-\draw[uaArrow] (combat)--(owner); \draw[uaArrowO] (market)--(owner); \draw[uaArrow] (owner)--(rank);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Regla intuitiva}
-Un dato crítico necesita un owner claro. Los demás piden acciones o consumen hechos; no escriben silenciosamente las tablas internas del owner.
-\end{block}
-\end{frame}
-
-\begin{frame}{RPC: una llamada telefónica que exige respuesta ahora}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.8cm]
-\node[uaBoxO] (a) {Checkout};
-\node[uaBox,text width=2.5cm,right=2.0cm of a] (b) {Pagos};
-\draw[uaArrow] (a)--node[above,font=\scriptsize]{authorize}(b);
-\draw[uaArrowO] (b)--node[below,font=\scriptsize]{sí / no / timeout}(a);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Causalidad explícita y respuesta en el camino crítico.
-\item Latencia y disponibilidad de la dependencia se heredan.
-\item Timeouts, retries e idempotencia vuelven a aparecer.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Evento: publicar un hecho en un tablero durable}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{center}
 \begin{tikzpicture}[node distance=0.55cm]
-\node[uaBoxO] (p) {Orders};
-\node[uaBox,text width=2.2cm,right=of p] (log) {\texttt{OrderConfirmed}};
-\node[uaBoxO,text width=2.0cm,above right=0.3cm and 0.8cm of log] (n) {Notificación};
-\node[uaBox,text width=2.0cm,right=0.8cm of log] (a) {Analytics};
-\node[uaBoxO,text width=2.0cm,below right=0.3cm and 0.8cm of log] (r) {Ranking};
-\draw[uaArrow] (p)--(log); \draw[uaArrowO] (log)--(n); \draw[uaArrow] (log)--(a); \draw[uaArrowO] (log)--(r);
+\node[uaBoxO,text width=2.15cm] (cat) {Catálogo\\plantilla};
+\node[uaBox,text width=2.15cm,right=of cat] (market) {Mercado\\oferta};
+\node[uaBoxO,text width=2.15cm,right=of market] (inv) {Inventario\\pieza \#17};
+\node[uaBox,text width=2.15cm,right=of inv] (combat) {Combate\\arma equipada};
+\draw[uaArrow] (cat)--node[above,uaTiny]{referencia}(market);
+\draw[uaArrowO] (market)--node[above,uaTiny]{item\_id}(inv);
+\draw[uaArrow] (inv)--node[above,uaTiny]{vista autorizada}(combat);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Intuición}
-El productor declara un hecho sin esperar a todos los lectores. Gana desacoplamiento temporal; paga orden parcial, duplicados, evolución de contratos y debugging distribuido.
+\begin{itemize}
+\item Catálogo puede cambiar atributos base sin modificar el historial de propiedad.
+\item Mercado puede cerrar una oferta sin borrar la instancia del inventario.
+\item Combate necesita una vista rápida, pero no debe convertirse en dueño de la pieza.
+\end{itemize}
+\begin{block}{Traducción explícita}
+Los contextos intercambian IDs, comandos y eventos; no comparten silenciosamente un objeto universal mutable.
 \end{block}
 \end{frame}
 
-\begin{frame}{Outbox: anotar la carta en el mismo libro antes de enviarla}
+
+
+\begin{frame}[shrink=2]{Un contexto delimitado no obliga a crear un proceso}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.6cm]
-\node[uaBoxO,text width=2.2cm] (svc) {Servicio};
-\node[uaBox,text width=2.4cm,right=of svc] (db) {Transacción local\\estado + outbox};
-\node[uaBoxO,text width=2.1cm,right=of db] (courier) {Mensajero\\repetible};
-\node[uaBox,text width=2.1cm,right=of courier] (broker) {Broker};
-\draw[uaArrow] (svc)--(db); \draw[uaArrowO] (db)--(courier); \draw[uaArrow] (courier)--(broker);
-\end{tikzpicture}
-\end{center}
+\begin{columns}[T]
+\column{0.47\textwidth}
+\begin{block}{Dentro de un monolito}
+\begin{itemize}
+\item módulo Inventario;
+\item API interna;
+\item esquema o espacio de nombres protegido;
+\item pruebas de arquitectura;
+\item transacción local.
+\end{itemize}
+\end{block}
+\column{0.49\textwidth}
+\begin{block}{Como servicio separado}
+\begin{itemize}
+\item proceso propio;
+\item API o mensajes de red;
+\item publicación de versión y escalado propios;
+\item datos bajo autoridad exclusiva;
+\item nuevas fallas parciales.
+\end{itemize}
+\end{block}
+\end{columns}
 \begin{uakeybox}
-El outbox no hace magia exactly-once: vuelve durable la intención de publicar y permite retry controlado con IDs y deduplicación.
+Primero se descubre la frontera semántica. La separación física se decide después, cuando existe una necesidad concreta que justifica asumir el costo adicional de distribuir.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Saga: un itinerario con acciones compensatorias}
+\begin{frame}{Responsabilidad: quién puede decidir la verdad sobre \texttt{\#17}}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.1cm] (s) {Reservar\\stock};
-\node[uaBox,text width=2.1cm,right=of s] (p) {Cobrar\\pago};
-\node[uaBoxO,text width=2.1cm,right=of p] (e) {Emitir\\entrega};
-\node[uaSoft,text width=2.1cm,below=0.8cm of s] (cs) {Liberar stock};
-\node[uaSoft,text width=2.1cm,below=0.8cm of p] (cp) {Reembolsar};
-\draw[uaArrow] (s)--(p); \draw[uaArrowO] (p)--(e);
-\draw[uaArrow,dashed] (p)--(cs); \draw[uaArrowO,dashed] (e)--(cp);
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaBoxO,text width=2.55cm] (auth) {Inventario\\único que modifica el propietario};
+\node[uaBox,text width=2.15cm,left=1.05cm of auth] (market) {Mercado\\solicita reservar/transferir};
+\node[uaBox,text width=2.15cm,above right=0.25cm and 0.95cm of auth] (combat) {Combate\\consulta/equipa};
+\node[uaBox,text width=2.15cm,below right=0.25cm and 0.95cm of auth] (audit) {Auditoría\\consume transferencias};
+\draw[uaArrowO] (market)--(auth); \draw[uaArrow] (combat)--(auth); \draw[uaArrowO] (auth)--(audit);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Intuición}
-Una compensación es una nueva acción de negocio. Puede llegar tarde, fallar o no borrar efectos físicos ya visibles.
-\end{block}
+\begin{columns}[T]
+\column{0.31\textwidth}\begin{block}{Regla}Inventario define cuándo la pieza puede cambiar de dueño.\end{block}
+\column{0.31\textwidth}\begin{block}{Estado}Solo Inventario modifica el dato autoritativo.\end{block}
+\column{0.31\textwidth}\begin{block}{Equipo}Cambia la regla, observa métricas y atiende incidentes.\end{block}
+\end{columns}
 \end{frame}
 
-\UASectionSlide{Formalizar fronteras: autonomía,\\invariantes y prima distribuida}
-
-\begin{frame}{Arquitectura como asignación de responsabilidades}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-Una frontera está bien defendida si declara:
-\begin{enumerate}
-\item capacidad de negocio;
-\item owner del dato y del on-call;
-\item invariantes locales;
-\item contrato de entrada y salida;
-\item fallas toleradas;
-\item autonomía ganada;
-\item costo operacional aceptado.
-\end{enumerate}
-\begin{uawarn}
-``Kafka + Kubernetes + microservicios'' es una lista de tecnologías, no una arquitectura.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Monolito modular no significa bola de barro}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}[t]{Sofía y Leo compiten por la misma espada}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\small
 \begin{center}
-\begin{tabular}{p{0.27\textwidth}p{0.30\textwidth}p{0.30\textwidth}}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaBoxO,text width=2.15cm] (s) {Sofía\\\texttt{attempt=S}};
+\node[uaBox,text width=2.15cm,below=0.40cm of s] (l) {Leo\\\texttt{attempt=L}};
+\node[uaBoxO,text width=3.40cm,right=1.0cm of s,yshift=-0.50cm] (i) {Inventario\\reserva condicional atómica de \#17};
+\node[uaBox,text width=2.30cm,right=0.75cm of i] (r) {Una reserva OK\\la otra rechazada};
+\draw[uaArrowO] (s)--(i); \draw[uaArrow] (l)--(i); \draw[uaArrowO] (i)--(r);
+\end{tikzpicture}
+\end{center}
+\begin{block}{La decisión que protege el invariante}
+Inventario cambia \texttt{DISPONIBLE} a \texttt{RESERVADA(attempt)} solo si \texttt{\#17} todavía está disponible. La transacción serializa la competencia: una petición obtiene éxito y la otra debe elegir otra pieza.
+\end{block}
+\vspace{-0.12cm}
+\noindent\textbf{Timeout:} Sofía conserva el ID de intento al reintentar, para evitar otra compra lógica.
+\end{frame}
+
+\begin{frame}{Cuando el invariante cruza fronteras aparece un protocolo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.28cm]
+\node[uaBoxO,text width=1.82cm] (a) {Mercado\\crea intento};
+\node[uaBox,text width=1.82cm,right=of a] (b) {Inventario\\reserva \#17};
+\node[uaBoxO,text width=1.82cm,right=of b] (c) {Pagos\\autoriza};
+\node[uaBox,text width=1.82cm,right=of c] (d) {Inventario\\transfiere};
+\node[uaBoxO,text width=1.82cm,right=of d] (e) {Mercado\\confirma};
+\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d); \draw[uaArrowO] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Qué significa protocolo aquí}
+Secuencia explícita de mensajes, estados durables y reglas para continuar, reintentar o reparar cuando los participantes no comparten una transacción y alguno puede fallar.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{itemize}\item identidad de cada intento;\item autoridad de cada dato;\item estado que se guarda antes de responder;\end{itemize}
+\column{0.48\textwidth}\begin{itemize}\item significado de un timeout;\item política de reintento;\item reparación de efectos parciales.\end{itemize}
+\end{columns}
+\end{frame}
+
+% =============================================================================
+% MODULAR MONOLITH, MICROSERVICES AND DISTRIBUTED PREMIUM
+% =============================================================================
+
+\UASectionSlide{Aplicación modular o servicios separados:\\simplicidad o independencia medible}
+
+\begin{frame}[shrink=3]{Monolito modular: una solución, no una etapa vergonzosa}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{0.27\textwidth}p{0.31\textwidth}p{0.32\textwidth}}
 \toprule
-Dimensión & Modular monolith & Big ball of mud \\
+\textbf{Dimensión} & \textbf{Monolito modular} & \textbf{Aplicación enmarañada} \\
 \midrule
-Dependencias & reglas explícitas & cualquier módulo llama a todo \\
-Ownership & módulos y equipos claros & responsabilidad difusa \\
-Datos & acceso mediado & tablas compartidas sin límites \\
-Cambios & contratos internos & efectos impredecibles \\
+Dependencias & explícitas y verificables & cualquier parte llama a cualquier otra \\
+Datos & acceso mediante APIs internas & tablas compartidas sin autoridad \\
+Cambios & contratos y pruebas internas & efectos laterales impredecibles \\
+Responsabilidad & responsables claros & todos pueden cambiar todo \\
+Publicación & conjunta por decisión & conjunta porque nada puede separarse \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{block}{Caso real}
-Shopify ha documentado su trabajo para modularizar un gran monolito Rails y hacer visibles dependencias y componentes sin asumir que microservicios sean la única solución.
-\end{block}
-\end{frame}
-
-\begin{frame}{Cuándo el monolito modular es una ventaja}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Equipo pequeño y dominio todavía cambiante.
-\item Invariantes atraviesan varios módulos y necesitan transacción local.
-\item Escalado relativamente homogéneo.
-\item El costo de plataforma distribuida superaría el beneficio.
-\item Se necesita aprender las fronteras antes de congelarlas en red.
-\end{itemize}
 \begin{uakeybox}
-La simplicidad es una propiedad de arquitectura que debe defenderse, no una señal de inmadurez.
+Compartir un proceso simplifica comunicación y transacciones. El problema aparece cuando el código se vuelve una maraña sin límites internos, no por el mero hecho de publicar los módulos juntos.
 \end{uakeybox}
 \end{frame}
 
-\begin{frame}{Microservicio útil: autonomía verificable}
+\begin{frame}{Cuándo conviene mantener Asteria modular y unida}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{itemize}
-\item Capacidad de negocio coherente.
-\item Owner claro de comportamiento y datos.
-\item Despliegue y rollback independientes en la mayoría de los cambios.
-\item Escalado diferente y justificable.
-\item Contratos explícitos y observabilidad propia.
+\item El dominio todavía cambia y las fronteras no están maduras.
+\item El equipo es pequeño y modifica varios módulos en conjunto.
+\item La compra necesita invariantes que caben en una transacción local.
+\item La carga de los componentes todavía es parecida.
+\item El equipo aún no posee herramientas y guardias para operar muchos servicios.
 \end{itemize}
-\begin{alertblock}{No es}
-Una clase convertida en proceso, una tabla envuelta en HTTP o un servicio genérico que todos llaman para todo.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{La prima distribuida}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.2cm] (gain) {Autonomía\\escala / despliegue};
-\node[uaBox,text width=1.98cm,right=of gain] (rpc) {RPC\\timeouts / retries};
-\node[uaBoxO,text width=1.98cm,right=of rpc] (data) {Datos\\consistencia};
-\node[uaBox,text width=1.98cm,right=of data] (ops) {Operación\\tracing / on-call};
-\node[uaBoxO,text width=1.98cm,right=of ops] (sec) {Seguridad\\identidad / secretos};
-\draw[uaArrow] (gain)--(rpc); \draw[uaArrowO] (rpc)--(data); \draw[uaArrow] (data)--(ops); \draw[uaArrowO] (ops)--(sec);
-\end{tikzpicture}
-\end{center}
-\begin{block}{Decisión}
-Se paga la prima solo cuando autonomía, escala o organización producen un beneficio real y medible.
+\begin{block}{Ventaja de esperar}
+Refactorizar una frontera dentro del proceso es más barato que cambiarla cuando ya es una API de red, un esquema de eventos almacenado y una responsabilidad operativa independiente.
 \end{block}
 \end{frame}
 
-\begin{frame}{Disponibilidad compuesta: cada dependencia entra al camino crítico}
+\begin{frame}[shrink=8]{Qué independencia puede justificar una separación}
 \UASlideTag{NÚCLEO}{UAIngNavy}
-Si cuatro servicios independientes tienen disponibilidad $0.999$ y todos son necesarios:
+\small
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{0.27\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Independencia buscada} & \textbf{Evidencia concreta} \\
+\midrule
+Publicar versiones & Ranking sale o vuelve atrás sin coordinar Mercado ni Inventario \\
+Escalar & Ranking absorbe un torneo sin multiplicar recursos de Pagos \\
+Aislar fallas & una caída de Chat no interrumpe la compra \\
+Evolucionar datos & Inventario cambia internals sin acceso directo de otros componentes \\
+Responsabilidad de equipo & un grupo decide cambios y atiende incidentes de la capacidad \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uainfo}
+Separar no crea independencia automáticamente. Una base compartida, versiones coordinadas o contratos frágiles pueden dejar el sistema igual de acoplado, pero con red en el medio.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}[t]{Primera frontera: separar Ranking}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\small
+\begin{block}{Síntoma observado}
+El torneo carga CPU y base de datos compartidas: el p99 de compra sube. Ranking ya se calcula después de comprar, pero comparte recursos y versión publicada con Mercado.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Decisión y beneficio esperado}
+Ranking procesa compras confirmadas. Puede escalar y publicar versiones sin cargar el flujo de compra.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Costo que aceptamos}
+Entrega durable del evento, atraso de la vista, duplicados, reconstrucción, observabilidad y guardia del nuevo servicio.
+\end{block}
+\end{columns}
+\vspace{0.09cm}
+\noindent\textbf{Contrato:} Mercado publica \texttt{PurchaseConfirmed} con outbox e idempotencia.
+\end{frame}
+
+\begin{frame}{Sofía compra desde otra región}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Lecturas cercanas al jugador}
+Catálogo y Ranking pueden usar cachés o réplicas regionales. Sofía ve la oferta con menos latencia, aunque la copia puede estar atrasada.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Escritura bajo una autoridad}
+Antes de confirmar \texttt{\#17}, Mercado pide a Inventario reservarla. Esa operación necesita una decisión coordinada y puede sumar tiempo de red entre regiones.
+\end{block}
+\end{columns}
+\begin{uakeybox}
+Una oferta visible en caché no garantiza disponibilidad. La reserva autoritativa decide si Sofía gana; acercar lecturas no habilita dos propietarios.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{De llamada local a cadena sincrónica}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.30cm]
+\node[uaBoxO,text width=1.8cm] (api) {API de\\compra};
+\node[uaBox,text width=1.8cm,right=of api] (market) {Mercado};
+\node[uaBoxO,text width=1.8cm,right=of market] (inv) {Inventario};
+\node[uaBox,text width=1.8cm,right=of inv] (pay) {Pagos};
+\node[uaBoxO,text width=1.8cm,right=of pay] (notify) {Respuesta\\a Sofía};
+\draw[uaArrow] (api)--node[above,uaTiny]{espera}(market);
+\draw[uaArrowO] (market)--node[above,uaTiny]{espera}(inv);
+\draw[uaArrow] (inv)--node[above,uaTiny]{espera}(pay);
+\draw[uaArrowO] (pay)--node[above,uaTiny]{termina}(notify);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Definición}
+Una \textbf{cadena sincrónica} es un flujo donde la petición original no puede terminar hasta recibir las respuestas requeridas de varias dependencias sucesivas.
+\end{block}
+\begin{itemize}
+\item las latencias se acumulan;
+\item un timeout remoto es ambiguo;
+\item la disponibilidad del flujo depende de todos los participantes requeridos.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{El costo adicional de distribuir: qué aparece al cruzar la red}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.15cm]
+\node[uaBoxO,text width=1.78cm] (rpc) {Comunicación\\latencia y timeout};
+\node[uaBox,text width=1.78cm,right=of rpc] (retry) {Entrega\\retry e idempotencia};
+\node[uaBoxO,text width=1.78cm,right=of retry] (data) {Datos\\consistencia y copias};
+\node[uaBox,text width=1.78cm,right=of data] (contract) {Contratos\\compatibilidad};
+\node[uaBoxO,text width=1.78cm,right=of contract] (ops) {Operación\\trazas y guardias};
+\node[uaBox,text width=1.78cm,right=of ops] (sec) {Seguridad\\identidad y secretos};
+\end{tikzpicture}
+\end{center}
+\begin{block}{Regla económica}
+Aceptamos este costo solo cuando resuelve una necesidad concreta y la mejora puede medirse: menor tiempo hasta producción, escala separada, menor alcance de incidentes o reglas mejor aisladas.
+\end{block}
+\begin{uawarn}
+La red no elimina el acoplamiento: puede transformarlo en timeouts, contratos, duplicados y coordinación entre equipos.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Disponibilidad compuesta: una aproximación útil, no una ley}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+Si cuatro dependencias independientes son obligatorias y cada una está disponible el $99.9\%$:
 \[
-A_{camino}=0.999^4\approx 0.996
+A_{flujo}\approx 0.999^4\approx 0.996
 \]
-\begin{itemize}
-\item El cálculo es simplificado: las fallas pueden estar correlacionadas.
-\item La latencia de cola también se compone.
-\item Caching, degradación y asincronía pueden retirar dependencias del camino crítico.
-\end{itemize}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Qué muestra}
+Cada dependencia requerida puede bloquear el camino crítico.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Qué omite}
+Fallas correlacionadas, red, colas, retries, cachés, degradación y dependencia condicional.
+\end{block}
+\end{columns}
 \begin{uawarn}
-Más servicios no implican automáticamente mayor disponibilidad; pueden crear más puntos de espera y falla.
+Más procesos no implican más disponibilidad. El objetivo es retirar dependencias no críticas o permitir degradación, no multiplicar cajas.
 \end{uawarn}
 \end{frame}
 
-\begin{frame}{Monolito distribuido: pagar el costo sin ganar autonomía}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}[t]{La ruta crítica de la compra de Sofía}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO] (a) {A}; \node[uaBox,right=of a] (b) {B}; \node[uaBoxO,right=of b] (c) {C}; \node[uaBox,right=of c] (d) {D};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
-\node[uaSoft,text width=8.2cm,below=0.9cm of $(b)!0.5!(c)$] {base compartida + despliegue coordinado + cadena sincrónica};
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Servicios separados, pero cada cambio exige coordinar todos.
-\item Una base compartida permite acoplamiento invisible.
-\item Si falla un servicio, todo el flujo se detiene.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Caso real: modularidad antes de extraer}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\small
-Shopify ha descrito un enfoque de monolito modular con componentes y herramientas para hacer cumplir dependencias. También ha extraído componentes cuando una presión concreta —por ejemplo despliegue geográfico o performance— justificó la separación.
-\begin{itemize}
-\item Modificar fronteras dentro del proceso es más barato que hacerlo sobre red.
-\item La extracción es una decisión puntual, no una migración religiosa.
-\item Métrica: lead time, frecuencia de despliegue, rendimiento y blast radius.
-\end{itemize}
-{\scriptsize Fuentes: Shopify Engineering, artículos sobre modular monolith y componentización.}
-\end{frame}
-
-\begin{frame}{Caso real: Netflix y autonomía de escala}
-\UASlideTag{RESPALDO}{UAIngMuted}
-\small
-Netflix ha documentado sistemas donde servicios y pipelines tienen cargas, ciclos de cambio y estrategias de escalado diferentes. El beneficio aparece junto con una plataforma madura de despliegue, observabilidad y ownership.
-\begin{itemize}
-\item La independencia de despliegue requiere contratos compatibles.
-\item Escala técnica debe acompañar escala organizacional.
-\item Microservicios sin plataforma trasladan complejidad al equipo de producto.
-\end{itemize}
-{\scriptsize Fuente: Netflix TechBlog, casos de pipelines y event-driven systems.}
-\end{frame}
-
-\UASectionSlide{Comunicación: llamada,\\hecho y contrato}
-
-\begin{frame}{Comando, evento y consulta no son sinónimos}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tabular}{p{0.20\textwidth}p{0.31\textwidth}p{0.33\textwidth}}
+\renewcommand{\arraystretch}{1.14}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth}>{\raggedright\arraybackslash}p{0.27\textwidth}>{\raggedright\arraybackslash}p{0.28\textwidth}}
 \toprule
-Mensaje & Intención & Ejemplo Asteria \\
+\textbf{Paso antes de responder éxito} & \textbf{Resultado requerido} & \textbf{Costo si cruza procesos} \\
 \midrule
-Comando & pedir al owner que haga algo & \texttt{ReserveItem} \\
-Evento & declarar un hecho ocurrido & \texttt{ItemReserved} \\
-Consulta & solicitar información sin cambiar estado & \texttt{GetInventory} \\
+Mercado valida la oferta & intento aceptado & llamada y estado durable \\
+Inventario reserva \texttt{\#17} & exclusión de otros compradores & red, timeout y posible contención \\
+Pagos autoriza & respuesta del proveedor & latencia e incertidumbre de pago \\
+Inventario transfiere & Sofía queda propietaria & otra llamada y recuperación si falla \\
+Mercado confirma & compra y aviso pendientes en un COMMIT local & escritura local y posible reintento \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{alertblock}{Error frecuente}
-Nombrar un comando en pasado no lo convierte en evento. La semántica depende de quién puede rechazarlo y quién posee la decisión.
-\end{alertblock}
+\vspace{0.17cm}
+\noindent\textbf{Costo acumulado:} se suman las esperas obligatorias y los reintentos. Ranking y Notificaciones quedan fuera del camino crítico, con atraso medible.
 \end{frame}
 
-\begin{frame}{Elegir RPC o evento con una pregunta simple}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}{Muchos servicios, pero una sola unidad de cambio}
+\UASlideTag{ANTIPATRÓN}{UAIngOrange}
+\small
 \begin{center}
-\begin{tikzpicture}[node distance=0.7cm]
-\node[uaBoxO,text width=2.5cm] (q) {¿Necesito una respuesta\\para continuar ahora?};
-\node[uaBox,text width=2.6cm,below left=0.8cm and 1.1cm of q] (yes) {Sí\\RPC / comando};
-\node[uaBoxO,text width=2.6cm,below right=0.8cm and 1.1cm of q] (no) {No\\evento / trabajo async};
-\draw[uaArrow] (q)--node[left,font=\scriptsize]{camino crítico}(yes);
-\draw[uaArrowO] (q)--node[right,font=\scriptsize]{desacoplar}(no);
+\begin{tikzpicture}[node distance=0.42cm]
+\node[uaBoxO] (a) {Mercado}; \node[uaBox,right=of a] (b) {Inventario}; \node[uaBoxO,right=of b] (c) {Pagos}; \node[uaBox,right=of c] (d) {Ranking};
+\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
+\node[uaSoft,text width=8.7cm,below=0.82cm of $(b)!0.5!(c)$]{misma base + versiones coordinadas + modelos compartidos + cadena RPC obligatoria};
 \end{tikzpicture}
 \end{center}
-\begin{block}{Después preguntar}
-¿Qué ocurre si el receptor tarda, no existe, procesa dos veces o cambia su contrato?
+\begin{block}{Por qué se usa la expresión ``monolito distribuido''}
+Es una etiqueta crítica y paradójica: físicamente hay varios procesos y red, pero los cambios, datos y operación siguen comportándose como una única pieza inseparable.
 \end{block}
-\end{frame}
-
-\begin{frame}{Dual write: dos sistemas, una ventana de inconsistencia}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[x=1.1cm,y=0.9cm]
-\draw[->,thick] (0,0)--(8.5,0) node[right]{tiempo};
-\foreach \x/\lab in {1/{guardar orden},3/{COMMIT DB},4.5/{CRASH},6.5/{publicar evento}}{
-  \draw (\x,-0.12)--(\x,0.12); \node[above,align=center,font=\scriptsize] at (\x,0.18){\lab};
-}
-\draw[very thick,UAIngOrange] (4.5,0.9)--(4.5,-0.6);
-\node[uaSoft,text width=3.0cm] at (2.6,-1.0){estado confirmado};
-\node[uaSoft,text width=3.0cm] at (6.5,-1.0){evento ausente};
-\end{tikzpicture}
-\end{center}
-\begin{uawarn}
-Publicar primero solo invierte el problema: consumidores ven un evento de una transacción que podría abortar.
-\end{uawarn}
-\end{frame}
-
-\begin{frame}{Transactional outbox: frontera local coherente}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{center}
-\begin{tikzpicture}[node distance=0.6cm]
-\node[uaBoxO,text width=2.2cm] (cmd) {\texttt{ConfirmOrder}};
-\node[uaBox,text width=2.4cm,right=of cmd] (tx) {Una transacción\\order + outbox};
-\node[uaBoxO,text width=2.1cm,right=of tx] (relay) {Relay\\at-least-once};
-\node[uaBox,text width=2.2cm,right=of relay] (broker) {Broker\\event\_id};
-\draw[uaArrow] (cmd)--(tx); \draw[uaArrowO] (tx)--(relay); \draw[uaArrow] (relay)--(broker);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Estado e intención de publicar confirman juntos.
-\item El relay puede duplicar y debe reintentar.
-\item Consumidores necesitan deduplicación y contrato versionado.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{El contrato de evento es una API durable}
-\UASlideTag{NÚCLEO}{UAIngNavy}
-\begin{itemize}
-\item Queda retenido y puede ser leído por consumidores desconocidos al publicar.
-\item Cambiar semántica rompe replay histórico, no solo clientes actuales.
-\item Agregar campos opcionales suele ser más seguro que renombrar o reinterpretar.
-\item Debe existir owner, versión, compatibilidad y política de deprecación.
-\end{itemize}
 \begin{uakeybox}
-El desacoplamiento temporal aumenta la responsabilidad sobre el contrato, no la elimina.
+Se pagan latencia, timeouts y observabilidad distribuida sin obtener independencia. El nombre describe un antipatrón; no propone una arquitectura deseable.
 \end{uakeybox}
 \end{frame}
 
-\UASectionSlide{Sagas: consistencia de negocio\\sin rollback global}
+\begin{frame}{Casos reales: la forma depende de la necesidad}
+\UASlideTag{CASOS REALES}{UAIngOrange}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Shopify: reforzar límites internos}Una aplicación grande puede mejorar módulos y dependencias dentro del mismo proceso mientras publicar todo junto siga siendo aceptable.\end{block}
+\column{0.48\textwidth}\begin{block}{Netflix: servicios con plataforma madura}La separación puede tener sentido cuando cargas, equipos y ciclos son distintos y existen herramientas para publicar, observar y recuperar cada servicio.\end{block}
+\end{columns}
+\begin{uakeybox}
+Copiar la forma sin compartir la necesidad y la capacidad operativa produce complejidad sin beneficio. Primero se declara el problema; después se elige la estructura.
+\end{uakeybox}
+\SourceLine{Shopify Engineering; Netflix TechBlog; Fowler, Monolith First y Microservice Trade-Offs.}
+\end{frame}
 
-\begin{frame}{Saga de compra: camino feliz}
+% =============================================================================
+% COMMUNICATION
+% =============================================================================
+
+\UASectionSlide{Cruzar la frontera:\\RPC, comandos, consultas y eventos}
+
+\begin{frame}{Llamada local y RPC se parecen en el código, no en la falla}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{block}{RPC}
+\textbf{Remote Procedure Call} o \textbf{llamada a procedimiento remoto}: contrato que hace parecer una interacción de red como una llamada a una función. Simplifica la interfaz; no elimina la incertidumbre distribuida.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Llamada local}\begin{itemize}\item mismo proceso;\item error inmediato y visible;\item una pila y un entorno de ejecución;\item transacción local posible.\end{itemize}\end{block}
+\column{0.48\textwidth}\begin{block}{RPC}\begin{itemize}\item serialización y red;\item petición o respuesta pueden perderse;\item el receptor puede ejecutar y el emisor observar timeout;\item requiere identidad, retry y observabilidad.\end{itemize}\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Timeout ambiguo: ¿Inventario reservó la espada?}
+\UASlideTag{EJECUCIÓN ADVERSARIAL}{UAIngOrange}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.45cm]
-\node[uaBoxO,text width=2.1cm] (a) {1. Reservar\\objeto};
-\node[uaBox,text width=2.1cm,right=of a] (b) {2. Autorizar\\pago};
-\node[uaBoxO,text width=2.1cm,right=of b] (c) {3. Transferir\\propiedad};
-\node[uaBox,text width=2.1cm,right=of c] (d) {4. Notificar\\jugador};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d);
+\begin{tikzpicture}[x=1.05cm,y=0.82cm]
+\draw[thick] (0,2)--(8.2,2); \node[left] at (0,2) {Mercado};
+\draw[thick] (0,0)--(8.2,0); \node[left] at (0,0) {Inventario};
+\node[uaEventO] (a) at (1.1,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.06cm]a.north) {envía\\ReserveItem};
+\node[uaEvent] (b) at (3.2,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.06cm]b.south) {reserva \#17\\durable};
+\node[uaEvent] (c) at (5.1,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.06cm]c.south) {envía OK};
+\node[uaEventO] (d) at (6.4,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.06cm]d.north) {timeout};
+\draw[uaArrowO] (a)--(b);
+\draw[uaDashed] (c)--node[above,uaTiny]{respuesta perdida}(d);
 \end{tikzpicture}
 \end{center}
-\begin{block}{Decisión previa}
-¿Qué pasos son críticos? ¿Cuáles pueden reintentarse? ¿Qué estado intermedio puede ver el usuario?
+\begin{block}{Lo único que Mercado sabe}
+No recibió respuesta dentro de su plazo. No sabe si Inventario no recibió, falló antes de reservar, reservó y perdió la respuesta, o sigue lento.
+\end{block}
+\begin{uainfo}
+El retry necesita una clave idempotente estable y un resultado durable para no crear una segunda reserva lógica.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Comando, evento y consulta: tres contratos distintos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tabular}{p{0.18\textwidth}p{0.31\textwidth}p{0.35\textwidth}}
+\toprule
+\textbf{Mensaje} & \textbf{Semántica} & \textbf{Ejemplo Asteria} \\
+\midrule
+Comando & pedir al responsable autoritativo que intente una acción; puede rechazar & \texttt{ReserveItem(item\_17)} \\
+Evento & declarar un hecho que ya ocurrió & \texttt{ItemReserved(item\_17)} \\
+Consulta & pedir información sin cambiar el estado autoritativo & \texttt{GetItemOwner(item\_17)} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uawarn}
+Un nombre en pasado no convierte un comando en evento. La diferencia está en quién decide y si el receptor puede rechazar la acción.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Elegir RPC o evento desde la necesidad del flujo}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.70cm]
+\node[uaBoxO,text width=3.1cm] (q) {¿La petición necesita esta respuesta para poder terminar correctamente?};
+\node[uaBox,text width=3.0cm,below left=0.75cm and 1.05cm of q] (yes) {Sí\\RPC o comando con respuesta};
+\node[uaBoxO,text width=3.0cm,below right=0.75cm and 1.05cm of q] (no) {No\\evento y procesamiento posterior};
+\draw[uaArrow] (q)--node[left,uaTiny]{camino crítico}(yes);
+\draw[uaArrowO] (q)--node[right,uaTiny]{desacoplar}(no);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Ejemplos sincrónicos}
+reservar la pieza, autorizar pago, consultar una regla necesaria.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Ejemplos asíncronos}
+notificación, ranking, analítica y otras vistas derivadas.
+\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Necesidad: varios componentes deben enterarse sin bloquear la compra}
+\UASlideTag{PROBLEMA}{UAIngOrange}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.60cm]
+\node[uaBoxO,text width=2.35cm] (market) {Mercado\\confirma compra};
+\node[uaSoft,text width=2.55cm,right=of market] (notice) {hecho preservado\\\texttt{Purchase-}\\\texttt{Confirmed}};
+\node[uaBox,text width=2.15cm,right=0.85cm of notice,yshift=0.95cm] (rank) {Ranking};
+\node[uaBox,text width=2.15cm,right=0.85cm of notice] (notify) {Notificaciones};
+\node[uaBox,text width=2.15cm,right=0.85cm of notice,yshift=-0.95cm] (audit) {Auditoría};
+\draw[uaArrowO] (market)--(notice); \draw[uaArrow] (notice.east)--(rank.west); \draw[uaArrow] (notice.east)--(notify.west); \draw[uaArrow] (notice.east)--(audit.west);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Problema}Mercado no debería esperar a todos los lectores ni conocer cada uso futuro.\end{block}
+\column{0.48\textwidth}\begin{block}{Necesidad}Conservar un aviso que otros puedan leer, reintentar y procesar a su propio ritmo.\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Intuición: un evento es un aviso durable sobre un hecho}
+\UASlideTag{INTUICIÓN}{UAIngOrange}
+\scriptsize
+\begin{block}{Ejemplo}
+\texttt{PurchaseConfirmed(purchase\_id=42, item=17, buyer=Sofía)} informa que Mercado ya confirmó la compra tras conocer la transferencia. Describe pasado confirmado; no ordena una acción futura.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Qué permite}\begin{itemize}\item lectores independientes;\item replay después de una caída;\item nuevas vistas sin modificar Inventario.\end{itemize}\end{block}
+\column{0.48\textwidth}\begin{block}{Qué exige}\begin{itemize}\item identidad estable;\item significado inequívoco;\item formato compatible;\item política de duplicados y orden.\end{itemize}\end{block}
+\end{columns}
+\begin{uainfo}
+Si el mensaje pretende que un destinatario haga algo, es un comando, aunque viaje por un broker.
+\end{uainfo}
+\end{frame}
+
+% =============================================================================
+% DUAL WRITE AND OUTBOX
+% =============================================================================
+
+\begin{frame}{Contrato de evento: la interfaz pública que queda almacenada}
+\UASlideTag{FORMALIZACIÓN}{UAIngNavy}
+\scriptsize
+\begin{block}{Definición}
+El \textbf{contrato de un evento} especifica qué hecho representa, qué campos transporta, cómo se identifica, qué orden puede suponerse y cómo evoluciona sin romper consumidores.
+\end{block}
+\begin{center}
+\renewcommand{\arraystretch}{1.10}
+\begin{tabular}{p{0.21\textwidth}p{0.64\textwidth}}
+\toprule
+\textbf{Parte} & \textbf{En \texttt{PurchaseConfirmed}} \\
+\midrule
+Identidad & \texttt{event\_id}, \texttt{purchase\_id} y versión del evento \\
+Semántica & Mercado confirmó la compra tras la transferencia; no es una intención pendiente \\
+Esquema & nombres, tipos y obligatoriedad de campos \\
+Evolución & reglas para agregar o retirar campos sin romper lectores viejos \\
+Entrega & posibilidad de duplicado, orden relevante por compra y replay \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Se parece a una API porque otros componentes dependen de esa interfaz. La diferencia es que queda almacenada: consumidores nuevos o atrasados leen eventos producidos por versiones anteriores.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Ventajas y costos de publicar un contrato de evento}
+\UASlideTag{TRADE-OFF}{UAIngOrange}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Ventajas}\begin{itemize}\item desacopla productor y lectores;\item permite replay y reconstrucción;\item agrega lectores sin cambiar Inventario;\item retira efectos secundarios del camino crítico.\end{itemize}\end{block}
+\column{0.48\textwidth}\begin{block}{Costos}\begin{itemize}\item duplicados y atraso;\item compatibilidad durante años;\item observabilidad de lag y fallas;\item mala semántica se propaga a todos.\end{itemize}\end{block}
+\end{columns}
+\begin{uainfo}
+Identidad: cuándo dos registros representan el mismo hecho. Semántica: qué afirma. Evolución: cómo cambia el formato sin romper la historia almacenada.
+\end{uainfo}
+\end{frame}
+
+\UASectionSlide{Preservar integridad:\\dos escrituras, outbox e idempotencia}
+
+\begin{frame}{Dual write: una intención, dos sistemas sin transacción común}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{columns}[T]
+\column{0.43\textwidth}
+\begin{block}{La necesidad}
+Mercado debe:
+\begin{enumerate}
+\item confirmar la compra en su base de datos (DB);
+\item publicar \texttt{PurchaseConfirmed} para Ranking y Notificaciones.
+\end{enumerate}
+\end{block}
+\column{0.53\textwidth}
+\begin{center}
+\begin{tikzpicture}[node distance=0.65cm]
+\node[uaBoxO,text width=1.85cm] (svc) {Mercado};
+\node[uaBox,text width=2.05cm,above right=0.25cm and 0.75cm of svc] (db) {Base de datos\\compra CONFIRMADA};
+\node[uaBox,text width=2.05cm,below right=0.25cm and 0.75cm of svc] (broker) {Broker\\Purchase\\Confirmed};
+\draw[uaArrow] (svc)--(db);
+\draw[uaArrowO] (svc)--(broker);
+\end{tikzpicture}
+\end{center}
+\end{columns}
+\begin{uawarn}
+No existe un único COMMIT que abarque automáticamente la base local y el broker remoto.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Dos órdenes, dos ventanas de falla}
+\UASlideTag{EJECUCIÓN ADVERSARIAL}{UAIngOrange}
+\scriptsize
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Base de datos primero}
+\begin{enumerate}
+\item confirmar compra en la base;
+\item \textbf{crash};
+\item evento nunca publicado.
+\end{enumerate}
+Resultado: compra autoritativa sin notificación ni ranking.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Broker primero}
+\begin{enumerate}
+\item publicar evento;
+\item \textbf{crash o reversión de la transacción local};
+\item la base no confirma la compra.
+\end{enumerate}
+Resultado: consumidores reaccionan a una compra inexistente.
+\end{block}
+\end{columns}
+\begin{uakeybox}
+Cambiar el orden no elimina la ventana: solo cambia qué mitad queda sola.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}[shrink=2]{Intuición de outbox: dejar el aviso en la misma operación local}
+\UASlideTag{INTUICIÓN}{UAIngOrange}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaBoxO,text width=2.65cm] (tx) {Transacción local\\de Mercado};
+\node[uaBox,text width=2.65cm,right=of tx,yshift=0.65cm] (state) {guardar compra\\\texttt{CONFIRMADA}};
+\node[uaBox,text width=2.65cm,right=of tx,yshift=-0.65cm] (out) {guardar aviso pendiente\\en \texttt{outbox}};
+\draw[uaArrow] (tx)--(state); \draw[uaArrowO] (tx)--(out);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Imagen mental}
+Después de conocer la transferencia de Inventario, Mercado anota la compra confirmada y el aviso que deberá enviar. Si la transacción local confirma, existen ambos; si aborta, no existe ninguno.
+\end{block}
+\begin{uakeybox}
+La outbox evita olvidar la intención de publicar si el proceso cae después del commit local. Todavía hace falta un proceso que publique el aviso.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Definición formal: transactional outbox}
+\UASlideTag{FORMALIZACIÓN}{UAIngNavy}
+\small
+\begin{block}{Definición}
+Una \textbf{transactional outbox} es una tabla o colección persistente donde el servicio inserta un evento pendiente dentro de la misma transacción local que modifica el estado de negocio.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.48cm]
+\node[uaBoxO,text width=2.35cm] (market) {Mercado\\COMMIT local};
+\node[uaBox,text width=2.25cm,right=of market] (row) {fila outbox\\\texttt{PENDING}};
+\node[uaBoxO,text width=2.20cm,right=of row] (relay) {Relay\\publica/reintenta};
+\node[uaBox,text width=2.20cm,right=of relay] (broker) {Broker\\evento durable};
+\draw[uaArrow] (market)--(row); \draw[uaArrowO] (row)--(relay); \draw[uaArrow] (relay)--(broker);
+\end{tikzpicture}
+\end{center}
+\begin{itemize}
+\item el relay puede leer por polling o CDC;
+\item la publicación suele ser al menos una vez;
+\item el consumidor deduplica mediante \texttt{event\_id} o inbox transaccional.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué resuelve outbox y qué deja abierto}
+\UASlideTag{TRADE-OFF}{UAIngOrange}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Resuelve}\begin{itemize}\item estado sin intención durable de publicar;\item crash entre commit local y registro del aviso;\item recuperación del trabajo pendiente.\end{itemize}\end{block}
+\column{0.48\textwidth}\begin{block}{No resuelve sola}\begin{itemize}\item duplicados del relay;\item COMMIT global con Inventario o Pagos;\item consumidores no idempotentes;\item atraso y crecimiento de la tabla.\end{itemize}\end{block}
+\end{columns}
+\begin{uainfo}
+Métricas mínimas: filas pendientes, edad de la más antigua, reintentos y tiempo extremo a extremo hasta el consumidor.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}[t]{Sofía ve éxito; Ranking todavía puede estar atrasado}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\small
+\begin{enumerate}
+\item Inventario confirma la transferencia. Mercado guarda \texttt{CONFIRMADA} y \texttt{PurchaseConfirmed} pendiente en un mismo COMMIT local.
+\item Sofía recibe la confirmación basada en ese estado autoritativo. El relay aún puede estar detenido y Ranking mostrar la puntuación anterior.
+\item El relay publica o reintenta; Ranking deduplica por \texttt{event\_id} y actualiza su proyección.
+\end{enumerate}
+\begin{columns}[T]
+\column{0.48\textwidth}
+\begin{block}{Beneficio}
+Una falla de Ranking no borra la compra confirmada y la proyección puede recuperarse.
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Costo observable}
+Medir edad de la outbox, atraso de Ranking, duplicados y tiempo de reconstrucción.
+\end{block}
+\end{columns}
+\end{frame}
+
+
+
+
+
+% =============================================================================
+% SAGAS
+% =============================================================================
+
+\UASectionSlide{Coordinar la compra:\\saga y reparación}
+
+\begin{frame}{Tres autoridades independientes participan en la compra}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\small
+\begin{center}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{p{0.21\textwidth}p{0.31\textwidth}p{0.36\textwidth}}
+\toprule
+\textbf{Autoridad} & \textbf{Hecho que decide} & \textbf{Por qué es independiente} \\
+\midrule
+Mercado & intento y estado de la oferta & posee su estado, transacción y fallas \\
+Inventario & reserva y propietario de \#17 & confirma en su propia base y reinicia aparte \\
+Pagos & autorización o rechazo del pago & depende de un proveedor y no comparte COMMIT con Inventario \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{block}{Independencia en esta historia}
+Cada autoridad puede confirmar, fallar, reintentar o recuperarse sin que las otras participen de la misma transacción atómica. Ninguna puede deshacer por sí sola todo el proceso.
 \end{block}
 \end{frame}
 
-\begin{frame}{Saga de compra: falla y compensación}
+\begin{frame}{Por qué aparece una saga en Asteria}
+\UASlideTag{NECESIDAD}{UAIngOrange}
+\small
+\begin{block}{Problema}
+La compra atraviesa Mercado, Inventario y Pagos. Cada autoridad confirma localmente, pero no existe un COMMIT único que abarque a las tres.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.50cm]
+\node[uaBoxO,text width=2.35cm] (m) {Mercado\\intento creado};
+\node[uaBox,text width=2.35cm,right=of m] (i) {Inventario\\pieza reservada};
+\node[uaBoxO,text width=2.35cm,right=of i] (p) {Pagos\\pago autorizado};
+\node[uaBox,text width=2.35cm,right=of p] (t) {Inventario\\propiedad transferida};
+\draw[uaArrow] (m)--(i); \draw[uaArrowO] (i)--(p); \draw[uaArrow] (p)--(t);
+\end{tikzpicture}
+\end{center}
+\begin{uakeybox}
+Necesitamos conservar el estado del proceso y decidir qué hacer si un paso tarda, se duplica, queda incierto o falla después de que otros ya confirmaron.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Intuición: una saga es un itinerario durable de negocio}
+\UASlideTag{INTUICIÓN}{UAIngOrange}
+\small
+\begin{block}{Imagen mental}
+La compra es un viaje con varias paradas. En cada parada se anota durablemente dónde quedó, qué respuesta recibió y cuál es el próximo paso permitido.
+\end{block}
+\begin{center}
+\begin{tikzpicture}[node distance=0.28cm]
+\node[uaBoxO,text width=1.85cm] (a) {CREADA}; \node[uaBox,text width=1.85cm,right=of a] (b) {RESERVADA}; \node[uaBoxO,text width=1.85cm,right=of b] (c) {PAGO\\AUTORIZADO}; \node[uaBox,text width=2.03cm,right=of c] (d) {PROPIEDAD\\TRANSFERIDA}; \node[uaBoxO,text width=2.03cm,right=of d] (e) {COMPLETADA};
+\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d); \draw[uaArrowO] (d)--(e);
+\end{tikzpicture}
+\end{center}
+\begin{uainfo}
+Si el proceso reinicia, no vuelve a empezar a ciegas: lee el estado durable y continúa, consulta o repara desde allí.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Definición formal: saga}
+\UASlideTag{FORMALIZACIÓN}{UAIngNavy}
+\small
+\begin{block}{Definición}
+Una \textbf{saga} coordina una operación mediante transacciones locales. Conserva estados durables y define reintentos, consultas, timeouts y compensaciones para resultados parciales.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Registra}\begin{itemize}\item \texttt{saga\_id} e intento;\item estado y deadline;\item comandos y respuestas;\item último resultado durable.\end{itemize}\end{block}
+\column{0.48\textwidth}\begin{block}{Decide}\begin{itemize}\item continuar;\item consultar o reintentar;\item compensar;\item pasar a revisión manual.\end{itemize}\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Camino feliz: qué confirma cada participante}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{center}
+\begin{tikzpicture}[node distance=0.43cm]
+\node[uaBoxO,text width=2.1cm] (a) {1. Inventario\\reserva \#17};
+\node[uaBox,text width=2.1cm,right=of a] (b) {2. Pagos\\autoriza cargo};
+\node[uaBoxO,text width=2.1cm,right=of b] (c) {3. Inventario\\transfiere propiedad};
+\node[uaBox,text width=2.1cm,right=of c] (d) {4. Mercado\\confirma compra};
+\draw[uaArrow] (a)--(b);
+\draw[uaArrowO] (b)--(c);
+\draw[uaArrow] (c)--(d);
+\end{tikzpicture}
+\end{center}
+\begin{block}{Pregunta previa}
+¿En qué estado puede responderse ``compra confirmada'' y qué evidencia durable demuestra que la pieza y el cargo quedaron coherentes?
+\end{block}
+\end{frame}
+
+\begin{frame}{Falla realista: el pago puede quedar incierto}
+\UASlideTag{EJECUCIÓN ADVERSARIAL}{UAIngOrange}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[x=1.0cm,y=0.78cm]
+\draw[thick] (0,2)--(8.4,2); \node[left] at (0,2) {Saga};
+\draw[thick] (0,0)--(8.4,0); \node[left] at (0,0) {Pagos};
+\node[uaEventO] (a) at (1.1,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.06cm]a.north) {Authorize\\payment};
+\node[uaEvent] (b) at (3.2,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.06cm]b.south) {cargo\\autorizado};
+\node[uaEvent] (c) at (5.0,0) {};
+\node[uaTiny,anchor=north] at ([yshift=-0.06cm]c.south) {envía OK};
+\node[uaEventO] (d) at (6.3,2) {};
+\node[uaTiny,anchor=south] at ([yshift=0.06cm]d.north) {timeout};
+\draw[uaArrowO] (a)--(b);
+\draw[uaDashed] (c)--node[above,uaTiny]{respuesta perdida}(d);
+\end{tikzpicture}
+\end{center}
+\begin{uawarn}
+Reintentar ciegamente puede cobrar dos veces. La saga necesita un payment\_attempt\_id, consulta de estado y un estado durable \texttt{PAYMENT\_UNKNOWN}.
+\end{uawarn}
+\end{frame}
+
+\begin{frame}{Falla posterior: pago autorizado, transferencia imposible}
 \UASlideTag{NÚCLEO}{UAIngNavy}
 \begin{center}
 \begin{tikzpicture}[node distance=0.45cm]
 \node[uaBoxO,text width=2.1cm] (a) {Reserva OK};
-\node[uaBox,text width=2.1cm,right=of a] (b) {Pago OK};
+\node[uaBox,text width=2.1cm,right=of a] (b) {Autorización OK};
 \node[uaBoxO,text width=2.1cm,right=of b] (c) {Transferencia\\FALLA};
-\node[uaSoft,text width=2.2cm,below=0.9cm of b] (cb) {Reembolso};
-\node[uaSoft,text width=2.2cm,below=0.9cm of a] (ca) {Liberar reserva};
-\draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c);
-\draw[uaArrowO,dashed] (c)--(cb); \draw[uaArrow,dashed] (cb)--(ca);
+\node[uaSoft,text width=2.2cm,below=0.85cm of b] (cb) {Anular autorización};
+\node[uaSoft,text width=2.2cm,below=0.85cm of a] (ca) {Liberar reserva};
+\draw[uaArrow] (a)--(b);
+\draw[uaArrowO] (b)--(c);
+\draw[uaDashed] (c)--(cb);
+\draw[uaDashed] (cb)--(ca);
 \end{tikzpicture}
 \end{center}
+\begin{block}{Estado global}
+La saga pasa a \texttt{COMPENSATING}; solo termina cuando conoce el resultado durable de cada compensación o deriva el caso a intervención manual. Si el cargo ya se capturó, puede hacer falta un reembolso.
+\end{block}
+\end{frame}
+
+\begin{frame}{Tres formas de ``volver atrás'' que no son equivalentes}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.16}
+\begin{tabular}{p{0.24\textwidth}p{0.36\textwidth}p{0.31\textwidth}}
+\toprule
+\textbf{Mecanismo} & \textbf{Qué hace} & \textbf{Ejemplo} \\
+\midrule
+Rollback transaccional & aborta cambios locales aún no confirmados & la base revierte una transacción sin COMMIT \\
+Vuelta atrás de versión & devuelve tráfico o software a una versión anterior & se retira una versión defectuosa de Ranking \\
+Compensación de negocio & ejecuta una nueva acción para reparar un efecto confirmado & anular autorización y liberar la reserva \\
+\bottomrule
+\end{tabular}
+\end{center}
 \begin{uawarn}
-El reembolso es una transacción nueva. Puede tardar, fallar o dejar movimientos visibles. La saga necesita estados, retries e intervención manual.
+Volver una versión de software no borra pagos, eventos ni cambios de propiedad ya producidos. Esos efectos requieren acciones explícitas.
 \end{uawarn}
 \end{frame}
 
-\begin{frame}{Compensación no es rollback}
+\begin{frame}{Compensación: reparar el negocio sin borrar la historia}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Definición}
+Una compensación es una nueva acción de negocio que intenta neutralizar o reparar un efecto ya confirmado. También puede fallar, duplicarse o requerir intervención humana.
+\end{block}
 \begin{center}
-\begin{tabular}{p{0.27\textwidth}p{0.30\textwidth}p{0.30\textwidth}}
+\begin{tikzpicture}[node distance=0.55cm]
+\node[uaBoxO,text width=2.35cm] (paid) {Pago autorizado}; \node[uaBox,text width=2.35cm,right=of paid] (fail) {Transferencia imposible}; \node[uaBoxO,text width=2.35cm,right=of fail] (void) {Anular autorización}; \node[uaBox,text width=2.35cm,right=of void] (release) {Liberar reserva};
+\draw[uaArrow] (paid)--(fail); \draw[uaArrowO] (fail)--(void); \draw[uaArrow] (void)--(release);
+\end{tikzpicture}
+\end{center}
+\begin{uainfo}
+El historial conserva autorización, falla, anulación solicitada y resultado. Si el pago se capturó, se solicita reembolso en vez de anular la autorización.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}{Intuición: coreografía y orquestación}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Coreografía}Como bailarines que conocen las señales: cada participante observa un hecho y decide su próximo movimiento, sin un director que conserve todo el plan.\end{block}
+\column{0.48\textwidth}\begin{block}{Orquestación}Como una dirección de escena: un coordinador conserva el estado del proceso y envía la próxima instrucción.\end{block}
+\end{columns}
+\begin{uakeybox}
+Son dos formas de coordinar la misma saga. Ninguna elimina estados durables, idempotencia, timeouts ni reparación.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Coreografía en Asteria: cada servicio reacciona a hechos}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.38cm]
+\node[uaBoxO,text width=2.2cm] (inv) {Inventario\\publica \texttt{ItemReserved}}; \node[uaBox,text width=2.2cm,right=of inv] (pay) {Pagos\\publica \texttt{Payment-}\\\texttt{Authorized}}; \node[uaBoxO,text width=2.2cm,right=of pay] (transfer) {Inventario\\transfiere}; \node[uaBox,text width=2.2cm,right=of transfer] (market) {Mercado\\completa compra};
+\draw[uaArrow] (inv)--(pay); \draw[uaArrowO] (pay)--(transfer); \draw[uaArrow] (transfer)--(market);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Ventaja}Participantes poco acoplados; nuevos lectores se agregan con facilidad.\end{block}
+\column{0.48\textwidth}\begin{block}{Riesgo}El proceso global queda repartido entre contratos; ciclos y fallas son difíciles de visualizar.\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Orquestación en Asteria: un coordinador conserva el proceso}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\begin{tikzpicture}[node distance=0.60cm]
+\node[uaBoxO,text width=2.55cm] (orch) {Coordinador de compra\\estado durable de la saga};
+\node[uaBox,text width=2.15cm,right=1.0cm of orch,yshift=1.15cm] (inv) {Inventario}; \node[uaBox,text width=2.15cm,right=1.0cm of orch] (pay) {Pagos}; \node[uaBox,text width=2.15cm,right=1.0cm of orch,yshift=-1.15cm] (market) {Mercado};
+\draw[uaArrow] (orch.east)--(inv.west); \draw[uaArrowO] (orch.east)--(pay.west); \draw[uaArrow] (orch.east)--(market.west);
+\end{tikzpicture}
+\end{center}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Ventaja}Un lugar visible para estado, deadlines, reintentos, compensaciones e intervención humana.\end{block}
+\column{0.48\textwidth}\begin{block}{Riesgo}Puede concentrar demasiada lógica; coordina, pero no debe apropiarse de los datos de otros.\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Coreografía u orquestación: elegir por el proceso}
+\UASlideTag{TRADE-OFF}{UAIngOrange}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{p{0.27\textwidth}p{0.30\textwidth}p{0.31\textwidth}}
 \toprule
-Efecto & ¿Se puede ``deshacer''? & Compensación real \\
+\textbf{Dimensión} & \textbf{Coreografía} & \textbf{Orquestación} \\
 \midrule
-Reserva interna & casi siempre & liberar reserva \\
-Cobro & no borrar historial & reembolso \\
-Email enviado & imposible retirar & enviar corrección \\
-Paquete despachado & efecto físico & devolución / soporte \\
+Próximo paso & cada servicio reacciona a hechos & coordinador envía comandos \\
+Estado global & repartido & visible en el coordinador \\
+Cambio de flujo & revisar varios contratos & modificar el proceso coordinador \\
+Fallas largas/humanas & difíciles de seguir & fáciles de supervisar \\
+Riesgo & ciclos y lógica emergente & coordinador con demasiada responsabilidad \\
 \bottomrule
 \end{tabular}
 \end{center}
-\begin{block}{Lección}
-Diseñar una saga exige semántica de negocio, no solo encadenar endpoints.
-\end{block}
+\begin{uakeybox}
+Para la compra de \#17, la orquestación suele ser más clara cuando hay pago incierto, compensaciones y revisión manual; Ranking y Notificaciones pueden continuar coreografiados.
+\end{uakeybox}
 \end{frame}
 
-\begin{frame}{Coreografía: cada servicio escucha y reacciona}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO] (o) {Orders};
-\node[uaBox,right=1.2cm of o] (p) {Payments};
-\node[uaBoxO,right=1.2cm of p] (i) {Inventory};
-\node[uaBox,right=1.2cm of i] (n) {Notify};
-\draw[uaArrow] (o)--node[above,font=\scriptsize]{OrderCreated}(p);
-\draw[uaArrowO] (p)--node[above,font=\scriptsize]{PaymentOK}(i);
-\draw[uaArrow] (i)--node[above,font=\scriptsize]{ItemMoved}(n);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Menos coordinador central.
-\item Más lógica global distribuida entre contratos.
-\item Difícil ver el estado de la saga sin observabilidad adicional.
-\end{itemize}
-\end{frame}
+% =============================================================================
+% MIGRATION AND OPERATIONS
+% =============================================================================
 
-\begin{frame}{Orquestación: un coordinador conserva el proceso}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO,text width=2.2cm] (orch) {Saga orchestrator\\estado del flujo};
-\node[uaBox,above right=0.3cm and 1.3cm of orch] (p) {Payments};
-\node[uaBox,right=1.3cm of orch] (i) {Inventory};
-\node[uaBox,below right=0.3cm and 1.3cm of orch] (n) {Notify};
-\draw[uaArrow] (orch)--(p); \draw[uaArrowO] (orch)--(i); \draw[uaArrow] (orch)--(n);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Flujo y estados más visibles.
-\item Acoplamiento al proceso central.
-\item El orquestador debe ser durable, recuperable e idempotente.
-\end{itemize}
-\end{frame}
+\UASectionSlide{Migrar y operar:\\la frontera debe sobrevivir en producción}
 
-\begin{frame}{Elegir coreografía u orquestación}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
-\begin{center}
-\begin{tabular}{p{0.22\textwidth}p{0.31\textwidth}p{0.31\textwidth}}
-\toprule
-Criterio & Coreografía & Orquestación \\
-\midrule
-Flujo & emergente & explícito \\
-Visibilidad & requiere reconstrucción & estado central del proceso \\
-Acoplamiento & contratos de eventos & al orquestador \\
-Complejidad & crece con participantes & crece en coordinador \\
-\bottomrule
-\end{tabular}
-\end{center}
-\begin{block}{Regla}
-No hay ganador universal. Importan longitud del proceso, necesidad de intervención, auditabilidad y frecuencia de cambio.
-\end{block}
-\end{frame}
-
-\UASectionSlide{Migrar y operar: una frontera\\debe sobrevivir producción}
-
-\begin{frame}{Strangler Fig: reemplazar por rutas, no por fe}
-\UASlideTag{EXTENSIÓN}{UAIngMuted}
-\begin{center}
-\begin{tikzpicture}[node distance=0.65cm]
-\node[uaBoxO,text width=2.3cm] (gw) {Router / gateway};
-\node[uaBox,text width=2.6cm,above right=0.45cm and 1.3cm of gw] (old) {Monolito\\rutas restantes};
-\node[uaBoxO,text width=2.6cm,below right=0.45cm and 1.3cm of gw] (new) {Nuevo servicio\\ruta extraída};
-\draw[uaArrow] (gw)--node[above,font=\scriptsize]{legacy}(old);
-\draw[uaArrowO] (gw)--node[below,font=\scriptsize]{migrada}(new);
-\end{tikzpicture}
-\end{center}
-\begin{itemize}
-\item Migración incremental y reversible.
-\item Permite medir beneficio antes de extraer todo.
-\item Requiere resolver sincronización de datos y rutas durante coexistencia.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Checklist de readiness antes de distribuir}
+\begin{frame}[shrink=4]{¿Qué extraer primero en Asteria?}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{columns}[T]
 \column{0.48\textwidth}
+\begin{block}{Ranking: candidato inicial}
 \begin{itemize}
-\item CI/CD y rollback;
-\item logs y tracing;
-\item métricas y SLO;
-\item ownership y on-call;
-\item contratos versionados.
+\item carga diferente y con picos;
+\item tolera atraso acotado;
+\item puede construirse como proyección;
+\item falla sin detener la compra;
+\item escala y despliega de forma distinta.
 \end{itemize}
+\end{block}
 \column{0.48\textwidth}
+\begin{block}{Inventario: extracción riesgosa}
 \begin{itemize}
-\item secretos e identidad;
-\item timeouts y retries;
-\item pruebas de falla;
-\item capacidad de datos;
-\item runbooks e incidentes.
+\item preserva propiedad única;
+\item participa en el camino crítico;
+\item genera sagas y estados intermedios;
+\item exige idempotencia y operación madura;
+\item una falla puede duplicar o bloquear objetos.
 \end{itemize}
+\end{block}
+\end{columns}
+\begin{uakeybox}
+La primera frontera debe ofrecer beneficio y aprendizaje con riesgo controlable.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Migración gradual: patrón Strangler Fig}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\small
+\begin{block}{Intuición}
+En vez de reemplazar toda la aplicación en una fecha única, una parte nueva crece al costado de la anterior. El tráfico se desvía por porciones hasta retirar el camino viejo.
+\end{block}
+\begin{block}{Definición}
+El patrón \textbf{Strangler Fig} es una migración incremental donde el componente antiguo y el nuevo coexisten y una fachada decide qué camino utilizar.
+\end{block}
+\begin{uakeybox}
+No significa simplemente ``crear un microservicio''. Es un método para reducir riesgo: coexistir, comparar, desviar y retirar.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Prueba gradual y vuelta atrás: limitar el riesgo}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\small
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{block}{Prueba canary}Una fracción pequeña del tráfico real usa la versión nueva. Se comparan errores, latencia y resultados antes de ampliar.\end{block}
+\column{0.48\textwidth}\begin{block}{Vuelta atrás de versión}Si las métricas empeoran, el router devuelve el tráfico al camino anterior. No deshace efectos de negocio ya confirmados.\end{block}
+\end{columns}
+\begin{uakeybox}
+La migración es reversible mientras ambos caminos coexistentes puedan recibir tráfico y los datos se mantengan comparables.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Migración gradual aplicada a Ranking}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{center}
+\begin{tikzpicture}[node distance=0.60cm]
+\node[uaBoxO,text width=2.25cm] (events) {Eventos de\\compras y combate}; \node[uaBox,text width=2.45cm,right=of events] (old) {Ranking del\\monolito}; \node[uaBoxO,text width=2.45cm,below=0.85cm of old] (new) {Nuevo servicio\\de Ranking}; \node[uaBox,text width=2.35cm,right=1.0cm of old,yshift=-0.42cm] (router) {API / router\\elige lectura};
+\draw[uaArrow] (events)--(old); \draw[uaArrowO] (events)--(new); \draw[uaArrow] (old)--(router); \draw[uaArrowO] (new)--(router);
+\end{tikzpicture}
+\end{center}
+\begin{enumerate}
+\item alimentar ambos cálculos;
+\item comparar exactitud, atraso y costo;
+\item enviar una fracción pequeña al camino nuevo;
+\item volver al anterior si las métricas empeoran;
+\item retirar el código viejo después de evidencia suficiente.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}[t,shrink=2]{Balance de decisiones en Asteria}
+\UASlideTag{CASO CONDUCTOR}{UAIngOrange}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.12}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{>{\raggedright\arraybackslash}p{0.18\textwidth}>{\raggedright\arraybackslash}p{0.23\textwidth}>{\raggedright\arraybackslash}p{0.29\textwidth}>{\raggedright\arraybackslash}p{0.21\textwidth}}
+\toprule
+\textbf{Decisión} & \textbf{Beneficio esperado} & \textbf{Qué cuesta sostener} & \textbf{Cómo comprobar} \\
+\midrule
+Réplicas y caché & lecturas más rápidas & recursos, invalidación, oferta potencialmente vieja & p99 y aciertos de caché \\
+Ranking separado & compra menos expuesta al torneo & outbox, broker, atraso, duplicados, otra guardia & p99, lag e incidentes \\
+Si Pagos se separa & controles y cambios de pago aislados & RPC, timeout ambiguo, IDs idempotentes & fallas de pago y auditoría \\
+Si Inventario se separa & escala y versión propias & llamadas críticas, saga y recuperación de reservas & conflictos, latencia y compras correctas \\
+\bottomrule
+\end{tabular}
+\end{center}
+\vspace{0.17cm}
+\noindent\textbf{Decisión:} probar Ranking primero. Inventario queda unido mientras su costo distribuido supere el beneficio medido.
+\end{frame}
+
+\begin{frame}{Vocabulario operativo I: CI, CD y preparación operativa}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.14}
+\begin{tabular}{p{0.22\textwidth}p{0.66\textwidth}}
+\toprule
+\textbf{Término} & \textbf{Definición de trabajo} \\
+\midrule
+CI — Integración Continua & integrar cambios con frecuencia y ejecutar compilación, pruebas y controles automáticos \\
+CD — Entrega Continua & mantener cada cambio validado listo para producción; la promoción puede ser manual \\
+CD — Despliegue Continuo & poner automáticamente en producción todo cambio que supera los controles; hay que aclarar qué significado se usa \\
+Preparación operativa (readiness) & evidencia de que un equipo puede publicar, observar, recuperar y sostener una capacidad en producción \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+CI y CD automatizan el camino del cambio; no sustituyen contratos compatibles, recuperación, métricas ni responsables de incidentes.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Vocabulario operativo II: guardia, procedimiento, SLO y trazas}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.14}
+\begin{tabular}{p{0.22\textwidth}p{0.65\textwidth}}
+\toprule
+\textbf{Término} & \textbf{Definición de trabajo} \\
+\midrule
+Guardia (guardia) & rotación responsable de recibir alertas y coordinar la respuesta a incidentes \\
+Procedimiento (runbook) & pasos escritos para diagnosticar, mitigar y recuperar una falla repetible \\
+SLI & indicador medido, por ejemplo compras correctas o latencia p99 \\
+SLO & meta cuantificada para un SLI durante una ventana, por ejemplo 99,9\% de compras correctas por mes \\
+Trazas distribuidas & correlación del recorrido de una petición o evento a través de varios procesos \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uainfo}
+Estas capacidades hacen visible quién opera la frontera, qué promesa intenta cumplir y cómo investigar una falla entre servicios.
+\end{uainfo}
+\end{frame}
+
+\begin{frame}[shrink=3]{Preparación operativa: separar implica sostener otro sistema}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\small
+\begin{block}{Definición}
+Existe preparación operativa cuando el equipo demuestra que puede publicar, observar y recuperar la capacidad en producción; no alcanza con que un chequeo \texttt{/ready} responda.
+\end{block}
+\begin{columns}[T]
+\column{0.48\textwidth}\begin{itemize}\item CI y publicación de versiones;\item vuelta atrás probada;\item permisos y secretos;\item logs, métricas y trazas;\item retries e idempotencia;\end{itemize}
+\column{0.48\textwidth}\begin{itemize}\item SLO y alertas;\item guardia y procedimientos;\item backup y recuperación;\item pruebas de falla;\item capacidad y costos.\end{itemize}
 \end{columns}
 \begin{uawarn}
-Sin estas capacidades, la separación puede aumentar el tiempo de entrega y reducir confiabilidad aunque el diagrama parezca moderno.
+Sin esta preparación, separar puede demorar cambios y reducir confiabilidad aunque el diagrama parezca moderno.
 \end{uawarn}
 \end{frame}
 
-\begin{frame}{Métricas que demuestran autonomía real}
-\UASlideTag{NÚCLEO}{UAIngNavy}
+\begin{frame}{Cómo leer las métricas de autonomía}
+\UASlideTag{VOCABULARIO JUSTO A TIEMPO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.18cm]
-\node[uaBoxO,text width=1.98cm] (a) {Lead time\\por cambio};
-\node[uaBox,text width=1.98cm,right=of a] (b) {Deploys\\independientes};
-\node[uaBoxO,text width=1.98cm,right=of b] (c) {Blast radius\\incidentes};
-\node[uaBox,text width=1.98cm,right=of c] (d) {p99 / SLO\\por servicio};
-\node[uaBoxO,text width=1.98cm,right=of d] (e) {Coordinaciones\\entre equipos};
-\end{tikzpicture}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{p{0.25\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{Métrica} & \textbf{Qué significa y qué pregunta responde} \\
+\midrule
+Tiempo hasta producción (tiempo hasta producción) & desde que un cambio está listo hasta que funciona: ¿la frontera acelera el cambio? \\
+Publicaciones sin coordinación & versiones que salen sin sincronizar otros equipos \\
+Escala independiente & recursos agregados solo a la capacidad que crece \\
+Alcance del incidente (alcance del incidente) & usuarios, regiones, datos y capacidades afectados \\
+p99 & valor por debajo del cual queda el 99\% de observaciones; muestra la cola de latencia \\
+Coordinaciones entre equipos & aprobaciones, tickets y bloqueos necesarios para cambiar u operar \\
+\bottomrule
+\end{tabular}
 \end{center}
-\begin{block}{Pregunta}
-Si después de extraer todos despliegan juntos y comparten la misma base, ¿qué autonomía se ganó realmente?
-\end{block}
 \end{frame}
 
-\begin{frame}{Actividad de 15 minutos: diseñar Asteria sin slogans}
+\begin{frame}{Métricas para comprobar que la separación valió la pena}
+\UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{p{0.23\textwidth}p{0.39\textwidth}p{0.27\textwidth}}
+\toprule
+\textbf{Métrica} & \textbf{Qué mide} & \textbf{Qué esperamos} \\
+\midrule
+Tiempo hasta producción & cambio listo a versión funcionando & bajar sin aumentar incidentes \\
+Publicaciones sin coordinación & versiones que no esperan a otros equipos & aumentar \\
+Escala por capacidad & recursos solo donde crece carga & evitar escalar todo Asteria \\
+Alcance del incidente & usuarios y capacidades afectados & reducir \\
+p99 y errores & experiencia de la cola y fallas & cumplir el SLO \\
+Coordinaciones cruzadas & trabajo manual entre equipos & reducir \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+Hace falta una línea base anterior. Si el nuevo servicio sigue compartiendo base, versiones y guardias con la aplicación, la independencia prometida no se materializó.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Actividad: defender una frontera de Asteria}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
 \begin{columns}[T]
-\column{0.48\textwidth}
-\begin{block}{Elegir una frontera}
+\column{0.47\textwidth}
+\begin{block}{Elijan una capacidad}
 \begin{itemize}
 \item inventario;
-\item combate;
-\item ranking;
 \item pagos;
-\item chat.
+\item ranking;
+\item chat;
+\item combate por zona.
 \end{itemize}
 \end{block}
-\column{0.48\textwidth}
-\begin{block}{Defenderla}
-\begin{itemize}
-\item capacidad y owner;
-\item invariante local;
+\column{0.49\textwidth}
+\begin{block}{Completen el argumento}
+\begin{enumerate}
+\item regla e invariante;
+\item responsable y dato autoritativo;
+\item alternativa simple;
+\item frontera propuesta;
 \item RPC/evento;
-\item falla nueva;
-\item autonomía y métrica.
-\end{itemize}
+\item falla y recuperación;
+\item métrica de éxito.
+\end{enumerate}
 \end{block}
 \end{columns}
-\begin{uainfo}
-Una respuesta válida puede mantener módulos en un monolito si demuestra que separar no compra suficiente valor.
-\end{uainfo}
 \end{frame}
 
 \begin{frame}{Método reusable para decidir una frontera}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.35cm]
-\node[uaBoxO,text width=2.1cm] (d) {1. Dominio\\e invariante};
-\node[uaBox,text width=2.1cm,right=of d] (o) {2. Owner\\y equipo};
-\node[uaBoxO,text width=2.1cm,right=of o] (c) {3. Contrato\\y datos};
-\node[uaBox,text width=2.1cm,right=of c] (f) {4. Falla y\\operación};
-\node[uaBoxO,text width=2.1cm,right=of f] (m) {5. Métrica y\\revisión};
-\draw[uaArrow] (d)--(o); \draw[uaArrowO] (o)--(c); \draw[uaArrow] (c)--(f); \draw[uaArrowO] (f)--(m);
+\begin{tikzpicture}[node distance=0.18cm]
+\node[uaBoxO,text width=2.05cm] (p) {1. Problema\\y evidencia}; \node[uaBox,text width=2.05cm,right=of p] (r) {2. Regla, dato\\y autoridad}; \node[uaBoxO,text width=2.05cm,right=of r] (simple) {3. Alternativa\\más simple}; \node[uaBox,text width=2.05cm,right=of simple] (fail) {4. Costo, falla\\y mecanismo}; \node[uaBoxO,text width=2.05cm,right=of fail] (e) {5. Métrica\\y revisión};
+\draw[uaArrow] (p)--(r); \draw[uaArrowO] (r)--(simple); \draw[uaArrow] (simple)--(fail); \draw[uaArrowO] (fail)--(e);
 \end{tikzpicture}
 \end{center}
 \begin{block}{Marco del curso}
-$D=(P,F,G,S,T)$: la tecnología aparece después del problema, la falla y la garantía.
+$D=(P,F,G,S,T)$: la tecnología aparece después de declarar problema, fallas, garantías y costo aceptado.
 \end{block}
+\end{frame}
+
+\begin{frame}[shrink=3]{Cierre comparativo: por qué distribuir y cuándo no hacerlo}
+\UASlideTag{SÍNTESIS DE DECISIÓN}{UAIngOrange}
+\scriptsize
+\begin{center}
+\renewcommand{\arraystretch}{1.12}
+\begin{tabular}{p{0.19\textwidth}p{0.23\textwidth}p{0.25\textwidth}p{0.17\textwidth}}
+\toprule
+\textbf{Capacidad} & \textbf{Límite del diseño unido} & \textbf{Separación propuesta} & \textbf{Prueba} \\
+\midrule
+Ranking & picos afectan la compra & proyección por eventos; versión propia & p99, atraso y tiempo hasta producción \\
+Pagos & controles y proveedor frenan cambios & servicio propio si existe operación madura & errores, auditoría y coordinaciones \\
+Inventario & la transacción local protege propiedad & mantener unido hasta justificar una saga & duplicaciones, latencia y carga \\
+\bottomrule
+\end{tabular}
+\end{center}
+\begin{uakeybox}
+La aplicación unida deja de alcanzar cuando una necesidad medible persiste y no se resuelve con modularidad interna. Distribuir es aceptar un costo para resolverla; si las métricas no mejoran, la decisión debe revisarse.
+\end{uakeybox}
+\end{frame}
+
+\begin{frame}{Volvemos a la predicción inicial}
+\UASlideTag{ACTIVIDAD}{UAIngOrange}
+\small
+Revise su primera respuesta y complete:
+\begin{enumerate}
+\item ¿La capacidad elegida tiene un lenguaje e invariante coherentes?
+\item ¿Existe un responsable técnico y operacional?
+\item ¿Qué autonomía concreta se obtendría?
+\item ¿Qué falla nueva aparece al cruzar la red?
+\item ¿Cómo se preserva la integridad del flujo?
+\item ¿Qué métrica podría refutar su decisión?
+\end{enumerate}
+\begin{uainfo}
+Cambiar de opinión es evidencia de aprendizaje si ahora puede justificar mejor la frontera.
+\end{uainfo}
 \end{frame}
 
 \begin{frame}{Volvemos al diagnóstico inicial}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
 \small
 \begin{enumerate}
-\item \textbf{Falso:} un monolito puede ser modular y tener fronteras claras.
-\item \textbf{Falso:} un microservicio representa una capacidad y autonomía, no una clase remota.
-\item \textbf{Falso:} guardar y publicar son dos escrituras; una falla entre ambas crea inconsistencia.
-\item \textbf{Falso:} compensar es ejecutar una nueva acción, no borrar el pasado.
-\item \textbf{Falso:} cadenas de dependencias pueden reducir disponibilidad y aumentar latencia.
+\item \textbf{Falso:} un monolito puede imponer módulos, APIs y responsabilidades claras.
+\item \textbf{Falso:} un microservicio no es una clase remota; representa una capacidad con autonomía operativa.
+\item \textbf{Falso:} servicios separados pueden seguir acoplados por base de datos, contratos y versiones coordinadas.
+\item \textbf{Falso:} la base de datos y el broker son dos escrituras; una caída entre ambas deja inconsistencia.
+\item \textbf{Falso:} compensar crea un nuevo efecto; las acciones previas siguen formando parte de la historia.
 \end{enumerate}
 \end{frame}
 
-\begin{frame}{Síntesis visual: una frontera debe pagar su alquiler}
+\begin{frame}{Síntesis: una frontera debe justificar su costo}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\scriptsize
 \begin{center}
-\begin{tikzpicture}[node distance=0.35cm]
-\node[uaBoxO,text width=2.1cm] (a) {Capacidad de\\negocio};
-\node[uaBox,text width=2.1cm,right=of a] (b) {Owner e\\invariante};
-\node[uaBoxO,text width=2.1cm,right=of b] (c) {Contrato y\\datos};
-\node[uaBox,text width=2.1cm,right=of c] (d) {Falla y\\operación};
-\node[uaBoxO,text width=2.1cm,right=of d] (e) {Autonomía\\medida};
+\begin{tikzpicture}[node distance=0.17cm]
+\node[uaBoxO,text width=2.02cm] (a) {Necesidad\\observable}; \node[uaBox,text width=2.02cm,right=of a] (b) {Regla, dato\\y autoridad}; \node[uaBoxO,text width=2.02cm,right=of b] (c) {Contrato\\y comunicación}; \node[uaBox,text width=2.02cm,right=of c] (d) {Falla\\y recuperación}; \node[uaBoxO,text width=2.02cm,right=of d] (e) {Mejora\\medida};
 \draw[uaArrow] (a)--(b); \draw[uaArrowO] (b)--(c); \draw[uaArrow] (c)--(d); \draw[uaArrowO] (d)--(e);
 \end{tikzpicture}
 \end{center}
 \begin{uakeybox}
-Distribuir no es progreso por sí mismo. Una frontera vale cuando compra autonomía, escala o aislamiento suficiente para pagar su prima distribuida.
+Distribuir no es progreso por sí mismo. Una frontera vale cuando resuelve una necesidad concreta, la mejora aparece en métricas y el equipo puede operar las fallas nuevas.
 \end{uakeybox}
 \end{frame}
 
 \begin{frame}{Exit ticket}
 \UASlideTag{ACTIVIDAD}{UAIngOrange}
-Responda en cuatro líneas cada punto:
+Responda brevemente:
 \begin{enumerate}
-\item ¿Qué diferencia un monolito modular de una bola de barro?
-\item ¿Qué evidencia justifica extraer un microservicio?
-\item ¿Cómo resuelve outbox el dual write y qué problema deja abierto?
-\item ¿Por qué una compensación de saga no es rollback?
+\item ¿Qué diferencia una frontera semántica de una frontera de red?
+\item ¿Qué autonomía concreta justificaría separar Ranking?
+\item ¿Qué sabe Mercado después de un timeout de Inventario?
+\item ¿Qué resuelve outbox y qué deja abierto?
+\item ¿Por qué compensar no equivale a rollback?
 \end{enumerate}
 \end{frame}
 
 \begin{frame}{Fuentes para profundizar}
 \UASlideTag{NÚCLEO}{UAIngNavy}
+\small
 \begin{itemize}
-\item Kleppmann, \emph{Designing Data-Intensive Applications}: servicios, eventos, consistencia y stream processing.
-\item Martin Fowler, \emph{Monolith First}, \emph{Microservice Trade-Offs} y \emph{Strangler Fig}.
-\item Shopify Engineering: modular monolith, componentización y Packwerk.
-\item AWS Prescriptive Guidance: transactional outbox, saga choreography/orchestration y strangler fig.
-\item Netflix TechBlog: casos de microservicios, pipelines y event-driven architecture.
+\item Kleppmann, \emph{Designing Data-Intensive Applications}: servicios, RPC, transacciones, streams y sistemas derivados.
+\item Evans, \emph{Domain-Driven Design}: bounded contexts y lenguaje ubicuo.
+\item Fowler, \emph{Monolith First}, \emph{Microservice Trade-Offs} y \emph{Strangler Fig}.
+\item Shopify Engineering: modular monolith, componentización y límites internos.
+\item AWS Prescriptive Guidance: transactional outbox y sagas.
+\item Richardson, \emph{Microservices Patterns}: sagas, contratos y datos por servicio.
+\item DORA, \emph{Accelerate State of DevOps}: tiempo hasta producción, frecuencia de puesta en producción y confiabilidad operacional.
 \end{itemize}
 \end{frame}
 
