@@ -106,31 +106,6 @@ mecanismos de resiliencia antes de que el daño se propague en cascada.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{¿Por qué monitorear?}
-\begin{itemize}
-\item \textbf{Contención de daño:} Un sistema que detecta su propia degradación puede activar
-mecanismos de resiliencia antes de que el daño se propague en cascada.
-\item \textbf{Aprendizaje continuo:} Los datos de monitoreo alimentan postmortems blameless, experimentos de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
-\end{itemize}
-\pause
-
-\begin{block}{Idea}
-No monitoreamos porque podemos. Monitoreamos porque sin visibilidad, no hay forma de mantener un sistema distribuido en producción.
-\end{block}
-\end{frame}
-
-\begin{frame}{Observabilidad: De la Teoría de Control al Software}
-
-\begin{block}{Observabilidad (Teoría de Control aplicada a Software)}
-Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
-\end{block}
-
-\pause
-
-Aplicado a la ingeniería de software moderna (Majors et al., 2022; Young \& Parker, 2024), un sistema es observable si permite a los ingenieros investigar y explicar cualquier estado arbitrario en el que se encuentre el sistema ---especialmente estados imprevistos o nunca antes vistos (\emph{unknown-unknowns})--- mediante preguntas exploratorias sin necesidad de adivinar, predecir el fallo de antemano o desplegar nuevo código para agregar más logs.
-
-\end{frame}
-
 \begin{frame}{La propuesta clásica: "Los Tres Pilares"}
 Tradicionalmente, la industria ha presentado la observabilidad como un sistema de tres señales complementarias (los tres pilares):
 
@@ -232,6 +207,27 @@ Las tres señales conservan su identidad y propósito, pero viajan y se almacena
 {\scriptsize\color{UAIngMuted}Adaptado de Young \& Parker, \emph{Learning OpenTelemetry} (O'Reilly, 2024), Fig.~1-3.}
 \end{frame}
 
+\begin{frame}{Monitoreo y observabilidad no son lo mismo}
+
+\begin{description}
+\item[Monitoreo] ¿Está funcionando el sistema? Chequea fallas que alguien \textbf{anticipó}: ¿hay memoria? ¿responde el ping? ¿subió el \emph{error rate}? Son \emph{known-unknowns}: sabés qué preguntar, no sabés la respuesta.
+\pause
+\item[Observabilidad] ¿Por qué está pasando \textbf{esto}, que nadie previó? Son \emph{unknown-unknowns}: ni siquiera sabías que había que preguntarlo.
+\end{description}
+
+\pause
+
+\begin{block}{La definición formal (Teoría de Control)}
+Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
+\end{block}
+
+\pause
+
+{\small Llevado a software: explicar cualquier estado del sistema haciendo preguntas nuevas, \textbf{sin desplegar código} para agregar más logs. Si para responder hay que deployar, no era observable.}
+
+{\scriptsize\color{UAIngMuted}Kálmán (1960); Majors et al. (2022); Young \& Parker (2024).}
+\end{frame}
+
 \UASectionSlide{El pegamento: Contexto e Instrumentación}
 
 \begin{frame}{El hilo de la trenza: Hard Context vs. Soft Context}
@@ -241,14 +237,14 @@ Esas verticales naranjas de la trenza tienen nombre: \textbf{el Contexto}. Metad
 
 
 \begin{itemize}
-\item \textbf{Hard Context (Duro):} Identificador único por solicitud que los servicios propagan entre sí (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Permite relacionar \textbf{explícitamente} mediciones que tienen relación causal. Define la \textbf{forma} del sistema.
+\item \textbf{Hard Context:} Identificador único por solicitud que los servicios propagan entre sí (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Permite relacionar \textbf{explícitamente} mediciones que tienen relación causal. Define la \textbf{forma} del sistema.
 \end{itemize}
 % poner una imagen del libro que muestre la froma de arbol Gateway → Auth → Orders → DB
 \end{frame}
 
 \begin{frame}{El hilo de la trenza: Hard Context vs. Soft Context}
 \begin{itemize}
-\item \textbf{Soft Context (Blando):} Atributos que cada instrumento adjunta a la medición (\texttt{customer\_id}, hostname, \emph{timestamp}). \textbf{Puede} haber relación causal, pero no está garantizada. Define las \textbf{dimensiones} por las que podés cortar los datos.
+\item \textbf{Soft Context:} Atributos que cada instrumento adjunta a la medición (\texttt{customer\_id}, hostname, \emph{timestamp}). \textbf{Puede} haber relación causal, pero no está garantizada. Define las \textbf{dimensiones} por las que podés cortar los datos.
 \end{itemize}
 % poner una imagen del libro que muestre lo de las dimensiones
 \pause
@@ -311,7 +307,7 @@ Memoria y CPU del host compitiendo con la aplicación, y acoplamiento: cambiar d
 \begin{enumerate}
 \item \textbf{SDK único:} el código se instrumenta contra una API neutral; no sabe a qué backend van los datos.
 \pause
-\item \textbf{OTLP (el protocolo):} un solo canal para métricas, logs y trazas, enviados en \emph{batches}. Por defecto \texttt{http/protobuf}, no gRPC.
+\item \textbf{OTLP (el protocolo):} un solo canal para métricas, logs y trazas, enviados en \emph{batches}. Por defecto \texttt{http/protobuf}.
 \pause
 \item \textbf{Collector:} proceso aparte (\emph{sidecar} o agente de nodo) que recibe, transforma, filtra o muestrea, y exporta a varios destinos por configuración.
 \end{enumerate}
@@ -412,7 +408,7 @@ La pregunta se decide cuando \textbf{escribís} la métrica, no cuando la consul
 \pause
 \item[Tráfico] Cuánta demanda recibe el sistema, en la unidad que corresponda: solicitudes por segundo en una API (rps), sesiones concurrentes en streaming, lecturas por segundo en una DB, etc. Mide \emph{demanda}, no capacidad: si cae, puede ser buena noticia o que nadie logra entrar.
 \pause
-\item[Errores] Tasa de solicitudes que fallan: \textbf{explícitas} (HTTP 5xx), \textbf{implícitas} (HTTP 4xx con algún error de negocio) y \textbf{por política} (si prometiste responder en 1\,s, lo que tarde más es un error).
+\item[Errores] Tasa de solicitudes que fallan: por ejemplo, HTTP 5xx, HTTP 4xx con algún error de negocio.
 \pause
 \item[Saturación] Qué tan lleno está el recurso más restringido (memoria, pool de conexiones de DB, CPU). Los sistemas se degradan \emph{antes} del 100\,\% de utilización, y el alza de latencia es el \textbf{indicador adelantado}.
 \end{description}
@@ -467,24 +463,28 @@ Hasta ahora la tratamos como un escalar: ``más consistencia global, más latenc
 \end{itemize}
 \end{frame}
 
-% \begin{frame}{El peligro de la Explosión de Cardinalidad en TSDBs}
-% \begin{alertblock}{Bases de Series Temporales (Prometheus)}
-% Cada combinación única de etiquetas crea una serie temporal nueva en memoria.
-% \end{alertblock}
+\begin{frame}{El límite de las métricas: cardinalidad}
+Si la métrica es pre-agregada y perdimos el detalle, la pregunta natural es: \textbf{¿y por qué no le agrego más etiquetas?}
 
-% \pause
+\pause
 
-% Si agregamos etiquetas de alta cardinalidad (ej: \texttt{user\_id} o \texttt{order\_id}):
-% \[
-% \text{Total series} = \text{métricas} \times \text{status} \times \text{endpoints} \times \mathbf{user\_ids} \longrightarrow \textbf{Colapso}
-% \]
+\begin{alertblock}{Porque cada combinación de etiquetas es una serie temporal distinta}
+\[
+\text{series} = \text{métricas} \times \text{endpoints} \times \text{status} \times \mathbf{user\_ids}
+\]
+Una TSDB como Prometheus mantiene cada serie en memoria. Agregar \texttt{user\_id} con 10 millones de usuarios \textbf{multiplica}, no suma.
+\end{alertblock}
 
-% \pause
+\pause
 
-% \begin{block}{Regla de diseño fundamental}
-% Las métricas solo admiten baja cardinalidad finita. La alta cardinalidad pertenece a los \textbf{Spans} y a los \textbf{Eventos Estructurados}.
-% \end{block}
-% \end{frame}
+\begin{block}{La regla}
+Alta cardinalidad en \textbf{spans y eventos anchos}. Nunca en métricas.
+\end{block}
+
+\pause
+
+{\small Por eso la Capa 2 inyecta \texttt{user\_id} en el span y no en un contador: el span describe \emph{una} solicitud; la métrica, un agregado de todas.}
+\end{frame}
 
 \begin{frame}{Señal 2: Tracing Distribuido (DAG y Spans)}
 Responde: \emph{¿Dónde estuvo la solicitud y en qué orden causal viajó?}
@@ -612,7 +612,7 @@ Lo que ve el usuario, y lo que dispara la alerta, es el paso 4. Lo que hay que a
 
 \pause
 
-{\small Miren el paso 3: el \emph{retry} que en clases anteriores era la solución, acá es el combustible. Volvemos sobre esto ...}
+{\small Miren el paso 3: el \emph{retry} que en clases anteriores era la solución, acá es el combustible. Volveremos sobre esto ...}
 \end{frame}
 
 \begin{frame}{El Core Analysis Loop}
