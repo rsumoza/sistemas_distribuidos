@@ -9,6 +9,7 @@
 
 \author{\UAProfessor}
 \date{\UADate}
+%\includeonlyframes{wip} % TODO remover
 \begin{document}
 
 {
@@ -25,36 +26,43 @@ Ya vimos RPC, retries, consistencia, transacciones y logs. Vimos componentes y c
 
 \pause
 
-¿Qué es lo que aparece una vez que un sistema distribuido está desplegado en producción?
+¿Qué es lo que aparece una vez que el sistema está desplegado en producción? \pause \textbf{Problemas}
 
 \pause
 
-Los problemas ...
-% Agregar imagen que muestre como se pasa del diseño a producción pero con problemas (barco que se da vuelta)
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.80, transform shape,
+  every node/.style={font=\scriptsize},
+  box/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=1.6cm, minimum height=0.48cm},
+  ghost/.style={draw=UAIngRule, fill=UAIngRule!30, text=UAIngMuted, rounded corners, minimum width=1.6cm, minimum height=0.48cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy},
+  dead/.style={-{Stealth[length=1.6mm]}, draw=UAIngRule, dashed}
+]
+\node[font=\scriptsize\bfseries, text=UAIngNavy] at (0,1.05) {En el diseño};
+\node[box] (a1) at (0,0.40) {API Gateway};
+\node[box] (a2) at (0,-0.28) {Auth};
+\node[box] (a3) at (0,-0.96) {Orders};
+\node[box] (a4) at (0,-1.64) {DB};
+\draw[flow] (a1)--(a2); \draw[flow] (a2)--(a3); \draw[flow] (a3)--(a4);
+
+\draw[draw=UAIngRule] (3.0,1.25) -- (3.0,-2.0);
+
+\node[font=\scriptsize\bfseries, text=UAIngOrange] at (6.0,1.05) {En producción, 4 AM};
+\node[ghost] (b1) at (6.0,0.40) {?};
+\node[ghost] (b2) at (6.0,-0.28) {?};
+\node[ghost] (b3) at (6.0,-0.96) {?};
+\node[ghost] (b4) at (6.0,-1.64) {?};
+\draw[dead] (b1)--(b2); \draw[dead] (b2)--(b3); \draw[dead] (b3)--(b4);
+\node[font=\scriptsize\bfseries, text=UAIngOrange, right=0.4cm of b1] (err) {HTTP 504};
+\draw[-{Stealth[length=1.6mm]}, draw=UAIngOrange] (err) -- (b1);
+\end{tikzpicture}
+\end{center}
+
 \pause
 
-\begin{block}{El desafío real (Las 4:00 AM en producción)}
-Una solicitud atravesó 5 microservicios y falló intermitentemente. No hay un stack trace único ni podés poner un breakpoint local. ¿Cómo entendés qué sucedió?
-\end{block}
-\end{frame}
-
-\begin{frame}{¿Por qué monitorear?}
-      % Agregar una imagen que se muestre una sola vez mostrando sistemas de monitoreo (tablero de un auto, monitores de internación médica, etc)
-\begin{itemize}
-\item Hay problemas que no se resuelven de manera automática y es necesario informar
-      a un humano: un disco que se está llenando, un certificado SSL por vencer,
-      un servicio que degrada lentamente.
-\item Sin monitoreo, la primera señal de fallo suele ser un usuario quejándose.
-\item Los datos de monitoreo permiten tomar decisiones informadas:
-      ¿cuánto mejoró el hit rate de memcache al agregar un nodo?
-      Sin métricas, esa respuesta es una apuesta.
-\end{itemize}
-
-\pause
-
-\begin{block}{Idea}
-No monitoreamos porque podemos. Monitoreamos porque sin visibilidad operativa,
-no hay forma de sostener un sistema distribuido en producción.
+\begin{block}{El desafío real}
+No se trata solo de que el sistema opere correctamente. Sino de poder entenderlo mientras opera. Por ejemplo, qué está fallando y por qué.
 \end{block}
 \end{frame}
 
@@ -63,22 +71,68 @@ En un único servidor (o monolito en producción):
 \begin{itemize}
 \item \textbf{Stack trace completo:} el hilo de ejecución vive en el mismo espacio de memoria; ante un fallo, el runtime explica la causalidad.
 \item \textbf{Reloj físico único:} el hardware serializa los logs locales con orden real.
-\item \textbf{Llamadas en memoria:} no hay latencia oculta en colas de red.
+\item \textbf{Llamadas en memoria:} una llamada entre funciones toma ns. El tiempo que tarda el sistema se puede explicar mirando un solo lugar.
+\end{itemize}
+
+\end{frame}
+
+\begin{frame}{Un solo servidor vs. Múltiples servidores en red}
+Al pasar a múltiples servidores:
+\begin{itemize}
+\item \textbf{Stack trace desaparece:} el usuario final solo ve 4xx o 5xx.
+\item \textbf{\emph{Clock drift}:} logs de distintas instancias no permiten seguir el orden causa -> efecto.
+\item \textbf{Tiempos ocultos:} la latencia empeiza a depender de otros servicios y de la red.
+\item \textbf{Fallas combinatorias:} cada nodo se ve ``sano'' en sus métricas locales, por la latencia se acumula.
 \end{itemize}
 
 \pause
 
-Al cruzar a múltiples servidores por red:
+\begin{block}{Por lo tanto}
+La observabilidad no es un agregado opcional al final del desarrollo. Es una \textbf{propiedad arquitectónica estructural} del sistema.
+\end{block}
+\end{frame}
+
+\begin{frame}{¿Por qué monitorear?}
+      % Agregar una imagen que se muestre una sola vez mostrando sistemas de monitoreo (tablero de un auto, monitores de internación médica, etc)
 \begin{itemize}
-\item \textbf{Stack trace desaparece:} solo se ve 5xx.
-\item \textbf{\emph{Clock drift}:} logs de distintas máquinas desordenan causa y efecto.
-\item \textbf{Tiempos ocultos:} la latencia vive en colas y red, fuera del código.
-\item \textbf{Fallas combinatorias:} cada nodo se ve ``sano'' en sus métricas locales, por la latencia se acumula.
+\item \textbf{Detección temprana:} Sin monitoreo, la primera señal de fallo suele ser un usuario quejándose.
+\item \textbf{Diagnóstico:} Hay problemas que no se resuelven de manera automática y es necesario informar a un humano: un disco que se está llenando, un certificado SSL por vencer, un servicio que degrada lentamente.
+\item \textbf{Decisiones informadas:} Los datos de monitoreo permiten tomar decisiones informadas:
+      ¿Cuánto mejoró el hit rate de memcache al agregar un nodo?
+      Sin métricas, esa respuesta es una apuesta.
+\item \textbf{Contención de daño:} Un sistema que detecta su propia degradación puede activar
+mecanismos de resiliencia antes de que el daño se propague en cascada.
+\item \textbf{Aprendizaje continuo:} Los datos de monitoreo alimentan postmortems blameless, experimentos de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
 \end{itemize}
 \end{frame}
 
+\begin{frame}{¿Por qué monitorear?}
+\begin{itemize}
+\item \textbf{Contención de daño:} Un sistema que detecta su propia degradación puede activar
+mecanismos de resiliencia antes de que el daño se propague en cascada.
+\item \textbf{Aprendizaje continuo:} Los datos de monitoreo alimentan postmortems blameless, experimentos de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
+\end{itemize}
+\pause
+
+\begin{block}{Idea}
+No monitoreamos porque podemos. Monitoreamos porque sin visibilidad, no hay forma de mantener un sistema distribuido en producción.
+\end{block}
+\end{frame}
+
+\begin{frame}{Observabilidad: De la Teoría de Control al Software}
+
+\begin{block}{Observabilidad (Teoría de Control aplicada a Software)}
+Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
+\end{block}
+
+\pause
+
+Aplicado a la ingeniería de software moderna (Majors et al., 2022; Young \& Parker, 2024), un sistema es observable si permite a los ingenieros investigar y explicar cualquier estado arbitrario en el que se encuentre el sistema ---especialmente estados imprevistos o nunca antes vistos (\emph{unknown-unknowns})--- mediante preguntas exploratorias sin necesidad de adivinar, predecir el fallo de antemano o desplegar nuevo código para agregar más logs.
+
+\end{frame}
+
 \begin{frame}{La propuesta clásica: "Los Tres Pilares"}
-Frente a la fragmentación de la red y la pérdida del stack trace, la industria propuso abordar el sistema mediante tres señales complementarias:
+Tradicionalmente, la industria ha presentado la observabilidad como un sistema de tres señales complementarias (los tres pilares):
 
 % resaltar más qué esto es una respuesta a lo anterior capaz poner un título más llamativo o poner la imagen de los 3 pilares
 \begin{itemize}
@@ -86,7 +140,7 @@ Frente a la fragmentación de la red y la pérdida del stack trace, la industria
 \item \textbf{Logs:} Registros detallados de eventos individuales que ocurren en el código de cada servicio.
 \item \textbf{Trazas:} El recorrido topológico de una solicitud individual a través de los múltiples saltos de red.
 \end{itemize}
-
+% poner imágenes que muestren cada uno así los pibes se hacen una idea de qué hablamos
 \pause
 
 \begin{block}{La promesa}
@@ -94,15 +148,15 @@ Si recolectamos las tres señales de forma exhaustiva, tendremos visibilidad suf
 \end{block}
 \end{frame}
 
-\begin{frame}{Tecnologías y modelos de datos divergentes}
+\begin{frame}{La propuesta clásica: "Los Tres Pilares"}
 Cada una de las tres señales demandó requerimientos técnicos radicalmente distintos:
 
 \begin{description}
-\item[Métricas:] Escritura numérica masiva y agregación temporal en memoria $\rightarrow$ Bases de Series Temporales (\emph{TSDB}, ej: Prometheus).
+\item[\textbf{Métricas:}] Escritura numérica masiva y agregación temporal en memoria $\rightarrow$ Bases de Series Temporales (\emph{TSDB}, ej: Prometheus).
 \pause
-\item[Logs:] Búsqueda sobre texto libre no estructurado $\rightarrow$ Motores de indexación invertida (\emph{Lucene}, ej: Elasticsearch).
+\item[\textbf{Logs:}] Búsqueda sobre texto libre no estructurado $\rightarrow$ Motores de indexación invertida (\emph{Lucene}, ej: Elasticsearch).
 \pause
-\item[Trazas:] Reconstrucción de árboles y grafos acíclicos $\rightarrow$ Almacenamiento especializado de spans (\emph{Dapper}, ej: Jaeger).
+\item[\textbf{Trazas:}] Reconstrucción de árboles y grafos acíclicos $\rightarrow$ Almacenamiento especializado de spans (\emph{Dapper}, ej: Jaeger).
 \end{description}
 
 \pause
@@ -114,6 +168,8 @@ Cada solución evolucionó de forma aislada: con su propio agente en el host, su
 
 %poner el meme de recalculando con la idea de mostrar qué hay que estar haciendo correlaciones
 \begin{frame}{El antipatrón de "Las Tres Pestañas"}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.62\textwidth}
 En la práctica, la divergencia tecnológica se trasladó a la pantalla del operador durante un incidente:
 
 \begin{alertblock}{Three Browser Tabs}
@@ -123,6 +179,14 @@ En la práctica, la divergencia tecnológica se trasladó a la pantalla del oper
 \item Pestaña 3: Herramienta de trazas aisladas (Jaeger).
 \end{itemize}
 \end{alertblock}
+\end{column}
+\begin{column}{0.36\textwidth}
+\vspace{0.6em}
+\begin{center}
+\includegraphics[width=\linewidth,keepaspectratio]{assets/10/4AM.jpeg} %usar la de recalculando
+\end{center}
+\end{column}
+\end{columns}
 
 \pause
 
@@ -134,58 +198,175 @@ En la práctica, la divergencia tecnológica se trasladó a la pantalla del oper
 Las tres señales conservan su identidad y propósito, pero viajan y se almacenan \textbf{entrelazadas mediante contexto compartido}.
 \end{block}
 
-% usar imagen del libro y agregar referencia al libro
+\pause
+
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.92, transform shape,
+  every node/.style={font=\scriptsize},
+  lane/.style={draw=UAIngRule, line width=0.9pt},
+  stitch/.style={draw=UAIngOrange, line width=1.1pt},
+  dot/.style={circle, fill=UAIngNavy, inner sep=1.1pt}
+]
+\node[text=UAIngMuted, anchor=east] at (-0.15,1.0) {Métricas};
+\node[text=UAIngMuted, anchor=east] at (-0.15,0.0) {Trazas};
+\node[text=UAIngMuted, anchor=east] at (-0.15,-1.0) {Logs};
+\draw[lane] (0,1.0) -- (9.0,1.0);
+\draw[lane] (0,0.0) -- (9.0,0.0);
+\draw[lane] (0,-1.0) -- (9.0,-1.0);
+\foreach \x in {1.5,4.0,6.5} {
+  \draw[stitch] (\x,1.0) -- (\x,-1.0);
+  \node[dot] at (\x,1.0) {};
+  \node[dot] at (\x,0.0) {};
+  \node[dot] at (\x,-1.0) {};
+}
+\node[text=UAIngOrange, font=\scriptsize\bfseries, anchor=south] at (1.5,1.2) {\texttt{trace\_id=a1}};
+\node[text=UAIngOrange, font=\scriptsize\bfseries, anchor=south] at (4.0,1.2) {\texttt{trace\_id=b7}};
+\node[text=UAIngOrange, font=\scriptsize\bfseries, anchor=south] at (6.5,1.2) {\texttt{trace\_id=c2}};
+\node[text=UAIngMuted, anchor=north] at (4.5,-1.45) {el mismo \texttt{trace\_id} atraviesa las tres señales};
+\end{tikzpicture}
+\end{center}
 
 \pause
 
-\begin{itemize}
-\item Rompe el aislamiento de las tres pestañas: permite que las computadoras (y no solo los ojos del operador) calculen correlaciones automáticas.
-\item Un estándar de instrumentación unificado y un protocolo común (OTLP) reemplaza la proliferación de agentes incompatibles.
-\end{itemize}
+{\scriptsize\color{UAIngMuted}Adaptado de Young \& Parker, \emph{Learning OpenTelemetry} (O'Reilly, 2024), Fig.~1-3.}
 \end{frame}
-
-\begin{frame}{De Monitoreo a Observabilidad}
-\begin{itemize}
-\item \textbf{Monitoreo tradicional:} ¿Está el sistema funcionando? Inspecciona fallas predecibles de componentes (\emph{known-unknowns}, ej: ¿hay memoria? ¿responde el ping?). Es pasivo y basado en síntomas.
-\end{itemize}
-
-\pause
-
-\begin{block}{Observabilidad (Teoría de Control aplicada a Software)}
-Un sistema es observable si su estado interno puede inferirse a partir del conocimiento de sus salidas externas.
-\end{block}
-
-\pause
-
-\begin{itemize}
-\item \textbf{Observabilidad moderna:} ¿Por qué está ocurriendo este comportamiento anómalo e imprevisto? Permite explicar cualquier estado arbitrario del sistema (\emph{unknown-unknowns}) haciendo preguntas nuevas sin desplegar código nuevo.
-\end{itemize}
-\end{frame}
-
-% agregar una slide explicando los objetivos de OLTP ver: https://github.com/open-telemetry/opentelemetry-proto/blob/main/docs/design-goals.md
 
 \UASectionSlide{El pegamento: Contexto e Instrumentación}
 
 \begin{frame}{El hilo de la trenza: Hard Context vs. Soft Context}
-¿Qué es lo que entrelaza las tres señales? \textbf{El Contexto}.
+Esas verticales naranjas de la trenza tienen nombre: \textbf{el Contexto}. Metadatos que describen la relación entre operaciones y telemetría.
 
-\begin{description}
-\item[Soft Context (Blando):] Correlación implícita por ventanas de tiempo coincidentes o filtros de texto libre. Es frágil y exige que un humano intuya la causa.
 \pause
-\item[Hard Context (Duro):] Enlaces explícitos e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Define la topología y causalidad exacta.
-\end{description}
+
+
+\begin{itemize}
+\item \textbf{Hard Context (Duro):} Identificador único por solicitud que los servicios propagan entre sí (\texttt{trace\_id}, \texttt{span\_id}, cabeceras W3C). Permite relacionar \textbf{explícitamente} mediciones que tienen relación causal. Define la \textbf{forma} del sistema.
+\end{itemize}
+% poner una imagen del libro que muestre la froma de arbol Gateway → Auth → Orders → DB
+\end{frame}
+
+\begin{frame}{El hilo de la trenza: Hard Context vs. Soft Context}
+\begin{itemize}
+\item \textbf{Soft Context (Blando):} Atributos que cada instrumento adjunta a la medición (\texttt{customer\_id}, hostname, \emph{timestamp}). \textbf{Puede} haber relación causal, pero no está garantizada. Define las \textbf{dimensiones} por las que podés cortar los datos.
+\end{itemize}
+% poner una imagen del libro que muestre lo de las dimensiones
+\pause
+
+\begin{alertblock}{No es uno o el otro}
+Soft Context: es lo que deja descubrir que la falla correlaciona con \texttt{tenant\_id=450}. El problema es el soft context \emph{sin} hard context: ahí el tiempo queda como única dimensión compartida y alguien tiene que alinear \emph{timestamps} a ojo. Eso son las tres pestañas.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Antes de OpenTelemetry: un agente por señal}
+Volvamos al problema de los agentes incompatibles: la trenza no se sostiene si cada señal viaja por su propio cable.
+
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.85, transform shape,
+  every node/.style={font=\scriptsize},
+  box/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.4cm, minimum height=0.5cm},
+  back/.style={draw=UAIngRule, fill=UAIngRule!30, rounded corners, minimum width=2.0cm, minimum height=0.5cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}
+]
+\node[draw=UAIngNavy, rounded corners, minimum width=1.6cm, minimum height=2.4cm] (app) at (0,0) {Servicio};
+\node[box] (m) at (3.4, 0.9) {Cliente Prometheus};
+\node[box] (l) at (3.4, 0.0) {Filebeat (regex)};
+\node[box] (t) at (3.4,-0.9) {SDK Jaeger};
+\node[back] (bm) at (7.6, 0.9) {Prometheus};
+\node[back] (bl) at (7.6, 0.0) {Elasticsearch};
+\node[back] (bt) at (7.6,-0.9) {Jaeger};
+\draw[flow] (app.east |- m) -- (m);  \draw[flow] (m) -- node[above]{scraping} (bm);
+\draw[flow] (app.east |- l) -- (l);  \draw[flow] (l) -- node[above]{archivos} (bl);
+\draw[flow] (app.east |- t) -- (t);  \draw[flow] (t) -- node[above]{UDP binario} (bt);
+\end{tikzpicture}
+\end{center}
+
+\pause
+
+\begin{alertblock}{El costo}
+Memoria y CPU del host compitiendo con la aplicación, y acoplamiento: cambiar de backend obliga a reescribir la instrumentación.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{OpenTelemetry: un SDK, un protocolo, un Collector}
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.85, transform shape,
+  every node/.style={font=\scriptsize},
+  box/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.0cm, minimum height=0.5cm},
+  back/.style={draw=UAIngRule, fill=UAIngRule!30, rounded corners, minimum width=2.0cm, minimum height=0.5cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}
+]
+\node[box] (app) at (0,0) {Servicio + SDK};
+\node[box, draw=UAIngOrange] (col) at (3.8,0) {Collector};
+\node[back] (b1) at (7.4, 0.8) {Prometheus};
+\node[back] (b2) at (7.4, 0.0) {Jaeger};
+\node[back] (b3) at (7.4,-0.8) {Elasticsearch};
+\draw[flow, draw=UAIngOrange, line width=1.1pt] (app) -- node[above, text=UAIngOrange, font=\scriptsize\bfseries]{OTLP} (col);
+\draw[flow] (col) -- (b1); \draw[flow] (col) -- (b2); \draw[flow] (col) -- (b3);
+\end{tikzpicture}
+\end{center}
+
+\begin{enumerate}
+\item \textbf{SDK único:} el código se instrumenta contra una API neutral; no sabe a qué backend van los datos.
+\pause
+\item \textbf{OTLP (el protocolo):} un solo canal para métricas, logs y trazas, enviados en \emph{batches}. Por defecto \texttt{http/protobuf}, no gRPC.
+\pause
+\item \textbf{Collector:} proceso aparte (\emph{sidecar} o agente de nodo) que recibe, transforma, filtra o muestrea, y exporta a varios destinos por configuración.
+\end{enumerate}
+
+\pause
+\begin{alertblock}{Clave:}
+OpenTelemetry es la capa de transporte, no la de almacenamiento: no se ata a ningún proveedor.
+\end{alertblock}
+
+\note{características rápidas de serialización y deserialización, diseñado para ejercer una presión mínima sobre el gestor de memoria, exige alcanzar ratios de compresión altos, considerando el batching y el agrupamiento de datos similares para lograr mejor compresión — reduce uso de ancho de banda, por default usa Protocol Buffers que refuerza lo anterior}
 \end{frame}
 
 \begin{frame}{De la teoría al código: Estrategia en 2 Capas}
-¿Cómo implementamos esa trenza en el software sin reinventar la rueda?
+¿Cómo implementamos esto?
 
-\begin{description}
-\item[Capa 1: Infraestructura (Auto-instrumentación)]~\\
+\begin{enumerate}
+\item \textbf{Capa 1: Infraestructura (Auto-instrumentación)}
 Middlewares HTTP/gRPC y agentes que capturan el esqueleto de red y propagan el \textbf{Hard Context} (cabeceras W3C) automáticamente.
 \pause
-\item[Capa 2: Dominio (Instrumentación Manual)]~\\
-El desarrollador inyecta atributos de negocio de alta cardinalidad (\texttt{tenant\_id}, \texttt{cart\_items}) en el contexto activo de la solicitud.
+\item \textbf{Capa 2: Dominio (Instrumentación Manual)}
+El desarrollador inyecta atributos de negocio de alta cardinalidad (\texttt{user\_id}, \texttt{cart\_items}) en el contexto activo de la solicitud.
+\end{enumerate}
+\end{frame}
+
+\begin{frame}{Correlación automática (I): el software hace de puente}
+En las tres pestañas, el puente era el operador. Con hard context compartido, el puente es un \emph{JOIN}.
+
+\begin{description}
+\item[Contexto activo:] al recibir la solicitud, el SDK guarda \texttt{trace\_id} y \texttt{span\_id} en el contexto del hilo (en Java, el \texttt{Context} de OTel sobre un \texttt{ThreadLocal}).
+\pause
+\item[Log $\leftrightarrow$ Traza:] cada llamada al logger sale con esos IDs estampados, sin que el desarrollador los pase.
 \end{description}
+
+\begin{center}
+\scriptsize
+\texttt{\{"level":"error", "msg":"timeout DB", \textcolor{UAIngOrange}{"trace\_id":"a1", "span\_id":"7f"}\}}
+\end{center}
+
+\pause
+
+\textbf{Resultado:} el span y todos sus logs se unen por igualdad exacta de ID, no por cercanía de \emph{timestamps}.
+\end{frame}
+
+\begin{frame}{Correlación automática (II): de la métrica a la causa}
+\begin{description}
+\item[Métrica $\leftrightarrow$ Traza (\emph{Exemplars}):] un \emph{bucket} del histograma guarda el \texttt{trace\_id} de una solicitud concreta. Clic en el pico de p99 en Grafana $\rightarrow$ se abre la traza que lo causó.
+\pause
+\item[Análisis diferencial:] como todas las señales comparten atributos, el motor compara su distribución entre solicitudes fallidas y exitosas, y aísla la dimensión culpable sin hipótesis previa.
+\end{description}
+
+\pause
+
+\begin{block}{Conexión con el diagnóstico}
+Esto es lo que va a hacer posible el Core Analysis Loop del final: métrica $\rightarrow$ dimensión $\rightarrow$ traza.
+\end{block}
 \end{frame}
 
 \UASectionSlide{Las tres señales de la trenza}
@@ -204,38 +385,106 @@ Una alerta que solo dice ``error rate alto'' es una alarma de incendio sin indic
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{Señal 1: Métricas, Percentiles y Golden Signals}
+\begin{frame}{Señal 1: Métricas}
 Responde: \emph{¿Qué componente o servicio está degradado?}
 
-\begin{itemize}
-\item \textbf{Golden Signals (Google SRE):} Latencia, Tráfico, Errores y Saturación.
-\item \textbf{La falacia del promedio:} La media oculta a las minorías.
-\item Mirar y alertar siempre sobre percentiles:
-  \begin{itemize}
-  \item \textbf{p50:} Experiencia típica del usuario.
-  \item \textbf{p95 / p99:} Comportamiento de la cola larga bajo estrés o contención.
-  \end{itemize}
-\end{itemize}
-\end{frame}
+\begin{block}{Qué es una métrica}
+Una representación numérica del estado del sistema durante el intervalo en que fue registrada: \textbf{nombre + etiquetas + una serie de pares (timestamp, valor)}.
+\end{block}
 
-\begin{frame}{El peligro de la Explosión de Cardinalidad en TSDBs}
-\begin{alertblock}{Bases de Series Temporales (Prometheus)}
-Cada combinación única de etiquetas crea una serie temporal nueva en memoria.
+\pause
+
+\begin{alertblock}{La propiedad que define todo: es \emph{pre-agregada}}
+La pregunta se decide cuando \textbf{escribís} la métrica, no cuando la consultás. Los requests individuales que generaron ese número ya no existen. Es decir, no podes desagregar para ver detalle.
 \end{alertblock}
 
 \pause
 
-Si agregamos etiquetas de alta cardinalidad (ej: \texttt{user\_id} o \texttt{order\_id}):
-\[
-\text{Total series} = \text{métricas} \times \text{status} \times \text{endpoints} \times \mathbf{user\_ids} \longrightarrow \textbf{Colapso}
-\]
+\begin{itemize}
+\item Una solicitud deja rastro en cientos de métricas y ninguna sabe de las otras: no hay hard context.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Las cuatro Golden Signals, una por una}
+\small
+\begin{description}
+\item[Latencia] Tiempo que toma atender una solicitud. Es bueno \textbf{separar la de éxito de la de error}: por ejemplo un HTTP 500 por caída de la DB podría responder rapidísimo y, promediado con el resto, \emph{mejora} el número. Y al revés, un error lento puede empeorarlo. Siempre es peor que un error lento.
+\pause
+\item[Tráfico] Cuánta demanda recibe el sistema, en la unidad que corresponda: solicitudes por segundo en una API (rps), sesiones concurrentes en streaming, lecturas por segundo en una DB, etc. Mide \emph{demanda}, no capacidad: si cae, puede ser buena noticia o que nadie logra entrar.
+\pause
+\item[Errores] Tasa de solicitudes que fallan: \textbf{explícitas} (HTTP 5xx), \textbf{implícitas} (HTTP 4xx con algún error de negocio) y \textbf{por política} (si prometiste responder en 1\,s, lo que tarde más es un error).
+\pause
+\item[Saturación] Qué tan lleno está el recurso más restringido (memoria, pool de conexiones de DB, CPU). Los sistemas se degradan \emph{antes} del 100\,\% de utilización, y el alza de latencia es el \textbf{indicador adelantado}.
+\end{description}
+
+\end{frame}
+
+\begin{frame}{La latencia no es un número: es una distribución}
+Hasta ahora la tratamos como un escalar: ``más consistencia global, más latencia''.
 
 \pause
 
-\begin{block}{Regla de diseño fundamental}
-Las métricas solo admiten baja cardinalidad finita. La alta cardinalidad pertenece a los \textbf{Spans} y a los \textbf{Eventos Estructurados}.
-\end{block}
+\begin{alertblock}{La falacia del promedio}
+99 usuarios tardan 10\,ms y 1 usuario tarda 10\,000\,ms. El promedio es \textbf{110\,ms}: un número que no describe a \textbf{nadie} ---ni al que esperó 10\,ms ni al que esperó 10 segundos---.
+\end{alertblock}
+
+\pause
+
+{\small Los percentiles no son exclusivos de las métricas: también se calculan sobre spans y eventos anchos, y ahí son \emph{más} flexibles ---un p99 de Prometheus sale de cubos de histograma que elegiste al instrumentar---.}
 \end{frame}
+
+\begin{frame}{Percentiles sobre una distribución de latencia real}
+\begin{center}
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize, align=center},
+  curva/.style={draw=UAIngNavy, line width=1pt},
+  marca/.style={draw=UAIngNavy, dashed, line width=0.7pt},
+  eje/.style={draw=UAIngMuted, line width=0.6pt}
+]
+\fill[UAIngOrange, opacity=0.18]
+  plot[domain=6.2958:13, samples=60] (\x*0.72, {(\x*\x*exp(-\x))*4.4})
+  -- (13*0.72,0) -- (6.2958*0.72,0) -- cycle;
+\draw[curva] plot[domain=0.02:13, samples=140, smooth] (\x*0.72, {(\x*\x*exp(-\x))*4.4});
+\draw[eje] (0,0) -- (13*0.72,0);
+\node[text=UAIngMuted, below left] at (13*0.72,-0.05) {latencia};
+\draw[marca] (2.6741*0.72,0) -- (2.6741*0.72,{(2.6741*2.6741*exp(-2.6741))*4.4});
+\node[text=UAIngNavy, below] at (2.6741*0.72,-0.05) {\textbf{p50}\\100\,ms};
+\draw[draw=UAIngOrange, line width=1pt] (3.0*0.72,0) -- (3.0*0.72,{(3*3*exp(-3))*4.4});
+\node[text=UAIngOrange, right] at (3.0*0.72+0.15,{(3*3*exp(-3))*4.4+0.3}) {media\\112\,ms};
+\draw[marca] (6.2958*0.72,0) -- (6.2958*0.72,{(6.2958*6.2958*exp(-6.2958))*4.4});
+\node[text=UAIngNavy, below] at (6.2958*0.72,-0.05) {\textbf{p95}\\235\,ms};
+\draw[marca] (8.4059*0.72,0) -- (8.4059*0.72,{(8.4059*8.4059*exp(-8.4059))*4.4});
+\node[text=UAIngNavy, below] at (8.4059*0.72,-0.05) {\textbf{p99}\\314\,ms};
+\node[text=UAIngOrange, right] at (9.6*0.72,0.55) {la cola:\\el 5\% peor};
+\end{tikzpicture}
+\end{center}
+
+\pause
+
+\begin{itemize}
+\item No es una campana: la latencia es \textbf{asimétrica}. Tiene piso físico y no tiene techo.
+\item Por eso la \textbf{media} cae a la derecha de la mediana, y el \textbf{p99 triplica al p50}.
+\end{itemize}
+\end{frame}
+
+% \begin{frame}{El peligro de la Explosión de Cardinalidad en TSDBs}
+% \begin{alertblock}{Bases de Series Temporales (Prometheus)}
+% Cada combinación única de etiquetas crea una serie temporal nueva en memoria.
+% \end{alertblock}
+
+% \pause
+
+% Si agregamos etiquetas de alta cardinalidad (ej: \texttt{user\_id} o \texttt{order\_id}):
+% \[
+% \text{Total series} = \text{métricas} \times \text{status} \times \text{endpoints} \times \mathbf{user\_ids} \longrightarrow \textbf{Colapso}
+% \]
+
+% \pause
+
+% \begin{block}{Regla de diseño fundamental}
+% Las métricas solo admiten baja cardinalidad finita. La alta cardinalidad pertenece a los \textbf{Spans} y a los \textbf{Eventos Estructurados}.
+% \end{block}
+% \end{frame}
 
 \begin{frame}{Señal 2: Tracing Distribuido (DAG y Spans)}
 Responde: \emph{¿Dónde estuvo la solicitud y en qué orden causal viajó?}
@@ -253,20 +502,30 @@ Campos esenciales de un Span:
 \end{center}
 \end{frame}
 
-\begin{frame}{Semántica de Spans: SpanKind y Links}
-No todos los spans representan el mismo tipo de trabajo:
-\begin{description}
-\item[\texttt{CLIENT} / \texttt{SERVER}:] Comunicación síncrona (RPC/HTTP). Su diferencia temporal aísla la latencia de tránsito de red (\emph{network flight time}).
-\item[\texttt{PRODUCER} / \texttt{CONSUMER}:] Mensajería asincrónica (Kafka, RabbitMQ) desacoplada en el tiempo.
-\item[\texttt{INTERNAL}:] Cómputo local sin cruce de red.
-\end{description}
+\begin{frame}[t]{Un trace es esto}
+\vspace{-2em}
+\begin{center}
+\includegraphics[width=0.80\textwidth]{assets/10/traces_spans.png}
+\end{center}
+\vspace{-1em}
 
-\pause
-
-\begin{block}{Span Links (Enlaces)}
-Cuando un \texttt{CONSUMER} procesa un lote (\emph{batch}) de múltiples mensajes, asocia las múltiples trazas causantes mediante \textbf{Links}.
-\end{block}
+{\small Arriba la topología, abajo la línea de tiempo: la misma solicitud vista de dos maneras. Cada barra \textbf{contiene} a la siguiente, y eso es por el \texttt{parent\_span\_id}.}
 \end{frame}
+
+% \begin{frame}{Semántica de Spans: SpanKind y Links}
+% No todos los spans representan el mismo tipo de trabajo:
+% \begin{description}
+% \item[\texttt{CLIENT} / \texttt{SERVER}:] Comunicación síncrona (RPC/HTTP). Su diferencia temporal aísla la latencia de tránsito de red (\emph{network flight time}).
+% \item[\texttt{PRODUCER} / \texttt{CONSUMER}:] Mensajería asincrónica (Kafka, RabbitMQ) desacoplada en el tiempo.
+% \item[\texttt{INTERNAL}:] Cómputo local sin cruce de red.
+% \end{description}
+
+% \pause
+
+% \begin{block}{Span Links (Enlaces)}
+% Cuando un \texttt{CONSUMER} procesa un lote (\emph{batch}) de múltiples mensajes, asocia las múltiples trazas causantes mediante \textbf{Links}.
+% \end{block}
+% \end{frame}
 
 \begin{frame}{Tracing y Causalidad: Lamport vs. Clock Drift}
 \begin{block}{¿Por qué el timestamp de inicio no alcanza?}
@@ -276,7 +535,7 @@ Por el \emph{clock drift}, dos servidores desfasados por 50 ms registrarán even
 \pause
 
 \begin{itemize}
-\item El campo \texttt{parent\_span\_id} implementa la relación \textbf{\emph{happened-before} ($\rightarrow$) de Lamport} (Clase 03).
+\item El campo \texttt{parent\_span\_id} implementa la relación \textbf{\emph{happened-before} ($\rightarrow$) de Lamport}.
 \item Reconstruye el orden causal estricto sin depender de relojes físicos sincronizados.
 \end{itemize}
 \end{frame}
@@ -285,13 +544,12 @@ Por el \emph{clock drift}, dos servidores desfasados por 50 ms registrarán even
 \begin{itemize}
 \item \textbf{In-Band:} Cabeceras W3C (\texttt{traceparent}) viajan dentro de los mensajes de red. Si un microservicio olvida inyectarlas, la traza se corta.
 \item \textbf{Out-of-Band:} Envío asíncrono hacia el \textbf{OTel Collector} para buffering sin penalizar la latencia del usuario.
-\item \textbf{Exemplars:} Adjuntan un \texttt{trace\_id} representativo a un punto de métrica (el clic directo desde Grafana a la traza).
 \end{itemize}
 
 \pause
 
 \begin{block}{Sampling (Trade-off de escala)}
-No es viable almacenar $10^9$ trazas: se decide qué guardar al inicio (\emph{head-based}) o al finalizar para retener errores y colas lentas (\emph{tail-based}).
+No es viable almacenar $10^9$ trazas: se decide qué guardar al inicio (\emph{head-based}) o al finalizar para retener errores y colas lentas (\emph{tail-based}). Por ejemplo: guardar el 100\% de las trazas que tengan errores o alta latencia, y solo el 5\% del tráfico normal.
 \end{block}
 \end{frame}
 
@@ -306,50 +564,73 @@ Responde: \emph{¿Por qué ocurrió el problema en este caso específico?}
 \pause
 
 \begin{block}{Unidad de trabajo (Unit of Work)}
-Inicializar un mapa en memoria al recibir la solicitud, acumular todos los atributos de negocio durante la ejecución y emitir un \textbf{único evento estructurado ancho} al finalizar.
+En lugar de emitir múltiples líneas sueltas, se inicializa un map en memoria al recibir la solicitud, se acumulan todos los atributos de negocio durante la ejecución y se emitie un \textbf{único evento estructurado ancho} al finalizar.
 \end{block}
 
-\begin{itemize}
-\item Permite aislar al \textbf{``Cliente Elefante''} mediante cortes dimensionales.
-\end{itemize}
+\end{frame}
+
+\begin{frame}[t]{Cómo se encadenan las tres señales}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.46\textwidth}
+\vspace{-0.5em}
+\begin{center}
+\includegraphics[height=5.4cm]{assets/10/layered_signals.png}
+\end{center}
+\end{column}
+\begin{column}{0.52\textwidth}
+\begin{enumerate}
+\item \textbf{Histograma de latencia} de la API: métrica agregada. Dice que \emph{algo} se degradó.
+\pause
+\item \textbf{Exemplar}: el \emph{bucket} del pico guarda el \texttt{trace\_id} de una solicitud concreta. Es el salto de lo agregado a lo individual.
+\pause
+\item \textbf{La traza}: en qué span se fue el tiempo.
+\pause
+\item \textbf{El log o el \emph{profile}} de ese span: el detalle por componente o por función.
+\end{enumerate}
+
+\end{column}
+\end{columns}
+
+{\scriptsize\color{UAIngMuted}Young \& Parker, \emph{Learning OpenTelemetry} (O'Reilly, 2024), Fig.~2-4.}
 \end{frame}
 
 \UASectionSlide{Diagnóstico en producción y caso real}
 
-\begin{frame}{Cascadas de Falla y el Core Analysis Loop}
-\begin{alertblock}{La trampa de la causa raíz}
-El síntoma visible explota en el borde (HTTP 504 en API Gateway), pero la causa raíz está 4 capas aguas abajo en una DB lenta.
+\begin{frame}{La causa raíz no está donde explota el síntoma}
+\begin{alertblock}{La cascada}
+\begin{enumerate}
+\item Una base de datos aguas abajo se degrada por contención de bloqueos.
+\item El servicio intermedio agota su pool de hilos encolando peticiones.
+\item Los clientes aguas arriba reintentan automáticamente y \textbf{amplifican} el tráfico.
+\item El API Gateway del borde empieza a devolver HTTP 504.
+\end{enumerate}
 \end{alertblock}
 
 \pause
 
-\begin{block}{Core Analysis Loop (Análisis por Primeros Principios)}
-\begin{enumerate}
-\item \textbf{Observar anomalía agregada:} Salto en p99 de latencia (Métrica).
-\item \textbf{Aislar muestra (BubbleUp):} Filtrar el conjunto anómalo (Eventos Anchos).
-\item \textbf{Diferenciar dimensiones:} Encontrar qué atributo correlaciona 100\% con el fallo (ej: \texttt{tenant\_id=450}).
-\item \textbf{Confirmar causa raíz:} Abrir la traza individual representativa (Tracing).
-\end{enumerate}
-\end{block}
+Lo que ve el usuario, y lo que dispara la alerta, es el paso 4. Lo que hay que arreglar es el 1.
+
+\pause
+
+{\small Miren el paso 3: el \emph{retry} que en clases anteriores era la solución, acá es el combustible. Volvemos sobre esto ...}
 \end{frame}
 
-\begin{frame}{Ejercicio en vivo: Incidente en el Checkout}
-\begin{center}
-\textbf{Flujo:} \texttt{API Gateway} $\rightarrow$ \texttt{Auth Service} $\rightarrow$ \texttt{Orders Service} $\rightarrow$ \texttt{Database}
-\end{center}
+\begin{frame}{El Core Analysis Loop}
+Análisis por primeros principios: cada paso usa una señal distinta.
 
-\begin{alertblock}{Escenario de falla}
-La DB entra en contención de bloqueos. Las órdenes encolan hilos y el API Gateway retorna errores HTTP 504 a los usuarios.
-\end{alertblock}
+\begin{enumerate}
+\item \textbf{Observar la anomalía agregada} $\rightarrow$ \textbf{Métrica}. El p99 saltó. Sabés \emph{que} algo pasa, no \emph{qué}.
+\pause
+\item \textbf{Diferenciar dimensiones} $\rightarrow$ \textbf{Eventos anchos}. ¿Qué atributo separa las solicitudes que fallaron de las que no? Por ejemplo, \texttt{availability\_zone=us-east-1a} aparece en el 98\,\% de los fallos y en el 15\,\% del resto. Esto es el \emph{soft context} haciendo el trabajo pesado.
+\pause
+\item \textbf{Confirmar con una traza individual} $\rightarrow$ \textbf{Tracing}. Abrís una solicitud representativa y ves en qué span se fue el tiempo.
+\end{enumerate}
 
 \pause
 
-\textbf{¿Qué vemos en cada herramienta?}
-\begin{itemize}
-\item \textbf{Métrica en Gateway (Grafana):} Alerta de latencia p99 y error rate (¿\emph{Qué} está roto?).
-\item \textbf{Buscador de Logs (Elasticsearch):} Miles de logs desconectados de timeout sin causa clara.
-\item \textbf{Traza Distribuida (Jaeger/OTel):} Revela que el 90\% del tiempo de respuesta está en el span hacia la DB (¿\emph{Dónde} y \emph{Por qué}?).
-\end{itemize}
+{\small Si el atributo que encontraste no explica lo suficiente, volvés al paso 2 con el subconjunto ya filtrado. Eso es lo que lo hace un \emph{loop} y no una lista de pasos.}
+
+{\scriptsize\color{UAIngMuted}Majors et al., \emph{Observability Engineering} (O'Reilly, 2022), cap.~8.}
 \end{frame}
 
 \begin{frame}{Modelo del Curso: Observabilidad en $D = (P, F, G, S, T)$}

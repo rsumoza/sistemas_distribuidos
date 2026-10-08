@@ -64,6 +64,8 @@ daño se propague en cascada.
 de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
 \end{description}
 
+Esta taxonomía es de la cátedra. El \emph{SRE Book} (Beyer et al., 2016, cap.~6) organiza las razones de otro modo: análisis de tendencias de largo plazo, comparación entre períodos o grupos experimentales, \emph{alerting}, construcción de dashboards y análisis retrospectivo \emph{ad hoc}. El ejemplo del \emph{hit rate} de memcache está tomado de allí.
+
 \section{Observabilidad: De la Teoría de Control al Software}
 
 \subsection{Definición conceptual}
@@ -96,9 +98,11 @@ La observabilidad moderna trasciende las tres pestañas mediante \textbf{``La Tr
 Para que las herramientas puedan calcular correlaciones automáticas en la trenza de datos, es vital distinguir entre dos tipos de contexto:
 
 \begin{itemize}
-\item \textbf{Soft Context (Contexto Blando):} Correlaciones implícitas o agregadas basadas en ventanas de tiempo o etiquetas genéricas (como \texttt{service\_name} o \texttt{environment}). Es frágil porque exige que un operador humano deduzca manualmente la relación causa-efecto.
-\item \textbf{Hard Context (Contexto Duro):} Enlaces explícitos, estructurales e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id}, cabeceras W3C Trace Context). Define la topología causal exacta de una solicitud individual, permitiendo conectar logs y métricas (vía \emph{exemplars}) directamente con su traza correspondiente.
+\item \textbf{Soft Context (Contexto Blando):} Atributos que cada instrumento adjunta a la medición: identificador de cliente, hostname del balanceador, \emph{timestamp}. Pueden acompañar una relación causal, pero no la garantizan. Su valor es que \textbf{definen las dimensiones} por las que se puede cortar y agrupar la telemetría: descubrir que el 98\,\% de los fallos comparten una misma \texttt{availability\_zone} es trabajo de soft context. El soft context más usado en monitoreo es el tiempo, y es también el más débil: cuando es la única dimensión compartida, el operador termina alineando marcas temporales a ojo.
+\item \textbf{Hard Context (Contexto Duro):} Enlaces explícitos, estructurales e inmutables inyectados a nivel de protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id}, cabeceras W3C Trace Context). Define la topología causal exacta de una solicitud individual, permitiendo conectar logs y métricas (vía \emph{exemplars}) directamente con su traza correspondiente. \textbf{Define la forma} del sistema: qué se relaciona causalmente con qué.
 \end{itemize}
+
+En síntesis (Young \& Parker, 2024, cap.~2): el hard context define la \emph{forma} del sistema y el soft context define las \emph{dimensiones} que explican qué representa cada señal. Lo frágil no es el soft context ---sin él no hay análisis diferencial posible---, sino el soft context \emph{sin} hard context.
 
 \subsection{La arquitectura de la Trenza Única: OTLP, Collector y Correlación Automática}
 
@@ -118,7 +122,7 @@ Esta proliferación generaba sobrecarga de memoria en la aplicación, competenci
 El estándar OpenTelemetry (Young \& Parker, 2024) resuelve esta fragmentación mediante una arquitectura desacoplada:
 \begin{enumerate}
 \item \textbf{Un único SDK en la aplicación:} El código del servicio se instrumenta contra una API neutral y unificada, sin importar qué backend de almacenamiento se utilice.
-\item \textbf{Un protocolo común (\emph{OpenTelemetry Protocol} - OTLP):} Formato binario serializado con Protocol Buffers sobre gRPC o HTTP/2, diseñado para emitir métricas, logs y trazas de forma compacta y en lotes (\emph{batches}) a través de un único canal de red.
+\item \textbf{Un protocolo común (\emph{OpenTelemetry Protocol} - OTLP):} Un único canal de red para emitir métricas, logs y trazas en lotes (\emph{batches}). OTLP admite \textbf{tres transportes}: \texttt{grpc}, \texttt{http/protobuf} y \texttt{http/json}. Los dos primeros serializan con Protocol Buffers; el tercero, con JSON. El transporte por defecto y recomendado es \texttt{http/protobuf} (Young \& Parker, 2024), no gRPC, pese a que gRPC sea el más asociado al proyecto. Puertos por defecto: \texttt{4317} para gRPC y \texttt{4318} para HTTP.
 \item \textbf{El OpenTelemetry Collector:} Un proceso intermediario independiente (desplegado típicamente como \emph{sidecar} o agente de nodo) que recibe telemetría en formato OTLP, aplica transformaciones, filtros o muestreo, y la encamina concurrentemente hacia múltiples destinos (Prometheus, Jaeger, Elasticsearch, etc.) mediante configuración declarativa, sin intervención del código de la aplicación.
 \end{enumerate}
 
@@ -165,7 +169,7 @@ Un log de texto libre (por ejemplo, \texttt{"User 42 logged in from 10.0.0.1"}) 
 
 En sistemas distribuidos se exige \textbf{log estructurado} (típicamente JSON) con campos bien definidos:
 \begin{itemize}
-\item \texttt{timestamp} (ISO-8601 con precisión de microsegundos);
+\item \texttt{timestamp} de alta precisión, en UTC y con formato único en todo el sistema;
 \item \texttt{service\_name} y \texttt{service\_version};
 \item \texttt{trace\_id} y \texttt{span\_id} (\textbf{Hard Context});
 \item \texttt{severity\_text} (INFO, WARN, ERROR);
@@ -186,7 +190,7 @@ Las cuatro señales doradas (Google SRE, 2016) constituyen la base del monitoreo
 \item \textbf{Latencia:} Tiempo que toma procesar una solicitud (diferenciando éxito de error).
 \item \textbf{Tráfico:} Demanda sobre el sistema (ej: solicitudes HTTP/segundo).
 \item \textbf{Errores:} Tasa de solicitudes que fallan (explícitas como HTTP 500, implícitas como payload incorrecto).
-\item \textbf{Saturación:} Qué tan lleno está el recurso más restringido (memoria, pool de conexiones de DB, CPU).
+\item \textbf{Saturación:} Qué tan lleno está el recurso más restringido (memoria, pool de conexiones de DB, CPU). Dos advertencias del propio SRE Book que suelen olvidarse: muchos sistemas se degradan \emph{antes} de alcanzar el 100\,\% de utilización, por lo que fijar un objetivo de utilización es imprescindible; y el aumento de latencia suele ser un \textbf{indicador adelantado} de saturación ---medir el percentil 99 sobre una ventana corta da una señal temprana---. Esto enlaza esta señal con la sección de percentiles.
 \end{itemize}
 
 \subsection{La falacia del promedio: Percentiles vs. Media}
@@ -205,7 +209,7 @@ Si se inyecta un campo con alta cardinalidad (como \texttt{user\_id} con 10 mill
 \[
 \text{Total series} = \text{métricas} \times \text{métodos} \times \text{status\_codes} \times \text{user\_ids}
 \]
-Esto produce un colapso por consumo exponencial de memoria (\textbf{Explosión de Cardinalidad}).
+Cada combinación de etiquetas es una serie temporal residente, de modo que agregar una dimensión \textbf{multiplica} la cantidad de series y con ella la memoria (\textbf{Explosión de Cardinalidad}). El crecimiento es combinatorio en la cantidad de dimensiones ---como muestra el producto de arriba---; llamarlo ``exponencial'' es impreciso.
 
 \begin{quote}
 \textbf{Regla de diseño fundamental:} Las métricas agregadas solo deben contener etiquetas de baja cardinalidad finita (\texttt{http\_method}, \texttt{status\_code}, \texttt{endpoint}). La alta cardinalidad pertenece a los Spans y Eventos Estructurados.
@@ -228,7 +232,7 @@ Un Span contiene cinco elementos obligatorios: Trace ID, Span ID, Parent Span ID
 
 Un span no es únicamente un intervalo de tiempo genérico. Sin conocer el rol del componente que lo emite, las herramientas de observabilidad no pueden distinguir si un intervalo prolongado responde a cómputo intensivo local, espera de red o encolamiento asincrónico.
 
-Para resolver esto, el estándar de OpenTelemetry (Young \& Parker, 2024) define el atributo \texttt{SpanKind}, que establece el rol semántico del span dentro de la topología distribuida:
+Para resolver esto, la \emph{OpenTelemetry Specification} (API de trazas) define el atributo \texttt{SpanKind}, que establece el rol semántico del span dentro de la topología distribuida:
 
 \begin{description}
 \item[\texttt{CLIENT}:] Representa una llamada síncrona saliente hacia un servicio remoto o recurso externo (por ejemplo, una solicitud HTTP saliente, una invocación gRPC o una consulta SQL a una base de datos). El span se inicia al comenzar a preparar el envío y finaliza cuando se recibe la respuesta completa.
@@ -238,8 +242,13 @@ Para resolver esto, el estándar de OpenTelemetry (Young \& Parker, 2024) define
 \item[\texttt{INTERNAL}:] Modela operaciones internas dentro del mismo proceso o servicio que no cruzan límites de red ni interactúan con colas externas (por ejemplo, un cálculo matemático complejo, un algoritmo de renderizado o procesamiento en memoria).
 \end{description}
 
-\paragraph{Aislamiento de latencia de red (Simetría CLIENT--SERVER):}
-En llamadas síncronas entre dos servicios instrumentados, el span \texttt{CLIENT} del llamante y el span \texttt{SERVER} del receptor forman un par acoplado. Siguiendo el modelo Dapper (Sigelman et al., 2010), el span \texttt{CLIENT} engloba temporalmente al span \texttt{SERVER}. La diferencia de duración entre ambos permite aislar cuantitativamente el tiempo de tránsito de red y el encolamiento en el receptor (\emph{network flight time}), sin necesidad de asumir relojes físicos sincronizados entre ambos extremos.
+\paragraph{Aislamiento de latencia de red (par CLIENT--SERVER):}
+En llamadas síncronas entre dos servicios instrumentados con OpenTelemetry, el span \texttt{CLIENT} del llamante y el span \texttt{SERVER} del receptor forman un par: el \texttt{SERVER} es hijo del \texttt{CLIENT} y, en el caso normal, queda contenido temporalmente dentro de él. No siempre: si el llamante abandona por \emph{timeout}, el servidor puede seguir trabajando después de que el span \texttt{CLIENT} ya cerró.
+
+La resta $\text{duración}(\texttt{CLIENT}) - \text{duración}(\texttt{SERVER})$ acota el tiempo que \textbf{no} transcurrió dentro del handler del servidor: red de ida, red de vuelta y encolamiento previo a que el handler tome la solicitud. Es una \emph{suma} de los tres; la resta no permite separarlos. Su virtud es que no exige relojes sincronizados, porque cada duración se mide contra un único reloj local.
+
+\paragraph{Nota histórica: el modelo de Dapper era distinto.}
+Dapper (Sigelman et al., 2010, \S2.1) no usaba dos spans por RPC sino \textbf{uno solo, compartido por ambos hosts}: \emph{``in a typical Dapper trace we expect to find a single span for each RPC''} y \emph{``every RPC span contains annotations from both the client and server processes, making two-host spans the most common ones''}. Con un span de dos hosts, cliente y servidor escriben timestamps de relojes distintos en el mismo registro, y Dapper trataba el desfase por acotación: como el cliente siempre envía antes de que el servidor reciba (y viceversa para la respuesta), se obtienen una cota inferior y una superior para los timestamps del lado servidor. El paso al par \texttt{CLIENT}/\texttt{SERVER} de OpenTelemetry es una decisión de modelo de datos con consecuencias medibles: cada extremo mide con su propio reloj y la comparación se hace después, en el análisis.
 
 \paragraph{El límite de la jerarquía simple: Span Links:}
 En flujos síncronos, la causalidad se expresa limpiamente como un árbol jerárquico mediante \texttt{parent\_span\_id}. Sin embargo, en arquitecturas basadas en eventos con procesamiento por lotes (\emph{batch processing}), un trabajador \texttt{CONSUMER} puede procesar simultáneamente múltiples mensajes provenientes de trazas independientes. Dado que un span solo admite un único padre directo, el modelo incorpora \textbf{Span Links} (\emph{enlaces entre spans}): referencias causales que conectan el span actual con múltiples trazas antecedentes sin forzar una jerarquía estricta de padre e hijo.
@@ -285,11 +294,12 @@ El síntoma visible estalla en el borde, pero la causa raíz reside aguas abajo.
 En lugar de depender de la intuición o de dashboards estáticos, la observabilidad propone un flujo iterativo y estructurado (\emph{Core Analysis Loop}, Majors et al., 2022):
 
 \begin{enumerate}
-\item \textbf{Observar la anomalía agregada:} Detectar un salto en el percentil p99 de latencia o tasa de errores.
-\item \textbf{Aislar la muestra (\emph{BubbleUp}):} Seleccionar el subconjunto de eventos y trazas anómalos frente a la línea base normal.
-\item \textbf{Diferenciar dimensiones (\emph{Compute Diff}):} Computar la discrepancia estadística de todos los atributos entre la muestra anómala y la base (por ejemplo: identificar que el atributo \texttt{availability\_zone=us-east-1a} concentra el 98\% de los fallos frente al 15\% usual).
-\item \textbf{Drill-down y trazabilidad:} Filtrar por esa dimensión y examinar las trazas individuales para diagnosticar la causa raíz.
+\item \textbf{Observar la anomalía agregada (Métrica):} un salto en el percentil p99 de latencia o en la tasa de errores. Indica \emph{que} algo cambió, no \emph{qué}.
+\item \textbf{Diferenciar dimensiones (Eventos estructurados anchos):} computar qué atributo separa las solicitudes anómalas de la línea base. Por ejemplo, \texttt{availability\_zone=us-east-1a} concentra el 98\,\% de los fallos frente al 15\,\% usual. Es el \emph{soft context} el que hace posible este corte.
+\item \textbf{Confirmar con una traza individual (Tracing):} abrir una solicitud representativa del subconjunto anómalo y determinar en qué span se consumió el tiempo.
 \end{enumerate}
+
+Si el atributo hallado no explica suficientemente la anomalía, se filtra la vista por ese atributo y se vuelve al paso 2 con el subconjunto reducido. Esa iteración es lo que convierte el procedimiento en un \emph{loop} y no en una lista de pasos: es un método de fuerza bruta que recorre las dimensiones disponibles sin exigir conocimiento previo del sistema. Recorrerlas a mano resulta impracticable a escala, de modo que las herramientas de observabilidad automatizan el paso 2 comparando todas las dimensiones dentro y fuera del área anómala y ordenándolas por discrepancia (Majors et al., 2022, cap.~8).
 
 \section{Modelo del Curso}
 
@@ -323,14 +333,16 @@ Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón:
 \end{uakeybox}
 
 \section{Bibliografía guiada y ruta de profundización}
-Para profundizar esta clase se recomienda: Google SRE Book; OpenTelemetry conceptual model; Kleppmann para causalidad y fallas parciales.
+Para profundizar esta clase se recomienda: \emph{Site Reliability Engineering} (cap.~6) para señales y monitoreo; \emph{Learning OpenTelemetry} (caps.~1 a 3) para el modelo conceptual, el contexto duro y OTLP; \emph{Observability Engineering} (caps.~5 y 8) para eventos anchos y análisis; y el paper de Dapper para el origen del tracing distribuido.
 
 \subsection*{Referencias canónicas}
 \begin{enumerate}
 \item \textbf{Young, T. y Parker, A.} (2024). \emph{Learning OpenTelemetry: Setting Up and Operating a Modern Observability System}. O'Reilly Media. (Capítulos 1, 2 y 3).
-\item \textbf{Majors, C., Fong-Jones, L. y Miranda, G.} (2022). \emph{Observability Engineering: Achieving Production-Excellence}. O'Reilly Media. (Capítulos 1, 5 y 6).
+\item \textbf{Majors, C., Fong-Jones, L. y Miranda, G.} (2022). \emph{Observability Engineering: Achieving Production-Excellence}. O'Reilly Media. (Capítulos 1, 5, 6 y 8; el \emph{core analysis loop} está en el 8).
 \item \textbf{Sigelman, B. H., et al.} (2010). \emph{Dapper, a Large-Scale Distributed Systems Tracing Infrastructure}. Google Technical Report.
-\item \textbf{Beyer, B., et al.} (2016). \emph{Site Reliability Engineering: How Google Runs Production Systems}. O'Reilly Media. (Capítulo 6).
+\item \textbf{Beyer, B., et al.} (2016). \emph{Site Reliability Engineering: How Google Runs Production Systems}. O'Reilly Media. (Capítulo 6, \emph{Monitoring Distributed Systems}).
+\item \textbf{Kálmán, R. E.} (1960). \emph{On the General Theory of Control Systems}. IFAC Proceedings Volumes, 1(1), 491--502.
+\item \textbf{OpenTelemetry Authors.} \emph{OpenTelemetry Specification}: API de trazas (\texttt{SpanKind}, \emph{Links}) y especificación de OTLP. \texttt{https://opentelemetry.io/docs/specs/}
 \end{enumerate}
 
 La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
