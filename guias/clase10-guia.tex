@@ -6,17 +6,19 @@
 \UASetClassTitle{Observabilidad distribuida}
 \UASetDocKind{Guía de ejercicios}
 
-\title{Clase 10 --- Observabilidad distribuida, tracing, métricas y debugging}
+\title{Clase 10 --- Guía de ejercicios}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Indicaciones generales}
 Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable. Justificar siempre. En esta clase no alcanza con decir “usar logs” o “mirar trazas”: se espera explicar qué problema resuelve cada herramienta, qué límites tiene y qué patrones de diseño exige.
 
-\section{Nivel 1: observabilidad y señales}
+\section{Nivel 1: fundamentos y reconocimiento}
+\begin{uaexercise}
+Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
+\end{uaexercise}
 
 \begin{uaexercise}
 Explique al menos tres razones por las cuales un sistema distribuido en producción necesita monitoreo activo, y por qué cada una no se satisface solo con testing pre-producción.
@@ -47,12 +49,12 @@ Defina la noción de \textbf{Evento Estructurado Ancho} (\emph{Arbitrarily Wide 
 Diseñe un esquema JSON de campos para un evento estructurado en un servicio HTTP de comercio electrónico.
 \end{uaexercise}
 
-\section{Nivel 3: tracing y propagación de contexto}
-
 \begin{uaexercise}
 Construya un escenario donde la ausencia de \texttt{trace\_id} o \texttt{span\_id} en un log impida determinar el impacto de un error en el cliente final.
 \end{uaexercise}
 
+
+\section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
 Explique qué son las Golden Signals y por qué son útiles para evaluar la salud de un servicio.
 \end{uaexercise}
@@ -65,8 +67,6 @@ Explique qué es la \textbf{Explosión de Cardinalidad} en bases de datos de ser
 Explique por qué mirar promedios de latencia puede ocultar problemas serios que sí se reflejan en el percentil p99.
 \end{uaexercise}
 
-\section{Nivel 4: debugging causal en producción}
-
 \begin{uaexercise}
 Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
 \end{uaexercise}
@@ -75,15 +75,11 @@ Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servido
 Diferencie la propagación de contexto \textbf{In-Band} (en cabeceras HTTP/gRPC como W3C \texttt{traceparent}) de la recolección \textbf{Out-of-Band} (exportación asíncrona OTLP al Collector).
 \end{uaexercise}
 
-\begin{uaexercise}
-Una saga de compra contiene eventos \texttt{StockReserved}, \texttt{PaymentAuthorized}, \texttt{ShipmentRequested} y compensaciones. Diseñe la observabilidad necesaria para reconstruir una instancia completa de saga, aun cuando los eventos lleguen tarde, duplicados o fuera de orden.
-\end{uaexercise}
 
+\section{Nivel 4: integración y defensa}
 \begin{uaexercise}
 Explique la \textbf{Estrategia de Instrumentación en 2 Capas}: Capa 1 de Infraestructura (Auto-instrumentación / esqueleto de propagación) vs. Capa 2 de Dominio (Enriquecimiento semántico manual).
 \end{uaexercise}
-
-\section{Nivel 5: alertas, costo y diseño integral}
 
 \begin{uaexercise}
 Describa los pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción, indicando qué señal usa cada paso y por qué el método es iterativo. Explique además por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.

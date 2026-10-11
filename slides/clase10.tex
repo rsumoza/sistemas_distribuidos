@@ -2,30 +2,16 @@
 \documentclass[institutional,screen,none]{../cls/ua-engineering-v6-beamer}
 \input{../config/course-config}
 
-% Fallback local para mantener el archivo portable entre el entorno local y CI.
-% Algunas versiones del estilo compartido no definen todavía el entorno uacase.
-\makeatletter
-\@ifundefined{uacase}{%
-  \newtcolorbox{uacase}{%
-    enhanced,breakable,
-    colback=white,colframe=UAIngOrange,
-    boxrule=0.9pt,arc=1.6mm,
-    left=3mm,right=3mm,top=2mm,bottom=2mm,
-    title=\textbf{Caso real},
-    colbacktitle=UAIngOrange,coltitle=white}%
-}{}
-\makeatother
-
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
 \title{\UACourse}
-\subtitle{Clase 10 --- Logs, métricas, trazas y debugging causal en producción}
+\subtitle{Clase 10 --- Tracing, métricas, logs y debugging en producción}
+
 \author{\UAProfessor}
 \date{\UADate}
 %\includeonlyframes{wip} % TODO remover
 \begin{document}
 
-\begin{document}
 {
 \setbeamertemplate{footline}{}
 \begin{frame}[plain]
@@ -550,7 +536,6 @@ Por el \emph{clock drift}, dos servidores desfasados por 50 ms registrarán even
 \item El campo \texttt{parent\_span\_id} implementa la relación \textbf{\emph{happened-before} ($\rightarrow$) de Lamport}.
 \item Reconstruye el orden causal estricto sin depender de relojes físicos sincronizados.
 \end{itemize}
-{\scriptsize Fuente: postmortem oficial de Cloudflare, 18 de noviembre de 2025.}
 \end{frame}
 
 \begin{frame}{Propagación, Collector y Muestreo}

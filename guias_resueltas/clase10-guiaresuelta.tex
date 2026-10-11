@@ -1,29 +1,26 @@
 % !TeX encoding = UTF-8
-\documentclass[variant=guiaresuelta,cover=institutional,mode=screen]{ua-engineering-v6-article}
+\documentclass[variant=guia,cover=institutional,mode=screen]{ua-engineering-v6-article}
 \input{../config/course-config}
 
 \UASetClassNumber{10}
 \UASetClassTitle{Observabilidad distribuida}
 \UASetDocKind{Guía resuelta}
 
-\title{Clase 10 --- Guía resuelta: observabilidad, tracing, métricas y debugging}
+\title{Clase 10 --- Guía resuelta}
 \author{\UAProfessor}
 \date{\UADate}
 
 \begin{document}
-\maketitle
 
 \section{Criterio de lectura}
-Las resoluciones son modelos de razonamiento, no recetas universales. Una buena respuesta separa hechos observados, hipótesis, evidencia confirmatoria o refutatoria y decisión. En producción, una explicación convincente debe poder ser contradicha por nueva evidencia.
-
-\section{Resoluciones completas}
+Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
 \section{Ejercicios y resoluciones completas}
 
 \subsection*{Nivel 1: Fundamentos y reconocimiento}
 
 \begin{uaexercise}
-Un equipo afirma que su sistema es observable porque dispone de un dashboard con CPU, memoria y cantidad de requests. Explique por qué eso constituye monitoreo útil, pero no demuestra observabilidad. Proponga una pregunta nueva sobre el comportamiento interno que esas métricas no podrían responder por sí solas.
+Defina observabilidad distribuida y explique en qué se diferencia de monitoreo básico.
 \end{uaexercise}
 \begin{uaanswer}
 La \textbf{observabilidad} (derivada de la Teoría de Control por R.~E.~Kálmán y adaptada a la ingeniería de software) es la propiedad que mide en qué grado es posible inferir y reconstruir el estado interno de un sistema a partir del conocimiento de sus salidas externas y de sus señales de telemetría. En software moderno, un sistema es observable si permite formular preguntas abiertas sobre comportamientos imprevistos o no anticipados (\emph{unknown-unknowns}) y llegar a su causa raíz sin necesidad de adivinar, alterar o desplegar nuevo código con logs adicionales.
