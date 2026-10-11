@@ -76,19 +76,6 @@ Bajo este esquema, ante un incidente el operador humano debe actuar como un ``pu
 En contraste, el modelo de **La Trenza Única de Datos** (\emph{Single Braid of Data}, materializado en OpenTelemetry/OTLP) integra las tres señales de forma estructural: las señales conservan su función especializada pero están entrelazadas mediante contexto compartido inyectado en el protocolo (\texttt{trace\_id}, \texttt{span\_id}, \texttt{attributes}). De este modo, el sistema computacional realiza las correlaciones de forma automática: al seleccionar un punto atípico en un gráfico de percentiles (\emph{exemplar}), se abre directamente la traza individual correspondiente y sus logs estructurados vinculados, sin intervención manual.
 \end{uaanswer}
 
-\begin{uaexercise}
-Diferencie \textbf{Hard Context} de \textbf{Soft Context}. Explique por qué el Hard Context es indispensable para que las computadoras puedan calcular correlaciones automáticas entre telemetrías.
-\end{uaexercise}
-\begin{uaanswer}
-La diferencia radica en la naturaleza de la correlación:
-\begin{itemize}
-\item \textbf{Soft Context (Contexto Blando):} Correlaciones implícitas y probabilísticas basadas en coincidencias temporales o etiquetas genéricas (por ejemplo, agrupar eventos porque ocurrieron en el mismo minuto y comparten la etiqueta \texttt{env=prod} o \texttt{region=us-east}). En sistemas con alto tráfico (miles de solicitudes por segundo), miles de ejecuciones no relacionadas coinciden en la misma ventana temporal, haciendo que la correlación sea ambigua y requiera inspección visual humana.
-\item \textbf{Hard Context (Contexto Duro):} Enlaces determinísticos, explícitos e inmutables inyectados directamente en las cabeceras de los protocolos de comunicación (\texttt{trace\_id}, \texttt{span\_id}, \texttt{parent\_span\_id} bajo el estándar W3C Trace Context). Define de forma unívoca la topología y la causalidad estricta de una solicitud individual.
-\end{itemize}
-El Hard Context es indispensable porque permite que los algoritmos de análisis automático (como el análisis dimensional BubbleUp o la detección de cuellos de botella en grafos acíclicos dirigidos) operen sobre relaciones de pertenencia exactas, sin incurrir en falsas correlaciones estadísticas.
-\end{uaanswer}
-
-
 \subsection*{Nivel 2: Ejecuciones y fallas}
 
 \begin{uaexercise}
@@ -280,7 +267,7 @@ Casi el 40\% de los usuarios finales sufrirá una degradación inaceptable de 10
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{Conexión con Clase 03:} Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
+Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
 \end{uaexercise}
 \begin{uaanswer}
 Como se estudió en la Clase 03, los relojes de hardware de distintos servidores sufren \emph{clock drift} y \emph{clock skew} debido a variaciones térmicas e imprecisiones de sincronización NTP.
@@ -343,56 +330,20 @@ La Capa 1 provee el esqueleto estructural y la conectividad causal; la Capa 2 ap
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas donde el síntoma visible sea un error HTTP 504 en la API de borde, pero la causa raíz sea una base de datos downstream saturada.
+Describa los pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción, indicando qué señal usa cada paso y por qué el método es iterativo. Explique además por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
 \end{uaexercise}
 \begin{uaanswer}
-\textbf{Escenario de propagación de falla:}
+El \textbf{Core Analysis Loop} (Majors et al., 2022, cap.~8) es un método de diagnóstico por primeros principios: no exige conocer de antemano la topología ni el comportamiento del sistema. Cada paso se apoya en una señal distinta de la trenza:
 \begin{enumerate}
-\item \textbf{Causa raíz (Capa 4 - Base de Datos de Pagos):} Se ejecuta una consulta masiva sin índice que bloquea tablas críticas. La latencia de respuesta para validar transacciones salta de 10 ms a 25 segundos.
-\item \textbf{Degradación en Payments Service (Capa 3):} Las conexiones del pool se bloquean esperando la base de datos. Nuevas solicitudes se encolan hasta que el pool se satura completamente.
-\item \textbf{Propagación hacia Orders Service (Capa 2):} \texttt{Orders Service} invoca a \texttt{Payments Service} con un timeout de 4 segundos. Al agotarse el timeout, ejecuta una política ingenua de 3 reintentos inmediatos, quintuplicando la carga sobre el servicio de pagos ya saturado.
-\item \textbf{Síntoma en el Borde (Capa 1 - API Gateway):} El API Gateway tiene configurado un timeout global de 10 segundos. Al no recibir respuesta de \texttt{Orders Service}, corta la conexión y devuelve al cliente un error **HTTP 504 Gateway Timeout**.
+\item \textbf{Observar la anomalía agregada $\rightarrow$ Métrica.} Un salto en el percentil p99 de latencia o en la tasa de errores. Indica \emph{que} algo cambió, no \emph{qué}.
+\item \textbf{Diferenciar dimensiones $\rightarrow$ Eventos estructurados anchos.} Determinar qué atributo separa las solicitudes anómalas de la línea base (por ejemplo, \texttt{availability\_zone=us-east-1a} concentra el 98\,\% de los fallos frente al 15\,\% usual). Es el \emph{soft context} el que hace posible este corte dimensional.
+\item \textbf{Confirmar con una traza individual $\rightarrow$ Tracing.} Abrir una solicitud representativa del subconjunto anómalo y determinar en qué span se consumió el tiempo.
 \end{enumerate}
 
-\textbf{Análisis con observabilidad:}
-\begin{itemize}
-\item Si el operador solo mira el dashboard del API Gateway, verá un pico de errores 504 y asumirá erróneamente que el Gateway o la red de borde están fallando.
-\item Al inspeccionar la traza distribuida (Trace DAG), se observa que el Span raíz del API Gateway (10.000 ms) contiene al Span de Orders (9.980 ms), el cual contiene a los Spans de reintentos hacia Payments (4.000 ms cada uno), los cuales a su vez contienen el Span terminal bloqueado en la consulta SQL de la base de datos. La traza aísla inmediatamente la causa raíz en la base de datos downstream.
-\end{itemize}
-\end{uaanswer}
-
-\begin{uaexercise}
-Describa los 4 pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción y explique por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
-\end{uaexercise}
-\begin{uaanswer}
-El **Core Analysis Loop** (Majors et al., 2022) es la metodología sistemática de diagnóstico basada en evidencia y primeros principios:
-\begin{enumerate}
-\item \textbf{Observar la anomalía agregada:} Detectar el síntoma en las señales de alto nivel (por ejemplo: un incremento abrupto en la latencia p99 o en la tasa de errores en un endpoint).
-\item \textbf{Aislar la muestra anómala:} Filtrar y delimitar el conjunto de eventos/trazas que experimentan la degradación frente a la línea base de ejecuciones normales (ej: separar las solicitudes con latencia > 2 s de las nominales < 100 ms).
-\item \textbf{Computar diferencias dimensionales (BubbleUp / Análisis estadístico):} Comparar automáticamente la distribución de todas las dimensiones y atributos entre la muestra anómala y la muestra de control para identificar qué atributo explica la desviación (por ejemplo: el 98\% de las solicitudes lentas comparten \texttt{db.host = replica-3} o \texttt{client.version = 3.1.0}).
-\item \textbf{Confirmar causalidad mediante traza individual y drill-down:} Seleccionar una traza representativa del grupo anómalo para inspeccionar la secuencia de Spans y confirmar el mecanismo causal del fallo antes de aplicar la mitigación.
-\end{enumerate}
+\textbf{Por qué es un \emph{loop}:} si el atributo hallado no explica suficientemente la anomalía, se filtra la vista por ese atributo y se vuelve al paso 2 con el subconjunto reducido. Esa iteración es lo que distingue al método de una lista de pasos: se trata de una exploración por fuerza bruta sobre las dimensiones disponibles. Como recorrerlas manualmente resulta impracticable a escala, las herramientas de observabilidad automatizan el paso 2 comparando todas las dimensiones dentro y fuera del área anómala y ordenándolas por discrepancia.
 
 \textbf{Por qué no es sostenible ``buscar la línea exacta que falló'':}
-En sistemas distribuidos complejos, la mayoría de los incidentes en producción no son provocados por errores de sintaxis o excepciones no controladas en una línea de código local. Son el resultado de interacciones dinámicas emergentes: agotamiento de recursos compartidos, cascadas de reintentos, saturación de hilos o incompatibilidad de versiones. Buscar una línea en miles de archivos de log sin una guía causal es un proceso ineficiente y dependiente de la suerte.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique cómo cambia el problema de propagación de contexto en un sistema basado en eventos (Event-Driven / Kafka) respecto de uno sincrónico (HTTP/gRPC).
-\end{uaexercise}
-\begin{uaanswer}
-El pasaje de un modelo sincrónico (HTTP/gRPC) a un modelo basado en eventos (Kafka, RabbitMQ) altera tres premisas estructurales de la propagación de contexto:
-\begin{enumerate}
-\item \textbf{Desacoplamiento temporal:} En HTTP/gRPC, el cliente y el servidor ejecutan en sincronía temporal inmediata. En Kafka, un productor puede publicar un mensaje y el consumidor procesarlo segundos, horas o días después. Si se modelara el procesamiento del consumidor como un Span hijo directo del productor, la duración del trace parecería ser de horas, falseando las métricas de latencia.
-\item \textbf{Patrón 1 a N (Fan-out):} Un único mensaje producido en un topic puede ser consumido en paralelo por múltiples microservicios independientes (ej: Facturación, Notificaciones y Stock).
-\item \textbf{Procesamiento por lotes (\emph{Batch Consumption}):} Un consumidor suele recibir un lote de 100 o 500 mensajes juntos en una sola llamada de sondeo.
-\end{enumerate}
-
-\textbf{Solución técnica:}
-\begin{itemize}
-\item El productor inyecta la cabecera W3C \texttt{traceparent} en los **Record Headers** del mensaje de Kafka.
-\item Al consumir un lote de mensajes, el consumidor crea un Span propio para el procesamiento del batch y vincula cada mensaje procesado a su traza originaria utilizando **Span Links** (enlaces semánticos de OpenTelemetry) en lugar de una relación jerárquica padre-hijo tradicional. De este modo, se preserva la correlación causal sin distorsionar la duración de la traza original.
-\end{itemize}
+En sistemas distribuidos, la mayoría de los incidentes en producción no provienen de una excepción en una línea de código, sino de la interacción entre componentes sanos: contención de recursos, latencia acumulada, saturación parcial o combinaciones de atributos de negocio. No hay una línea culpable que encontrar; hay una dimensión que aislar.
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -412,6 +363,29 @@ La formalización del problema de observabilidad distribuida bajo la tupla $D=(P
 \item Disciplina rigurosa requerida en todos los equipos para propagar cabeceras y evitar la fragmentación de trazas.
 \end{itemize}
 \end{description}
+\end{uaanswer}
+
+
+% ===== TBD: 3 ejercicios pendientes de redacción =====
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{[TBD]} Respuesta pendiente de redacción.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{[TBD]} Respuesta pendiente de redacción.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{[TBD]} Respuesta pendiente de redacción.
 \end{uaanswer}
 
 \end{document}

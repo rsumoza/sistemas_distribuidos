@@ -30,12 +30,7 @@ Un equipo recibe una alerta que dice ``error rate > 5\%''. Explique por qué est
 Explique el antipatrón de las ``Tres Pestañas del Navegador'' (\emph{Three Browser Tabs}) y compárelo con el modelo de ``La Trenza Única de Datos'' (\emph{Single Braid of Data}).
 \end{uaexercise}
 
-\begin{uaexercise}
-Diferencie \textbf{Hard Context} de \textbf{Soft Context}. Explique por qué el Hard Context es indispensable para que las computadoras puedan calcular correlaciones automáticas entre telemetrías.
-\end{uaexercise}
-
-\section{Nivel 2: métricas que representan experiencia}
-
+\section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
 Compare logs, métricas y trazas en términos de qué pregunta responde cada uno y cómo se entrelazan mediante OpenTelemetry.
 \end{uaexercise}
@@ -73,7 +68,7 @@ Explique por qué mirar promedios de latencia puede ocultar problemas serios que
 \section{Nivel 4: debugging causal en producción}
 
 \begin{uaexercise}
-\textbf{Conexión con Clase 03:} Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
+Explique por qué el desvío de reloj físico (\emph{clock drift}) entre servidores impide ordenar eventos distantes por timestamp real y cómo el campo \texttt{parent\_span\_id} implementa la relación \emph{happened-before} ($\rightarrow$) de Lamport mediante un Grafo Acíclico Dirigido (DAG).
 \end{uaexercise}
 
 \begin{uaexercise}
@@ -91,19 +86,25 @@ Explique la \textbf{Estrategia de Instrumentación en 2 Capas}: Capa 1 de Infrae
 \section{Nivel 5: alertas, costo y diseño integral}
 
 \begin{uaexercise}
-Construya un escenario de cascada de fallas donde el síntoma visible sea un error HTTP 504 en la API de borde, pero la causa raíz sea una base de datos downstream saturada.
-\end{uaexercise}
-
-\begin{uaexercise}
-Describa los 4 pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción y explique por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique cómo cambia el problema de propagación de contexto en un sistema basado en eventos (Event-Driven / Kafka) respecto de uno sincrónico (HTTP/gRPC).
+Describa los pasos del \textbf{Core Analysis Loop} (Análisis por Primeros Principios) para diagnosticar un incidente en producción, indicando qué señal usa cada paso y por qué el método es iterativo. Explique además por qué ``buscar la línea exacta que falló'' no es un enfoque sostenible.
 \end{uaexercise}
 
 \begin{uaexercise}
 Aplique el modelo del curso $D=(P,F,G,S,T)$ al problema de la observabilidad distribuida.
+\end{uaexercise}
+
+
+% ===== TBD: 3 ejercicios pendientes de redacción =====
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{[TBD]} Ejercicio pendiente de redacción.
 \end{uaexercise}
 
 \end{document}

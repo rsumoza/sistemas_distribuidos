@@ -76,7 +76,7 @@ Ya vimos RPC, retries, consistencia, transacciones y logs. Vimos componentes y c
 \pause
 
 \begin{block}{El desafío real}
-No se trata solo de que el sistema opere correctamente. Sino de poder entenderlo mientras opera. Por ejemplo, qué está fallando y por qué.
+No se trata solo de que el sistema opere correctamente, sino de poder entenderlo mientras opera. Por ejemplo, qué está fallando y por qué.
 \end{block}
 \end{frame}
 
@@ -85,7 +85,7 @@ En un único servidor (o monolito en producción):
 \begin{itemize}
 \item \textbf{Stack trace completo:} el hilo de ejecución vive en el mismo espacio de memoria; ante un fallo, el runtime explica la causalidad.
 \item \textbf{Reloj físico único:} el hardware serializa los logs locales con orden real.
-\item \textbf{Llamadas en memoria:} una llamada entre funciones toma ns. El tiempo que tarda el sistema se puede explicar mirando un solo lugar.
+\item \textbf{Llamadas en memoria:} una llamada entre funciones toma nanosegundos. El tiempo que tarda el sistema se puede explicar mirando un solo lugar.
 \end{itemize}
 
 \end{frame}
@@ -94,9 +94,9 @@ En un único servidor (o monolito en producción):
 Al pasar a múltiples servidores:
 \begin{itemize}
 \item \textbf{Stack trace desaparece:} el usuario final solo ve 4xx o 5xx.
-\item \textbf{\emph{Clock drift}:} logs de distintas instancias no permiten seguir el orden causa -> efecto.
-\item \textbf{Tiempos ocultos:} la latencia empeiza a depender de otros servicios y de la red.
-\item \textbf{Fallas combinatorias:} cada nodo se ve ``sano'' en sus métricas locales, por la latencia se acumula.
+\item \textbf{\emph{Clock drift}:} logs de distintas instancias no permiten seguir el orden causa $\rightarrow$ efecto.
+\item \textbf{Tiempos ocultos:} la latencia empieza a depender de otros servicios y de la red.
+\item \textbf{Fallas combinatorias:} cada nodo se ve ``sano'' en sus métricas locales, pero la latencia se acumula.
 \end{itemize}
 
 \pause
@@ -111,16 +111,14 @@ La observabilidad no es un agregado opcional al final del desarrollo. Es una \te
 \begin{itemize}
 \item \textbf{Detección temprana:} Sin monitoreo, la primera señal de fallo suele ser un usuario quejándose.
 \item \textbf{Diagnóstico:} Hay problemas que no se resuelven de manera automática y es necesario informar a un humano: un disco que se está llenando, un certificado SSL por vencer, un servicio que degrada lentamente.
-\item \textbf{Decisiones informadas:} Los datos de monitoreo permiten tomar decisiones informadas:
-      ¿Cuánto mejoró el hit rate de memcache al agregar un nodo?
-      Sin métricas, esa respuesta es una apuesta.
+\item \textbf{Decisiones informadas:} ¿Cuánto mejoró el hit rate de memcache al agregar un nodo? Sin métricas, esa respuesta es una apuesta.
 \item \textbf{Contención de daño:} Un sistema que detecta su propia degradación puede activar
 mecanismos de resiliencia antes de que el daño se propague en cascada.
 \item \textbf{Aprendizaje continuo:} Los datos de monitoreo alimentan postmortems blameless, experimentos de caos (Chaos Engineering) y mejoras continuas de diseño arquitectónico.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{La propuesta clásica: "Los Tres Pilares"}
+\begin{frame}{La propuesta clásica: ``Los Tres Pilares''}
 Tradicionalmente, la industria ha presentado la observabilidad como un sistema de tres señales complementarias (los tres pilares):
 
 % resaltar más qué esto es una respuesta a lo anterior capaz poner un título más llamativo o poner la imagen de los 3 pilares
@@ -137,7 +135,7 @@ Si recolectamos las tres señales de forma exhaustiva, tendremos visibilidad suf
 \end{block}
 \end{frame}
 
-\begin{frame}{La propuesta clásica: "Los Tres Pilares"}
+\begin{frame}{La propuesta clásica: ``Los Tres Pilares''}
 Cada una de las tres señales demandó requerimientos técnicos radicalmente distintos:
 
 \begin{description}
@@ -156,7 +154,7 @@ Cada solución evolucionó de forma aislada: con su propio agente en el host, su
 \end{frame}
 
 %poner el meme de recalculando con la idea de mostrar qué hay que estar haciendo correlaciones
-\begin{frame}{El antipatrón de "Las Tres Pestañas"}
+\begin{frame}{El antipatrón de ``Las Tres Pestañas''}
 \begin{columns}[T,onlytextwidth]
 \begin{column}{0.62\textwidth}
 En la práctica, la divergencia tecnológica se trasladó a la pantalla del operador durante un incidente:
@@ -182,7 +180,7 @@ En la práctica, la divergencia tecnológica se trasladó a la pantalla del oper
 \textbf{El problema operativo:} La información vive inconexa. El ser humano se ve forzado a ser el ``puente manual'', memorizando IDs, alineando marcas de tiempo a ojo e intentando adivinar correlaciones entre tres herramientas a las 4 AM.
 \end{frame}
 
-\begin{frame}{La solución arquitectónica: "La Trenza Única de Datos"}
+\begin{frame}{La solución arquitectónica: ``La Trenza Única de Datos''}
 \begin{block}{Single Braid of Data (OpenTelemetry / OTLP)}
 Las tres señales conservan su identidad y propósito, pero viajan y se almacenan \textbf{entrelazadas mediante contexto compartido}.
 \end{block}
@@ -264,7 +262,7 @@ Esas verticales naranjas de la trenza tienen nombre: \textbf{el Contexto}. Metad
 \pause
 
 \begin{alertblock}{No es uno o el otro}
-Soft Context: es lo que deja descubrir que la falla correlaciona con \texttt{tenant\_id=450}. El problema es el soft context \emph{sin} hard context: ahí el tiempo queda como única dimensión compartida y alguien tiene que alinear \emph{timestamps} a ojo. Eso son las tres pestañas.
+El soft context es lo que deja descubrir que la falla correlaciona con \texttt{tenant\_id=450}. El problema es el soft context \emph{sin} hard context: ahí el tiempo queda como única dimensión compartida y alguien tiene que alinear \emph{timestamps} a ojo. Eso son las tres pestañas.
 \end{alertblock}
 \end{frame}
 
@@ -405,7 +403,7 @@ Una representación numérica del estado del sistema durante el intervalo en que
 \pause
 
 \begin{alertblock}{La propiedad que define todo: es \emph{pre-agregada}}
-La pregunta se decide cuando \textbf{escribís} la métrica, no cuando la consultás. Los requests individuales que generaron ese número ya no existen. Es decir, no podes desagregar para ver detalle.
+La pregunta se decide cuando \textbf{escribís} la métrica, no cuando la consultás. Los requests individuales que generaron ese número ya no existen. Es decir, no podés desagregar para ver detalle.
 \end{alertblock}
 
 \pause
@@ -418,7 +416,7 @@ La pregunta se decide cuando \textbf{escribís} la métrica, no cuando la consul
 \begin{frame}{Las cuatro Golden Signals, una por una}
 \small
 \begin{description}
-\item[Latencia] Tiempo que toma atender una solicitud. Es bueno \textbf{separar la de éxito de la de error}: por ejemplo un HTTP 500 por caída de la DB podría responder rapidísimo y, promediado con el resto, \emph{mejora} el número. Y al revés, un error lento puede empeorarlo. Siempre es peor que un error lento.
+\item[Latencia] Tiempo que toma atender una solicitud. Es bueno \textbf{separar la de éxito de la de error}: por ejemplo un HTTP 500 por caída de la DB podría responder rapidísimo y, promediado con el resto, \emph{mejora} el número. Y un error lento es todavía peor que un error rápido.
 \pause
 \item[Tráfico] Cuánta demanda recibe el sistema, en la unidad que corresponda: solicitudes por segundo en una API (rps), sesiones concurrentes en streaming, lecturas por segundo en una DB, etc. Mide \emph{demanda}, no capacidad: si cae, puede ser buena noticia o que nadie logra entrar.
 \pause
@@ -564,7 +562,7 @@ Por el \emph{clock drift}, dos servidores desfasados por 50 ms registrarán even
 \pause
 
 \begin{block}{Sampling (Trade-off de escala)}
-No es viable almacenar $10^9$ trazas: se decide qué guardar al inicio (\emph{head-based}) o al finalizar para retener errores y colas lentas (\emph{tail-based}). Por ejemplo: guardar el 100\% de las trazas que tengan errores o alta latencia, y solo el 5\% del tráfico normal.
+No es viable almacenar $10^9$ trazas: se decide qué guardar al inicio (\emph{head-based}) o al finalizar para retener errores y colas lentas (\emph{tail-based}). Por ejemplo: guardar el 100\,\% de las trazas que tengan errores o alta latencia, y solo el 5\,\% del tráfico normal.
 \end{block}
 \end{frame}
 
@@ -579,7 +577,7 @@ Responde: \emph{¿Por qué ocurrió el problema en este caso específico?}
 \pause
 
 \begin{block}{Unidad de trabajo (Unit of Work)}
-En lugar de emitir múltiples líneas sueltas, se inicializa un map en memoria al recibir la solicitud, se acumulan todos los atributos de negocio durante la ejecución y se emitie un \textbf{único evento estructurado ancho} al finalizar.
+En lugar de emitir múltiples líneas sueltas, se inicializa un map en memoria al recibir la solicitud, se acumulan todos los atributos de negocio durante la ejecución y se emite un \textbf{único evento estructurado ancho} al finalizar.
 \end{block}
 
 \end{frame}
@@ -609,7 +607,7 @@ En lugar de emitir múltiples líneas sueltas, se inicializa un map en memoria a
 {\scriptsize\color{UAIngMuted}Young \& Parker, \emph{Learning OpenTelemetry} (O'Reilly, 2024), Fig.~2-4.}
 \end{frame}
 
-\UASectionSlide{Diagnóstico en producción y caso real}
+\UASectionSlide{Diagnóstico en producción}
 
 \begin{frame}{La causa raíz no está donde explota el síntoma}
 \begin{alertblock}{La cascada}
@@ -660,7 +658,7 @@ Análisis por primeros principios: cada paso usa una señal distinta.
 
 \begin{frame}{Cierre y Conexión con Clase 11}
 \begin{block}{Idea central de cátedra}
-Observabilidad distribuida no es "mirar dashboards ni abrir tres pestañas". Es diseñar el software para que transporte contexto causal y pueda explicarse a sí mismo cuando falle.
+Observabilidad distribuida no es ``mirar dashboards ni abrir tres pestañas''. Es diseñar el software para que transporte contexto causal y pueda explicarse a sí mismo cuando falle.
 \end{block}
 
 \pause
