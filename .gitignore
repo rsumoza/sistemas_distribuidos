@@ -2,3 +2,5 @@
 config/build-info.tex
 /.idea/
 /out/
+
+.DS_Store
