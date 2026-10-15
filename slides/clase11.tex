@@ -170,25 +170,50 @@ Anoten: ¿qué le pasa a\ldots
 {\small \textbf{Nadie se cayó}: alcanza con que una dependencia se ponga lenta.}
 \end{frame}
 
-\begin{frame}{La cuenta: ley de Little}
+\begin{frame}{Ley de Little: una peluquería}
 \[
 L = \lambda \cdot W
 \]
-$L$: pedidos en vuelo (hilos ocupados necesarios) · $\lambda$: tasa de llegada · $W$: tiempo que un pedido ocupa un hilo.
+
+\begin{itemize}
+\item $\lambda$: cuántos \textbf{clientes llegan} por hora.
+\item $W$: cuántas horas \textbf{se queda} cada uno.
+\item $L$: cuántos clientes hay \textbf{adentro a la vez}.
+\end{itemize}
+
+\pause
+
+Llegan 2 clientes por hora y cada uno se queda 1,5 horas: $L = 2 \times 1{,}5 = \mathbf{3}$ clientes adentro.
+
+\pause
+
+\begin{alertblock}{Si la peluquería tiene 2 sillas}
+No da abasto, aunque nadie esté ``roto''. Y si cada corte tarda más, $W$ sube y $L$ sube, \textbf{sin que llegue un solo cliente más}.
+\end{alertblock}
+
+\pause
+
+{\small \textbf{Peluquería $\to$ Generator:} clientes = pedidos · sillas = hilos del pool · tiempo en la peluquería = tiempo que un pedido ocupa un hilo.}
+
+{\scriptsize\color{UAIngMuted}Little (1961). La analogía es de la cátedra.}
+\end{frame}
+
+\begin{frame}{La cuenta con el sistema de la demo}
+$\lambda = 5$ pedidos por segundo (k6) · pool de \textbf{8} hilos.  % TODO calibrar
 
 \pause
 
 \begin{itemize}
-\item Con \texttt{special} sana, un pedido tarda decenas de ms: $L \approx 5 \times 0{,}05 \approx 0{,}25$ hilos.  % TODO calibrar
+\item \textbf{\texttt{special} sana:} un pedido tarda decenas de ms, $W \approx 0{,}05$ s: $L \approx 5 \times 0{,}05 \approx 0{,}25$ hilos.  % TODO calibrar
 \pause
-\item Con 2 s por llamada y 4--5 llamadas por pedido: $W \approx 9$ s.  % TODO calibrar
+\item \textbf{\texttt{special} con 2 s por llamada:} cada pedido hace 4--5 llamadas una tras otra, $W \approx 9$ s.  % TODO calibrar
 \item $L = 5 \times 9 \approx \mathbf{45}$ pedidos simultáneos. El pool tiene \textbf{8}.  % TODO calibrar
 \end{itemize}
 
 \pause
 
 \begin{alertblock}{Consecuencia}
-Sostenemos $8/9 \approx 0{,}9$ pedidos por segundo, no 5. El resto se acumula en una cola.
+Sostenemos $8/9 \approx 0{,}9$ pedidos por segundo, no 5. El resto se acumula en una cola. Cambió $W$, no $\lambda$.
 \end{alertblock}
 
 {\scriptsize\color{UAIngMuted}Little (1961); Nygard, \emph{Release It!} (2018), cap.~9.}
