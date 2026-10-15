@@ -592,7 +592,7 @@ Timeout + breaker por tasa (ventana 50, mínimo 20, umbral 50\,\%) + fallback.
 
 \pause
 
-\textbf{Hipótesis:} con 10\,\% no abre nunca; con 50\,\% abre en uno o dos segundos. Resuelve el dilema.
+\textbf{Hipótesis:} con 10\,\% no abre nunca; con 50\,\% abre en uno o dos segundos. Resuelve el dilema.  % TODO calibrar
 \end{frame}
 
 \begin{frame}{Prueba 4: caída intermitente y half-open}
@@ -604,7 +604,7 @@ Timeout + reintentos con backoff y jitter + breaker por tasa + fallback. \texttt
 
 \pause
 
-\textbf{Comparación:} \texttt{half\_open\_max\_calls} \textbf{1} contra \textbf{0} (sin tope): sin tope, al pasar a half-open salen hasta 8 pruebas a la vez (una por hilo).
+\textbf{Comparación:} \texttt{half\_open\_max\_calls} \textbf{1} contra \textbf{0} (sin tope): sin tope, al pasar a half-open salen hasta 8 pruebas a la vez (una por hilo).  % TODO calibrar
 
 \pause
 
