@@ -73,6 +73,8 @@ La relación entre carga, concurrencia y tiempo de respuesta tiene una forma cua
 \[
 L = \lambda \cdot W.
 \]
+Una analogía ayuda a fijar la idea. En una peluquería llegan en promedio 2 clientes por hora ($\lambda = 2$) y cada uno permanece 1,5 horas ($W = 1{,}5$): en cualquier momento hay en promedio $L = 2 \times 1{,}5 = 3$ clientes adentro. Si el local tiene solo 2 sillas, no da abasto, aunque nada esté ``roto''; y si cada atención se alarga, $W$ y con él $L$ crecen sin que llegue un solo cliente más. La analogía es de la cátedra, no de la bibliografía.
+
 Aplicada a un servicio con un pool de hilos, $\lambda$ es la tasa de pedidos por segundo, $W$ es el tiempo que un pedido ocupa un hilo y $L$ es la cantidad de hilos ocupados \emph{necesarios} para sostener esa tasa. Si $L$ supera el tamaño del pool, el servicio no puede atender la demanda: los pedidos se acumulan en una cola.
 
 \paragraph{Ejemplo.} El generador de contraseñas recibe $\lambda = 5$ pedidos por segundo. Con la dependencia sana, un pedido tarda unas decenas de milisegundos y se necesitan $L = 5 \times 0{,}05 = 0{,}25$ hilos: un pool de 8 hilos es holgado. Si ahora cada llamada a una de las dependencias tarda 2 s y cada pedido hace en promedio unas 4 o 5 llamadas secuenciales a esa dependencia, el pedido ocupa un hilo unos 9 s y la concurrencia necesaria pasa a ser $L = 5 \times 9 = 45$. Con 8 hilos, el servicio satura: por mucho que se agregue capacidad de cómputo, la tasa sostenible es $8 / 9 \approx 0{,}9$ pedidos por segundo. Obsérvese que ninguna dependencia ``se cayó'': alcanzó con que una se pusiera lenta.
