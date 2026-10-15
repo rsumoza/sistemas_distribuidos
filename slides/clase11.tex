@@ -337,7 +337,8 @@ P(\text{falla del pedido}) = 1 - (1-p)^n
 
 \begin{itemize}
 \item $p = 10\,\%$ y $n = 4{,}4$: $1 - 0{,}9^{4{,}4} \approx \mathbf{37\,\%}$.  % TODO calibrar
-\item Con \textbf{un reintento}: la llamada falla con $p^2 = 1\,\%$ y el pedido con $\approx \mathbf{4\,\%}$.
+\item Con \textbf{un reintento}, la llamada solo falla si fallan \textbf{los dos intentos}: $p \cdot p = p^2 = 0{,}1 \times 0{,}1 = 1\,\%$.
+\item Entonces el pedido falla con $1 - 0{,}99^{4{,}4} \approx \mathbf{4\,\%}$.
 \end{itemize}
 
 \pause
