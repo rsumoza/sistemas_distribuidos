@@ -11,308 +11,506 @@
 \date{\UADate}
 
 \begin{document}
+\sloppy
 \maketitle
 
 \section{Introducción}
 
-En sistemas distribuidos, la falla no es una excepción rara, sino una condición normal del entorno. La cuestión central no es si el sistema fallará, sino \emph{cómo} fallará y \emph{qué tan lejos} se propagará esa falla.
+En un sistema distribuido la falla parcial no es una anomalía: es la condición normal de operación. Alguna dependencia está siempre más lenta de lo habitual, algún nodo se reinicia, alguna conexión se corta. La clase 10 mostró cómo \emph{ver} esas fallas; esta clase trata de qué hace el sistema \emph{mientras} ocurren. La pregunta de fondo no es cómo evitar toda falla ---eso no es posible---, sino cómo impedir que una falla local se convierta en una falla global.
 
-Una dependencia lenta, un broker saturado o una base de datos bajo presión pueden transformar una degradación local en un colapso sistémico. Por eso la resiliencia distribuida no consiste en “agregar reintentos” sin más, sino en diseñar mecanismos que contengan la propagación del daño.
+\subsection{Falta, error y falla}
 
-\begin{quote}
-Resiliencia es la capacidad del sistema de sostener comportamiento útil bajo estrés, degradación o falla parcial.
-\end{quote}
+Nygard (2018, cap.~3) propone una terminología precisa para hablar de la cadena que lleva de un defecto a una caída:
+\begin{description}
+\item[\emph{Fault} (falta):] condición que crea un estado interno incorrecto en el software. Puede deberse a un defecto latente que se dispara o a una condición no controlada en una frontera con otro sistema.
+\item[\emph{Error}:] comportamiento visiblemente incorrecto.
+\item[\emph{Failure} (falla):] un sistema que no responde. Nygard observa que la falla ``está en el ojo del observador'': una máquina puede tener energía y no responder ningún pedido.
+\end{description}
 
-\section{Fallos locales y fallos sistémicos}
+Una falta se convierte en error y un error provoca una falla; así avanza lo que el autor llama una \emph{grieta} (\emph{crack}). En cada eslabón la grieta puede acelerar, frenar o detenerse. El acoplamiento fuerte la acelera: cuantas más vías de propagación existen, más oportunidades hay de que una falta menor termine en una caída total. El conjunto formado por el disparador original, el modo en que la grieta se propaga y el daño resultante se denomina \emph{modo de falla} (\emph{failure mode}).
 
-Una falla local es un problema en un componente específico:
+\subsection{Diseñar los modos de falla}
+
+Nygard (2018, cap.~3) sostiene que negar la inevitabilidad de las fallas quita el poder de controlarlas. Si el diseño no define cómo falla el sistema, falla de la manera que emerja, que suele ser peligrosa. Tomando el concepto de James Chiles, llama \emph{crackstoppers} a las protecciones que se construyen a propósito para que el daño no avance: así como un automóvil tiene zonas de deformación que fallan primero para proteger a los pasajeros, el sistema puede decidir qué funciones son indispensables y construir modos de falla que mantengan las grietas lejos de ellas.
+
+La pregunta de esta clase puede formularse entonces con precisión: dado que una dependencia va a fallar, ¿en qué punto de la cadena se corta la propagación y a qué costo?
+
+\subsection{El ejemplo recurrente}
+
+A lo largo de estos apuntes se usa un sistema simple, un \emph{generador de contraseñas}. Un servicio recibe pedidos de usuarios y, para armar cada contraseña, llama repetidamente a cuatro servicios más: uno que devuelve letras mayúsculas, otro letras minúsculas, otro dígitos y otro caracteres especiales. Hay además una dependencia que no figura en el diagrama de arquitectura: el servicio de minúsculas, internamente, consulta al de dígitos. Cada pedido hace varias llamadas a cada servicio hijo (un \emph{fan-out}), de modo que cualquier política que se aplique por llamada se multiplica por pedido. El ejemplo es deliberadamente pequeño: sirve para razonar con números, no porque el problema sea pequeño.
+
+\section{Anatomía de una falla en cascada}
+
+\subsection{Puntos de integración}
+
+Nygard (2018, cap.~4) abre su catálogo de antipatrones con los puntos de integración, a los que considera ``the number-one killer of systems'' (la principal causa de muerte de los sistemas): cada conexión con otro sistema es una oportunidad de que el problema de otro se vuelva propio. La tendencia a descomponer en servicios más chicos y a integrar proveedores externos agrava la situación, porque multiplica la cantidad de puntos de integración.
+
+Un \emph{fallo cascada} (\emph{cascading failure}) ocurre cuando una grieta en una capa provoca una grieta en la capa que la llama. Para que ocurra se necesita un mecanismo que transmita la falla de una capa a otra: ``salta el hueco'' cuando el comportamiento del llamante se desencadena por la condición de falla del proveedor. Según el mismo capítulo, estas cascadas resultan con frecuencia de pools de recursos que se agotan por una falla en una capa inferior, y una llamada a un punto de integración sin \emph{timeout} es una forma segura de provocarla. Los servicios con muchos llamantes (alto \emph{fan-in}) propagan sus problemas más ampliamente y merecen un escrutinio especial.
+
+\subsection{Falla rápida y falla lenta}
+
+No todas las fallas de una dependencia son iguales para quien la llama. Una conexión rechazada vuelve en milisegundos; un paquete de confirmación que se pierde deja al hilo bloqueado durante minutos antes de que salte una excepción. El hilo bloqueado no puede atender otros pedidos y la capacidad total se reduce; si todos los hilos terminan bloqueados, para todo fin práctico el servidor está caído. Nygard (2018, cap.~4) lo resume así: ``Clearly, a slow response is a lot worse than no response.''
+
+La consecuencia de diseño es contraintuitiva: una dependencia lenta es más peligrosa que una dependencia caída, porque la caída libera rápido los recursos del llamante y la lentitud los retiene.
+
+\subsection{Hilos bloqueados y pools agotados}
+
+La mayoría de los servicios atiende cada pedido con un hilo tomado de un conjunto finito. Mientras el hilo espera la respuesta de una dependencia no hace nada útil, pero sigue ocupado. Nygard (2018, cap.~4, \emph{Blocked Threads}) señala que la mayoría de las fallas que atendió no fueron caídas del proceso sino procesos vivos con todos sus hilos esperando un resultado imposible: ``el sistema se colgó'', no ``el sistema se cayó''.
+
+Esto explica una observación que desorienta a quien opera: con el sistema saturado, la utilización de CPU es baja. Los hilos esperan entrada/salida, no calculan. Un panel de CPU en verde es compatible con un servicio completamente bloqueado, y por eso la saturación debe medirse sobre el recurso que realmente se agota (hilos ocupados contra hilos disponibles), no sobre el procesador.
+
+\subsection{Reacciones en cadena y capacidades desbalanceadas}
+
+Nygard (2018, cap.~4) describe otros dos mecanismos de propagación.
+
+\paragraph{Reacciones en cadena.} En una granja horizontal de ocho servidores iguales cada nodo atiende el 12,5\,\% de la carga. Si uno falla, cada uno de los siete restantes pasa a atender aproximadamente el 14,3\,\% ($1/7$). El aumento absoluto es de apenas 1,8 puntos porcentuales, pero la carga de cada servidor crece cerca del 15\,\% ($(1/7)/(1/8) = 8/7$). Si la causa de la primera caída era una condición de carga (una fuga de memoria, una condición de carrera), los sobrevivientes son más propensos a fallar, y cada baja recarga a los demás. En el caso degenerado de un clúster de dos nodos, la carga del sobreviviente se duplica.
+
+\paragraph{Capacidades desbalanceadas.} En el ejemplo del mismo capítulo, un servicio de \emph{front end} dispone de 3000 hilos de atención y el servicio de agendamiento que consulta tiene solamente 450. Mientras el porcentaje de pedidos que llegan al servicio chico sea pequeño no hay problema, pero una promoción que lleve a muchos más usuarios a ese camino lo desborda: el \emph{front end} siempre puede abrumar al \emph{back end} porque sus capacidades no están balanceadas. Igualar capacidades suele ser inviable económicamente, de modo que tanto llamantes como proveedores deben construirse para resistir una avalancha de pedidos.
+
+\subsection{La ley de Little aplicada al pool de hilos}
+
+La relación entre carga, concurrencia y tiempo de respuesta tiene una forma cuantitativa simple. La \textbf{ley de Little} (Little, 1961) establece que, en un sistema estable, el número promedio de elementos en el sistema es el producto de la tasa de llegada por el tiempo promedio que cada elemento permanece:
+\[
+L = \lambda \cdot W.
+\]
+Aplicada a un servicio con un pool de hilos, $\lambda$ es la tasa de pedidos por segundo, $W$ es el tiempo que un pedido ocupa un hilo y $L$ es la cantidad de hilos ocupados \emph{necesarios} para sostener esa tasa. Si $L$ supera el tamaño del pool, el servicio no puede atender la demanda: los pedidos se acumulan en una cola.
+
+\paragraph{Ejemplo.} El generador de contraseñas recibe $\lambda = 5$ pedidos por segundo. Con la dependencia sana, un pedido tarda unas decenas de milisegundos y se necesitan $L = 5 \times 0{,}05 = 0{,}25$ hilos: un pool de 8 hilos es holgado. Si ahora cada llamada a una de las dependencias tarda 2 s y cada pedido hace en promedio unas 4 o 5 llamadas secuenciales a esa dependencia, el pedido ocupa un hilo unos 9 s y la concurrencia necesaria pasa a ser $L = 5 \times 9 = 45$. Con 8 hilos, el servicio satura: por mucho que se agregue capacidad de cómputo, la tasa sostenible es $8 / 9 \approx 0{,}9$ pedidos por segundo. Obsérvese que ninguna dependencia ``se cayó'': alcanzó con que una se pusiera lenta.
+
+\paragraph{Tiempo en cola y tiempo de procesamiento.} Cuando los hilos están todos ocupados, los pedidos nuevos esperan en una cola (la cola de escucha del socket y las colas del servidor web). Nygard (2018, cap.~9) llama \emph{tiempo de residencia} (\emph{residence time}) a la suma del tiempo en cola y del tiempo de procesamiento, y advierte que muchos equipos se equivocan midiendo solo el tiempo de procesamiento: el servicio cree que todo anda bien mientras sus clientes se quejan de lentitud. Dado que la cola es serial y el procesamiento multihilo, a la larga el tiempo de cola domina. Por eso la latencia que ve el cliente es mayor que la que registra el servidor, y la diferencia entre ambas es precisamente el tiempo de espera.
+
+Nygard (2018, cap.~9) hace además una aclaración metodológica importante: la ley de Little deja de describir bien al sistema cuando se alcanzan los límites y la longitud máxima de las colas. Sirve para dimensionar y para predecir la saturación, no para modelar el comportamiento detallado una vez saturado.
+
+\subsection{Retroalimentación: los reintentos llegan cuando más duele}
+
+El mecanismo que cierra el círculo es la retroalimentación. Al aumentar la carga los recursos se retienen más tiempo, lo que alarga los tiempos de respuesta de los nuevos pedidos. En algún momento el tiempo de respuesta supera el \emph{timeout} del llamante, que abandona el pedido original y, según Nygard (2018, cap.~9), probablemente dispare un reintento ---en sus palabras, \emph{``exactly when it hurts the worst''}---. El SRE Book (Beyer et al., 2016, cap.~22) desarrolla el mismo fenómeno con números: un backend con límite de 10\,000 consultas por segundo recibe 10\,100; los 100 pedidos rechazados se reintentan y suman carga, el volumen de reintentos crece y cada vez menos pedidos tienen éxito en el primer intento. El reintento, que en clases anteriores era la solución a una pérdida de mensaje, es aquí el combustible de la cascada.
+
+\section{Timeouts}
+
+\subsection{Para qué sirven}
+
+Un \emph{timeout} es el mecanismo que permite dejar de esperar una respuesta cuando se estima que no llegará. Nygard (2018, cap.~5) fundamenta su necesidad en la naturaleza de las redes: todo sistema es hoy un sistema distribuido y toda red es falible, de modo que el código no puede esperar para siempre ---``Hope is not a design method''---. Los \emph{timeouts} bien ubicados proveen aislamiento de fallas: el problema de otro servicio no tiene por qué convertirse en el propio.
+
+El autor lamenta que, cuanto más alto es el nivel de abstracción de una librería, más raro es encontrar \emph{timeouts} configurables; muchas APIs ofrecen una llamada con \emph{timeout} y otra más cómoda que bloquea indefinidamente. Lo mismo aplica a los recursos internos: todo pool que bloquea hilos debe tener un \emph{timeout}, y toda primitiva de sincronización debe usarse en su forma con plazo.
+
+\subsection{Timeout de conexión y timeout de lectura}
+
+Una llamada remota tiene al menos dos etapas con modos de falla distintos:
 \begin{itemize}
-\item un servicio responde lento;
-\item una cola se llena;
-\item una base de datos supera su capacidad;
-\item un cache deja de responder.
+\item \textbf{Establecimiento de la conexión.} Si el destino está caído o inalcanzable, la conexión o es rechazada inmediatamente (falla rápida) o no recibe respuesta (falla lenta). El \emph{timeout de conexión} acota esta etapa; como establecer una conexión dentro de un mismo centro de datos es rápido, puede ser muy corto.
+\item \textbf{Espera de la respuesta.} Una vez establecida la conexión, el servidor puede aceptarla y no contestar, o contestar muy lento. El \emph{timeout de lectura} acota el tiempo que se espera cada respuesta, y debe reflejar cuánto tarda la dependencia en operación normal.
+\end{itemize}
+Un \emph{timeout} de lectura no acota el tiempo total de la llamada si la respuesta llega en pequeños fragmentos; para acotarlo hace falta, además, un plazo global (\emph{deadline}) de la operación.
+
+\subsection{Cómo elegir el valor}
+
+Un \emph{timeout} demasiado corto convierte la variabilidad normal en errores; demasiado largo no protege. El valor debe salir de la \textbf{distribución de latencia de la dependencia}, medida en condiciones normales: típicamente el percentil 99 de la línea de base más un margen que absorba la variabilidad. Se retoma así la lección de la clase 10: el promedio no describe a nadie, y un \emph{timeout} basado en la media cortaría una fracción grande de las llamadas normales, mientras que uno basado en el máximo observado casi nunca actuaría. Debe medirse del lado del cliente: la latencia que importa para decidir cuánto esperar es la que ve el llamante, que incluye la red y el encolamiento y que puede diferir de lo que registra el servidor.
+
+Como el percentil se estima a partir de histogramas con cubos de ancho fijo, es una aproximación; alcanza para calibrar, pero conviene dejar margen y no presentarlo como un valor exacto. El valor debe revisarse cuando cambia la dependencia o su carga.
+
+\subsection{Presupuesto de tiempo a lo largo de la cadena}
+
+Los \emph{timeouts} de una cadena de llamadas no son independientes. Si el servicio A llama al servicio B y B llama al servicio C, el \emph{timeout} que A usa con B debe cubrir el tiempo que B puede tardar \emph{incluyendo} lo que B espera a C. De lo contrario A abandona mientras B sigue trabajando: A cuenta una falla aunque B terminaría bien, y B consume recursos para una respuesta que nadie recibirá.
+
+En el generador de contraseñas el servicio de minúsculas consulta internamente al de dígitos. Si el \emph{timeout} del primero se fija sin conocer esa cadena, con un valor que ``parece razonable'' para su propia lógica, puede resultar menor que el tiempo que el servicio tarda legítimamente cuando la consulta interna es lenta; el servicio de minúsculas falla aunque cada número, mirado por separado, parezca razonable. La regla es que el \emph{timeout} de un servicio debe ser mayor que el de cada dependencia que llama por dentro más su propio tiempo de procesamiento.
+
+Si además hay reintentos, el tiempo máximo que una llamada lógica puede tardar es
+\[
+T_{\max} \;=\; (1 + r)\cdot t \;+\; \sum_{i=1}^{r} e_i,
+\]
+donde $t$ es el \emph{timeout} por intento, $r$ es la cantidad de reintentos y $e_i$ son las esperas de \emph{backoff}. Ese $T_{\max}$ debe caber en el \emph{timeout} del llamante. Es el motivo por el cual, en cadenas largas, no alcanza con elegir cada valor ``razonable'': hay que repartir un presupuesto de tiempo de extremo a extremo.
+
+\subsection{Timeouts y fail fast}
+
+Nygard (2018, cap.~5) presenta el patrón \emph{Timeouts} y el patrón \emph{Fail Fast} como \emph{``two sides of the same coin''}: los \emph{timeouts} se aplican sobre todo a los pedidos salientes y protegen de la falla de otro; \emph{Fail Fast} se aplica a los pedidos entrantes y consiste en rechazar de inmediato lo que el sistema ya sabe que no podrá procesar, en vez de gastar recursos para descartar el resultado. Un pedido que se sabe de antemano que fallará (porque un recurso necesario no está disponible, porque el \emph{circuit breaker} de una dependencia requerida está abierto, porque los parámetros son inválidos) debe fallar al principio, no a mitad del trabajo.
+
+Una advertencia necesaria: fallar rápido no es lo mismo que funcionar. Un \emph{timeout} bien puesto evita la saturación del llamante, pero sigue habiendo pedidos que fallan; recuperarlos es tarea de los mecanismos que siguen.
+
+\section{Reintentos}
+
+\subsection{Cuándo ayudan y cuándo destruyen}
+
+Un reintento es útil frente a una falla \emph{transitoria}: un paquete perdido, una conexión reiniciada. Frente a una falla persistente o a una sobrecarga, es destructivo. Nygard (2018, cap.~5) observa que dentro de un centro de datos la falla suele deberse a algo que anda mal en el otro extremo y que los problemas tienden a durar un tiempo, de modo que un reintento inmediato probablemente falle otra vez, y que el cliente que reintenta mantiene sus recursos ocupados más tiempo del necesario y puede empujar su respuesta más allá del \emph{timeout} de su propio llamante.
+
+Dos condiciones previas: solo se reintentan operaciones \textbf{idempotentes} (repetirlas no cambia el resultado), y solo se reintentan las fallas que tienen sentido reintentar (\emph{timeouts}, errores de conexión, errores 5xx; no errores 4xx ni de validación, que fallarían igual).
+
+\subsection{La cuenta de la amplificación}
+
+Un pedido que depende de $n$ llamadas independientes, cada una con probabilidad de falla $p$, falla si falla alguna:
+\[
+P(\text{falla del pedido}) = 1 - (1-p)^n.
+\]
+Con $p = 10\,\%$ y $n = 4{,}4$ llamadas por pedido (el promedio del generador de contraseñas para una dependencia),
+\[
+1 - 0{,}9^{4{,}4} \approx 37\,\%.
+\]
+Un 10\,\% de fallas por llamada se convierte en más de un tercio de pedidos fallidos: el \emph{fan-out} amplifica.
+
+Con un reintento, para que la llamada falle deben fallar los dos intentos, con probabilidad $p^2 = 1\,\%$, y el pedido falla con probabilidad $1 - 0{,}99^{4{,}4} \approx 4\,\%$. La protección es considerable, pero tiene un costo en carga: cada llamada pasa a significar en promedio $1 + p$ intentos (con hasta dos reintentos, $1 + p + p^2 = 1{,}11$), de modo que las $4{,}4$ llamadas se convierten en cerca de $4{,}9$. Cuando la falla es una caída o una saturación en lugar de una pérdida independiente, $p$ se acerca a 1 y cada llamada pasa a significar $1 + r$ intentos: el reintento multiplica justo la carga sobre el componente que no puede soportarla.
+
+\paragraph{Reintentos en varias capas.} Si cada capa reintenta, los factores se multiplican. El SRE Book (Beyer et al., 2016, cap.~22) calcula que si las capas de \emph{backend}, \emph{frontend} y JavaScript emiten cada una 3 reintentos (4 intentos), una única acción del usuario puede generar $4^3 = 64$ intentos sobre la base de datos. Con tres capas de tres intentos cada una (dos reintentos por capa) son hasta $3^3 = 27$ llamadas. El mismo capítulo aconseja pensar el servicio de manera integral y decidir si realmente hace falta reintentar en cada nivel.
+
+\subsection{Backoff exponencial y jitter}
+
+Para no reintentar de inmediato, se espera entre intentos. En el \emph{backoff exponencial} la espera crece geométricamente con el número de reintento $n$ ($n = 0, 1, 2,\dots$) hasta un tope:
+\[
+d_n = \min\bigl(\text{tope},\; \text{base}\cdot m^{\,n}\bigr),
+\]
+con $m$ típicamente igual a 2. Si todos los clientes que fallaron a la vez usan la misma $d_n$, también reintentan a la vez, y la ola de reintentos llega sincronizada: es el fenómeno que Nygard (2018, cap.~4, \emph{Dogpile}) describe para arranques simultáneos de servidores, tareas programadas a la hora en punto o cambios de configuración que se aplican a todos al mismo tiempo, y que se mitiga dispersando los instantes con una variación aleatoria. Allí se llama \emph{dogpile} a la carga transitoria que un conjunto de clientes impone a la vez.
+
+El \emph{jitter} agrega aleatoriedad a la espera para desincronizar a los clientes. Brooker (2015) describe varias variantes; dos de las más usadas son:
+\begin{description}
+\item[\emph{Full jitter}:] se elige la espera uniformemente en el intervalo completo, $\;e_n \sim U(0,\, d_n)$.
+\item[\emph{Equal jitter}:] se conserva la mitad del retardo y se aleatoriza la otra mitad, $\;e_n = d_n/2 + U(0,\, d_n/2)$.
+\end{description}
+Brooker (2015) concluye que el \emph{backoff} con \emph{jitter} es claramente mejor que el exponencial sin \emph{jitter}, y que debería considerarse un enfoque estándar para clientes remotos. El efecto del \emph{jitter} solo es apreciable cuando hay muchos clientes que fallan a la vez: con pocos clientes no hay sincronización que romper.
+
+\subsection{Presupuesto de reintentos y reglas de contención}
+
+El SRE Book (Beyer et al., 2016, cap.~22) enumera consideraciones para los reintentos automáticos:
+\begin{itemize}
+\item usar siempre \emph{backoff} exponencial aleatorizado;
+\item limitar los reintentos por pedido: no reintentar indefinidamente;
+\item considerar un \emph{presupuesto de reintentos} (\emph{retry budget}) por proceso, por ejemplo permitir como máximo 60 reintentos por minuto y, al agotarlo, fallar directamente: así se acota el efecto de los reintentos y se distingue una falla de planificación de capacidad que descarta algunas consultas de una cascada global;
+\item evitar reintentar en múltiples niveles.
+\end{itemize}
+A esto se suma una regla propia de los \emph{circuit breakers} (sección siguiente): un rechazo del \emph{breaker} nunca se reintenta, porque la decisión de no llamar ya incorporó la información de que la dependencia está mal.
+
+\subsection{Caso Pokémon GO}
+
+El capítulo 11 del SRE Workbook (Bethea et al., 2018) analiza el lanzamiento de Pokémon GO de Niantic. Antes del lanzamiento se había probado la carga hasta cinco veces la estimación más optimista; el ritmo real de pedidos por segundo fue casi cincuenta veces esa estimación. La sobrecarga volvió extremadamente lentos a los \emph{backends} (en lugar de rechazar pedidos), y el balanceador de carga reintentaba los GET, sumando carga.
+
+La aplicación, a su vez, reintentaba por cuenta de los usuarios con una estrategia de ``a single immediate retry, followed by constant backoff''. Durante la caída, los \emph{backends} devolvían a veces gran cantidad de errores rápidos (por ejemplo, cuando se reiniciaba un \emph{backend} compartido); esas respuestas sincronizaron los reintentos de los clientes y produjeron picos de pedidos de hasta veinte veces el máximo global anterior (el ``\emph{thundering herd}''). Entre las acciones de mitigación estuvieron aislar y ampliar el conjunto de balanceadores que servían al juego y limitar con autorización de Niantic el tráfico aceptado. Como cambio de fondo, Niantic incorporó \emph{jitter} y \emph{backoff} exponencial truncado a sus clientes.
+
+La lección es doble: un reintento sin dispersión temporal convierte a muchos clientes independientes en una única ola, y la sobrecarga por reintentos puede alcanzar también a componentes ajenos al servicio que sufre el problema (en este caso, la capacidad de balanceo global).
+
+\section{Circuit breaker}
+
+\subsection{Idea y estados}
+
+Nygard (2018, cap.~5) toma el nombre del dispositivo eléctrico: un componente que falla primero, cortando el circuito, para evitar que se destruya el sistema completo, y que luego puede restablecerse. En software, un \emph{circuit breaker} envuelve una operación peligrosa y la \emph{evita} cuando el sistema no está sano. Se diferencia así de los reintentos: existe para \emph{prevenir} operaciones, no para reejecutarlas. Es una forma de degradar automáticamente la funcionalidad cuando el sistema está bajo estrés.
+
+Se modela como una máquina de tres estados:
+\begin{description}
+\item[\emph{Closed} (cerrado):] estado normal. Las llamadas se ejecutan y se registra su resultado. Si el conteo de fallas supera el umbral, el \emph{breaker} ``salta''.
+\item[\emph{Open} (abierto):] las llamadas fallan inmediatamente, sin intentar la operación real. Tras un tiempo de espera se pasa a \emph{half-open}.
+\item[\emph{Half-open} (semiabierto):] se deja pasar una llamada de prueba (o unas pocas). Si tiene éxito, el \emph{breaker} se restablece y vuelve a \emph{closed}; si falla, vuelve a \emph{open} hasta que transcurra otro período de espera.
+\end{description}
+
+\begin{center}
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.2cm, minimum height=0.9cm, font=\small\bfseries},
+  flow/.style={-{Stealth[length=1.8mm]}, draw=UAIngNavy}
+]
+\node[st] (c) at (0,0) {Closed};
+\node[st, draw=UAIngOrange] (o) at (8.4,0) {Open};
+\node[st] (h) at (4.2,-3.6) {Half-open};
+\draw[flow] (c) -- (o);
+\node at (4.2,0.55) {fallas $\ge$ umbral (según la política elegida)};
+\draw[flow] (o.south west) -- (h.north east);
+\node[anchor=west] at (6.9,-1.9) {pasó el tiempo\\de espera};
+\draw[flow, draw=UAIngOrange] (h.east) to[bend right=35] (o.south);
+\node[anchor=west, text=UAIngOrange] at (8.0,-2.9) {una prueba falla};
+\draw[flow] (h.north west) -- (c.south east);
+\node[anchor=east] at (1.7,-2.5) {las pruebas necesarias\\tienen éxito};
+\node[text=UAIngMuted, anchor=north] at (0,-0.6) {las llamadas se ejecutan;\\se cuentan las fallas};
+\node[text=UAIngMuted, anchor=north west] at (8.6,-0.6) {las llamadas se rechazan\\sin ejecutarse};
+\end{tikzpicture}
+\end{center}
+
+\subsection{Qué cuenta como falla}
+
+El \emph{breaker} solo debe contar los eventos que indican que la dependencia está enferma: \emph{timeouts}, errores de conexión y respuestas 5xx. No debe contar errores del cliente (4xx) ni errores de validación: no dicen nada sobre la salud del proveedor, y contarlos abriría el \emph{breaker} por culpa de pedidos incorrectos del propio llamante. Nygard (2018, cap.~5) agrega que el \emph{breaker} puede registrar por separado distintos tipos de falla, por ejemplo con un umbral más bajo para los \emph{timeouts} que para las conexiones rechazadas. Cuando el \emph{breaker} rechaza una llamada, conviene lanzar una excepción distinta de un \emph{timeout} corriente, para que quien llama pueda reaccionar con información útil.
+
+La cooperación con los \emph{timeouts} es un requisito, no una opción. Una llamada lenta que no tiene \emph{timeout} no termina nunca, y el \emph{breaker} solo registra un resultado cuando la llamada termina: sin \emph{timeout} no ve la falla lenta, que es la más peligrosa. Nygard (2018, cap.~5) lo expresa en sus recomendaciones: usar \emph{Circuit Breaker} junto con \emph{Timeouts}.
+
+\subsection{Cuándo abrir: fallas consecutivas contra tasa de fallas}
+
+La decisión central de configuración es cuándo se considera que hay ``demasiadas fallas''. Nygard (2018, cap.~5) advierte que un simple contador que suma todas las fallas no es interesante: hay una gran diferencia entre cinco fallas repartidas en cinco horas y cinco fallas en los últimos treinta segundos; lo que importa es la \emph{densidad} de fallas. Existen dos familias de políticas.
+
+\paragraph{Política de fallas consecutivas.} El \emph{breaker} se abre cuando se observan $k$ fallas seguidas; cualquier éxito reinicia el conteo. Es simple, pero tiene una propiedad poco evidente. Si cada llamada falla con probabilidad $p$ de forma independiente, el número esperado de llamadas necesarias hasta observar $k$ fallas consecutivas es
+\[
+E(k,p) = \frac{1 - p^{k}}{(1-p)\,p^{k}}.
+\]
+(Es el resultado clásico del tiempo de espera hasta una racha de longitud $k$ en ensayos independientes de Bernoulli.) Los valores para dos umbrales y dos tasas de falla son:
+
+\begin{center}
+\begin{tabular}{lrr}
+\toprule
+ & $p = 10\,\%$ & $p = 50\,\%$ \\
+\midrule
+$k = 3$  & $\approx 1110$ llamadas & $14$ llamadas \\
+$k = 10$ & $\approx 1{,}1\times 10^{10}$ (en la práctica, nunca) & $\approx 2046$ llamadas \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{El dilema.} Ningún valor de $k$ sirve a la vez para tolerar una tasa de error baja pero normal (10\,\%) y para detectar rápido una dependencia realmente enferma (50\,\%):
+\begin{itemize}
+\item con $k = 3$ el \emph{breaker} detecta rápido el 50\,\% ($\approx 14$ llamadas), pero también se dispara por azar con un 10\,\% de errores, cada $\approx 1110$ llamadas;
+\item con $k = 10$ nunca se dispara con el 10\,\%, pero tarda $\approx 2046$ llamadas en detectar el 50\,\%.
+\end{itemize}
+La causa es que las fallas consecutivas mezclan dos magnitudes distintas: la \emph{tasa} de error y el \emph{volumen} de tráfico. A igual tasa, cuanto más tráfico, más rachas ocurren por unidad de tiempo. A 100 llamadas por segundo, un \emph{breaker} con $k = 3$ abre en promedio cada $1110/100 \approx 11$ s aun con un 10\,\% de errores; si permanece abierto 10 s cada vez, está abierto cerca del 47\,\% del tiempo y degrada el 100\,\% del tráfico hacia esa dependencia durante esos intervalos, por una tasa de error que el sistema toleraba perfectamente.
+
+\paragraph{Política de tasa de fallas en ventana.} La solución es medir la tasa directamente: el \emph{breaker} mantiene una \emph{ventana deslizante} con los resultados de las últimas $N$ llamadas y se abre cuando la proporción de fallas alcanza un umbral $\theta$, pero solo después de haber visto un mínimo $m$ de llamadas, para no decidir con muestras insignificantes. Es el modelo de resilience4j: tipo y tamaño de ventana, mínimo de llamadas, umbral de tasa de fallas, y como variante un umbral de tasa de llamadas lentas con su duración (\emph{slow call duration}); la documentación aclara que las tasas solo se calculan una vez registrado el mínimo de llamadas.
+
+Con una ventana de 50 llamadas, un mínimo de 20 y un umbral del 50\,\%, la probabilidad de observar 25 o más fallas en 50 llamadas cuando la tasa real es 10\,\% es del orden de $10^{-12}$ (distribución binomial): el \emph{breaker} no abre. Con una tasa real del 50\,\% abre casi en cuanto se alcanza el mínimo, porque ya la primera evaluación con 20 llamadas tiene una probabilidad cercana al 59\,\% de ver 10 o más fallas. Detecta entonces una dependencia enferma en decenas de llamadas, independientemente del volumen total, y tolera la tasa baja. Se desplaza el compromiso: una ventana chica detecta rápido pero es ruidosa (más falsos positivos cuando la tasa real se acerca al umbral); una ventana grande es estable pero reacciona más lento.
+
+El umbral de llamadas lentas permite abrir también por latencia: aunque las llamadas no fallen formalmente, si una proporción grande supera una duración dada, la dependencia está degradada y la sobrecarga que genera en el llamante justifica cortarla.
+
+\subsection{Cuánto tiempo abierto y qué pasa en half-open}
+
+El tiempo que el \emph{breaker} permanece abierto es un compromiso: si es muy corto, se prueba una dependencia todavía enferma una y otra vez y se acumulan pruebas fallidas; si es muy largo, se sigue degradando innecesariamente después de que la dependencia se recuperó. En \emph{half-open} hay dos decisiones: cuántas llamadas de prueba se dejan pasar a la vez y cuántos éxitos hacen falta para cerrar. Nygard (2018, cap.~5) describe la prueba como \emph{la próxima llamada}, es decir, una. Si la implementación deja pasar \emph{todas} las llamadas durante \emph{half-open}, cada hilo del llamante lanza una prueba simultánea contra una dependencia que quizá sigue mal: se pierde el sentido de la prueba. Limitar las pruebas simultáneas es una decisión de configuración que conviene explicitar. Cerrar con un solo éxito es sensible a un éxito aislado; exigir varios éxitos reduce el riesgo de cerrar y volver a abrir en bucle.
+
+\subsection{Alcance}
+
+Nygard (2018, cap.~5) recomienda construir el \emph{breaker} con el alcance de un único proceso: el mismo estado afecta a todos los hilos del proceso, pero no se comparte entre procesos. Hay una pérdida de eficiencia, porque cada instancia del llamante descubre por su cuenta que el proveedor está caído, pero compartir el estado introduce otra comunicación fuera de proceso, y con ella un nuevo modo de falla de la propia protección. Corolario práctico: un \emph{breaker} por dependencia y por proceso. Un único \emph{breaker} para todas las dependencias haría que la falla de una desconecte a las demás.
+
+\subsection{Combinación con timeouts y reintentos}
+
+Dentro de una llamada lógica, cada intento (no cada llamada lógica) cuenta para el \emph{breaker}: es la información sobre la salud de la dependencia. Si un intento fallido abre el \emph{breaker}, el intento siguiente se rechaza y la secuencia de reintentos termina. Y el rechazo del \emph{breaker} no se reintenta. Sin esa regla, el reintento anularía el efecto protector del \emph{breaker}.
+
+\subsection{Observabilidad}
+
+Nygard (2018, cap.~5) subraya que los cambios de estado de los \emph{breakers} deben registrarse siempre y su estado actual debe poder consultarse; que la frecuencia de cambios de estado es una métrica útil que conviene graficar en el tiempo, porque es un indicador adelantado de problemas en otras partes del sistema; y que operaciones necesita una forma de abrir o reiniciar el \emph{breaker} manualmente. Es también un lugar cómodo para recoger métricas de volumen de llamadas y tiempos de respuesta. Esto conecta con la clase 10: un \emph{breaker} que cambia de estado sin que nadie lo vea es una decisión automática que se vuelve invisible.
+
+\begin{uawarn}
+\textbf{Una protección mal implementada.} Nygard (2018, cap.~5) advierte contra reducir accidentalmente a un solo hilo todas las llamadas a un sistema remoto: aun compartido solamente dentro de un proceso, el \emph{breaker} queda expuesto a los errores de la programación multihilo. Una implementación de \emph{circuit breaker} que toma un \emph{lock} durante toda la ejecución de la llamada protegida produce exactamente ese efecto: serializa todas las llamadas a la dependencia, de modo que una sola llamada lenta bloquea a las demás, y la protección introduce la saturación que debía evitar. Una implementación correcta toma el \emph{lock} solo para leer y actualizar el estado, y nunca durante la llamada de red. Lección: las librerías de resiliencia también se evalúan antes de adoptarlas; el mismo autor recomienda partir de una librería de código abierto, pero eso no exime de revisar cómo maneja la concurrencia.
+\end{uawarn}
+
+\section{Degradación elegante}
+
+\subsection{El fallback como decisión de producto}
+
+Cuando una dependencia no está disponible (por un \emph{timeout}, por un \emph{breaker} abierto), el llamante debe hacer \emph{algo} con el pedido. Nygard (2018, cap.~5) enumera estrategias de reemplazo (\emph{fallback}): devolver la última respuesta buena o un valor en caché, una respuesta genérica en vez de una personalizada, o llamar a un servicio secundario. Su observación clave es que cualquier estrategia tiene impacto en el negocio, y por lo tanto es esencial involucrar a los interesados: ¿debe un sistema de comercio aceptar una orden si no puede confirmar la disponibilidad de los productos? ¿y si no puede verificar la tarjeta o la dirección? La decisión es de producto, no técnica; hablar del \emph{circuit breaker} suele ser una forma más efectiva de abrir la conversación que pedir un documento de requisitos.
+
+\subsection{Condiciones de una buena degradación}
+
+\begin{itemize}
+\item \textbf{Explícita para quien recibe la respuesta.} Si la respuesta es degradada, el receptor debe poder saberlo (por ejemplo, con un campo que lista qué partes faltan). Una respuesta degradada presentada como completa transforma una falla visible en un error silencioso.
+\item \textbf{Definida de antemano}, junto con los interesados, y no improvisada en la excepción.
+\item \textbf{Más barata que el camino normal}: una degradación que consume tantos recursos como la operación completa no contiene nada.
 \end{itemize}
 
-El verdadero problema aparece cuando el resto del sistema reacciona mal:
-\begin{itemize}
-\item multiplica requests;
-\item acumula trabajo sin límite;
-\item consume recursos compartidos;
-\item propaga latencia a otras capas.
-\end{itemize}
+\subsection{Cuándo no es aceptable degradar}
 
-Esto transforma una falla localizada en una falla sistémica.
+Algunas operaciones no admiten una versión parcial. En el generador de contraseñas, omitir los caracteres especiales cuando ese servicio no responde produce una contraseña que puede violar la política de contraseñas del usuario: ``degradar'' pasa a ser ``responder algo incorrecto''. Lo mismo ocurre con un cobro cuyo servicio de verificación no responde. En esos casos la decisión correcta puede ser fallar de forma explícita (y rápida), o diferir la operación, en vez de simular un éxito.
 
-\section{Retries correctos}
+\subsection{Un breaker sin fallback}
 
-\subsection{Intuición}
-
-Retry es útil cuando la falla es transitoria. Ejemplos:
-\begin{itemize}
-\item una pérdida de paquete;
-\item jitter corto de red;
-\item una condición temporal recuperable.
-\end{itemize}
-
-\subsection{Problema}
-
-Retry es peligroso cuando la causa es:
-\begin{itemize}
-\item saturación;
-\item cola excesiva;
-\item falla persistente;
-\item operación no idempotente.
-\end{itemize}
-
-En esos casos, reintentar agrega más presión sobre el componente que ya está en problemas.
-
-\subsection{Buenas prácticas}
-
-\begin{itemize}
-\item límite estricto de intentos;
-\item exponential backoff;
-\item jitter para evitar sincronización patológica;
-\item aplicar solo en operaciones seguras o idempotentes;
-\item evitar retry en múltiples capas a la vez.
-\end{itemize}
-
-\subsection{Razón profunda}
-
-Un retry no es gratis. Cada retry consume:
-\begin{itemize}
-\item ancho de banda;
-\item conexiones;
-\item CPU;
-\item slots de concurrencia;
-\item tiempo de espera en colas.
-\end{itemize}
-
-\section{Circuit Breakers}
-
-\subsection{Idea}
-
-Un circuit breaker corta temporalmente las llamadas a una dependencia degradada cuando detecta demasiadas fallas o latencias excesivas.
-
-\subsection{Estados}
-
-\paragraph{Closed}
-Las requests fluyen normalmente.
-
-\paragraph{Open}
-Se rechazan llamadas sin intentar ejecutarlas.
-
-\paragraph{Half-open}
-Se deja pasar un pequeño conjunto de requests de prueba para evaluar si la dependencia se recuperó.
-
-\subsection{Ventajas}
-
-\begin{itemize}
-\item evita insistir sobre una dependencia caída o saturada;
-\item protege recursos locales;
-\item reduce tiempo desperdiciado en espera inútil;
-\item da feedback más rápido al sistema llamador.
-\end{itemize}
-
-\subsection{Peligros}
-
-\begin{itemize}
-\item thresholds mal ajustados;
-\item abrir demasiado pronto;
-\item reabrir demasiado tarde;
-\item usarlo sin estrategia de fallback.
-\end{itemize}
-
-\section{Backpressure}
-
-\subsection{Idea}
-
-Cuando el consumidor no puede sostener el ritmo, el productor debe desacelerarse o el sistema debe rechazar trabajo.
-
-\subsection{Sin backpressure}
-
-\begin{itemize}
-\item las colas crecen;
-\item la latencia sube;
-\item aumenta el uso de memoria;
-\item aparecen timeouts;
-\item se disparan retries;
-\item el sistema entra en espiral.
-\end{itemize}
-
-\subsection{Con backpressure}
-
-\begin{itemize}
-\item el ingreso se regula;
-\item se rechaza trabajo antes del colapso;
-\item el sistema protege su estabilidad.
-\end{itemize}
-
-\subsection{Formas de backpressure}
-
-\begin{itemize}
-\item límites de cola;
-\item ventanas de crédito;
-\item control explícito de demanda;
-\item rate limiting;
-\item rechazo temprano.
-\end{itemize}
+Un \emph{breaker} sin estrategia de reemplazo falla rápido, pero sigue fallando: el llamante libera recursos y evita saturarse, pero los usuarios siguen recibiendo errores. El \emph{circuit breaker} protege al sistema; solo el \emph{fallback} (o una decisión de producto equivalente) protege a la experiencia del usuario. Por eso son mecanismos complementarios.
 
 \section{Bulkheads}
 
-\subsection{Analogía}
+Nygard (2018, cap.~5) toma la analogía de los mamparos de un barco: particiones que, selladas, dividen el casco en compartimientos estancos, de modo que una sola perforación no hunde la nave. Aplicado a un sistema, se trata de partir recursos para que la falla de una parte no destruya el resto: ``salvar parte del barco''.
 
-En ingeniería naval, un bulkhead separa compartimentos para que una vía de agua no hunda todo el barco. En sistemas distribuidos, el patrón hace lo mismo con recursos.
+\subsection{Formas}
 
-\subsection{Aplicación}
-
+Pueden particionarse recursos a distintos niveles de granularidad:
 \begin{itemize}
-\item pools de hilos separados por dependencia;
-\item colas independientes;
-\item límites de concurrencia por tipo de request;
-\item aislamiento por tenant o dominio.
+\item \textbf{Hilos dentro de un proceso:} un pool de hilos (o un tope de concurrencia) por dependencia, de modo que una dependencia lenta agote solamente su porción. Un ejemplo recomendado por el autor es reservar un pool de hilos para tareas administrativas, para poder diagnosticar o apagar el servicio aun si todos los hilos de atención están colgados.
+\item \textbf{Procesadores de un servidor,} por ejemplo fijando un proceso a ciertos núcleos para que un proceso descontrolado no consuma todos los ciclos del equipo.
+\item \textbf{Instancias o clústeres dedicados:} capacidad reservada para clientes críticos, separada de la que usan los no críticos. El autor da el ejemplo de un sistema de emisión de pasajes con servidores dedicados al \emph{check-in}, que no se verían afectados si los servidores compartidos se saturan con consultas de estado de vuelo.
+\item \textbf{Zonas y regiones} en la nube.
 \end{itemize}
 
-\subsection{Valor}
+\subsection{Costo}
 
-Si una dependencia consume todos los hilos, conexiones o buffers del sistema, otras rutas críticas quedan bloqueadas. Bulkheads evitan esa contaminación transversal.
+El \emph{bulkhead} tiene un precio: capacidad ociosa. Una partición reservada para un cliente crítico está subutilizada la mayor parte del tiempo, y particionar demasiado fino desperdicia recursos. Nygard (2018, cap.~5) subraya que no hay una regla única: hay que evaluar el impacto de negocio de cada pérdida de capacidad y buscar los límites naturales donde la partición sea técnicamente factible y económicamente conveniente, alineados con los llamantes, con las funciones o con la topología.
 
-\section{Graceful Degradation}
+\subsection{Un caso}
 
-\subsection{Idea}
+En el caso de la aerolínea (Nygard, 2018, cap.~2) el servidor de las funciones centrales usaba pools de hilos separados para las llamadas remotas y para las peticiones HTTP; por eso podía seguir respondiendo a la aplicación de monitoreo aun en medio de la caída, y el diagnóstico fue posible. Sin embargo, esa partición no alcanzó para proteger a los demás sistemas, porque el recurso compartido que se agotó (el pool de conexiones a la base) estaba dentro de la partición que atendía los pedidos de los clientes. En el capítulo 5 el autor señala que una partición de los servidores en grupos de servicio habría permitido seguir atendiendo el \emph{check-in} de pasajeros aunque los socios no pudieran consultar tarifas.
 
-Cuando el sistema no puede ofrecer la funcionalidad completa, intenta ofrecer una versión degradada pero todavía útil.
+\section{Backpressure y load shedding}
 
-\subsection{Ejemplos}
+\subsection{Las colas}
 
+Nygard (2018, cap.~5, \emph{Create Back Pressure}) parte de una observación: ``Every performance problem starts with a queue backing up somewhere''. Puede ser la cola de escucha de un socket, la cola de ejecución del sistema operativo o la cola de E/S de una base de datos. Si una cola no tiene límite, puede consumir toda la memoria disponible y, según la ley de Little, a medida que su longitud crece también lo hace el tiempo que tarda un trabajo en atravesarla: cuando la longitud tiende a infinito, el tiempo de respuesta también. Por eso no deben existir colas no acotadas. Con una cola acotada llena y un productor que intenta agregar un elemento más, las opciones son limitadas:
 \begin{itemize}
-\item servir catálogo sin recomendaciones;
-\item responder desde cache aun si está desactualizada;
-\item desactivar features no críticas;
-\item aceptar solo lecturas;
-\item rechazar operaciones caras mientras se sostiene el núcleo del servicio.
+\item aparentar aceptarlo y descartarlo;
+\item aceptarlo y descartar otro elemento de la cola (por ejemplo, el más viejo, si el valor de los datos decae rápidamente con la edad);
+\item rechazarlo;
+\item bloquear al productor hasta que haya lugar.
 \end{itemize}
 
-\subsection{Propósito}
+\subsection{Backpressure}
 
-Graceful degradation permite que el sistema falle en forma parcial y controlada, en lugar de caer completamente.
+Bloquear al productor es una forma de control de flujo: la cola aplica presión hacia atrás (\emph{back pressure}), que idealmente se propaga hasta el cliente final, cuya velocidad se reduce hasta que la cola libera espacio. TCP lo hace con la ventana de recepción. Funciona mejor con programación asincrónica y solo ayuda a administrar la carga cuando el conjunto de consumidores es finito; si el origen es muy diverso, no hay efecto sistémico. Hay que distinguir además una presión por una condición temporal de una presión porque un consumidor está roto.
 
-\section{Combinación de patrones}
+\subsection{Load shedding}
 
-La resiliencia real no suele depender de un único mecanismo. Una estrategia razonable combina:
+Los servicios no controlan su demanda: el mundo siempre puede generar más carga de la que se puede atender, y no se la puede superar solo escalando. Nygard (2018, cap.~5, \emph{Shed Load}, y cap.~9, \emph{Demand Control}) sostiene que lo mejor que se puede hacer ante carga alta es rechazar el trabajo que no se podrá completar a tiempo: el \emph{load shedding}, la forma más importante de controlar la demanda entrante. Un rechazo rápido es mejor que un \emph{timeout} lento, y conviene rechazar lo más temprano posible, antes de haber ocupado recursos en varias capas; los balanceadores cercanos al borde son el lugar ideal. Un servicio puede definir ``carga demasiado alta'' como el momento en que sus pedidos tardan más que su acuerdo de nivel de servicio, o limitar con un semáforo la cantidad de pedidos simultáneos. Con un balanceador, cada instancia puede responder 503 en su \emph{health check} para indicarle que se aparte por un tiempo, y el balanceador responde 503 al cliente cuando todas las instancias están indisponibles.
 
-\begin{itemize}
-\item timeouts bien elegidos;
-\item retries limitados con backoff;
-\item circuit breakers;
-\item aislamiento de recursos;
-\item control de presión;
-\item degradación funcional;
-\item observabilidad suficiente para decidir.
-\end{itemize}
+Dentro de los límites de un sistema o de una empresa, el autor prefiere \emph{backpressure} y deja el \emph{load shedding} como medida secundaria; en el borde, expuesto a una demanda efectivamente ilimitada, el \emph{load shedding} es imprescindible. Para el SRE Book (Beyer et al., 2016, cap.~22), cuando un servidor está sobrecargado se debe fallar temprano y con poco costo (\emph{fail early and cheaply}).
 
-\section{Error común}
+\subsection{Caso Dressy: dos mecanismos sanos que interactúan mal}
 
-Un error muy habitual es introducir solo retries y timeouts, sin circuit breakers ni backpressure. Eso crea un sistema que parece más robusto, pero en realidad responde al estrés con más carga, más espera y más amplificación de la falla.
+El SRE Workbook (Bethea et al., 2018, cap.~11) presenta, como caso ilustrativo (la empresa Dressy es explícitamente ficticia), un servicio de venta de ropa desplegado en tres regiones. La región A recibió ligeramente más tráfico que las otras y su CPU alcanzó antes el umbral configurado para el \emph{load shedding}: cada servidor empezó a rechazar el 10\,\% de los pedidos, luego el 20\,\%, luego el 50\,\%. El balanceador de carga conocía la utilización de CPU de los contenedores y la usaba para estimar el costo por pedido; como la CPU se mantenía constante mientras los pedidos rechazados bajaban, concluyó que en A cada pedido costaba diez veces menos, es decir, que A era mucho más eficiente. A atendía 240 pedidos por segundo al 80\,\% de CPU (el tope de rechazo) mientras B y C atendían solamente 120; el balanceador siguió enviando más tráfico a A, hasta que A recibió 400 y B y C cayeron a 40.
+
+La explicación del capítulo es que ``the load balancer didn't know that the `efficient' requests were errors'': los dos sistemas fueron agregados y habilitados por separado, probablemente por personas diferentes, y nadie los examinó como un único sistema de manejo de carga. La corrección que propone es contar cada pedido rechazado como 120\,\% de utilización de CPU (cualquier valor por encima de 100 sirve), con lo cual A pasa a parecer sobrecargada y el tráfico se reparte. La lección es general: cada mecanismo de control de carga debe configurarse y evaluarse junto con los demás, no por separado.
+
+\section{Combinar mecanismos}
+
+\subsection{El orden dentro de una llamada}
+
+Los mecanismos de las secciones anteriores no son alternativas: se combinan en una misma llamada, y el orden en que se aplican importa. Un orden razonable, de afuera hacia adentro, es el siguiente.
+
+\begin{enumerate}
+\item \textbf{Bulkhead:} antes de gastar nada, ver si hay lugar en la partición reservada a esa dependencia; si no lo hay, rechazar de inmediato.
+\item \textbf{Circuit breaker:} si la dependencia está marcada como enferma, rechazar sin llamarla. Va antes de la llamada y antes de los reintentos, porque es la decisión de no intentar.
+\item \textbf{Timeout:} el intento real, con plazo acotado.
+\item \textbf{Reintentos:} si el intento falló por una causa reintentable, esperar con \emph{backoff} y \emph{jitter} y volver a pasar por el \emph{breaker}, de modo que cada intento cuente y que la secuencia se interrumpa si el \emph{breaker} abrió.
+\item \textbf{Fallback:} si todo falló o se rechazó, aplicar la degradación decidida de antemano.
+\end{enumerate}
+
+La razón del orden es que cada mecanismo ahorra recursos al siguiente: el \emph{bulkhead} y el \emph{breaker} evitan intentos inútiles; el \emph{timeout} acota los que se hacen; los reintentos recuperan lo transitorio sin saltarse las protecciones; el \emph{fallback} decide qué hacer con lo que no se pudo recuperar.
+
+\subsection{Interacciones peligrosas}
+
+Tener cada mecanismo bien configurado por separado no garantiza que funcionen bien juntos. Ejemplos ya vistos: reintentos en varias capas que se multiplican y \emph{load shedding} que engaña al balanceador (caso Dressy). Otro ejemplo, derivado de lo anterior: reintentos que ocupan el \emph{pool} que un \emph{bulkhead} intenta proteger. El SRE Workbook (Bethea et al., 2018, cap.~11) concluye que, al adoptar una nueva herramienta de manejo de carga, hay que examinar con cuidado cómo interactúa con las demás, y que el manejo de tráfico funciona mejor cuando se basa en una visión holística. Otro ejemplo del mismo capítulo: en el caso de Pokémon GO, una ``manada'' de reintentos sincronizados se combinó con balanceadores que esperaban a \emph{backends} que no respondían.
+
+\subsection{Más patrones no es mejor}
+
+Nygard (2018, cap.~5) previene contra suponer que un sistema con más patrones es superior a uno con menos: ``Count of patterns applied'' nunca es una buena métrica de calidad. Lo que se busca es una mentalidad orientada a la recuperación: esperar que haya fallas y aplicar los patrones con criterio para reducir el daño de cada una. Cada mecanismo agrega configuración, estados y modos de falla propios; se justifica por la amenaza concreta que contiene, y su efecto debe verificarse (con pruebas de carga y de falla, no solo con revisión de código).
+
+\section{Caso de estudio: la excepción que dejó en tierra a una aerolínea}
+
+Nygard (2018, cap.~2) narra una caída que paralizó a una aerolínea mundial. Sirve para ver, en un caso real, la cadena completa y para ubicar en cada eslabón el mecanismo que la habría cortado (Nygard, 2018, cap.~3, \emph{Stopping Crack Propagation}).
+
+\paragraph{El sistema.} Un servicio de funciones centrales (\emph{core facilities}, CF) atendía la búsqueda de vuelos para los quioscos de \emph{check-in}, el sistema de respuesta telefónica y las aplicaciones de socios comerciales. Era un diseño de alta disponibilidad con hardware redundante: no tenía los puntos únicos de falla habituales. Su cliente, desde otros sistemas, lo invocaba mediante llamadas a procedimientos remotos (EJB sobre RMI).
+
+\paragraph{La cadena.} Tras una conmutación planificada de la base de datos, un método que consultaba vuelos cerraba un \emph{statement} dentro de un bloque \texttt{finally}; ese cierre podía lanzar una excepción (lo permite la especificación de JDBC) cuando la conexión estaba rota por la conmutación. Como la excepción impedía cerrar la conexión que seguía, cada llamada dejaba una conexión sin devolver. Tras unas cuarenta llamadas el pool de conexiones se agotó, y todas las llamadas siguientes quedaron bloqueadas esperando una conexión. Los hilos que atendían las llamadas remotas se bloquearon todos; los clientes, que llamaban con RMI, cuyas llamadas por defecto no tienen \emph{timeout}, quedaron bloqueados a su vez, y con ellos los quioscos y la respuesta telefónica. Una sola excepción no capturada paralizó a una aerolínea global.
+
+\begin{center}
+\begin{tabular}{p{0.30\textwidth}p{0.30\textwidth}p{0.32\textwidth}}
+\toprule
+\textbf{Eslabón de la cadena} & \textbf{Mecanismo que la corta} & \textbf{Por qué} \\
+\midrule
+Excepción al cerrar el \emph{statement}; la conexión no se devuelve & Revisión y pruebas de falla (no es un patrón de resiliencia) & Es la falta original; Nygard (cap.~2) sostiene que los defectos no pueden eliminarse todos, de modo que hay que sobrevivirlos. \\
+Pool agotado; hilos bloqueados esperando una conexión & \emph{Timeout} en el pool (bloquear un tiempo limitado) & El hilo se libera y el error queda local. \\
+Llamadas remotas sin \emph{timeout} & \emph{Timeout} en el cliente & Evita que la lentitud de CF se vuelva bloqueo de los quioscos. \\
+Cada cliente bloquea hilos esperando a CF & \emph{Circuit breaker} en el cliente & Tras unas fallas deja de llamar y falla rápido. \\
+CF compartido por todos los clientes & \emph{Bulkhead} (grupos de servicio, capacidad reservada) & Un problema en un grupo no tumba a todos los usuarios de CF. \\
+Quioscos y respuesta telefónica caídos & \emph{Fallback} o degradación & Decidir con el negocio qué hacer sin la búsqueda de vuelos. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Nygard (2018, cap.~3) enumera varios de esos puntos de corte: el pool podría haberse configurado para bloquear solo por un tiempo limitado; el cliente de RMI podría haber instalado un \emph{timeout} en los sockets; podrían haberse separado los servidores de CF en grupos de servicio; y arquitecturas menos acopladas (colas de pedido/respuesta) habrían amortiguado el error en lugar de amplificarlo. La conclusión del capítulo 2 es la que organiza esta clase: no es realista esperar que se eliminen todos los defectos, de modo que deben sobrevivirse; y la pregunta útil es cómo evitar que un defecto en un sistema afecte a todos los demás.
 
 \section{Modelo del curso}
 
-Podemos expresar el problema con:
-
+Expresamos el problema de la resiliencia mediante el framework del curso:
 \[
 D = (P, F, G, S, T)
 \]
 
-Ejemplo:
 \begin{itemize}
-\item $P$: mantener servicio útil bajo degradación parcial;
-\item $F$: dependencia lenta, timeouts, saturación, colas crecientes;
-\item $G$: contención de la falla y preservación parcial del servicio;
-\item $S$: retries limitados + circuit breaker + bulkheads + backpressure + degradación;
-\item $T$: más complejidad de configuración, tuning y operación.
+\item \textbf{$P$ (Problema):} Impedir que la falla o la lentitud de una dependencia se propague al resto del sistema.
+\item \textbf{$F$ (Factores/Restricciones):} Fallas parciales, dependencias lentas, pools finitos de hilos, \emph{fan-out}, reintentos que amplifican la carga, tráfico que no se controla.
+\item \textbf{$G$ (Garantías/Objetivos):} Contención del daño, latencia acotada, recuperación automática y degradación explícita en vez de caída total.
+\item \textbf{$S$ (Solución):} \emph{Timeouts} calibrados con percentiles, reintentos con \emph{backoff} y \emph{jitter} acotados por un presupuesto, \emph{circuit breaker} por dependencia con política de tasa de fallas, \emph{fallback} decidido con el negocio, \emph{bulkheads}, \emph{backpressure} y \emph{load shedding}.
+\item \textbf{$T$ (Trade-offs/Costos):} Capacidad ociosa (\emph{bulkheads}), degradación de la respuesta, complejidad de configuración, falsos positivos y falsos negativos del \emph{breaker}, interacciones entre mecanismos.
 \end{itemize}
 
 \section{Conclusión}
 
-La resiliencia distribuida no elimina la falla. La vuelve:
-\begin{itemize}
-\item contenida;
-\item observable;
-\item recuperable;
-\item menos destructiva.
-\end{itemize}
+La resiliencia distribuida no consiste en evitar las fallas ni en agregar reintentos sin más: consiste en decidir de antemano cómo falla el sistema. Cada mecanismo corta un tramo de la cadena de propagación: los \emph{timeouts} acotan la espera, los reintentos recuperan lo transitorio, el \emph{breaker} deja de insistir contra una dependencia enferma, el \emph{fallback} decide qué recibe el usuario, los \emph{bulkheads} limitan el alcance del daño y el \emph{load shedding} protege al servicio de la demanda que no puede atender. Ninguno es gratuito, y en combinación pueden fallar de maneras que ninguno exhibe por separado.
 
 \begin{uakeybox}
-Un sistema resiliente no es el que nunca falla, sino el que impide que una falla local se transforme en colapso sistémico.
+Un sistema resiliente no es el que no falla, sino el que falla de la forma que se diseñó: rápido, acotado y visible. Los reintentos que en clases anteriores resolvían una pérdida de mensaje, frente a una dependencia saturada son el combustible de la cascada; y una dependencia lenta es más peligrosa que una caída.
 \end{uakeybox}
 
-
 \section{Síntesis razonada de la clase}
-Esta unidad debe leerse como parte de una cadena de decisiones de diseño y no como un catálogo de mecanismos. Para estudiar el tema con profundidad conviene reconstruir cuatro preguntas: \emph{qué problema aparece}, \emph{qué garantía se desea}, \emph{qué mecanismo la aproxima} y \emph{qué costo introduce}. En cada ejemplo debe identificarse además el modelo de falla implícito.
+Esta unidad se estudia como una cadena de decisiones, cada una apoyada en la anterior: \emph{medir} la línea de base de cada dependencia (percentiles, llamadas por pedido); \emph{elegir el timeout} a partir de esa distribución y de la cadena de llamadas; \emph{decidir los reintentos} (cuáles fallas, cuántos, con qué espera y bajo qué presupuesto) sabiendo cuánto amplifican; \emph{configurar el breaker} (qué cuenta como falla, política de apertura, tiempo abierto, pruebas en \emph{half-open}); y \emph{definir la degradación}, es decir, qué recibe el usuario cuando la dependencia no está. Si falta un eslabón, los demás no compensan: un \emph{breaker} sin \emph{timeout} no ve la falla lenta, y un \emph{breaker} sin \emph{fallback} falla rápido pero sigue fallando.
 
 \begin{uakeybox}
-Una respuesta técnicamente madura no termina al nombrar un algoritmo o patrón: declara sus supuestos, la propiedad que preserva y el escenario en el que deja de ser suficiente.
+Una respuesta técnicamente madura no termina en nombrar un patrón: dice qué falla contiene, con qué supuestos, a qué costo y en qué escenario deja de ser suficiente.
 \end{uakeybox}
 
 \section{Bibliografía guiada y ruta de profundización}
-Para profundizar esta clase se recomienda: Google SRE Book; Nygard, Release It!; AWS Builders Library sobre retries y jitter.
+Para profundizar se recomienda, en este orden: \emph{Release It!} (caps.~2 a 5) para el caso de la aerolínea, los antipatrones y los patrones de estabilidad; el \emph{SRE Book} (caps.~21 y 22) para la sobrecarga y las fallas en cascada con números; el capítulo 11 del \emph{SRE Workbook} para los casos de Pokémon GO y Dressy; el artículo de Brooker para el \emph{backoff} con \emph{jitter}; y la documentación de resilience4j para ver cómo se parametriza un \emph{breaker} por ventana.
 
-La lectura debe hacerse con preguntas concretas: (1) ¿qué modelo de sistema asume el autor?, (2) ¿qué propiedad demuestra o persigue?, (3) ¿qué falla o anomalía motiva el mecanismo?, y (4) ¿qué trade-off queda abierto?
+\subsection*{Referencias canónicas}
+\begin{enumerate}
+\item \textbf{Nygard, M. T.} (2018). \emph{Release It! Design and Deploy Production-Ready Software} (2.ª ed.). Pragmatic Bookshelf. (Capítulos 2, 3, 4, 5 y 9; en el 9, la sección \emph{Demand Control}).
+\item \textbf{Beyer, B., Jones, C., Petoff, J. y Murphy, N. R.} (2016). \emph{Site Reliability Engineering: How Google Runs Production Systems}. O'Reilly Media. (Capítulos 21, \emph{Handling Overload}, y 22, \emph{Addressing Cascading Failures}).
+\item \textbf{Beyer, B., Murphy, N. R., Rensin, D. K., Kawahara, K. y Thorne, S.} (2018). \emph{The Site Reliability Workbook: Practical Ways to Implement SRE}. O'Reilly Media. (Capítulo 11, \emph{Managing Load}, de Bethea, Sheerin, Mace y King).
+\item \textbf{Brooker, M.} (2015). \emph{Exponential Backoff and Jitter}. AWS Architecture Blog.
+\item \textbf{Little, J. D. C.} (1961). A Proof for the Queuing Formula: $L = \lambda W$. \emph{Operations Research}, 9(3), 383--387.
+\item \textbf{Resilience4j.} Documentación del módulo \emph{CircuitBreaker} (ventana deslizante, mínimo de llamadas, umbrales de tasa de fallas y de llamadas lentas). \texttt{https://resilience4j.readme.io/docs/circuitbreaker}
+\end{enumerate}
+
+La lectura debe hacerse con preguntas concretas: (1) ¿qué cadena de propagación describe el autor?, (2) ¿en qué eslabón actúa el mecanismo?, (3) ¿qué supuesto sobre la falla hace que funcione?, y (4) ¿qué costo o interacción queda abierto?
 
 \section{Conexión con el Trabajo Final Integrador}
-El grupo debe señalar qué parte de su sistema utiliza los conceptos de esta unidad, justificar por qué son necesarios y documentar una alternativa descartada. Cuando el contenido todavía no corresponda a la etapa vigente, debe registrarse como hipótesis o decisión pendiente.
+El grupo debe identificar cada dependencia remota de su sistema (servicios propios, bases de datos, APIs externas, colas) y decidir para cada una: el \emph{timeout} (con su justificación en percentiles medidos y, si hay cadena de llamadas, en el presupuesto de tiempo), la política de reintentos (qué operaciones son idempotentes, cuántos reintentos, \emph{backoff}, presupuesto), la configuración del \emph{circuit breaker} (qué cuenta como falla, política de apertura, tiempo abierto) y la degradación aceptable, acordada con el dominio del problema. Los valores deben justificarse con datos; cuando todavía no se pueden medir, se registran como hipótesis con la medición que los confirmaría.
 
 \section{Autoevaluación conceptual}
 \begin{enumerate}
-\item ¿Cuál es el problema distribuido concreto que motiva esta clase?
-\item ¿Qué propiedad de seguridad y qué propiedad de progreso están en juego?
-\item ¿Qué supuesto de red, tiempo o falla resulta decisivo?
-\item ¿Qué trade-off aceptaría en un sistema real y cuál no aceptaría en un dominio crítico?
-\item ¿Cómo observaría experimentalmente que la solución se comporta como espera?
+\item ¿Por qué una dependencia lenta es más peligrosa que una dependencia caída? Explicar el mecanismo con hilos y pools.
+\item Un servicio recibe 20 pedidos por segundo y cada uno ocupa un hilo durante 3 s. ¿Cuántos hilos se necesitan? ¿Qué pasa si el pool tiene 40?
+\item ¿Por qué la utilización de CPU puede ser baja con el servicio saturado?
+\item ¿Por qué el \emph{timeout} del servicio de minúsculas debe ser mayor que el del servicio de dígitos al que llama internamente?
+\item Con 10\,\% de fallas por llamada y 5 llamadas por pedido, ¿qué proporción de pedidos falla? ¿Y con un reintento?
+\item ¿Qué diferencia hay entre \emph{full jitter} y \emph{equal jitter}? ¿Por qué hace falta \emph{jitter} aun con \emph{backoff} exponencial?
+\item ¿Cuándo no se debe reintentar una operación?
+\item ¿Qué falla hace que un \emph{circuit breaker} por fallas consecutivas con $k = 3$ se abra con un 10\,\% de errores?
+\item ¿Por qué un \emph{circuit breaker} necesita \emph{timeouts}?
 \end{enumerate}
 
 \section{Profundización autocontenida v9}
 \subsection{Problema, límite e invariante}
-El núcleo de esta clase es retry budgets, backoff, jitter, circuit breakers, backpressure, bulkheads y graceful degradation. Para estudiarlo de manera autónoma conviene separar tres planos. Primero, el \emph{problema observable}: qué comportamiento incorrecto puede ver un cliente o un operador. Segundo, el \emph{límite del modelo}: qué información, sincronía o coordinación no está disponible. Tercero, el \emph{invariante}: qué propiedad no debe violarse aunque el sistema pierda progreso temporalmente.
+El núcleo de esta clase es la propagación de fallas parciales y los mecanismos que la contienen: \emph{timeouts}, reintentos, \emph{circuit breakers}, degradación, \emph{bulkheads}, \emph{backpressure} y \emph{load shedding}. Conviene separar tres planos. Primero, el \emph{problema observable}: qué ve un cliente o un operador cuando una dependencia falla (errores, latencia alta, caída total). Segundo, el \emph{límite del modelo}: cuántos recursos (hilos, conexiones, colas) tiene cada componente y cuánto tiempo de respuesta tolera su llamante. Tercero, el \emph{invariante}: la propiedad que no debe violarse aunque una dependencia falle, por ejemplo que la latencia de los pedidos sobre dependencias sanas permanezca acotada, o que no se devuelva una respuesta incorrecta presentada como correcta.
 
-El modelo de fallas relevante incluye dependencia lenta, retry storm, cola sin límite, pool agotado y cascada. Una solución debe describirse como protocolo y no solo como nombre de tecnología: actores, estados, mensajes, condición de éxito, condición de aborto y estado visible después de una interrupción. La evidencia esperada es curvas de carga, colas, breaker state y degradación del camino crítico.
+El modelo de fallas relevante incluye dependencias lentas, caídas totales, fallas intermitentes, errores parciales y sobrecarga. Una solución debe describirse como protocolo y no solo como nombre de técnica: qué se cuenta como falla, qué plazo se espera, cuándo se deja de intentar, qué se responde en su lugar, y qué estado queda visible después de una interrupción. La evidencia esperada son series de pedidos en vuelo contra capacidad del pool, tasas de error y de reintentos, estado y transiciones de cada \emph{breaker}, y latencia observada por el cliente.
 
 \subsection{Método de análisis}
-Ante un caso nuevo, siga esta secuencia:
+Ante un caso nuevo, se sigue esta secuencia:
 \begin{enumerate}
-\item Identifique actores, dato o recurso compartido y frontera de confianza.
-\item Escriba una ejecución nominal y una ejecución adversarial.
-\item Distinga seguridad (lo malo no ocurre) de progreso (algo bueno finalmente ocurre).
-\item Declare qué supuesto permite avanzar: mayoría, deadline, sincronía parcial, operación idempotente, almacenamiento durable u otro.
-\item Compare una alternativa más simple y una más fuerte; registre qué métrica o experimento haría cambiar la decisión.
+\item Identificar cada dependencia remota, su \emph{fan-out} por pedido y los recursos (hilos, conexiones) que consume una llamada en curso.
+\item Calcular con la ley de Little cuántos recursos hacen falta con la dependencia sana y con la dependencia lenta; ver si el pool alcanza.
+\item Recorrer una ejecución nominal y una adversarial: dependencia lenta, caída rápida, caída que cuelga, errores parciales, intermitencia.
+\item Elegir \emph{timeouts} desde la distribución de latencia y la cadena de llamadas; calcular $T_{\max}$ con reintentos.
+\item Para el \emph{breaker}: estimar qué política abriría por azar con la tasa de error normal y cuál detectaría una tasa de error anómala, con el volumen de tráfico real.
+\item Decidir con el dominio qué degradación es aceptable y cuál no.
+\item Registrar qué medición o experimento haría cambiar la decisión.
 \end{enumerate}
 
 \subsection{Caso transferible}
-Considere una plataforma de reservas que recibe operaciones duplicadas, pierde conectividad entre regiones y debe sostener un camino crítico sin ocultar el estado real al usuario. Aplique el mecanismo de esta clase a una única decisión concreta. Una respuesta madura no intenta resolver todo: delimita la operación, formula la garantía y explica la degradación esperada cuando el supuesto central deja de cumplirse.
+Considérese un servicio de \emph{checkout} que, para confirmar una compra, llama a un servicio de pagos que se vuelve lento (varios segundos por llamada) sin dejar de responder. Aplique el método: calcule cuántos pedidos simultáneos quedan bloqueados; defina un \emph{timeout} para la llamada de pago y diga cuál es el costo de equivocarse en cada sentido; argumente por qué reintentar el cobro exige idempotencia; elija la política del \emph{breaker} y su alcance; y decida con el negocio qué respuesta recibe el cliente cuando el pago no se puede confirmar ---por ejemplo, tomar la orden como pendiente de pago en lugar de simular que fue cobrada---. Una respuesta madura delimita la operación, formula la garantía y explica la degradación esperada cuando el supuesto central deja de cumplirse.
 
 \subsection{Errores de razonamiento frecuentes}
 \begin{itemize}
-\item confundir una propiedad con el producto que suele implementarla;
-\item describir el camino feliz sin recorrer una falla intermedia;
-\item afirmar ``exactly-once'', ``alta disponibilidad'' o ``consistencia'' sin definir alcance observable;
-\item medir solo throughput aunque la hipótesis trate sobre semántica o recuperación;
-\item presentar la complejidad añadida como beneficio sin compararla con la alternativa más simple.
+\item agregar reintentos sin evaluar cuánta carga suman cuando la causa es una saturación;
+\item reintentar en varias capas sin calcular el producto de intentos;
+\item elegir un \emph{timeout} ``a ojo'' o desde el promedio, en vez de desde la distribución;
+\item medir la saturación con la CPU cuando el recurso que se agota son los hilos;
+\item configurar un \emph{breaker} por fallas consecutivas sin considerar el volumen de tráfico;
+\item creer que un \emph{breaker} sin \emph{fallback} protege la experiencia del usuario, o que toda degradación es aceptable;
+\item configurar por separado mecanismos que interactúan (\emph{load shedding} y balanceo de carga);
+\item considerar que más patrones aplicados significa más resiliencia.
 \end{itemize}
 
 \section{Lectura guiada}
-Nygard, Release It!; Google SRE Workbook; patrones de backpressure y load shedding.
+\emph{Release It!}, cap.~2: seguir la cadena del caso de la aerolínea y marcar en qué eslabón actuaría cada mecanismo. Cap.~4: puntos de integración, hilos bloqueados, reacciones en cadena y capacidades desbalanceadas; buscar qué recurso se agota. Cap.~5: \emph{timeouts}, \emph{circuit breaker}, \emph{bulkheads}, \emph{fail fast}, \emph{backpressure} y \emph{load shedding}; buscar los supuestos de cada uno. Cap.~9, \emph{Demand Control}: tiempo de residencia y dónde rechazar. \emph{SRE Book}, cap.~22: la sección sobre reintentos y la sobre \emph{load shedding}; cap.~21: manejo de errores de sobrecarga. \emph{SRE Workbook}, cap.~11: reconstruir la secuencia de Pokémon GO y la de Dressy.
 
 Durante la lectura, registre: modelo de sistema, propiedad perseguida, contraejemplo que motiva el mecanismo, costo principal y una condición bajo la cual no lo elegiría. Estas cinco anotaciones convierten la bibliografía en una herramienta de diseño y no en una lista para memorizar.
 
 \section{Aplicación al Trabajo Final Integrador}
-El equipo debe producir un ADR breve con la decisión asociada a esta clase. Debe contener: contexto, dos alternativas, supuesto decisivo, garantía elegida, trade-off, evidencia pendiente y fecha de revisión. La evidencia mínima esperada para esta unidad es: curvas de carga, colas, breaker state y degradación del camino crítico.
+El equipo debe producir un ADR breve con la decisión de resiliencia del sistema. Debe contener: contexto (la dependencia y su rol), dos alternativas (por ejemplo, \emph{breaker} por fallas consecutivas contra por tasa de fallas, o \emph{fallback} contra falla explícita), supuesto decisivo (la tasa de error y el volumen esperados), garantía elegida, \emph{trade-off} aceptado, evidencia pendiente y fecha de revisión. La evidencia mínima esperada es: percentiles de latencia por dependencia que justifiquen los \emph{timeouts}, el cálculo de la amplificación por reintentos, y una prueba de falla (dependencia lenta o con errores) que muestre el comportamiento con y sin protección.
 
 \section{Autoevaluación avanzada}
 \begin{enumerate}
-\item ¿Puedo explicar la clase sin nombrar primero una tecnología?
-\item ¿Puedo construir una ejecución que viole la garantía si el mecanismo se configura mal?
-\item ¿Puedo distinguir seguridad, progreso y experiencia del usuario?
-\item ¿Puedo proponer una medición que valide la propiedad, no solo el rendimiento?
-\item ¿Puedo defender cuándo una solución más simple sería suficiente?
+\item Con $p = 10\,\%$ y 100 llamadas por segundo, ¿cada cuántos segundos abre en promedio un \emph{breaker} con $k = 3$? Si queda abierto 10 s, ¿qué fracción del tiempo está abierto?
+\item ¿Por qué ningún $k$ sirve a la vez para tolerar el 10\,\% y detectar rápido el 50\,\%? ¿Qué parámetros del \emph{breaker} por ventana arreglan el problema y qué costo agregan?
+\item Un servicio A (3 intentos) llama a B (3 intentos) que llama a C (3 intentos). ¿Cuántas llamadas puede recibir C por pedido? ¿Qué cambiaría con un presupuesto de reintentos?
+\item Un servicio activa \emph{load shedding} y su balanceador usa CPU para repartir tráfico. ¿Qué puede pasar y cómo se corrige?
+\item ¿Cuándo es preferible fallar explícitamente que degradar?
+\item ¿Qué puede salir mal si un \emph{breaker} deja pasar todas las llamadas en \emph{half-open}?
+\item ¿Puedo defender cuándo una solución más simple (solo \emph{timeouts}) sería suficiente?
 \end{enumerate}
 
 \end{document}
