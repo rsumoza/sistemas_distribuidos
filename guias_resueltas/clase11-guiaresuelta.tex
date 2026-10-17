@@ -12,63 +12,103 @@
 
 \begin{document}
 
+% Captura de la corrida de la demo de la clase 11. #1: archivo en slides/assets/11; #2: título de la slide de la que sale.
+\newcommand{\capturademo}[2]{%
+\begin{center}
+\includegraphics[width=0.85\linewidth]{../slides/assets/11/#1}\par\vspace{0.2em}
+{\footnotesize Slide ``#2''.}
+\end{center}
+}
+
 \section{Criterio de lectura}
 Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
 \section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída.
+Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída. Base la explicación en lo que le pasa al pool de hilos del servicio que la llama.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Una dependencia caída suele fallar rápido: la conexión se rechaza en milisegundos, el hilo del llamante recibe un error y queda libre para atender otro pedido. Una dependencia lenta, en cambio, retiene al hilo mientras dura la espera. Por la ley de Little, la cantidad de hilos ocupados es $L = \lambda \cdot W$: si $W$ crece, $L$ crece sin que llegue un solo pedido más, y cuando supera el tamaño del pool los pedidos nuevos se acumulan en una cola. A partir de ahí el servicio deja de atender todo, no solo lo que usa la dependencia lenta: el proceso sigue vivo, pero para todo fin práctico está caído. Nygard lo resume así: ``Clearly, a slow response is a lot worse than no response'' (cap.~4).
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Además, la falla lenta es más difícil de ver. Los hilos bloqueados esperan entrada/salida y no consumen CPU, y un monitoreo que solo verifica que el proceso esté vivo lo muestra sano. La falla rápida, en cambio, produce errores inmediatos que el llamante puede contar y a los que puede reaccionar.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya una cadena causal donde una degradación local termine generando una caída visible en el borde del sistema.
+En el caso de la aerolínea (apunte, sección del caso de estudio), identifique cuál fue la falta (\emph{fault}), cuál el error y cuál la falla (\emph{failure}). ¿Por qué el monitoreo del servicio de búsqueda de vuelos lo mostraba sano durante la caída?
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en retry budgets, backoff, jitter, circuit breakers, backpressure, bulkheads y graceful degradation. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo dependencia lenta, retry storm, cola sin límite, pool agotado y cascada. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
+\begin{itemize}
+\item \textbf{Falta:} tras la conmutación de la base de datos, cerrar una consulta sobre una conexión que había quedado rota lanzaba una excepción que el código no manejaba. Esa excepción impedía llegar a cerrar la conexión, que no volvía al pool. Nadie lo veía todavía, pero cada llamada dejaba una conexión sin devolver.
+\item \textbf{Error:} los primeros llamantes del servicio de búsqueda de vuelos (CF) empezaron a recibir excepciones en lugar de resultados.
+\item \textbf{Falla:} tras unas cuarenta llamadas el pool se agotó y CF dejó de responder; con él dejaron de atender los quioscos de \emph{check-in} y la respuesta telefónica, que lo llamaban.
+\end{itemize}
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+El monitoreo solo consultaba una página de estado, y esa página seguía respondiendo: el servidor de CF usaba pools de hilos separados para las llamadas remotas y para las peticiones HTTP, de modo que el pool que atendía al monitoreo no estaba bloqueado. Es el ejemplo de que la falla depende de quién mira (Nygard, cap.~3): para el monitoreo CF estaba sano; para los quioscos, no respondía. La salud de un servicio debe medirse desde el punto de vista de quien lo usa (clase 10).
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué la resiliencia distribuida no consiste en “hacer más retries”.
+Construya una cadena causal en la que una degradación local termine en una caída visible en el borde del sistema. Para cada eslabón, indique qué recurso se agota y cómo pasa la falla a la capa que llama.
+\end{uaexercise}
+\begin{uaanswer}
+Con el generador de contraseñas, sin protecciones:
+\begin{enumerate}
+\item \textbf{Degradación local.} El servicio \texttt{special} se vuelve lento: cada llamada tarda 2\,s más. Sigue respondiendo bien; ningún recurso se agotó todavía.
+\item \textbf{Hilos del llamante.} Cada pedido hace unas 5 llamadas secuenciales a \texttt{special}, así que ocupa un hilo del Generator unos 10\,s. Con 5 pedidos por segundo harían falta $L = 5 \times 10 = 50$ hilos y el pool tiene 8. Se agotan los hilos del Generator. La falla salta de capa porque el hilo del llamante espera al proveedor sin plazo: la lentitud de \texttt{special} se convierte en hilos bloqueados del Generator.
+\item \textbf{Cola.} Los pedidos que llegan sin hilo libre esperan en la cola del servidor. Se agota la capacidad de atender a tiempo: el tiempo de residencia (cola más procesamiento) crece.
+\item \textbf{Borde.} El cliente espera hasta su propio \emph{timeout} y recibe un error. El usuario ve caído al generador entero, aunque \texttt{upper}, \texttt{lower} y \texttt{digit} estén sanos. Si los clientes reintentan, suman carga sobre el servicio saturado.
+\end{enumerate}
+El mecanismo que transmite la falla de una capa a otra es casi siempre el mismo: un pool de recursos del llamante que se agota mientras espera a un proveedor que falla (Nygard, cap.~4). Si el Generator tuviera a su vez muchos llamantes (alto \emph{fan-in}), la falla se propagaría a todos ellos. Es lo que midió la demo con el escenario \texttt{latency 2000} y el preset \texttt{00} (nivel~6).
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué la resiliencia distribuida no consiste en ``hacer más reintentos''.
 \end{uaexercise}
 \begin{uaanswer}
 Porque el retry solo ayuda si la causa es transitoria. Si la causa es saturación o degradación persistente, reintentar agrega más trabajo sobre el componente degradado y empeora la situación. En esos casos, el retry amplifica la falla en vez de tolerarla.
+
+Además, los reintentos se multiplican con el \emph{fan-out} y con la cantidad de capas que reintentan, y no sirven contra la falla lenta: sin un \emph{timeout} la llamada no termina y no hay nada que reintentar. La resiliencia consiste en \emph{contener} la propagación: acotar la espera (\emph{timeout}), dejar de insistir contra una dependencia enferma (\emph{circuit breaker}), responder algo útil en lugar del error (\emph{fallback}), aislar recursos (\emph{bulkhead}) y controlar la demanda (\emph{backpressure} y \emph{load shedding}). El reintento es una herramienta más, útil solo frente a fallas transitorias y acotada por un presupuesto.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique la diferencia entre tolerar una falla y amplificarla.
+Explique la diferencia entre tolerar una falla y amplificarla. Muestre que un mismo mecanismo, el reintento, puede hacer una cosa o la otra según el tipo de falla.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Tolerar una falla es absorberla: el usuario no la ve, o la ve acotada, y el componente que falló no recibe más carga por eso. Amplificarla es responder de una manera que la agranda: más carga sobre el componente que falla, más tiempo de espera o más componentes afectados.
 
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{itemize}
+\item \textbf{Reintento que tolera.} Las fallas son pérdidas independientes y transitorias, con $p = 10\,\%$ por llamada y 5 llamadas por pedido. Sin reintento falla el $1 - 0{,}9^5 \approx 41\,\%$ de los pedidos; con un reintento la llamada falla con $p^2 = 1\,\%$ y el pedido con $1 - 0{,}99^5 \approx 4{,}9\,\%$. El costo es un 10\,\% más de intentos.
+\item \textbf{Reintento que amplifica.} La dependencia está saturada. Ahora $p$ se acerca a 1, cada llamada se convierte en $1 + r$ intentos y esa carga extra llega justo al componente que no da abasto: los tiempos se alargan, aparecen más \emph{timeouts} y con ellos más reintentos. Es la retroalimentación de la sección de reintentos.
+\end{itemize}
+La diferencia no está en el mecanismo sino en el supuesto sobre la falla: independiente y transitoria, o persistente y causada por sobrecarga.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique en qué casos retry es razonable y en qué casos es peligroso.
+¿En qué casos un reintento es razonable y en cuáles es peligroso? Tenga en cuenta el tipo de falla, la idempotencia de la operación y el error recibido.
 \end{uaexercise}
 \begin{uaanswer}
-Linearizabilidad exige que cada operación parezca ocurrir en un punto entre invocación y respuesta y que el orden respete tiempo real. Para validar una historia se propone un orden secuencial compatible; si ninguna ubicación de las operaciones satisface ambos requisitos, la historia no es linearizable.
+Un reintento es razonable cuando se cumplen tres condiciones:
+\begin{itemize}
+\item \textbf{La falla es transitoria}: un paquete perdido, una conexión reiniciada. Volver a intentar tiene una chance razonable de éxito.
+\item \textbf{La operación es idempotente}: repetirla no cambia el resultado. Si no lo es (un cobro, por ejemplo), hace falta una clave de idempotencia (clase 02) antes de reintentar.
+\item \textbf{El error es reintentable}: \emph{timeouts}, errores de conexión, respuestas 5xx. Un 4xx o un error de validación fallarían igual en el reintento. Un rechazo del \emph{circuit breaker} tampoco se reintenta, porque esa decisión ya incorporó la información de que la dependencia está mal.
+\end{itemize}
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Es peligroso cuando la falla es persistente o se debe a sobrecarga: el reintento suma carga sobre el componente que no da abasto. Dentro de un centro de datos, la falla suele deberse a algo que anda mal en el otro extremo y tiende a durar, de modo que un reintento inmediato probablemente falle otra vez; mientras tanto, el cliente que reintenta retiene sus recursos y puede pasarse del \emph{timeout} de su propio llamante (Nygard, cap.~5). También es peligroso cuando reintentan varias capas a la vez, porque los factores se multiplican. Por eso los reintentos se acotan por pedido y por cliente (presupuesto), y se espera entre ellos con \emph{backoff} y \emph{jitter}.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una política de retry para una operación idempotente.
+Explique la diferencia entre el \emph{timeout} de conexión y el \emph{timeout} de lectura. ¿Qué pasa con una llamada hecha con la librería \texttt{requests} de Python sin el parámetro \texttt{timeout}? ¿Por qué el \emph{timeout} de lectura no acota el tiempo total de la llamada?
+\end{uaexercise}
+\begin{uaanswer}
+El \textbf{timeout de conexión} acota el establecimiento de la conexión. Si el destino está caído o inalcanzable, la conexión o se rechaza enseguida (falla rápida) o no recibe respuesta (falla lenta); dentro de un mismo centro de datos conectar es rápido, de modo que este plazo puede ser muy corto. El \textbf{timeout de lectura} (\emph{read timeout}; \emph{socket timeout} en Java y en Apache HttpClient) acota cuánto se espera a que lleguen datos una vez establecida la conexión, y debe reflejar cuánto tarda la dependencia en operación normal.
+
+Sin el parámetro \texttt{timeout}, \texttt{requests} no corta nunca el pedido: según su documentación, ``By default, requests do not time out unless a timeout value is set explicitly''. El hilo puede quedar colgado minutos o más. El \emph{timeout} no viene puesto: hay que configurarlo.
+
+El \emph{timeout} de lectura mide el tiempo \emph{entre} datos recibidos, no el total. Una respuesta que llega en fragmentos pequeños y espaciados, cada uno antes de que venza el plazo, puede tardar mucho más que el \emph{timeout} sin que este salte. Para acotar el tiempo total hace falta además un plazo global de la operación (\emph{deadline}).
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe una política de reintentos para una operación idempotente: cuántos intentos, cuánto se espera entre ellos, qué \emph{timeout} tiene cada intento y qué errores se reintentan. Calcule cuánto puede tardar, como máximo, la llamada lógica.
 \end{uaexercise}
 \begin{uaanswer}
 Una política razonable incluye:
@@ -81,41 +121,61 @@ Una política razonable incluye:
 \end{itemize}
 
 La idempotencia es central porque convierte múltiples intentos físicos en un único efecto lógico.
+
+Un ejemplo concreto: hasta 2 reintentos (3 intentos); \emph{backoff} exponencial con base 100\,ms, multiplicador 2 y tope 1\,s, con \emph{full jitter}; \emph{timeout} de 500\,ms por intento; se reintentan \emph{timeouts}, errores de conexión y 5xx, y no los 4xx, los errores de validación ni los rechazos del \emph{breaker}. Las esperas nominales son 100 y 200\,ms, y con \emph{full jitter} nunca las superan, así que
+\[
+T_{\max} = (1 + r)\cdot t + \textstyle\sum e_i = 3 \times 500 + (100 + 200) = 1800\ \text{ms}.
+\]
+Ese valor tiene que caber en el \emph{timeout} de quien origina la llamada. Para que los reintentos no amplifiquen una falla persistente, se agrega un presupuesto por cliente: reintentar solo mientras los reintentos sean menos del 10\,\% de los pedidos.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique por qué el exponential backoff es mejor que reintentos inmediatos constantes.
+Explique por qué el \emph{backoff} exponencial es mejor que reintentar de inmediato o con una espera constante.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Un reintento inmediato vuelve a encontrar casi siempre la misma condición que hizo fallar al primero, de modo que probablemente falle otra vez, y suma carga justo cuando la dependencia está peor. Una espera constante da algo de aire, pero no se adapta a la duración de la falla: si el problema dura, todos los clientes siguen reintentando al mismo ritmo durante toda la falla.
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
+Con \emph{backoff} exponencial, $d_n = \min(\text{tope},\ \text{base}\cdot m^n)$, la espera crece geométricamente con cada reintento: las fallas cortas se recuperan rápido, y ante una falla larga la carga de reintentos decrece, dándole tiempo a la dependencia. El tope evita esperas absurdas.
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+El \emph{backoff} solo, sin embargo, no rompe la sincronización: clientes que fallaron a la vez esperan los mismos $d_n$ y reintentan a la vez. Por eso se combina con \emph{jitter}. Pokémon GO es el ejemplo: la aplicación hacía ``a single immediate retry, followed by constant backoff'', y los errores rápidos de los \emph{backends} sincronizaron los reintentos de los clientes; la corrección fue \emph{backoff} exponencial truncado con \emph{jitter} (Bethea et al., cap.~11 del \emph{SRE Workbook}).
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique el rol del jitter en un sistema con miles de clientes concurrentes.
+Un \emph{backend} puede atender 10\,000 consultas por segundo y rechaza las que exceden ese límite. Recibe 10\,100 por segundo, y sus clientes reintentan cada consulta rechazada. Muestre cómo evoluciona la carga y explique por qué, aunque la demanda vuelva a su nivel anterior, el \emph{backend} puede no salir de la sobrecarga. ¿Qué mecanismos cortan el ciclo?
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+En el primer segundo rechaza 100. Esas 100 se reintentan y se suman a las nuevas: recibe 10\,200 y rechaza 200; después 10\,300 y rechaza 300, y así sucesivamente. Cada vez menos consultas tienen éxito en el primer intento, y una fracción creciente del trabajo del \emph{backend} se dedica a consultas que van a fallar (Beyer et al., cap.~22). Si el \emph{backend} cae por esa carga, la que atendía se reparte entre los que quedan y la falla se propaga como reacción en cadena.
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Bajar la demanda nueva a 10\,000 no alcanza: los reintentos pendientes se suman a esa demanda y mantienen la carga por encima de la capacidad. El sistema quedó atrapado en la retroalimentación, no en la demanda original.
+
+Cortan el ciclo:
+\begin{itemize}
+\item un \textbf{presupuesto de reintentos} por cliente: cuando muchos pedidos fallan, la proporción de reintentos llega al límite y el cliente deja de reintentar;
+\item \textbf{backoff con jitter}, que reparte los reintentos en el tiempo en lugar de sumarlos al segundo siguiente;
+\item un \textbf{circuit breaker} en el cliente, que deja de llamar mientras la tasa de fallas sea alta;
+\item \textbf{load shedding} temprano y barato en el \emph{backend}, para que rechazar cueste poco y no le quite capacidad al trabajo útil.
+\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo donde retries en múltiples capas provoquen una tormenta de requests.
+La figura muestra la latencia de cada dependencia del generador de contraseñas en la línea de base, medida desde el Generator. El p99 de \texttt{special} ronda los 41\,ms, y los presets usan para esa llamada un \emph{timeout} de lectura de 100\,ms.
+\capturademo{e0-latency-table.png}{Línea de base: latencia de cada dependencia}
+\begin{enumerate}
+\item ¿Por qué el valor sale del p99 más un margen, y no de la media ni del máximo?
+\item ¿Qué pasaría con un \emph{timeout} de 30\,ms? Tenga en cuenta que cada pedido hace unas 5 llamadas a \texttt{special}.
+\item El p99 de \texttt{lower} es de 97\,ms, más alto que el de las demás. ¿Por qué? Para elegir su \emph{timeout}, ¿hace falta saber que \texttt{lower} llama internamente a \texttt{digit}?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{enumerate}
+\item El \emph{timeout} tiene que dejar pasar la variabilidad normal y cortar lo anormal. Con la media cortaría una fracción grande de las llamadas normales; con el máximo observado casi nunca actuaría. El p99 deja afuera solo el 1\,\% más lento de la operación normal, y el margen absorbe la variabilidad. Además, el percentil sale de histogramas con cubos de ancho fijo: es aproximado, lo que es otra razón para dejar margen. Debe medirse desde el llamante, porque esa latencia incluye la red y el encolamiento.
+\item 30\,ms está por debajo del p99, así que cortaría más del 1\,\% de las llamadas normales (cuánto más depende de la forma de la distribución, que la tabla no muestra). Con unas 5 llamadas por pedido, en condiciones normales tendría al menos $1 - 0{,}99^5 \approx 5\,\%$ de pedidos con alguna llamada cortada. La variabilidad normal se convertiría en errores, en reintentos que suman carga y hasta en aperturas del \emph{breaker} sin motivo.
+\item Porque \texttt{lower} llama a \texttt{digit}: medida desde el Generator, su latencia ya incluye esa consulta interna. Para el valor de partida no hace falta saberlo, porque el p99 medido desde el llamante ya contiene la cadena. Sí hace falta conocerla para verificar el peor caso: si \texttt{lower} tuviera \emph{timeout} y reintentos hacia \texttt{digit}, su $T_{\max}$ tendría que caber en el \emph{timeout} del Generator hacia \texttt{lower}. En los presets de la demo, el \emph{timeout} de lectura hacia \texttt{lower} es de 300\,ms y hacia \texttt{digit}, de 150\,ms.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina circuit breaker y describa sus estados.
+Describa los tres estados de un \emph{circuit breaker} y qué evento produce cada transición.
 \end{uaexercise}
 \begin{uaanswer}
 Un circuit breaker es un mecanismo que deja de enviar tráfico a una dependencia cuando detecta que hacerlo empeora la situación.
@@ -128,108 +188,205 @@ Estados:
 \end{itemize}
 
 La lógica es evitar insistir ciegamente sobre un componente ya degradado.
-\end{uaanswer}
 
-\begin{uaexercise}
-Explique con un ejemplo qué gana el sistema al abrir un breaker.
-\end{uaexercise}
-\begin{uaanswer}
-La respuesta debe situarse en retry budgets, backoff, jitter, circuit breakers, backpressure, bulkheads y graceful degradation. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo dependencia lenta, retry storm, cola sin límite, pool agotado y cascada. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Construya un caso donde un threshold mal calibrado de breaker empeore el comportamiento del sistema.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué el estado half-open es importante.
-\end{uaexercise}
-\begin{uaanswer}
-Porque evita dos extremos incorrectos:
+Las transiciones son:
 \begin{itemize}
-\item mantener el breaker abierto indefinidamente aunque la dependencia ya se haya recuperado;
-\item cerrarlo de golpe y restaurar todo el tráfico sin validación.
+\item \emph{closed} $\to$ \emph{open}: las fallas registradas alcanzan el umbral de la política elegida ($k$ fallas consecutivas, o una tasa de fallas en la ventana una vez alcanzado el mínimo de llamadas);
+\item \emph{open} $\to$ \emph{half-open}: pasó el tiempo de espera configurado;
+\item \emph{half-open} $\to$ \emph{closed}: las llamadas de prueba necesarias tienen éxito; el conteo vuelve a cero;
+\item \emph{half-open} $\to$ \emph{open}: una prueba falla, y empieza otro período de espera.
 \end{itemize}
-
-Half-open permite probar recuperación con tráfico controlado.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué problema resuelve backpressure.
+Explique con un ejemplo qué gana el sistema cuando el \emph{circuit breaker} se abre, y qué pierde.
+\end{uaexercise}
+\begin{uaanswer}
+Con \texttt{special} lenta y el preset \texttt{06} de la demo, el \emph{breaker} de \texttt{special} se abre. \textbf{Gana:}
+\begin{itemize}
+\item las llamadas se rechazan sin esperar: los hilos se liberan enseguida y el servicio no se satura (en la corrida, p99 del cliente de 0,67\,s, contra 10\,s sin protección);
+\item la dependencia enferma deja de recibir carga y tiene tiempo de recuperarse;
+\item el llamante falla rápido y, con un \emph{fallback}, responde algo útil (0 errores y 98\,\% de pedidos degradados).
+\end{itemize}
+\textbf{Pierde:}
+\begin{itemize}
+\item mientras está abierto se rechazan todas las llamadas, también las que habrían funcionado. Si abre sin motivo, degrada tráfico sano: con \texttt{04} y un 10\,\% de errores que el sistema toleraba, abrió 5 veces en 210\,s y salió degradado el 53\,\% de los pedidos;
+\item sin \emph{fallback}, el usuario recibe errores igual (preset \texttt{07}): el \emph{breaker} protege al sistema, no al usuario;
+\item agrega configuración, estados y un modo de falla propio, por ejemplo una implementación que serialice las llamadas.
+\end{itemize}
+\end{uaanswer}
+
+\begin{uaexercise}
+Un \emph{circuit breaker} protege las llamadas a un servicio de inventario. Indique cuáles de estos resultados debería contar como falla y por qué:
+\begin{enumerate}
+\item un \emph{timeout} de lectura;
+\item una conexión rechazada;
+\item una respuesta 503;
+\item una respuesta 404, porque el producto consultado no existe;
+\item una respuesta 400, porque el llamante mandó un parámetro inválido.
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+El \emph{breaker} solo debe contar los eventos que indican que la dependencia está enferma.
+\begin{enumerate}
+\item \textbf{Cuenta.} Es la forma en que se registra la falla lenta, la más peligrosa.
+\item \textbf{Cuenta.} El destino está caído o no acepta conexiones.
+\item \textbf{Cuenta.} Es un error del servidor: el proveedor dice que no puede atender.
+\item \textbf{No cuenta.} El servicio respondió bien: el producto no existe. Es una respuesta correcta.
+\item \textbf{No cuenta.} El error es del llamante. Contarlo abriría el \emph{breaker} por culpa de pedidos incorrectos propios, cortando un proveedor sano.
+\end{enumerate}
+Además, puede convenir registrar por separado distintos tipos de falla (por ejemplo, un umbral más bajo para los \emph{timeouts} que para las conexiones rechazadas), y cuando el \emph{breaker} rechaza una llamada conviene lanzar una excepción distinta de un \emph{timeout} corriente, para que el llamante sepa qué pasó (Nygard, cap.~5).
+\end{uaanswer}
+
+\begin{uaexercise}
+Para el Generator de la demo, un equipo propone dos cambios: usar un único \emph{circuit breaker} para las cuatro dependencias, en lugar de uno por dependencia, y compartir el estado de los \emph{breakers} entre todas las réplicas del Generator a través de un almacén externo. Analice cada propuesta.
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{Un único \emph{breaker}.} Mezcla la salud de cuatro dependencias distintas. Si el \emph{breaker} abre por la falla de \texttt{special}, corta también a \texttt{upper}, \texttt{lower} y \texttt{digit}, que están sanas: la falla de una desconecta a las demás. Y con una política por tasa puede no abrir nunca: si \texttt{special} falla el 50\,\% de sus llamadas y las cuatro reciben la misma cantidad, la tasa del \emph{breaker} único es del 12,5\,\%, por debajo de un umbral del 50\,\%. Pierde precisión en los dos sentidos. Lo correcto es un \emph{breaker} por dependencia, como en la demo (\texttt{generator-special} y los otros tres).
+
+\textbf{Estado compartido entre réplicas.} El \emph{breaker} se construye con alcance de proceso: lo comparten todos los hilos de una réplica, pero no las distintas réplicas. Es cierto que se pierde eficiencia, porque cada réplica descubre por su cuenta que el proveedor está mal. Pero compartir el estado agrega una comunicación fuera de proceso, y con ella un nuevo modo de falla de la propia protección (Nygard, cap.~5): si el almacén se pone lento o se cae, cada llamada protegida pasa a depender de él. La protección se convierte en un punto de integración más, sin \emph{timeout} ni \emph{breaker} propios.
+\end{uaanswer}
+
+\begin{uaexercise}
+Ordene \emph{bulkhead}, \emph{circuit breaker}, \emph{timeout}, reintentos y \emph{fallback} dentro de una llamada a una dependencia, y justifique el orden. ¿Qué pasa si los reintentos también reintentan los rechazos del \emph{breaker}?
+\end{uaexercise}
+\begin{uaanswer}
+De afuera hacia adentro:
+\begin{enumerate}
+\item \textbf{Bulkhead:} antes de gastar nada, ver si hay lugar en la partición de esa dependencia; si no lo hay, rechazar de inmediato.
+\item \textbf{Circuit breaker:} si la dependencia está marcada como enferma, rechazar sin llamarla. Va antes de la llamada y de los reintentos porque es la decisión de no intentar.
+\item \textbf{Timeout:} el intento real, con plazo acotado.
+\item \textbf{Reintentos:} si el intento falló por una causa reintentable, esperar con \emph{backoff} y \emph{jitter} y volver a pasar por el \emph{breaker}, para que cada intento cuente y la secuencia se corte si el \emph{breaker} abrió.
+\item \textbf{Fallback:} si todo falló o se rechazó, aplicar la degradación decidida de antemano.
+\end{enumerate}
+Cada mecanismo ahorra recursos al siguiente: el \emph{bulkhead} y el \emph{breaker} evitan intentos inútiles, el \emph{timeout} acota los que se hacen, los reintentos recuperan lo transitorio sin saltarse las protecciones y el \emph{fallback} decide qué hacer con lo que no se pudo recuperar.
+
+Si se reintentan los rechazos del \emph{breaker}, el reintento anula el efecto protector: el \emph{breaker} decidió no llamar porque ya sabe que la dependencia está mal, y el reintento insiste igual. En el mejor caso se gastan las esperas del \emph{backoff} para obtener el mismo rechazo; en el peor, si el \emph{breaker} pasa a \emph{half-open} durante la secuencia, los reintentos acumulados se lanzan contra la dependencia que intenta recuperarse. Por eso un rechazo del \emph{breaker} nunca se reintenta.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique qué problema resuelve la \emph{backpressure} y en qué se diferencia del \emph{load shedding}. ¿Cuándo conviene cada uno?
 \end{uaexercise}
 \begin{uaanswer}
 Backpressure resuelve el problema de desbalance entre ritmo de producción y capacidad de consumo. Si no se regula la entrada, las colas crecen, aumenta la latencia, se consumen buffers y el sistema puede entrar en espiral de degradación.
+
+La \emph{backpressure} bloquea o frena al productor cuando la cola acotada se llena: la presión se propaga hacia atrás, idealmente hasta el cliente final, como hace TCP con la ventana de recepción. El \emph{load shedding} rechaza el trabajo que ya no se podrá completar a tiempo, de forma temprana y barata. Uno desacelera al productor; el otro descarta trabajo.
+
+La \emph{backpressure} solo funciona cuando el conjunto de productores es finito y conocido, como dentro de un sistema o de una empresa; ahí conviene, y el \emph{load shedding} queda como medida secundaria. En el borde, expuesto a una demanda efectivamente ilimitada que no se puede frenar, el \emph{load shedding} es imprescindible (Nygard, caps.~5 y 9).
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un ejemplo donde la ausencia de backpressure haga crecer una cola hasta volver inútil el sistema.
+Un servicio procesa 100 pedidos por segundo y recibe 120, que se acumulan en una cola sin límite. Sus clientes abandonan a los 5\,s. Muestre con la ley de Little cómo crece la espera, y a partir de qué momento el sistema se vuelve inútil aunque siga procesando 100 pedidos por segundo. ¿Qué haría con la cola?
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Entran 20 pedidos por segundo más de los que salen, así que a los $t$ segundos hay unos $20\,t$ pedidos en cola. Por la ley de Little aplicada a la cola, con un caudal de salida de 100 pedidos por segundo, un pedido que llega espera $W = L / \lambda = 20\,t / 100 = 0{,}2\,t$ segundos. A los 25\,s la espera llega a 5\,s; al minuto, a 12\,s; a los diez minutos, a 120\,s.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
+Desde los 25\,s, todo pedido que sale de la cola ya fue abandonado por su cliente. El servicio sigue procesando 100 pedidos por segundo, pero el 100\,\% de ese trabajo produce respuestas que nadie espera: está ocupado y es inútil. Además, la cola consume memoria sin límite y, cuando su longitud tiende a infinito, también el tiempo de respuesta.
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+No debe haber colas sin límite. Con una cola acotada se puede aplicar \emph{backpressure} (bloquear al productor) si los productores son conocidos, o rechazar lo que excede (\emph{load shedding}), idealmente con un rechazo rápido y temprano. Si el valor de un pedido decae con la edad, conviene descartar los más viejos, que ya no van a llegar a tiempo.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué es bulkhead y cómo se implementa en términos de recursos.
+Explique qué es un \emph{bulkhead} y cómo se implementa particionando recursos. Dé ejemplos de partición en dos niveles distintos y explique cuál es su costo.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Un \emph{bulkhead} parte los recursos para que la falla de una parte no destruya el resto. El nombre viene de los mamparos que dividen un barco en compartimentos estancos: si el casco se perfora, se inunda un compartimento y no los demás (Nygard, cap.~5).
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Se puede particionar en distintos niveles:
+\begin{itemize}
+\item \textbf{Hilos dentro de un proceso:} un pool de hilos o un tope de concurrencia por dependencia, de modo que una dependencia lenta agote solo su porción. Un caso útil es reservar hilos para tareas administrativas, para diagnosticar o apagar el servicio aunque los hilos de atención estén colgados.
+\item \textbf{Procesadores de un servidor:} fijar un proceso a ciertos núcleos para que uno descontrolado no consuma todo.
+\item \textbf{Instancias o clústeres dedicados:} capacidad reservada para clientes críticos, por ejemplo servidores dedicados al \emph{check-in} separados de los que atienden consultas de estado de vuelo.
+\item \textbf{Zonas y regiones} en la nube.
+\end{itemize}
+
+El costo es capacidad ociosa: una partición reservada está subutilizada la mayor parte del tiempo, y particionar demasiado fino desperdicia recursos. Hay que buscar límites naturales (por llamante, por función o por topología) donde la partición sea factible y su costo se justifique por el impacto de negocio de perder esa capacidad.
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un caso donde un pool compartido arrastre rutas críticas que no tenían problema.
+Un servicio de comercio electrónico atiende con un único pool de 200 hilos tres rutas: búsqueda, \emph{checkout} y recomendaciones. Recomendaciones recibe 50 pedidos por segundo y su dependencia pasa a tardar 5\,s. Muestre cómo esa ruta arrastra al \emph{checkout}, aunque el servicio de pagos esté sano, y proponga un \emph{bulkhead} que lo evite.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Por la ley de Little, la ruta de recomendaciones necesita ahora $L = 50 \times 5 = 250$ hilos. El pool tiene 200 y es compartido: en pocos segundos todos los hilos quedan ocupados esperando a la dependencia de recomendaciones. Los pedidos de búsqueda y de \emph{checkout} no consiguen hilo y esperan en la cola, aunque sus propias dependencias (el servicio de pagos, por ejemplo) respondan normalmente. La ruta crítica cae por una función accesoria.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Con un \emph{bulkhead}, cada ruta tiene su porción del pool, o un tope de concurrencia. Si recomendaciones tiene, por ejemplo, 20 hilos, solo puede sostener $20 / 5 = 4$ pedidos por segundo mientras dure la lentitud: el resto de sus pedidos se rechaza de inmediato y puede recibir un \emph{fallback} (por ejemplo, los productos más vendidos). Búsqueda y \emph{checkout} conservan sus hilos. Conviene combinarlo con un \emph{timeout} hacia recomendaciones, que acota $W$, y con un \emph{breaker}. El costo es que, en operación normal, parte de esos 200 hilos puede quedar ociosa en una partición mientras otra se queda corta.
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina graceful degradation y compárela con caída total.
+Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación? ¿Qué pasa con un \emph{circuit breaker} sin \emph{fallback}?
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+La degradación elegante consiste en responder algo útil, aunque incompleto, cuando una dependencia no está disponible, en lugar de devolver un error: la última respuesta buena o un valor en caché, una respuesta genérica en vez de una personalizada, o el resultado de un servicio secundario. En una caída total, la falla de una dependencia se convierte en un error para el usuario; con degradación, el sistema pierde una parte de su funcionalidad y sigue prestando el resto.
 
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
+Una buena degradación es:
+\begin{itemize}
+\item \textbf{explícita} para quien recibe la respuesta, que debe poder saber qué falta; presentada como completa, transforma una falla visible en un error silencioso;
+\item \textbf{definida de antemano} junto con los interesados, no improvisada en la excepción;
+\item \textbf{más barata} que el camino normal; si cuesta lo mismo que la operación completa, no contiene nada.
+\end{itemize}
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Un \emph{breaker} sin \emph{fallback} falla rápido, pero sigue fallando: el llamante libera recursos y no se satura, pero el usuario recibe errores. En la demo, con la dependencia lenta, el preset \texttt{06} (con \emph{fallback}) no dio errores y el \texttt{07} (el mismo \emph{breaker}, sin \emph{fallback}) dio un 98\,\% de errores. El \emph{breaker} protege al sistema; el \emph{fallback} protege la experiencia del usuario.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe tres ejemplos concretos de degradación elegante en una plataforma de e-commerce.
+Diseñe tres degradaciones concretas para una plataforma de comercio electrónico. Indique, además, una operación en la que degradar no sea aceptable.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Tres ejemplos, cada uno con su marca explícita:
+\begin{itemize}
+\item \textbf{Recomendaciones personalizadas caídas:} mostrar una lista genérica de los más vendidos, guardada en caché, con un título que no diga ``para vos''.
+\item \textbf{Servicio de reseñas lento:} mostrar la página del producto sin la sección de reseñas, con un aviso de que no están disponibles por el momento.
+\item \textbf{Cálculo de envío no disponible:} permitir seguir con la compra e informar que el costo de envío se calculará antes de confirmar el pago.
+\end{itemize}
+Las tres son más baratas que el camino normal y se pueden acordar de antemano con el negocio.
 
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+No es aceptable degradar el cobro: confirmar como pagada una compra cuyo pago no se verificó presenta como hecho algo que no ocurrió. Las opciones razonables son fallar de forma explícita y rápida, o tomar la orden como pendiente de pago, avisando al cliente, si el negocio acepta ese riesgo. Si se acepta o no una orden sin confirmar el stock es una decisión de producto, no técnica (Nygard, cap.~5).
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué riesgos aparecen si la degradación no es explícita y semánticamente clara.
+En la demo, cuando falla la llamada a \texttt{special}, el \emph{fallback} arma la contraseña sin caracteres especiales y la marca como \texttt{degraded}. ¿Qué riesgos aparecerían si la respuesta no estuviera marcada? Aun marcada, ¿es una degradación aceptable para un generador de contraseñas real?
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+Sin la marca, el cliente recibiría una contraseña que parece completa y no lo es. La guardaría creyendo que cumple la política de contraseñas del usuario, que quizá exige caracteres especiales: la falla visible se convierte en un error silencioso, que aparece después y lejos de su causa (al rechazarse la contraseña en otro sistema, o como una contraseña más débil que nadie detectó). Tampoco el operador sabría cuántas respuestas fueron degradadas.
 
-La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Aun marcada, para un generador real no es aceptable como respuesta por defecto. Omitir los caracteres especiales puede violar la política de contraseñas: ``degradar'' pasa a ser ``responder algo incorrecto''. El apunte usa justamente este ejemplo como caso en que no conviene degradar. Lo correcto sería fallar de forma explícita y rápida, o dejar que el cliente decida si acepta una contraseña sin especiales. El \emph{fallback} de la demo está para mostrar el mecanismo, no como decisión de producto.
+\end{uaanswer}
+
+\begin{uaexercise}
+En el lanzamiento de Pokémon GO (apunte, ``Caso Pokémon GO''), los \emph{backends} se volvieron muy lentos en lugar de rechazar pedidos, el balanceador reintentaba los GET y la aplicación reintentaba una vez de inmediato y después con una espera constante. Explique cómo se combinaron esos comportamientos para producir picos de pedidos de hasta veinte veces el máximo global anterior, y qué mecanismo de esta clase habría cortado cada uno.
+\end{uaexercise}
+\begin{uaanswer}
+La demanda real fue casi cincuenta veces la estimación con la que se había probado la carga. Con esa sobrecarga:
+\begin{itemize}
+\item \textbf{Backends lentos en lugar de rechazar.} Cada pedido retenía recursos en el \emph{backend} y en el balanceador que lo esperaba. Lo habría cortado el \emph{load shedding}: rechazar temprano y barato lo que no se podía atender a tiempo.
+\item \textbf{Balanceador que reintentaba los GET.} Sumaba carga sobre \emph{backends} que ya no daban abasto: la retroalimentación de los reintentos. Lo habría cortado un presupuesto de reintentos (o no reintentar en esa capa).
+\item \textbf{Aplicación con un reintento inmediato y espera constante.} Cuando los \emph{backends} devolvían muchos errores rápidos (por ejemplo, al reiniciarse un \emph{backend} compartido), todos los clientes fallaban a la vez y reintentaban a la vez: los errores sincronizaron a los clientes en una sola ola (\emph{thundering herd}). Lo habría cortado el \emph{backoff} exponencial con \emph{jitter}, que es lo que Niantic incorporó a sus clientes.
+\end{itemize}
+La combinación es lo que produjo los picos: cada mecanismo agravaba al siguiente. Hay un detalle: rechazar rápido, sin \emph{jitter} en los clientes, también sincroniza los reintentos; el \emph{load shedding} solo no alcanza. Y la sobrecarga alcanzó a un componente ajeno al juego, la capacidad de balanceo global, que hubo que aislar y ampliar (Bethea et al., cap.~11 del \emph{SRE Workbook}).
+\end{uaanswer}
+
+\begin{uaexercise}
+En el caso de la aerolínea, recorra la cadena desde la excepción al cerrar la consulta hasta los quioscos de \emph{check-in} caídos. En cada eslabón, indique qué mecanismo habría cortado la propagación. ¿Por qué no alcanzó con que el servicio de búsqueda de vuelos tuviera redundancia en todos los niveles?
+\end{uaexercise}
+\begin{uaanswer}
+\begin{center}
+\small
+\begin{tabular}{p{0.42\linewidth}p{0.48\linewidth}}
+\toprule
+\textbf{Eslabón} & \textbf{Mecanismo que lo corta} \\
+\midrule
+Excepción al cerrar la consulta; la conexión no vuelve al pool & Revisión y pruebas de falla; es la falta original y no todo defecto se puede eliminar \\
+Pool de conexiones agotado; hilos de CF bloqueados esperando una conexión & \emph{Timeout} en el pool: bloquear un tiempo limitado; el hilo se libera y el error queda local \\
+Llamadas remotas de los quioscos a CF sin \emph{timeout} & \emph{Timeout} en el cliente: la lentitud de CF no se vuelve bloqueo de los quioscos \\
+Cada cliente bloquea sus hilos esperando a CF & \emph{Circuit breaker} en el cliente: tras unas fallas deja de llamar y falla rápido \\
+CF compartido por todos sus clientes & \emph{Bulkhead}: grupos de servidores de CF dedicados a distintos clientes \\
+Quioscos y respuesta telefónica caídos & \emph{Fallback} decidido con el negocio \\
+Monitoreo que solo miraba una página de estado & Medir desde el cliente (clase 10) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+La redundancia protege contra la pérdida de un componente: un servidor, un disco, un centro de datos. Acá no se perdió ninguno. El defecto estaba en el código, y por lo tanto en todos los servidores de CF por igual; la propia conmutación de la base, un procedimiento de alta disponibilidad, fue la que dejó las conexiones rotas. La resiliencia no es lo mismo que la tolerancia a fallas por redundancia: es contener la propagación, y CF no tenía ningún mecanismo que impidiera que su pool agotado se convirtiera en hilos bloqueados de sus clientes. Como resume el análisis original, no es realista esperar eliminar todos los defectos; hay que sobrevivirlos (Nygard, caps.~2 y 3).
 \end{uaanswer}
 
 \section{Nivel 5: cálculo y casos integradores}
@@ -361,6 +518,149 @@ Se evita limitando las pruebas simultáneas en \emph{half-open} (por ejemplo, a 
 \item Solo si la operación es idempotente: el cobro debe llevar una clave de idempotencia para que un reintento no cobre dos veces (clase 02). Aun así, con el pago lento por sobrecarga, reintentar suma carga; conviene a lo sumo un reintento, con \emph{backoff} y \emph{jitter}, y dentro de un presupuesto.
 \item Un \emph{breaker} por tasa de fallas en ventana (no por fallas consecutivas, que dependería del volumen), con umbral de llamadas lentas para que la lentitud también lo abra; uno por dependencia y por proceso; con un tiempo abierto acorde a cuánto suele tardar el proveedor en recuperarse y una prueba a la vez en \emph{half-open}.
 \item No es aceptable confirmar como pagada una compra cuyo cobro no se verificó. Son razonables dos opciones: fallar explícitamente y rápido (``no pudimos procesar el pago, intente más tarde''), o tomar la orden como \emph{pendiente de pago} y avisar al cliente que se confirmará después, si el negocio acepta ese riesgo. La degradación es aceptable mientras sea explícita y no presente como hecho algo que no ocurrió; la decisión es de producto, no técnica.
+\end{enumerate}
+\end{uaanswer}
+
+
+\section{Nivel 6: lectura de la evidencia de la demo}
+Los ejercicios de este nivel usan capturas y mediciones de la corrida de la demo que se muestra en las slides de la clase; debajo de cada figura se indica de qué slide sale. El \textbf{escenario} es la falla que Toxiproxy inyecta en \texttt{special}, y el \textbf{preset}, la configuración de protecciones del Generator (ver la tabla de presets en las slides). La línea amarilla punteada de cada captura marca el momento en que se aplicó una configuración. En todos los experimentos k6 envía 5 pedidos por segundo y el Generator atiende con un pool de 8 hilos.
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000} (cada llamada a \texttt{special} tarda 2\,s más), preset \texttt{00-no-protection}. Los 8 hilos del Generator quedan ocupados (primera figura) y su CPU baja de 0,27 a 0,06 núcleos (segunda figura). Cada pedido tardó en el servidor, en promedio, unos 10,4\,s.
+\capturademo{s1-00-inflight.png}{Sin protección: el pool se llena}\capturademo{s1-00-cpu.png}{Sin protección: la CPU baja}
+\begin{enumerate}
+\item ¿De dónde salen esos 10,4\,s, si la dependencia solo agrega 2\,s por llamada?
+\item ¿Cuántos hilos harían falta para sostener los 5 pedidos por segundo? ¿Qué tasa puede sostener el pool? Compárela con lo medido: 163 pedidos completados en 210\,s.
+\item ¿Por qué baja la CPU justo cuando el servicio deja de atender? ¿Cuál de los dos paneles muestra la saturación?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Del \emph{fan-out}: cada pedido hace unas 5 llamadas secuenciales a \texttt{special} (4,9 en promedio en la línea de base), cada una con 2\,s más. Son unos $5 \times 2 = 10$\,s, más el resto de las llamadas del pedido. Una demora por llamada se multiplica por pedido.
+\item $L = \lambda \cdot W = 5 \times 10{,}4 \approx 52$ hilos, contra 8 disponibles. La tasa sostenible es $\lambda_{\max} = 8 / 10{,}4 \approx 0{,}77$ pedidos por segundo. Lo medido es $163 / 210 \approx 0{,}78$: la ley de Little describe bien lo que pasó. Ninguna dependencia se cayó; cambió $W$, no $\lambda$.
+\item Porque los hilos están bloqueados esperando la respuesta de \texttt{special}, no calculando: un hilo que espera entrada/salida ocupa un lugar del pool pero no consume CPU. El panel de CPU ``en verde'' es compatible con un servicio bloqueado. La saturación la muestra el panel de pedidos en vuelo: 8 de 8 hilos ocupados, todo el tiempo. Hay que medir el recurso que se agota.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Mismo experimento. La latencia que ve k6 sube hasta 10\,s, que es su propio \emph{timeout}: en la ventana medida, todos los pedidos del cliente terminaron por \emph{timeout}. Sin embargo, en esa misma ventana el Generator completó 163 pedidos.
+\capturademo{s1-00-client-latency.png}{Sin protección: el usuario espera hasta rendirse}
+¿Cómo pueden ser ciertas las dos cosas a la vez? ¿Qué relación tiene con los \emph{timeouts} en una cadena de llamadas?
+\end{uaexercise}
+\begin{uaanswer}
+Cada pedido pasa primero un rato en la cola esperando un hilo libre y después unos 10,4\,s ocupando ese hilo. El total supera los 10\,s del \emph{timeout} de k6, así que el cliente abandona antes de que llegue la respuesta. El Generator no se entera: termina el trabajo y responde a una conexión que el cliente ya abandonó. Los 163 pedidos completados son respuestas que nadie recibió.
+
+Es el problema de los \emph{timeouts} en una cadena: si el \emph{timeout} de quien llama (k6, 10\,s) es menor que el peor caso interno del servicio llamado, el llamante abandona mientras el llamado sigue trabajando. El llamante cuenta una falla y el llamado gasta recursos, justamente los hilos que necesitan los pedidos nuevos, en un resultado que se descarta. Por eso hay que hacer caber los plazos internos dentro de los externos: con un \emph{timeout} hacia \texttt{special} (preset \texttt{01}) el pedido termina mucho antes de los 10\,s del cliente.
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{intermittent}: \texttt{special} se cae 20\,s de cada 40. Hasta las 14:04 la caída es \texttt{fast} (rechaza la conexión); después es \texttt{hang} (acepta la conexión y no responde). Preset \texttt{00-no-protection}. Con \texttt{fast} falla el 48\,\% de los pedidos; con \texttt{hang}, el 36\,\% termina por \emph{timeout} del cliente.
+\capturademo{s3-fasthang-inflight.png}{Una respuesta lenta es peor que ninguna}
+¿Por qué la falla \texttt{hang} es la más peligrosa, aunque deje menos pedidos fallidos? ¿Qué muestra la figura que no muestran esos porcentajes?
+\end{uaexercise}
+\begin{uaanswer}
+Con \texttt{fast}, cada llamada a \texttt{special} caída vuelve enseguida con un error: el pedido falla, pero rápido, y el hilo queda libre. Por eso el pool casi no se usa: el servicio sigue disponible y los pedidos que llegan mientras \texttt{special} está arriba se atienden normalmente.
+
+Con \texttt{hang}, cada llamada queda esperando una respuesta que no llega. La figura muestra que el pool \textbf{se llena en cada caída}: los 8 hilos quedan bloqueados y el servicio entero deja de atender, no solo lo que necesita a \texttt{special}. Sin \emph{timeout} nada registra un error en el servidor: la falla aparece recién en el cliente, cuando vence su propio \emph{timeout}.
+
+Los porcentajes miden cuántos pedidos terminaron mal, no cuánto se agotó el recurso compartido. La figura sí lo muestra: con la falla rápida el pool está casi vacío, y con la lenta, lleno. Es la lección de Nygard: una respuesta lenta es mucho peor que ninguna.
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000}. Al pasar de \texttt{00} a \texttt{01-timeout-only} (segunda línea amarilla de la primera figura), cada llamada a \texttt{special} se corta a los 100\,ms y el pool baja de 8 a un promedio de 1,5 hilos ocupados. Pero el 98\,\% de los pedidos responde HTTP 500 (segunda figura), con una latencia media de 200\,ms.
+\capturademo{s1-01-inflight.png}{Experimento: solo timeouts}\capturademo{s1-01-outcomes.png}{Experimento: solo timeouts, pero todo falla}
+\begin{enumerate}
+\item ¿El sistema mejoró o empeoró respecto de \texttt{00}? Responda desde el punto de vista del servicio y desde el del usuario.
+\item ¿Qué mecanismos faltan para que el usuario reciba algo útil? ¿Servirían los reintentos?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item \textbf{Para el servicio, mejoró}: los hilos se liberan, la saturación terminó y el Generator responde en 200\,ms en lugar de quedar bloqueado. \textbf{Para el usuario, mejoró poco}: antes esperaba 10\,s y recibía un \emph{timeout}; ahora recibe un error enseguida, pero el 98\,\% de los pedidos sigue fallando. Fallar rápido no es funcionar: el \emph{timeout} protege al llamante, no al usuario.
+\item Falta un \emph{fallback} que responda algo útil en lugar del error (la decisión de producto), y un \emph{circuit breaker} que deje de llamar a \texttt{special} mientras siga enferma: con solo \emph{timeout}, cada llamada sigue gastando sus 100\,ms y sigue cargando a la dependencia. Los reintentos no sirven: la falla es persistente (todas las llamadas tardan 2\,s más), cada reintento volvería a fallar y solo multiplicaría la carga.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.1}: se corta la conexión en el 10\,\% de las llamadas a \texttt{special}. Se aplican, en orden, \texttt{00} (sin protección), \texttt{02} (\emph{timeout} y 3 reintentos inmediatos) y \texttt{03} (\emph{timeout} y 2 reintentos con \emph{backoff} y \emph{jitter}). En la línea de base, cada pedido hace en promedio 4,9 llamadas a \texttt{special}. Lo medido: falla el 36,8\,\% de los pedidos con \texttt{00}, el 0,14\,\% con \texttt{02} y el 0,55\,\% con \texttt{03}. Con reintentos, cada pedido hace 5,4 llamadas a \texttt{special}; sin protección, 3,9.
+\capturademo{s2-0203-error-rate.png}{Experimento: reintentos contra 10\,\% de errores}\capturademo{s2-0203-amplification.png}{Experimento: el costo de los reintentos}
+\begin{enumerate}
+\item Calcule qué proporción de los pedidos debería fallar con \texttt{03} y compárela con la medida.
+\item Cada ventana tuvo unos 750 pedidos. ¿A cuántos pedidos corresponde el 0,14\,\% de \texttt{02}? ¿Qué se puede concluir de la comparación entre \texttt{02} y \texttt{03}?
+\item Explique las 5,4 llamadas por pedido con reintentos y las 3,9 sin protección.
+\item Entre \texttt{02} y \texttt{03} no se ve diferencia en la carga. ¿Contradice lo que se dijo sobre el \emph{jitter}?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Con 2 reintentos, una llamada falla solo si fallan los 3 intentos: $p^3 = 0{,}1^3 = 0{,}1\,\%$. El pedido falla con $1 - 0{,}999^{4{,}9} \approx 0{,}49\,\%$. Lo medido, 0,55\,\%, está muy cerca.
+\item $0{,}0014 \times 750 \approx 1$: es un pedido. La cuenta para \texttt{02} ($p^4 = 0{,}01\,\%$ por llamada, $\approx 0{,}05\,\%$ por pedido) predice menos de medio pedido fallido en la ventana. Con tan pocos eventos, la diferencia entre 0,14\,\% y 0,55\,\% no permite comparar las dos políticas con precisión. Lo que sí muestra el experimento es el efecto grande: con cualquiera de las dos, la proporción de pedidos fallidos baja de cerca del 37\,\% a menos del 1\,\%.
+\item Con reintentos, cada llamada hace en promedio $1 + p + p^2 \approx 1{,}11$ intentos (algo más con 3 reintentos, $1{,}111$), porque el reintento solo ocurre cuando el intento anterior falla: $4{,}9 \times 1{,}11 \approx 5{,}4$. Sin protección, el pedido se corta en la primera llamada que falla, así que hace menos llamadas que las que hubiera hecho: con 5 llamadas serían en promedio $1 + 0{,}9 + 0{,}9^2 + 0{,}9^3 + 0{,}9^4 = (1 - 0{,}9^5)/0{,}1 \approx 4{,}1$. Se mide algo menos, 3,9, porque la cantidad de llamadas varía de pedido en pedido (por la misma razón, el 36,8\,\% medido queda algo por debajo del 40\,\% de la cuenta).
+\item No. El \emph{jitter} sirve para romper la sincronización entre muchos clientes que fallaron a la vez. En la demo hay un solo cliente, k6, a 5 pedidos por segundo: no hay sincronización que romper. Con 10\,\% de fallas, además, las esperas del \emph{backoff} casi no pesan. La diferencia se vería con muchos clientes y con una falla que los afecte a todos al mismo tiempo.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000}. Con \texttt{06-complete} el 98\,\% de los pedidos sale degradado (amarillo) y no hay errores. Al pasar a \texttt{07-cb-no-fallback}, el \emph{breaker} se abre igual, pero el 98\,\% de los pedidos sale como error (rojo). Con \texttt{07}, la latencia media del servidor es de 85\,ms; con \texttt{01-timeout-only}, que también daba un 98\,\% de errores, era de 198\,ms.
+\capturademo{s1-07-outcomes.png}{Experimento: el mismo breaker, sin fallback}
+\begin{enumerate}
+\item ¿Qué decide la diferencia entre \texttt{06} y \texttt{07}? ¿Qué protege el \emph{breaker} y qué protege el \emph{fallback}?
+\item \texttt{07} y \texttt{01} dan la misma proporción de errores. ¿Qué agrega el \emph{breaker}?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item El \emph{fallback}. El \emph{breaker} se comporta igual en los dos presets: se abre y rechaza las llamadas a \texttt{special} sin esperar. Lo que cambia es qué se hace con el pedido cuando la llamada se rechaza: con \texttt{06} se arma una contraseña degradada; con \texttt{07} el pedido falla. El \emph{breaker} protege al sistema (hilos libres, dependencia sin carga); el \emph{fallback}, que es una decisión de producto, protege lo que recibe el usuario.
+\item Con \texttt{01} cada pedido sigue intentando la llamada a \texttt{special} y espera los 100\,ms del \emph{timeout} antes de fallar; con \texttt{07} el \emph{breaker} abierto rechaza la llamada sin hacerla. Por eso el pedido termina antes (85\,ms contra 198\,ms) y \texttt{special} deja de recibir carga mientras está enferma. Además, el \emph{breaker} prueba periódicamente en \emph{half-open} y vuelve a \emph{closed} solo cuando la dependencia se recupera, sin intervención manual.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.1}, ahora sin reintentos. Con \texttt{04-cb-consecutive-fragile} (abre con 3 fallas seguidas y queda abierto 10\,s), el \emph{breaker} abrió 5 veces en 210\,s y salió degradado el 53\,\% de los pedidos (primera figura). Con \texttt{05-cb-rate} (tasa en ventana: 50 llamadas, mínimo 20, umbral 50\,\%) no abrió nunca, y aun así salió degradado el 38\,\% (segunda figura). \texttt{special} recibió unas 21 llamadas por segundo.
+\capturademo{s2-04-err10-outcomes.png}{Experimento: 10\,\% de errores con fallas consecutivas}\capturademo{s2-05-err10-breaker.png}{Experimento: 10\,\% de errores con tasa en ventana}
+\begin{enumerate}
+\item Con $E(3;\,0{,}1) \approx 1110$ llamadas, ¿cada cuánto se espera una racha de 3 fallas? ¿Es compatible con lo observado?
+\item ¿Por qué \texttt{05} degrada el 38\,\% si su \emph{breaker} no abre? Estime esa proporción con la cuenta de la amplificación.
+\item Estime qué parte del 53\,\% de \texttt{04} se debe a las aperturas del \emph{breaker}.
+\item ¿Qué combinación de mecanismos elegiría frente a un 10\,\% de cortes de conexión transitorios?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item A 21 llamadas por segundo, una racha cada $1110 / 21 \approx 53$\,s, cerca de un minuto. Como el \emph{breaker} pasó unos $5 \times 10 = 50$\,s abierto, estuvo cerrado unos 160\,s, en los que se esperan unas 3 rachas; se observaron 5. Es el mismo orden de magnitud: con tan pocos eventos la variación es grande, y la cuenta supone fallas independientes. Lo importante es la conclusión: un 10\,\% de errores que el sistema toleraba abre el \emph{breaker} cada pocas decenas de segundos.
+\item Porque en la demo el \emph{fallback} actúa ante \emph{cualquier} llamada que falla, no solo con el \emph{breaker} abierto. Sin reintentos, todo pedido con alguna conexión cortada sale degradado: $1 - 0{,}9^{4{,}9} \approx 40\,\%$, cerca del 38\,\% medido (algo menos porque la cantidad de llamadas varía de pedido en pedido).
+\item \texttt{05} sirve de comparación: el mismo escenario, sin aperturas, degrada el 38\,\%. La diferencia, unos 15 puntos, es el efecto de las aperturas. Se puede estimar: el \emph{breaker} estuvo abierto unos 50 de 210\,s ($\approx 24\,\%$ del tiempo); en ese lapso se degradan todos los pedidos, incluido el $\approx 60\,\%$ que habría salido bien. Eso agrega $0{,}24 \times 0{,}6 \approx 14$ puntos: $38 + 14 \approx 52\,\%$, coherente con lo medido.
+\item Un 10\,\% de fallas transitorias es justamente lo que recuperan los reintentos: en el ejercicio anterior, con 2 reintentos con \emph{backoff} y \emph{jitter}, falló solo el 0,55\,\% de los pedidos. Lo razonable es combinar reintentos acotados por un presupuesto con un \emph{breaker} por tasa en ventana, que no se dispara con el 10\,\% y sí detecta una dependencia realmente enferma, y un \emph{fallback} para lo que no se recupera. Es lo que hace el preset \texttt{06}.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.5}. Se aplican, en orden, \texttt{04} ($k = 3$), \texttt{04b} ($k = 10$) y \texttt{05} (tasa en ventana). Con \texttt{04} y con \texttt{05} el \emph{breaker} abre enseguida y deja pasar 31 llamadas fallidas en 90\,s. Con \texttt{04b} tarda más de 2 minutos en abrir por primera vez y deja pasar 1867 llamadas fallidas en 210\,s. \texttt{special} recibe unas 20 llamadas por segundo.
+\capturademo{s2-err50-breaker.png}{Experimento: 50\,\% de errores, las tres configuraciones}
+\begin{enumerate}
+\item Con $E(10;\,0{,}5) \approx 2046$ llamadas, estime cuánto debería tardar \texttt{04b} en abrir y compárelo con lo observado.
+\item Junto con el ejercicio anterior, ¿qué muestra este experimento sobre las dos políticas?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item A 20 llamadas por segundo, $2046 / 20 \approx 102$\,s, algo menos de dos minutos. Se observaron más de dos minutos: el mismo orden. $E$ es un promedio, y la primera racha de 10 fallas puede tardar bastante más. Mientras tanto, la mitad de las llamadas falla y cada una espera su resultado: 1867 llamadas fallidas, contra 31 con \texttt{04} o \texttt{05}.
+\item Es el dilema de las fallas consecutivas, medido. Con $k = 3$ el \emph{breaker} detecta rápido el 50\,\%, pero se dispara sin motivo con el 10\,\% (5 aperturas en 210\,s). Con $k = 10$ tolera el 10\,\%, pero tarda minutos en detectar el 50\,\%. Ningún $k$ sirve para las dos cosas, porque las fallas consecutivas mezclan la tasa de error con el volumen de tráfico. La tasa en ventana (\texttt{05}) resuelve las dos: no abre con el 10\,\% y abre tan rápido como $k = 3$ con el 50\,\%.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escenario \texttt{intermittent fast} con \texttt{06-complete}. El \emph{breaker} de \texttt{special} se abre en cada caída y se cierra cuando \texttt{special} vuelve. Hubo 0 errores y salió degradado el 49\,\% de los pedidos.
+\capturademo{s3-06-breaker.png}{Experimento: caída intermitente}
+\begin{enumerate}
+\item ¿Por qué no hubo errores? ¿Por qué salió degradada cerca de la mitad de los pedidos?
+\item El panel no muestra nunca el estado \emph{half-open}. ¿Significa que no ocurrió? ¿Qué enseña sobre la observabilidad de los \emph{breakers}?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Porque toda llamada a \texttt{special} que falla, sea por un error de conexión o por un rechazo del \emph{breaker} abierto, va al \emph{fallback}: el pedido sale degradado, no con error. \texttt{special} está caída 20 de cada 40\,s, la mitad del tiempo, y durante las caídas los pedidos se degradan: de ahí el 49\,\%. Cuando \texttt{special} vuelve, el \emph{breaker} pasa por \emph{half-open}, la prueba tiene éxito y los pedidos vuelven a salir completos.
+\item No. El estado \emph{half-open} dura lo que tarda una llamada de prueba, milisegundos, y Prometheus toma una muestra del estado cada 5\,s: entre dos muestras, el \emph{breaker} pasa por \emph{half-open} y sale. El contador de transiciones del \emph{breaker} sí registra esos pasos. La lección es que el estado actual no alcanza: hay que registrar siempre los cambios de estado y graficar su frecuencia, que es además un indicador adelantado de problemas (Nygard, cap.~5). Un panel que muestrea un estado puede ocultar justamente las transiciones rápidas.
 \end{enumerate}
 \end{uaanswer}
 

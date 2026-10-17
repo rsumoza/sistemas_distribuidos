@@ -12,94 +12,135 @@
 
 \begin{document}
 
+% Captura de la corrida de la demo de la clase 11. #1: archivo en slides/assets/11; #2: título de la slide de la que sale.
+\newcommand{\capturademo}[2]{%
+\begin{center}
+\includegraphics[width=0.85\linewidth]{../slides/assets/11/#1}\par\vspace{0.2em}
+{\footnotesize Slide ``#2''.}
+\end{center}
+}
+
 \section{Indicaciones generales}
 Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
 \section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
-Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída.
+Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída. Base la explicación en lo que le pasa al pool de hilos del servicio que la llama.
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya una cadena causal donde una degradación local termine generando una caída visible en el borde del sistema.
+En el caso de la aerolínea (apunte, sección del caso de estudio), identifique cuál fue la falta (\emph{fault}), cuál el error y cuál la falla (\emph{failure}). ¿Por qué el monitoreo del servicio de búsqueda de vuelos lo mostraba sano durante la caída?
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué la resiliencia distribuida no consiste en “hacer más retries”.
+Construya una cadena causal en la que una degradación local termine en una caída visible en el borde del sistema. Para cada eslabón, indique qué recurso se agota y cómo pasa la falla a la capa que llama.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique la diferencia entre tolerar una falla y amplificarla.
+Explique por qué la resiliencia distribuida no consiste en ``hacer más reintentos''.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique en qué casos retry es razonable y en qué casos es peligroso.
+Explique la diferencia entre tolerar una falla y amplificarla. Muestre que un mismo mecanismo, el reintento, puede hacer una cosa o la otra según el tipo de falla.
+\end{uaexercise}
+
+\begin{uaexercise}
+¿En qué casos un reintento es razonable y en cuáles es peligroso? Tenga en cuenta el tipo de falla, la idempotencia de la operación y el error recibido.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique la diferencia entre el \emph{timeout} de conexión y el \emph{timeout} de lectura. ¿Qué pasa con una llamada hecha con la librería \texttt{requests} de Python sin el parámetro \texttt{timeout}? ¿Por qué el \emph{timeout} de lectura no acota el tiempo total de la llamada?
 \end{uaexercise}
 
 
 \section{Nivel 2: ejecuciones y fallas}
 \begin{uaexercise}
-Diseñe una política de retry para una operación idempotente.
+Diseñe una política de reintentos para una operación idempotente: cuántos intentos, cuánto se espera entre ellos, qué \emph{timeout} tiene cada intento y qué errores se reintentan. Calcule cuánto puede tardar, como máximo, la llamada lógica.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué el exponential backoff es mejor que reintentos inmediatos constantes.
+Explique por qué el \emph{backoff} exponencial es mejor que reintentar de inmediato o con una espera constante.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique el rol del jitter en un sistema con miles de clientes concurrentes.
+Un \emph{backend} puede atender 10\,000 consultas por segundo y rechaza las que exceden ese límite. Recibe 10\,100 por segundo, y sus clientes reintentan cada consulta rechazada. Muestre cómo evoluciona la carga y explique por qué, aunque la demanda vuelva a su nivel anterior, el \emph{backend} puede no salir de la sobrecarga. ¿Qué mecanismos cortan el ciclo?
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un ejemplo donde retries en múltiples capas provoquen una tormenta de requests.
+La figura muestra la latencia de cada dependencia del generador de contraseñas en la línea de base, medida desde el Generator. El p99 de \texttt{special} ronda los 41\,ms, y los presets usan para esa llamada un \emph{timeout} de lectura de 100\,ms.
+\capturademo{e0-latency-table.png}{Línea de base: latencia de cada dependencia}
+\begin{enumerate}
+\item ¿Por qué el valor sale del p99 más un margen, y no de la media ni del máximo?
+\item ¿Qué pasaría con un \emph{timeout} de 30\,ms? Tenga en cuenta que cada pedido hace unas 5 llamadas a \texttt{special}.
+\item El p99 de \texttt{lower} es de 97\,ms, más alto que el de las demás. ¿Por qué? Para elegir su \emph{timeout}, ¿hace falta saber que \texttt{lower} llama internamente a \texttt{digit}?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina circuit breaker y describa sus estados.
+Describa los tres estados de un \emph{circuit breaker} y qué evento produce cada transición.
 \end{uaexercise}
 
 
 \section{Nivel 3: diseño y comparación}
 \begin{uaexercise}
-Explique con un ejemplo qué gana el sistema al abrir un breaker.
+Explique con un ejemplo qué gana el sistema cuando el \emph{circuit breaker} se abre, y qué pierde.
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un caso donde un threshold mal calibrado de breaker empeore el comportamiento del sistema.
+Un \emph{circuit breaker} protege las llamadas a un servicio de inventario. Indique cuáles de estos resultados debería contar como falla y por qué:
+\begin{enumerate}
+\item un \emph{timeout} de lectura;
+\item una conexión rechazada;
+\item una respuesta 503;
+\item una respuesta 404, porque el producto consultado no existe;
+\item una respuesta 400, porque el llamante mandó un parámetro inválido.
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué el estado half-open es importante.
+Para el Generator de la demo, un equipo propone dos cambios: usar un único \emph{circuit breaker} para las cuatro dependencias, en lugar de uno por dependencia, y compartir el estado de los \emph{breakers} entre todas las réplicas del Generator a través de un almacén externo. Analice cada propuesta.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué problema resuelve backpressure.
+Ordene \emph{bulkhead}, \emph{circuit breaker}, \emph{timeout}, reintentos y \emph{fallback} dentro de una llamada a una dependencia, y justifique el orden. ¿Qué pasa si los reintentos también reintentan los rechazos del \emph{breaker}?
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe un ejemplo donde la ausencia de backpressure haga crecer una cola hasta volver inútil el sistema.
+Explique qué problema resuelve la \emph{backpressure} y en qué se diferencia del \emph{load shedding}. ¿Cuándo conviene cada uno?
+\end{uaexercise}
+
+\begin{uaexercise}
+Un servicio procesa 100 pedidos por segundo y recibe 120, que se acumulan en una cola sin límite. Sus clientes abandonan a los 5\,s. Muestre con la ley de Little cómo crece la espera, y a partir de qué momento el sistema se vuelve inútil aunque siga procesando 100 pedidos por segundo. ¿Qué haría con la cola?
 \end{uaexercise}
 
 
 \section{Nivel 4: integración y defensa}
 \begin{uaexercise}
-Explique qué es bulkhead y cómo se implementa en términos de recursos.
+Explique qué es un \emph{bulkhead} y cómo se implementa particionando recursos. Dé ejemplos de partición en dos niveles distintos y explique cuál es su costo.
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un caso donde un pool compartido arrastre rutas críticas que no tenían problema.
+Un servicio de comercio electrónico atiende con un único pool de 200 hilos tres rutas: búsqueda, \emph{checkout} y recomendaciones. Recomendaciones recibe 50 pedidos por segundo y su dependencia pasa a tardar 5\,s. Muestre cómo esa ruta arrastra al \emph{checkout}, aunque el servicio de pagos esté sano, y proponga un \emph{bulkhead} que lo evite.
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina graceful degradation y compárela con caída total.
+Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación? ¿Qué pasa con un \emph{circuit breaker} sin \emph{fallback}?
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe tres ejemplos concretos de degradación elegante en una plataforma de e-commerce.
+Diseñe tres degradaciones concretas para una plataforma de comercio electrónico. Indique, además, una operación en la que degradar no sea aceptable.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué riesgos aparecen si la degradación no es explícita y semánticamente clara.
+En la demo, cuando falla la llamada a \texttt{special}, el \emph{fallback} arma la contraseña sin caracteres especiales y la marca como \texttt{degraded}. ¿Qué riesgos aparecerían si la respuesta no estuviera marcada? Aun marcada, ¿es una degradación aceptable para un generador de contraseñas real?
+\end{uaexercise}
+
+\begin{uaexercise}
+En el lanzamiento de Pokémon GO (apunte, ``Caso Pokémon GO''), los \emph{backends} se volvieron muy lentos en lugar de rechazar pedidos, el balanceador reintentaba los GET y la aplicación reintentaba una vez de inmediato y después con una espera constante. Explique cómo se combinaron esos comportamientos para producir picos de pedidos de hasta veinte veces el máximo global anterior, y qué mecanismo de esta clase habría cortado cada uno.
+\end{uaexercise}
+
+\begin{uaexercise}
+En el caso de la aerolínea, recorra la cadena desde la excepción al cerrar la consulta hasta los quioscos de \emph{check-in} caídos. En cada eslabón, indique qué mecanismo habría cortado la propagación. ¿Por qué no alcanzó con que el servicio de búsqueda de vuelos tuviera redundancia en todos los niveles?
 \end{uaexercise}
 
 
@@ -169,5 +210,88 @@ Un servicio atiende con un pool de 8 hilos y usa un \emph{circuit breaker} cuya 
 \end{enumerate}
 \end{uaexercise}
 
+
+\section{Nivel 6: lectura de la evidencia de la demo}
+Los ejercicios de este nivel usan capturas y mediciones de la corrida de la demo que se muestra en las slides de la clase; debajo de cada figura se indica de qué slide sale. El \textbf{escenario} es la falla que Toxiproxy inyecta en \texttt{special}, y el \textbf{preset}, la configuración de protecciones del Generator (ver la tabla de presets en las slides). La línea amarilla punteada de cada captura marca el momento en que se aplicó una configuración. En todos los experimentos k6 envía 5 pedidos por segundo y el Generator atiende con un pool de 8 hilos.
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000} (cada llamada a \texttt{special} tarda 2\,s más), preset \texttt{00-no-protection}. Los 8 hilos del Generator quedan ocupados (primera figura) y su CPU baja de 0,27 a 0,06 núcleos (segunda figura). Cada pedido tardó en el servidor, en promedio, unos 10,4\,s.
+\capturademo{s1-00-inflight.png}{Sin protección: el pool se llena}\capturademo{s1-00-cpu.png}{Sin protección: la CPU baja}
+\begin{enumerate}
+\item ¿De dónde salen esos 10,4\,s, si la dependencia solo agrega 2\,s por llamada?
+\item ¿Cuántos hilos harían falta para sostener los 5 pedidos por segundo? ¿Qué tasa puede sostener el pool? Compárela con lo medido: 163 pedidos completados en 210\,s.
+\item ¿Por qué baja la CPU justo cuando el servicio deja de atender? ¿Cuál de los dos paneles muestra la saturación?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Mismo experimento. La latencia que ve k6 sube hasta 10\,s, que es su propio \emph{timeout}: en la ventana medida, todos los pedidos del cliente terminaron por \emph{timeout}. Sin embargo, en esa misma ventana el Generator completó 163 pedidos.
+\capturademo{s1-00-client-latency.png}{Sin protección: el usuario espera hasta rendirse}
+¿Cómo pueden ser ciertas las dos cosas a la vez? ¿Qué relación tiene con los \emph{timeouts} en una cadena de llamadas?
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{intermittent}: \texttt{special} se cae 20\,s de cada 40. Hasta las 14:04 la caída es \texttt{fast} (rechaza la conexión); después es \texttt{hang} (acepta la conexión y no responde). Preset \texttt{00-no-protection}. Con \texttt{fast} falla el 48\,\% de los pedidos; con \texttt{hang}, el 36\,\% termina por \emph{timeout} del cliente.
+\capturademo{s3-fasthang-inflight.png}{Una respuesta lenta es peor que ninguna}
+¿Por qué la falla \texttt{hang} es la más peligrosa, aunque deje menos pedidos fallidos? ¿Qué muestra la figura que no muestran esos porcentajes?
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000}. Al pasar de \texttt{00} a \texttt{01-timeout-only} (segunda línea amarilla de la primera figura), cada llamada a \texttt{special} se corta a los 100\,ms y el pool baja de 8 a un promedio de 1,5 hilos ocupados. Pero el 98\,\% de los pedidos responde HTTP 500 (segunda figura), con una latencia media de 200\,ms.
+\capturademo{s1-01-inflight.png}{Experimento: solo timeouts}\capturademo{s1-01-outcomes.png}{Experimento: solo timeouts, pero todo falla}
+\begin{enumerate}
+\item ¿El sistema mejoró o empeoró respecto de \texttt{00}? Responda desde el punto de vista del servicio y desde el del usuario.
+\item ¿Qué mecanismos faltan para que el usuario reciba algo útil? ¿Servirían los reintentos?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.1}: se corta la conexión en el 10\,\% de las llamadas a \texttt{special}. Se aplican, en orden, \texttt{00} (sin protección), \texttt{02} (\emph{timeout} y 3 reintentos inmediatos) y \texttt{03} (\emph{timeout} y 2 reintentos con \emph{backoff} y \emph{jitter}). En la línea de base, cada pedido hace en promedio 4,9 llamadas a \texttt{special}. Lo medido: falla el 36,8\,\% de los pedidos con \texttt{00}, el 0,14\,\% con \texttt{02} y el 0,55\,\% con \texttt{03}. Con reintentos, cada pedido hace 5,4 llamadas a \texttt{special}; sin protección, 3,9.
+\capturademo{s2-0203-error-rate.png}{Experimento: reintentos contra 10\,\% de errores}\capturademo{s2-0203-amplification.png}{Experimento: el costo de los reintentos}
+\begin{enumerate}
+\item Calcule qué proporción de los pedidos debería fallar con \texttt{03} y compárela con la medida.
+\item Cada ventana tuvo unos 750 pedidos. ¿A cuántos pedidos corresponde el 0,14\,\% de \texttt{02}? ¿Qué se puede concluir de la comparación entre \texttt{02} y \texttt{03}?
+\item Explique las 5,4 llamadas por pedido con reintentos y las 3,9 sin protección.
+\item Entre \texttt{02} y \texttt{03} no se ve diferencia en la carga. ¿Contradice lo que se dijo sobre el \emph{jitter}?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{latency 2000}. Con \texttt{06-complete} el 98\,\% de los pedidos sale degradado (amarillo) y no hay errores. Al pasar a \texttt{07-cb-no-fallback}, el \emph{breaker} se abre igual, pero el 98\,\% de los pedidos sale como error (rojo). Con \texttt{07}, la latencia media del servidor es de 85\,ms; con \texttt{01-timeout-only}, que también daba un 98\,\% de errores, era de 198\,ms.
+\capturademo{s1-07-outcomes.png}{Experimento: el mismo breaker, sin fallback}
+\begin{enumerate}
+\item ¿Qué decide la diferencia entre \texttt{06} y \texttt{07}? ¿Qué protege el \emph{breaker} y qué protege el \emph{fallback}?
+\item \texttt{07} y \texttt{01} dan la misma proporción de errores. ¿Qué agrega el \emph{breaker}?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.1}, ahora sin reintentos. Con \texttt{04-cb-consecutive-fragile} (abre con 3 fallas seguidas y queda abierto 10\,s), el \emph{breaker} abrió 5 veces en 210\,s y salió degradado el 53\,\% de los pedidos (primera figura). Con \texttt{05-cb-rate} (tasa en ventana: 50 llamadas, mínimo 20, umbral 50\,\%) no abrió nunca, y aun así salió degradado el 38\,\% (segunda figura). \texttt{special} recibió unas 21 llamadas por segundo.
+\capturademo{s2-04-err10-outcomes.png}{Experimento: 10\,\% de errores con fallas consecutivas}\capturademo{s2-05-err10-breaker.png}{Experimento: 10\,\% de errores con tasa en ventana}
+\begin{enumerate}
+\item Con $E(3;\,0{,}1) \approx 1110$ llamadas, ¿cada cuánto se espera una racha de 3 fallas? ¿Es compatible con lo observado?
+\item ¿Por qué \texttt{05} degrada el 38\,\% si su \emph{breaker} no abre? Estime esa proporción con la cuenta de la amplificación.
+\item Estime qué parte del 53\,\% de \texttt{04} se debe a las aperturas del \emph{breaker}.
+\item ¿Qué combinación de mecanismos elegiría frente a un 10\,\% de cortes de conexión transitorios?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{errors 0.5}. Se aplican, en orden, \texttt{04} ($k = 3$), \texttt{04b} ($k = 10$) y \texttt{05} (tasa en ventana). Con \texttt{04} y con \texttt{05} el \emph{breaker} abre enseguida y deja pasar 31 llamadas fallidas en 90\,s. Con \texttt{04b} tarda más de 2 minutos en abrir por primera vez y deja pasar 1867 llamadas fallidas en 210\,s. \texttt{special} recibe unas 20 llamadas por segundo.
+\capturademo{s2-err50-breaker.png}{Experimento: 50\,\% de errores, las tres configuraciones}
+\begin{enumerate}
+\item Con $E(10;\,0{,}5) \approx 2046$ llamadas, estime cuánto debería tardar \texttt{04b} en abrir y compárelo con lo observado.
+\item Junto con el ejercicio anterior, ¿qué muestra este experimento sobre las dos políticas?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Escenario \texttt{intermittent fast} con \texttt{06-complete}. El \emph{breaker} de \texttt{special} se abre en cada caída y se cierra cuando \texttt{special} vuelve. Hubo 0 errores y salió degradado el 49\,\% de los pedidos.
+\capturademo{s3-06-breaker.png}{Experimento: caída intermitente}
+\begin{enumerate}
+\item ¿Por qué no hubo errores? ¿Por qué salió degradada cerca de la mitad de los pedidos?
+\item El panel no muestra nunca el estado \emph{half-open}. ¿Significa que no ocurrió? ¿Qué enseña sobre la observabilidad de los \emph{breakers}?
+\end{enumerate}
+\end{uaexercise}
 
 \end{document}
