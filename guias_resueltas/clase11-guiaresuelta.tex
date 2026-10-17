@@ -47,20 +47,6 @@ El monitoreo solo consultaba una página de estado, y esa página seguía respon
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya una cadena causal en la que una degradación local termine en una caída visible en el borde del sistema. Para cada eslabón, indique qué recurso se agota y cómo pasa la falla a la capa que llama.
-\end{uaexercise}
-\begin{uaanswer}
-Con el generador de contraseñas, sin protecciones:
-\begin{enumerate}
-\item \textbf{Degradación local.} El servicio \texttt{special} se vuelve lento: cada llamada tarda 2\,s más. Sigue respondiendo bien; ningún recurso se agotó todavía.
-\item \textbf{Hilos del llamante.} Cada pedido hace unas 5 llamadas secuenciales a \texttt{special}, así que ocupa un hilo del Generator unos 10\,s. Con 5 pedidos por segundo harían falta $L = 5 \times 10 = 50$ hilos y el pool tiene 8. Se agotan los hilos del Generator. La falla salta de capa porque el hilo del llamante espera al proveedor sin plazo: la lentitud de \texttt{special} se convierte en hilos bloqueados del Generator.
-\item \textbf{Cola.} Los pedidos que llegan sin hilo libre esperan en la cola del servidor. Se agota la capacidad de atender a tiempo: el tiempo de residencia (cola más procesamiento) crece.
-\item \textbf{Borde.} El cliente espera hasta su propio \emph{timeout} y recibe un error. El usuario ve caído al generador entero, aunque \texttt{upper}, \texttt{lower} y \texttt{digit} estén sanos. Si los clientes reintentan, suman carga sobre el servicio saturado.
-\end{enumerate}
-El mecanismo que transmite la falla de una capa a otra es casi siempre el mismo: un pool de recursos del llamante que se agota mientras espera a un proveedor que falla (Nygard, cap.~4). Si el Generator tuviera a su vez muchos llamantes (alto \emph{fan-in}), la falla se propagaría a todos ellos. Es lo que midió la demo con el escenario \texttt{latency 2000} y el preset \texttt{00} (nivel~6).
-\end{uaanswer}
-
-\begin{uaexercise}
 Explique por qué la resiliencia distribuida no consiste en ``hacer más reintentos''.
 \end{uaexercise}
 \begin{uaanswer}
@@ -108,28 +94,6 @@ El \emph{timeout} de lectura mide el tiempo \emph{entre} datos recibidos, no el 
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe una política de reintentos para una operación idempotente: cuántos intentos, cuánto se espera entre ellos, qué \emph{timeout} tiene cada intento y qué errores se reintentan. Calcule cuánto puede tardar, como máximo, la llamada lógica.
-\end{uaexercise}
-\begin{uaanswer}
-Una política razonable incluye:
-\begin{itemize}
-\item máximo de intentos pequeño y explícito;
-\item exponential backoff;
-\item jitter;
-\item timeout acotado por intento;
-\item solo aplicar si el error es potencialmente transitorio.
-\end{itemize}
-
-La idempotencia es central porque convierte múltiples intentos físicos en un único efecto lógico.
-
-Un ejemplo concreto: hasta 2 reintentos (3 intentos); \emph{backoff} exponencial con base 100\,ms, multiplicador 2 y tope 1\,s, con \emph{full jitter}; \emph{timeout} de 500\,ms por intento; se reintentan \emph{timeouts}, errores de conexión y 5xx, y no los 4xx, los errores de validación ni los rechazos del \emph{breaker}. Las esperas nominales son 100 y 200\,ms, y con \emph{full jitter} nunca las superan, así que
-\[
-T_{\max} = (1 + r)\cdot t + \textstyle\sum e_i = 3 \times 500 + (100 + 200) = 1800\ \text{ms}.
-\]
-Ese valor tiene que caber en el \emph{timeout} de quien origina la llamada. Para que los reintentos no amplifiquen una falla persistente, se agrega un presupuesto por cliente: reintentar solo mientras los reintentos sean menos del 10\,\% de los pedidos.
-\end{uaanswer}
-
-\begin{uaexercise}
 Explique por qué el \emph{backoff} exponencial es mejor que reintentar de inmediato o con una espera constante.
 \end{uaexercise}
 \begin{uaanswer}
@@ -138,23 +102,6 @@ Un reintento inmediato vuelve a encontrar casi siempre la misma condición que h
 Con \emph{backoff} exponencial, $d_n = \min(\text{tope},\ \text{base}\cdot m^n)$, la espera crece geométricamente con cada reintento: las fallas cortas se recuperan rápido, y ante una falla larga la carga de reintentos decrece, dándole tiempo a la dependencia. El tope evita esperas absurdas.
 
 El \emph{backoff} solo, sin embargo, no rompe la sincronización: clientes que fallaron a la vez esperan los mismos $d_n$ y reintentan a la vez. Por eso se combina con \emph{jitter}. Pokémon GO es el ejemplo: la aplicación hacía ``a single immediate retry, followed by constant backoff'', y los errores rápidos de los \emph{backends} sincronizaron los reintentos de los clientes; la corrección fue \emph{backoff} exponencial truncado con \emph{jitter} (Bethea et al., cap.~11 del \emph{SRE Workbook}).
-\end{uaanswer}
-
-\begin{uaexercise}
-Un \emph{backend} puede atender 10\,000 consultas por segundo y rechaza las que exceden ese límite. Recibe 10\,100 por segundo, y sus clientes reintentan cada consulta rechazada. Muestre cómo evoluciona la carga y explique por qué, aunque la demanda vuelva a su nivel anterior, el \emph{backend} puede no salir de la sobrecarga. ¿Qué mecanismos cortan el ciclo?
-\end{uaexercise}
-\begin{uaanswer}
-En el primer segundo rechaza 100. Esas 100 se reintentan y se suman a las nuevas: recibe 10\,200 y rechaza 200; después 10\,300 y rechaza 300, y así sucesivamente. Cada vez menos consultas tienen éxito en el primer intento, y una fracción creciente del trabajo del \emph{backend} se dedica a consultas que van a fallar (Beyer et al., cap.~22). Si el \emph{backend} cae por esa carga, la que atendía se reparte entre los que quedan y la falla se propaga como reacción en cadena.
-
-Bajar la demanda nueva a 10\,000 no alcanza: los reintentos pendientes se suman a esa demanda y mantienen la carga por encima de la capacidad. El sistema quedó atrapado en la retroalimentación, no en la demanda original.
-
-Cortan el ciclo:
-\begin{itemize}
-\item un \textbf{presupuesto de reintentos} por cliente: cuando muchos pedidos fallan, la proporción de reintentos llega al límite y el cliente deja de reintentar;
-\item \textbf{backoff con jitter}, que reparte los reintentos en el tiempo en lugar de sumarlos al segundo siguiente;
-\item un \textbf{circuit breaker} en el cliente, que deja de llamar mientras la tasa de fallas sea alta;
-\item \textbf{load shedding} temprano y barato en el \emph{backend}, para que rechazar cueste poco y no le quite capacidad al trabajo útil.
-\end{itemize}
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -352,43 +299,6 @@ Sin la marca, el cliente recibiría una contraseña que parece completa y no lo 
 Aun marcada, para un generador real no es aceptable como respuesta por defecto. Omitir los caracteres especiales puede violar la política de contraseñas: ``degradar'' pasa a ser ``responder algo incorrecto''. El apunte usa justamente este ejemplo como caso en que no conviene degradar. Lo correcto sería fallar de forma explícita y rápida, o dejar que el cliente decida si acepta una contraseña sin especiales. El \emph{fallback} de la demo está para mostrar el mecanismo, no como decisión de producto.
 \end{uaanswer}
 
-\begin{uaexercise}
-En el lanzamiento de Pokémon GO (apunte, ``Caso Pokémon GO''), los \emph{backends} se volvieron muy lentos en lugar de rechazar pedidos, el balanceador reintentaba los GET y la aplicación reintentaba una vez de inmediato y después con una espera constante. Explique cómo se combinaron esos comportamientos para producir picos de pedidos de hasta veinte veces el máximo global anterior, y qué mecanismo de esta clase habría cortado cada uno.
-\end{uaexercise}
-\begin{uaanswer}
-La demanda real fue casi cincuenta veces la estimación con la que se había probado la carga. Con esa sobrecarga:
-\begin{itemize}
-\item \textbf{Backends lentos en lugar de rechazar.} Cada pedido retenía recursos en el \emph{backend} y en el balanceador que lo esperaba. Lo habría cortado el \emph{load shedding}: rechazar temprano y barato lo que no se podía atender a tiempo.
-\item \textbf{Balanceador que reintentaba los GET.} Sumaba carga sobre \emph{backends} que ya no daban abasto: la retroalimentación de los reintentos. Lo habría cortado un presupuesto de reintentos (o no reintentar en esa capa).
-\item \textbf{Aplicación con un reintento inmediato y espera constante.} Cuando los \emph{backends} devolvían muchos errores rápidos (por ejemplo, al reiniciarse un \emph{backend} compartido), todos los clientes fallaban a la vez y reintentaban a la vez: los errores sincronizaron a los clientes en una sola ola (\emph{thundering herd}). Lo habría cortado el \emph{backoff} exponencial con \emph{jitter}, que es lo que Niantic incorporó a sus clientes.
-\end{itemize}
-La combinación es lo que produjo los picos: cada mecanismo agravaba al siguiente. Hay un detalle: rechazar rápido, sin \emph{jitter} en los clientes, también sincroniza los reintentos; el \emph{load shedding} solo no alcanza. Y la sobrecarga alcanzó a un componente ajeno al juego, la capacidad de balanceo global, que hubo que aislar y ampliar (Bethea et al., cap.~11 del \emph{SRE Workbook}).
-\end{uaanswer}
-
-\begin{uaexercise}
-En el caso de la aerolínea, recorra la cadena desde la excepción al cerrar la consulta hasta los quioscos de \emph{check-in} caídos. En cada eslabón, indique qué mecanismo habría cortado la propagación. ¿Por qué no alcanzó con que el servicio de búsqueda de vuelos tuviera redundancia en todos los niveles?
-\end{uaexercise}
-\begin{uaanswer}
-\begin{center}
-\small
-\begin{tabular}{p{0.42\linewidth}p{0.48\linewidth}}
-\toprule
-\textbf{Eslabón} & \textbf{Mecanismo que lo corta} \\
-\midrule
-Excepción al cerrar la consulta; la conexión no vuelve al pool & Revisión y pruebas de falla; es la falta original y no todo defecto se puede eliminar \\
-Pool de conexiones agotado; hilos de CF bloqueados esperando una conexión & \emph{Timeout} en el pool: bloquear un tiempo limitado; el hilo se libera y el error queda local \\
-Llamadas remotas de los quioscos a CF sin \emph{timeout} & \emph{Timeout} en el cliente: la lentitud de CF no se vuelve bloqueo de los quioscos \\
-Cada cliente bloquea sus hilos esperando a CF & \emph{Circuit breaker} en el cliente: tras unas fallas deja de llamar y falla rápido \\
-CF compartido por todos sus clientes & \emph{Bulkhead}: grupos de servidores de CF dedicados a distintos clientes \\
-Quioscos y respuesta telefónica caídos & \emph{Fallback} decidido con el negocio \\
-Monitoreo que solo miraba una página de estado & Medir desde el cliente (clase 10) \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-La redundancia protege contra la pérdida de un componente: un servidor, un disco, un centro de datos. Acá no se perdió ninguno. El defecto estaba en el código, y por lo tanto en todos los servidores de CF por igual; la propia conmutación de la base, un procedimiento de alta disponibilidad, fue la que dejó las conexiones rotas. La resiliencia no es lo mismo que la tolerancia a fallas por redundancia: es contener la propagación, y CF no tenía ningún mecanismo que impidiera que su pool agotado se convirtiera en hilos bloqueados de sus clientes. Como resume el análisis original, no es realista esperar eliminar todos los defectos; hay que sobrevivirlos (Nygard, caps.~2 y 3).
-\end{uaanswer}
-
 \section{Nivel 5: cálculo y casos integradores}
 \begin{uaexercise}
 Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 segundos. Usando la ley de Little, calcule cuántos hilos necesita para sostener esa tasa. Si el pool tiene 40 hilos, ¿qué ocurre y qué tasa puede sostener como máximo?
@@ -397,15 +307,6 @@ Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 
 Por la ley de Little, $L = \lambda \cdot W = 20 \times 3 = 60$ hilos ocupados en promedio. Con un pool de 40 hilos el servicio no puede sostener la demanda: los 40 hilos quedan ocupados todo el tiempo y los pedidos sobrantes se acumulan en una cola, de modo que la latencia que ve el cliente crece sin límite mientras la del servidor parece estable (la diferencia es el tiempo en cola). La tasa máxima sostenible es $\lambda_{\max} = L_{\max} / W = 40 / 3 \approx 13{,}3$ pedidos por segundo.
 
 Las salidas posibles son reducir $W$ (un \emph{timeout} que corte la espera a una dependencia lenta, si esa es la causa), aumentar el pool (si el recurso que limita son los hilos y no otra cosa) o rechazar a tiempo el exceso (\emph{load shedding}). Agregar CPU no ayuda si los hilos están esperando E/S.
-\end{uaanswer}
-
-\begin{uaexercise}
-Un servicio está saturado (todos sus hilos ocupados, latencia del cliente en aumento), pero el panel de CPU muestra una utilización del 15\,\%. Explique cómo es posible y qué métricas usaría para detectar la saturación.
-\end{uaexercise}
-\begin{uaanswer}
-Los hilos están bloqueados esperando entrada/salida (la respuesta de una dependencia lenta, una conexión de un pool agotado), no calculando: un hilo bloqueado ocupa un lugar del pool pero no consume CPU. El proceso está vivo y ``ocioso'' desde el punto de vista del procesador, pero no puede atender pedidos nuevos.
-
-La saturación debe medirse sobre el recurso que se agota: hilos ocupados contra tamaño del pool (pedidos en vuelo), longitud de la cola de pedidos pendientes, y la diferencia entre la latencia vista por el cliente y la registrada por el servidor (que estima el tiempo en cola). El aumento de latencia es el indicador adelantado de saturación visto en la clase 10.
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -481,15 +382,6 @@ Un pedido del usuario atraviesa tres capas, A $\to$ B $\to$ C, y cada capa hace 
 Los intentos se multiplican: $3 \times 3 \times 3 = 27$ llamadas a C por cada pedido del usuario, justo cuando C no puede atender ninguna.
 
 Con un presupuesto por cliente del 10\,\%, cada capa deja de reintentar en cuanto sus reintentos superan el 10\,\% de sus pedidos. Si C está caída, todas las llamadas fallan, la proporción de reintentos llega enseguida al límite y cada capa pasa a multiplicar su carga por a lo sumo $\approx 1{,}1$; en las tres capas, $1{,}1^3 \approx 1{,}33$ en lugar de 27. Los errores se propagan hacia arriba en lugar de convertirse en carga, que es lo correcto cuando la falla no es transitoria. Además conviene decidir en qué capa se reintenta, en vez de hacerlo en todas.
-\end{uaanswer}
-
-\begin{uaexercise}
-Un servicio desplegado en tres regiones activa \emph{load shedding}: cuando la CPU de una región supera un umbral, sus servidores rechazan una fracción creciente de los pedidos. El balanceador global reparte el tráfico según la CPU por pedido de cada región. ¿Qué puede ocurrir? ¿Cómo se corrige?
-\end{uaexercise}
-\begin{uaanswer}
-Es el caso Dressy del \emph{SRE Workbook} (cap.~11). La región que primero alcanza el umbral empieza a rechazar pedidos; los rechazos casi no consumen CPU, así que la CPU por pedido de esa región baja y el balanceador la ve como la más eficiente. Le manda más tráfico, la región rechaza más, parece todavía más eficiente, y el ciclo continúa: una región recibe casi todo el tráfico y responde mayormente errores, mientras las otras quedan casi vacías.
-
-La corrección es que el balanceador sepa que esos pedidos ``baratos'' son errores, por ejemplo contando cada rechazo como más del 100\,\% de CPU, de modo que la región que rechaza parezca sobrecargada y el tráfico se reparta. La lección general es configurar y evaluar los mecanismos de control de carga juntos, no por separado.
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -582,25 +474,6 @@ Escenario \texttt{latency 2000}. Al pasar de \texttt{00} a \texttt{01-timeout-on
 \end{uaanswer}
 
 \begin{uaexercise}
-Escenario \texttt{errors 0.1}: se corta la conexión en el 10\,\% de las llamadas a \texttt{special}. Se aplican, en orden, \texttt{00} (sin protección), \texttt{02} (\emph{timeout} y 3 reintentos inmediatos) y \texttt{03} (\emph{timeout} y 2 reintentos con \emph{backoff} y \emph{jitter}). En la línea de base, cada pedido hace en promedio 4,9 llamadas a \texttt{special}. Lo medido: falla el 36,8\,\% de los pedidos con \texttt{00}, el 0,14\,\% con \texttt{02} y el 0,55\,\% con \texttt{03}. Con reintentos, cada pedido hace 5,4 llamadas a \texttt{special}; sin protección, 3,9.
-\capturademo{s2-0203-error-rate.png}{Experimento: reintentos contra 10\,\% de errores}\capturademo{s2-0203-amplification.png}{Experimento: el costo de los reintentos}
-\begin{enumerate}
-\item Calcule qué proporción de los pedidos debería fallar con \texttt{03} y compárela con la medida.
-\item Cada ventana tuvo unos 750 pedidos. ¿A cuántos pedidos corresponde el 0,14\,\% de \texttt{02}? ¿Qué se puede concluir de la comparación entre \texttt{02} y \texttt{03}?
-\item Explique las 5,4 llamadas por pedido con reintentos y las 3,9 sin protección.
-\item Entre \texttt{02} y \texttt{03} no se ve diferencia en la carga. ¿Contradice lo que se dijo sobre el \emph{jitter}?
-\end{enumerate}
-\end{uaexercise}
-\begin{uaanswer}
-\begin{enumerate}
-\item Con 2 reintentos, una llamada falla solo si fallan los 3 intentos: $p^3 = 0{,}1^3 = 0{,}1\,\%$. El pedido falla con $1 - 0{,}999^{4{,}9} \approx 0{,}49\,\%$. Lo medido, 0,55\,\%, está muy cerca.
-\item $0{,}0014 \times 750 \approx 1$: es un pedido. La cuenta para \texttt{02} ($p^4 = 0{,}01\,\%$ por llamada, $\approx 0{,}05\,\%$ por pedido) predice menos de medio pedido fallido en la ventana. Con tan pocos eventos, la diferencia entre 0,14\,\% y 0,55\,\% no permite comparar las dos políticas con precisión. Lo que sí muestra el experimento es el efecto grande: con cualquiera de las dos, la proporción de pedidos fallidos baja de cerca del 37\,\% a menos del 1\,\%.
-\item Con reintentos, cada llamada hace en promedio $1 + p + p^2 \approx 1{,}11$ intentos (algo más con 3 reintentos, $1{,}111$), porque el reintento solo ocurre cuando el intento anterior falla: $4{,}9 \times 1{,}11 \approx 5{,}4$. Sin protección, el pedido se corta en la primera llamada que falla, así que hace menos llamadas que las que hubiera hecho: con 5 llamadas serían en promedio $1 + 0{,}9 + 0{,}9^2 + 0{,}9^3 + 0{,}9^4 = (1 - 0{,}9^5)/0{,}1 \approx 4{,}1$. Se mide algo menos, 3,9, porque la cantidad de llamadas varía de pedido en pedido (por la misma razón, el 36,8\,\% medido queda algo por debajo del 40\,\% de la cuenta).
-\item No. El \emph{jitter} sirve para romper la sincronización entre muchos clientes que fallaron a la vez. En la demo hay un solo cliente, k6, a 5 pedidos por segundo: no hay sincronización que romper. Con 10\,\% de fallas, además, las esperas del \emph{backoff} casi no pesan. La diferencia se vería con muchos clientes y con una falla que los afecte a todos al mismo tiempo.
-\end{enumerate}
-\end{uaanswer}
-
-\begin{uaexercise}
 Escenario \texttt{latency 2000}. Con \texttt{06-complete} el 98\,\% de los pedidos sale degradado (amarillo) y no hay errores. Al pasar a \texttt{07-cb-no-fallback}, el \emph{breaker} se abre igual, pero el 98\,\% de los pedidos sale como error (rojo). Con \texttt{07}, la latencia media del servidor es de 85\,ms; con \texttt{01-timeout-only}, que también daba un 98\,\% de errores, era de 198\,ms.
 \capturademo{s1-07-outcomes.png}{Experimento: el mismo breaker, sin fallback}
 \begin{enumerate}
@@ -630,7 +503,7 @@ Escenario \texttt{errors 0.1}, ahora sin reintentos. Con \texttt{04-cb-consecuti
 \item A 21 llamadas por segundo, una racha cada $1110 / 21 \approx 53$\,s, cerca de un minuto. Como el \emph{breaker} pasó unos $5 \times 10 = 50$\,s abierto, estuvo cerrado unos 160\,s, en los que se esperan unas 3 rachas; se observaron 5. Es el mismo orden de magnitud: con tan pocos eventos la variación es grande, y la cuenta supone fallas independientes. Lo importante es la conclusión: un 10\,\% de errores que el sistema toleraba abre el \emph{breaker} cada pocas decenas de segundos.
 \item Porque en la demo el \emph{fallback} actúa ante \emph{cualquier} llamada que falla, no solo con el \emph{breaker} abierto. Sin reintentos, todo pedido con alguna conexión cortada sale degradado: $1 - 0{,}9^{4{,}9} \approx 40\,\%$, cerca del 38\,\% medido (algo menos porque la cantidad de llamadas varía de pedido en pedido).
 \item \texttt{05} sirve de comparación: el mismo escenario, sin aperturas, degrada el 38\,\%. La diferencia, unos 15 puntos, es el efecto de las aperturas. Se puede estimar: el \emph{breaker} estuvo abierto unos 50 de 210\,s ($\approx 24\,\%$ del tiempo); en ese lapso se degradan todos los pedidos, incluido el $\approx 60\,\%$ que habría salido bien. Eso agrega $0{,}24 \times 0{,}6 \approx 14$ puntos: $38 + 14 \approx 52\,\%$, coherente con lo medido.
-\item Un 10\,\% de fallas transitorias es justamente lo que recuperan los reintentos: en el ejercicio anterior, con 2 reintentos con \emph{backoff} y \emph{jitter}, falló solo el 0,55\,\% de los pedidos. Lo razonable es combinar reintentos acotados por un presupuesto con un \emph{breaker} por tasa en ventana, que no se dispara con el 10\,\% y sí detecta una dependencia realmente enferma, y un \emph{fallback} para lo que no se recupera. Es lo que hace el preset \texttt{06}.
+\item Un 10\,\% de fallas transitorias es justamente lo que recuperan los reintentos: en la misma corrida, con el preset \texttt{03} (slide ``Experimento: reintentos contra 10\,\% de errores''), con 2 reintentos con \emph{backoff} y \emph{jitter}, falló solo el 0,55\,\% de los pedidos. Lo razonable es combinar reintentos acotados por un presupuesto con un \emph{breaker} por tasa en ventana, que no se dispara con el 10\,\% y sí detecta una dependencia realmente enferma, y un \emph{fallback} para lo que no se recupera. Es lo que hace el preset \texttt{06}.
 \end{enumerate}
 \end{uaanswer}
 
@@ -646,21 +519,6 @@ Escenario \texttt{errors 0.5}. Se aplican, en orden, \texttt{04} ($k = 3$), \tex
 \begin{enumerate}
 \item A 20 llamadas por segundo, $2046 / 20 \approx 102$\,s, algo menos de dos minutos. Se observaron más de dos minutos: el mismo orden. $E$ es un promedio, y la primera racha de 10 fallas puede tardar bastante más. Mientras tanto, la mitad de las llamadas falla y cada una espera su resultado: 1867 llamadas fallidas, contra 31 con \texttt{04} o \texttt{05}.
 \item Es el dilema de las fallas consecutivas, medido. Con $k = 3$ el \emph{breaker} detecta rápido el 50\,\%, pero se dispara sin motivo con el 10\,\% (5 aperturas en 210\,s). Con $k = 10$ tolera el 10\,\%, pero tarda minutos en detectar el 50\,\%. Ningún $k$ sirve para las dos cosas, porque las fallas consecutivas mezclan la tasa de error con el volumen de tráfico. La tasa en ventana (\texttt{05}) resuelve las dos: no abre con el 10\,\% y abre tan rápido como $k = 3$ con el 50\,\%.
-\end{enumerate}
-\end{uaanswer}
-
-\begin{uaexercise}
-Escenario \texttt{intermittent fast} con \texttt{06-complete}. El \emph{breaker} de \texttt{special} se abre en cada caída y se cierra cuando \texttt{special} vuelve. Hubo 0 errores y salió degradado el 49\,\% de los pedidos.
-\capturademo{s3-06-breaker.png}{Experimento: caída intermitente}
-\begin{enumerate}
-\item ¿Por qué no hubo errores? ¿Por qué salió degradada cerca de la mitad de los pedidos?
-\item El panel no muestra nunca el estado \emph{half-open}. ¿Significa que no ocurrió? ¿Qué enseña sobre la observabilidad de los \emph{breakers}?
-\end{enumerate}
-\end{uaexercise}
-\begin{uaanswer}
-\begin{enumerate}
-\item Porque toda llamada a \texttt{special} que falla, sea por un error de conexión o por un rechazo del \emph{breaker} abierto, va al \emph{fallback}: el pedido sale degradado, no con error. \texttt{special} está caída 20 de cada 40\,s, la mitad del tiempo, y durante las caídas los pedidos se degradan: de ahí el 49\,\%. Cuando \texttt{special} vuelve, el \emph{breaker} pasa por \emph{half-open}, la prueba tiene éxito y los pedidos vuelven a salir completos.
-\item No. El estado \emph{half-open} dura lo que tarda una llamada de prueba, milisegundos, y Prometheus toma una muestra del estado cada 5\,s: entre dos muestras, el \emph{breaker} pasa por \emph{half-open} y sale. El contador de transiciones del \emph{breaker} sí registra esos pasos. La lección es que el estado actual no alcanza: hay que registrar siempre los cambios de estado y graficar su frecuencia, que es además un indicador adelantado de problemas (Nygard, cap.~5). Un panel que muestrea un estado puede ocultar justamente las transiciones rápidas.
 \end{enumerate}
 \end{uaanswer}
 
