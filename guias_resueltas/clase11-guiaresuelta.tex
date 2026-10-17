@@ -232,4 +232,136 @@ La idempotencia separa intentos físicos de una operación lógica. Se usa una c
 La evidencia apropiada sería curvas de carga, colas, breaker state y degradación del camino crítico. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
 \end{uaanswer}
 
+\section{Nivel 5: cálculo y casos integradores}
+\begin{uaexercise}
+Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 segundos. Usando la ley de Little, calcule cuántos hilos necesita para sostener esa tasa. Si el pool tiene 40 hilos, ¿qué ocurre y qué tasa puede sostener como máximo?
+\end{uaexercise}
+\begin{uaanswer}
+Por la ley de Little, $L = \lambda \cdot W = 20 \times 3 = 60$ hilos ocupados en promedio. Con un pool de 40 hilos el servicio no puede sostener la demanda: los 40 hilos quedan ocupados todo el tiempo y los pedidos sobrantes se acumulan en una cola, de modo que la latencia que ve el cliente crece sin límite mientras la del servidor parece estable (la diferencia es el tiempo en cola). La tasa máxima sostenible es $\lambda_{\max} = L_{\max} / W = 40 / 3 \approx 13{,}3$ pedidos por segundo.
+
+Las salidas posibles son reducir $W$ (un \emph{timeout} que corte la espera a una dependencia lenta, si esa es la causa), aumentar el pool (si el recurso que limita son los hilos y no otra cosa) o rechazar a tiempo el exceso (\emph{load shedding}). Agregar CPU no ayuda si los hilos están esperando E/S.
+\end{uaanswer}
+
+\begin{uaexercise}
+Un servicio está saturado (todos sus hilos ocupados, latencia del cliente en aumento), pero el panel de CPU muestra una utilización del 15\,\%. Explique cómo es posible y qué métricas usaría para detectar la saturación.
+\end{uaexercise}
+\begin{uaanswer}
+Los hilos están bloqueados esperando entrada/salida (la respuesta de una dependencia lenta, una conexión de un pool agotado), no calculando: un hilo bloqueado ocupa un lugar del pool pero no consume CPU. El proceso está vivo y ``ocioso'' desde el punto de vista del procesador, pero no puede atender pedidos nuevos.
+
+La saturación debe medirse sobre el recurso que se agota: hilos ocupados contra tamaño del pool (pedidos en vuelo), longitud de la cola de pedidos pendientes, y la diferencia entre la latencia vista por el cliente y la registrada por el servidor (que estima el tiempo en cola). El aumento de latencia es el indicador adelantado de saturación visto en la clase 10.
+\end{uaanswer}
+
+\begin{uaexercise}
+El servicio A llama a B y B llama internamente a C. El percentil 99 de B, medido desde A en condiciones normales, es de 150\,ms.
+\begin{enumerate}
+\item ¿Ese percentil incluye el tiempo que B espera a C? ¿Qué no incluye?
+\item B tiene hacia C un \emph{timeout} de 300\,ms y hasta 2 reintentos, con esperas de 100\,ms y 200\,ms. ¿Cuánto puede tardar B, en el peor caso, solo por la llamada a C?
+\item Si A usa hacia B un \emph{timeout} de 200\,ms (el p99 más un margen), ¿qué ocurre cuando C falla? ¿Qué propone?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Sí: medido desde A, el p99 de B incluye todo lo que B tarda, incluida su consulta a C, la red y el encolamiento, en condiciones normales. No incluye el \textbf{peor caso interno}: cuando C falla, B espera sus \emph{timeouts} completos y reintenta, cosas que casi no ocurren en la línea de base.
+\item $T_{\max} = (1 + r)\cdot t + \sum e_i = 3 \times 300 + (100 + 200) = 1200$\,ms, sin contar el procesamiento propio de B.
+\item A abandona a los 200\,ms mientras B sigue esperando o reintentando contra C hasta 1200\,ms: A cuenta una falla, y B gasta recursos (hilos, intentos contra C) en una respuesta que nadie va a recibir. Si A además reintenta, multiplica la carga sobre B y C. Hay que hacer caber los plazos internos en los externos: bajar el presupuesto interno de B (menos reintentos, \emph{timeout} menor hacia C, o un \emph{breaker} que corte rápido) para que su peor caso quede por debajo del \emph{timeout} de A, o, si la operación lo justifica, subir el de A. Medir el p99 alcanza para fijar el valor de partida; conocer la cadena sirve para verificar que los presupuestos encajan.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Cada pedido de un servicio hace 5 llamadas independientes a una dependencia, y cada llamada falla con probabilidad 10\,\%.
+\begin{enumerate}
+\item ¿Qué proporción de los pedidos falla?
+\item Si cada llamada se reintenta una vez, ¿qué proporción de los pedidos falla?
+\item ¿Cuántos intentos hace en promedio cada pedido con ese reintento? ¿Qué pasa con ese número si la dependencia está caída?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item $1 - 0{,}9^5 = 1 - 0{,}59 \approx 41\,\%$.
+\item Una llamada solo falla si fallan los dos intentos: $0{,}1 \times 0{,}1 = 1\,\%$. El pedido falla con $1 - 0{,}99^5 \approx 4{,}9\,\%$.
+\item Cada llamada hace en promedio $1 + p = 1{,}1$ intentos (el reintento ocurre solo cuando el primero falla): $5 \times 1{,}1 = 5{,}5$ intentos por pedido. Si la dependencia está caída, $p \approx 1$ y cada llamada hace los 2 intentos: 10 intentos por pedido, el doble de carga sobre una dependencia que no puede atenderla.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Un cliente usa \emph{backoff} exponencial y, para su segundo reintento, la espera nominal es de 400\,ms. Indique entre qué valores puede quedar la espera con \emph{full jitter} y con \emph{equal jitter}, y explique la ventaja de cada variante.
+\end{uaexercise}
+\begin{uaanswer}
+Con \emph{full jitter}, $e \sim U(0, 400)$: cualquier valor entre 0 y 400\,ms. Con \emph{equal jitter}, $e = 200 + U(0, 200)$: entre 200 y 400\,ms.
+
+\emph{Full jitter} dispersa más los reintentos de muchos clientes que fallaron a la vez, lo que reduce los picos sincronizados; a cambio, algún cliente puede reintentar casi de inmediato. \emph{Equal jitter} garantiza una espera mínima de la mitad del retardo, a costa de dispersar en un intervalo más chico. En ambos casos el efecto solo se nota cuando hay muchos clientes: con pocos no hay sincronización que romper.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué un \emph{circuit breaker} no sirve sin \emph{timeouts}.
+\end{uaexercise}
+\begin{uaanswer}
+El \emph{breaker} decide con el resultado de las llamadas que terminan: registra un éxito o una falla cuando la llamada vuelve. Una llamada a una dependencia colgada, sin \emph{timeout}, no vuelve nunca, de modo que el \emph{breaker} no registra ninguna falla y no abre. Mientras tanto, cada llamada colgada retiene un hilo, y el pool se agota antes de que el \emph{breaker} se entere. La falla lenta, que es la más peligrosa, queda invisible. El \emph{timeout} es lo que convierte la falla lenta en una falla registrable.
+\end{uaanswer}
+
+\begin{uaexercise}
+Un \emph{circuit breaker} por fallas consecutivas está configurado con $k = 3$ y permanece abierto 10\,s cada vez. La dependencia tiene una tasa de error normal del 10\,\% y recibe 100 llamadas por segundo. ¿Cada cuánto abre en promedio? ¿Qué fracción del tiempo está abierto? ¿Es aceptable?
+\end{uaexercise}
+\begin{uaanswer}
+El número esperado de llamadas hasta ver 3 fallas seguidas con $p = 0{,}1$ es $E = (1 - p^3)/((1 - p)\,p^3) = 0{,}999 / 0{,}0009 \approx 1110$. A 100 llamadas por segundo, abre en promedio cada $\approx 11{,}1$\,s. Cada ciclo dura unos $11{,}1 + 10 = 21{,}1$\,s, de los cuales está abierto 10: cerca del 47\,\% del tiempo.
+
+No es aceptable: durante casi la mitad del tiempo se degrada el 100\,\% del tráfico hacia una dependencia que funcionaba normalmente (un 10\,\% de error era su comportamiento habitual). El problema es que la política mezcla tasa de error con volumen: con el mismo $k$ y menos tráfico, abriría mucho menos seguido.
+\end{uaanswer}
+
+\begin{uaexercise}
+Explique por qué ningún valor de $k$ en un \emph{breaker} por fallas consecutivas permite a la vez tolerar un 10\,\% de errores y detectar rápido un 50\,\%. ¿Qué resuelve un \emph{breaker} por tasa de fallas en ventana y qué nuevo compromiso introduce?
+\end{uaexercise}
+\begin{uaanswer}
+Con $k = 3$ se detecta un 50\,\% en unas 14 llamadas, pero un 10\,\% produce rachas de 3 fallas cada $\approx 1110$ llamadas, que a alto tráfico ocurren cada pocos segundos. Con $k = 10$ un 10\,\% prácticamente nunca produce una racha, pero un 50\,\% necesita $\approx 2046$ llamadas. Las rachas dependen de la tasa \emph{y} del volumen: a más tráfico, más rachas por unidad de tiempo con la misma tasa.
+
+El \emph{breaker} por ventana mide la proporción de fallas sobre las últimas $N$ llamadas y abre cuando supera un umbral, una vez alcanzado un mínimo de llamadas. Mide la tasa directamente, sin importar el volumen: con 10\,\% no abre y con 50\,\% abre apenas junta el mínimo. El compromiso pasa al tamaño de la ventana y al mínimo: una ventana chica reacciona rápido pero es ruidosa (falsos positivos cerca del umbral); una grande es estable pero lenta, y el mínimo impide decidir en las primeras llamadas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Un pedido del usuario atraviesa tres capas, A $\to$ B $\to$ C, y cada capa hace hasta 3 intentos (2 reintentos) hacia la siguiente. ¿Cuántas llamadas puede recibir C por cada pedido si C está caída? ¿Cómo cambiaría con un presupuesto de reintentos por cliente que solo permita reintentar mientras los reintentos sean menos del 10\,\% de los pedidos?
+\end{uaexercise}
+\begin{uaanswer}
+Los intentos se multiplican: $3 \times 3 \times 3 = 27$ llamadas a C por cada pedido del usuario, justo cuando C no puede atender ninguna.
+
+Con un presupuesto por cliente del 10\,\%, cada capa deja de reintentar en cuanto sus reintentos superan el 10\,\% de sus pedidos. Si C está caída, todas las llamadas fallan, la proporción de reintentos llega enseguida al límite y cada capa pasa a multiplicar su carga por a lo sumo $\approx 1{,}1$; en las tres capas, $1{,}1^3 \approx 1{,}33$ en lugar de 27. Los errores se propagan hacia arriba en lugar de convertirse en carga, que es lo correcto cuando la falla no es transitoria. Además conviene decidir en qué capa se reintenta, en vez de hacerlo en todas.
+\end{uaanswer}
+
+\begin{uaexercise}
+Un servicio desplegado en tres regiones activa \emph{load shedding}: cuando la CPU de una región supera un umbral, sus servidores rechazan una fracción creciente de los pedidos. El balanceador global reparte el tráfico según la CPU por pedido de cada región. ¿Qué puede ocurrir? ¿Cómo se corrige?
+\end{uaexercise}
+\begin{uaanswer}
+Es el caso Dressy del \emph{SRE Workbook} (cap.~11). La región que primero alcanza el umbral empieza a rechazar pedidos; los rechazos casi no consumen CPU, así que la CPU por pedido de esa región baja y el balanceador la ve como la más eficiente. Le manda más tráfico, la región rechaza más, parece todavía más eficiente, y el ciclo continúa: una región recibe casi todo el tráfico y responde mayormente errores, mientras las otras quedan casi vacías.
+
+La corrección es que el balanceador sepa que esos pedidos ``baratos'' son errores, por ejemplo contando cada rechazo como más del 100\,\% de CPU, de modo que la región que rechaza parezca sobrecargada y el tráfico se reparta. La lección general es configurar y evaluar los mecanismos de control de carga juntos, no por separado.
+\end{uaanswer}
+
+\begin{uaexercise}
+Un servicio atiende con un pool de 8 hilos y usa un \emph{circuit breaker} cuya implementación, en estado \emph{half-open}, deja pasar todas las llamadas. ¿Qué puede salir mal cuando el \emph{breaker} pasa a \emph{half-open} y la dependencia todavía no se recuperó? ¿Qué configuración lo evita?
+\end{uaexercise}
+\begin{uaanswer}
+Al pasar a \emph{half-open}, los 8 hilos pueden lanzar a la vez una llamada ``de prueba''. Si la dependencia sigue mal, los 8 quedan esperando hasta su \emph{timeout}: durante ese lapso el servicio no atiende nada más, y la dependencia recibe una ráfaga justo cuando intenta recuperarse, lo que puede volver a tumbarla. El \emph{breaker} vuelve a abrir con la primera falla, pero las demás pruebas ya están en curso.
+
+Se evita limitando las pruebas simultáneas en \emph{half-open} (por ejemplo, a una): las demás llamadas se siguen rechazando hasta conocer el resultado de la prueba. Exigir varios éxitos para cerrar reduce además el riesgo de cerrar y volver a abrir en bucle.
+\end{uaanswer}
+
+\begin{uaexercise}
+\textbf{Caso integrador.} Un servicio de \emph{checkout} recibe 10 pedidos por segundo con un pool de 20 hilos. Para confirmar cada compra llama una vez a un servicio de pagos que, normalmente, responde en 200\,ms, pero hoy tarda 8\,s sin dejar de responder. Analice el caso siguiendo estos pasos:
+\begin{enumerate}
+\item Calcule con la ley de Little cuántos hilos hacen falta hoy y si el pool alcanza.
+\item Proponga un \emph{timeout} para la llamada de pago y explique el costo de equivocarse en cada sentido.
+\item ¿Se puede reintentar el cobro? ¿Bajo qué condición?
+\item Elija la política del \emph{circuit breaker} y su alcance.
+\item Decida qué respuesta recibe el cliente cuando el pago no se puede confirmar. ¿Es aceptable degradar? ¿Cuándo conviene fallar explícitamente?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Hoy $L = 10 \times 8 = 80$ hilos contra 20 disponibles: el pool satura y la tasa sostenible es $20/8 = 2{,}5$ pedidos por segundo. En condiciones normales, $L = 10 \times 0{,}2 = 2$ hilos. Ningún pago ``se cayó'': alcanza con la lentitud.
+\item El \emph{timeout} sale de la distribución normal de la dependencia: el p99 de la línea de base medido desde el \emph{checkout}, más un margen (por ejemplo, si el p99 es 400\,ms, algo como 600--800\,ms). Demasiado corto: cobros normales cortados, con riesgo de que el cobro se haya hecho igual y el cliente vea un error. Demasiado largo: hilos retenidos y saturación, que es lo que pasa hoy.
+\item Solo si la operación es idempotente: el cobro debe llevar una clave de idempotencia para que un reintento no cobre dos veces (clase 02). Aun así, con el pago lento por sobrecarga, reintentar suma carga; conviene a lo sumo un reintento, con \emph{backoff} y \emph{jitter}, y dentro de un presupuesto.
+\item Un \emph{breaker} por tasa de fallas en ventana (no por fallas consecutivas, que dependería del volumen), con umbral de llamadas lentas para que la lentitud también lo abra; uno por dependencia y por proceso; con un tiempo abierto acorde a cuánto suele tardar el proveedor en recuperarse y una prueba a la vez en \emph{half-open}.
+\item No es aceptable confirmar como pagada una compra cuyo cobro no se verificó. Son razonables dos opciones: fallar explícitamente y rápido (``no pudimos procesar el pago, intente más tarde''), o tomar la orden como \emph{pendiente de pago} y avisar al cliente que se confirmará después, si el negocio acepta ese riesgo. La degradación es aceptable mientras sea explícita y no presente como hecho algo que no ocurrió; la decisión es de producto, no técnica.
+\end{enumerate}
+\end{uaanswer}
+
 \end{document}

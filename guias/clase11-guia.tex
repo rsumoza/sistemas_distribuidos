@@ -103,4 +103,71 @@ Explique qué riesgos aparecen si la degradación no es explícita y semánticam
 \end{uaexercise}
 
 
+\section{Nivel 5: cálculo y casos integradores}
+\begin{uaexercise}
+Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 segundos. Usando la ley de Little, calcule cuántos hilos necesita para sostener esa tasa. Si el pool tiene 40 hilos, ¿qué ocurre y qué tasa puede sostener como máximo?
+\end{uaexercise}
+
+\begin{uaexercise}
+Un servicio está saturado (todos sus hilos ocupados, latencia del cliente en aumento), pero el panel de CPU muestra una utilización del 15\,\%. Explique cómo es posible y qué métricas usaría para detectar la saturación.
+\end{uaexercise}
+
+\begin{uaexercise}
+El servicio A llama a B y B llama internamente a C. El percentil 99 de B, medido desde A en condiciones normales, es de 150\,ms.
+\begin{enumerate}
+\item ¿Ese percentil incluye el tiempo que B espera a C? ¿Qué no incluye?
+\item B tiene hacia C un \emph{timeout} de 300\,ms y hasta 2 reintentos, con esperas de 100\,ms y 200\,ms. ¿Cuánto puede tardar B, en el peor caso, solo por la llamada a C?
+\item Si A usa hacia B un \emph{timeout} de 200\,ms (el p99 más un margen), ¿qué ocurre cuando C falla? ¿Qué propone?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Cada pedido de un servicio hace 5 llamadas independientes a una dependencia, y cada llamada falla con probabilidad 10\,\%.
+\begin{enumerate}
+\item ¿Qué proporción de los pedidos falla?
+\item Si cada llamada se reintenta una vez, ¿qué proporción de los pedidos falla?
+\item ¿Cuántos intentos hace en promedio cada pedido con ese reintento? ¿Qué pasa con ese número si la dependencia está caída?
+\end{enumerate}
+\end{uaexercise}
+
+\begin{uaexercise}
+Un cliente usa \emph{backoff} exponencial y, para su segundo reintento, la espera nominal es de 400\,ms. Indique entre qué valores puede quedar la espera con \emph{full jitter} y con \emph{equal jitter}, y explique la ventaja de cada variante.
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué un \emph{circuit breaker} no sirve sin \emph{timeouts}.
+\end{uaexercise}
+
+\begin{uaexercise}
+Un \emph{circuit breaker} por fallas consecutivas está configurado con $k = 3$ y permanece abierto 10\,s cada vez. La dependencia tiene una tasa de error normal del 10\,\% y recibe 100 llamadas por segundo. ¿Cada cuánto abre en promedio? ¿Qué fracción del tiempo está abierto? ¿Es aceptable?
+\end{uaexercise}
+
+\begin{uaexercise}
+Explique por qué ningún valor de $k$ en un \emph{breaker} por fallas consecutivas permite a la vez tolerar un 10\,\% de errores y detectar rápido un 50\,\%. ¿Qué resuelve un \emph{breaker} por tasa de fallas en ventana y qué nuevo compromiso introduce?
+\end{uaexercise}
+
+\begin{uaexercise}
+Un pedido del usuario atraviesa tres capas, A $\to$ B $\to$ C, y cada capa hace hasta 3 intentos (2 reintentos) hacia la siguiente. ¿Cuántas llamadas puede recibir C por cada pedido si C está caída? ¿Cómo cambiaría con un presupuesto de reintentos por cliente que solo permita reintentar mientras los reintentos sean menos del 10\,\% de los pedidos?
+\end{uaexercise}
+
+\begin{uaexercise}
+Un servicio desplegado en tres regiones activa \emph{load shedding}: cuando la CPU de una región supera un umbral, sus servidores rechazan una fracción creciente de los pedidos. El balanceador global reparte el tráfico según la CPU por pedido de cada región. ¿Qué puede ocurrir? ¿Cómo se corrige?
+\end{uaexercise}
+
+\begin{uaexercise}
+Un servicio atiende con un pool de 8 hilos y usa un \emph{circuit breaker} cuya implementación, en estado \emph{half-open}, deja pasar todas las llamadas. ¿Qué puede salir mal cuando el \emph{breaker} pasa a \emph{half-open} y la dependencia todavía no se recuperó? ¿Qué configuración lo evita?
+\end{uaexercise}
+
+\begin{uaexercise}
+\textbf{Caso integrador.} Un servicio de \emph{checkout} recibe 10 pedidos por segundo con un pool de 20 hilos. Para confirmar cada compra llama una vez a un servicio de pagos que, normalmente, responde en 200\,ms, pero hoy tarda 8\,s sin dejar de responder. Analice el caso siguiendo estos pasos:
+\begin{enumerate}
+\item Calcule con la ley de Little cuántos hilos hacen falta hoy y si el pool alcanza.
+\item Proponga un \emph{timeout} para la llamada de pago y explique el costo de equivocarse en cada sentido.
+\item ¿Se puede reintentar el cobro? ¿Bajo qué condición?
+\item Elija la política del \emph{circuit breaker} y su alcance.
+\item Decida qué respuesta recibe el cliente cuando el pago no se puede confirmar. ¿Es aceptable degradar? ¿Cuándo conviene fallar explícitamente?
+\end{enumerate}
+\end{uaexercise}
+
+
 \end{document}
