@@ -1,0 +1,345 @@
+Mediciones de la corrida de la demo de la clase 11 (2026-10-17), una ventana por experimento.
+Cada valor se mide en Prometheus sobre la ventana del experimento sin sus primeros 30 s. RATE=5, GEN_THREADS=8.
+
+## e0-baseline  (240 s, measured last 210 s)
+  requests by outcome: outcome=ok: 1053.685
+  special calls by outcome: outcome=ok: 5162.544
+  special calls per request: -: 4.900
+  retries by dependency: (none)
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 3.000
+  avg in flight: -: 1.452
+  server mean latency s: -: 0.236
+  server p99 s: -: 0.500
+  k6 responses by status: status=200: 1053.589
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.765
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.297
+  special attempt p99 s: -: 0.036
+
+## s1-00-latency  (240 s, measured last 210 s)
+  requests by outcome: outcome=ok: 163.037
+  special calls by outcome: outcome=ok: 820.312
+  special calls per request: -: 5.031
+  retries by dependency: (none)
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 8.000
+  avg in flight: -: 8.000
+  server mean latency s: -: 10.438
+  server p99 s: -: 10.000
+  k6 responses by status: status=0: 1042.834
+  k6 dropped iterations: -: 4.536
+  k6 p99 max: -: 10.003
+  k6 max VUs: -: 50.000
+  generator cpu cores avg: -: 0.059
+  special attempt p99 s: -: 4.970
+
+## s1-01-timeout  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 21.167; outcome=error: 969.660
+  special calls by outcome: outcome=ok: 0.000; outcome=timeout: 969.660
+  special calls per request: -: 0.979
+  retries by dependency: (none)
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 7.000
+  avg in flight: -: 1.548
+  server mean latency s: -: 0.198
+  server p99 s: -: 0.487
+  k6 responses by status: status=200: 17.080; status=0: 44.478; status=500: 755.929
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 10.003
+  k6 max VUs: -: 50.000
+  generator cpu cores avg: -: 0.240
+  special attempt p99 s: -: 0.248
+
+## s1-06-complete  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 12.533; outcome=error: 0.000; outcome=degraded: 743.634
+  special calls by outcome: outcome=ok: 0.000; outcome=timeout: 14.622; outcome=rejected_open: 2320.724
+  special calls per request: -: 3.088
+  retries by dependency: dependency=special: 14.622
+  breaker transitions: circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 14.622; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 14.622
+  breaker rejections: circuit_breaker=generator-special,reason=open: 2308.190; circuit_breaker=generator-special,reason=half_open_full: 12.533
+  max in flight: -: 2.000
+  avg in flight: -: 1.400
+  server mean latency s: -: 0.250
+  server p99 s: -: 0.499
+  k6 responses by status: status=200: 755.989
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.672
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.296
+  special attempt p99 s: -: 0.248
+
+## s1-07-nofallback  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 14.578; outcome=error: 741.389; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 0.000; outcome=timeout: 14.578; outcome=rejected_open: 726.811
+  special calls per request: -: 0.981
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 14.578; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 14.578
+  breaker rejections: circuit_breaker=generator-special,reason=open: 725.770; circuit_breaker=generator-special,reason=half_open_full: 1.041
+  max in flight: -: 1.000
+  avg in flight: -: 0.433
+  server mean latency s: -: 0.085
+  server p99 s: -: 0.318
+  k6 responses by status: status=200: 14.444; status=500: 741.021
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 8.307
+  k6 max VUs: -: 1.000
+  generator cpu cores avg: -: 0.141
+  special attempt p99 s: -: 0.248
+
+## s2-00-err10  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 477.232; outcome=error: 277.882; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 2654.983; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 277.882
+  special calls per request: -: 3.884
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 2.000
+  avg in flight: -: 1.194
+  server mean latency s: -: 0.193
+  server p99 s: -: 0.491
+  k6 responses by status: status=200: 477.465; status=500: 277.935
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 7.091
+  k6 max VUs: -: 1.000
+  generator cpu cores avg: -: 0.244
+  special attempt p99 s: -: 0.025
+
+## s2-02-naive  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 753.067; outcome=error: 1.042; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 3678.886; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 408.302
+  special calls per request: -: 5.420
+  retries by dependency: dependency=special: 407.261
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 2.000
+  avg in flight: -: 1.500
+  server mean latency s: -: 0.245
+  server p99 s: -: 0.497
+  k6 responses by status: status=200: 753.784
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 6.502
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.295
+  special attempt p99 s: -: 0.038
+
+## s2-03-jitter  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 751.259; outcome=error: 4.162; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 3737.566; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 390.197
+  special calls per request: -: 5.464
+  retries by dependency: dependency=special: 386.035
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 3.000
+  avg in flight: -: 1.467
+  server mean latency s: -: 0.264
+  server p99 s: -: 0.599
+  k6 responses by status: status=200: 749.849; status=500: 4.585
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 6.499
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.299
+  special attempt p99 s: -: 0.036
+
+## s2-04-err10  (240 s, measured last 210 s)
+  requests by outcome: outcome=ok: 491.737; outcome=error: 0.000; outcome=degraded: 565.146
+  special calls by outcome: outcome=ok: 3288.305; outcome=timeout: 0.000; outcome=rejected_open: 796.433; outcome=connection_error: 384.138
+  special calls per request: -: 4.228
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 5.028; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 5.028; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 1.006; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 4.022
+  breaker rejections: circuit_breaker=generator-special,reason=open: 795.428; circuit_breaker=generator-special,reason=half_open_full: 1.006
+  max in flight: -: 2.000
+  avg in flight: -: 1.279
+  server mean latency s: -: 0.256
+  server p99 s: -: 0.498
+  k6 responses by status: status=200: 1055.974
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.530
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.295
+  special attempt p99 s: -: 0.030
+
+## s2-05-err10  (180 s, measured last 150 s)
+  requests by outcome: outcome=ok: 467.196; outcome=error: 0.000; outcome=degraded: 284.470
+  special calls by outcome: outcome=ok: 3254.798; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 360.260
+  special calls per request: -: 4.809
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 2.000
+  avg in flight: -: 1.467
+  server mean latency s: -: 0.257
+  server p99 s: -: 0.500
+  k6 responses by status: status=200: 753.296
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.524
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.296
+  special attempt p99 s: -: 0.033
+
+## s2-04-err50  (120 s, measured last 90 s)
+  requests by outcome: outcome=ok: 5.313; outcome=error: 0.000; outcome=degraded: 446.313
+  special calls by outcome: outcome=ok: 28.692; outcome=timeout: 0.000; outcome=rejected_open: 1326.186; outcome=connection_error: 30.817
+  special calls per request: -: 3.068
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 6.376; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 8.501; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 2.125; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 6.376
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1324.061; circuit_breaker=generator-special,reason=half_open_full: 2.125
+  max in flight: -: 3.000
+  avg in flight: -: 1.389
+  server mean latency s: -: 0.260
+  server p99 s: -: 0.644
+  k6 responses by status: status=200: 452.039
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.523
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.288
+  special attempt p99 s: -: 0.024
+
+## s2-04b-err50  (240 s, measured last 210 s)
+  requests by outcome: outcome=ok: 78.995; outcome=error: 0.000; outcome=degraded: 971.534
+  special calls by outcome: outcome=ok: 1811.751; outcome=timeout: 0.000; outcome=rejected_open: 478.072; outcome=connection_error: 1867.150
+  special calls per request: -: 3.957
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 2.052; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 3.078; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 1.026; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 2.052
+  breaker rejections: circuit_breaker=generator-special,reason=open: 478.072
+  max in flight: -: 3.000
+  avg in flight: -: 1.571
+  server mean latency s: -: 0.281
+  server p99 s: -: 0.643
+  k6 responses by status: status=200: 1049.565
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.526
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.313
+  special attempt p99 s: -: 0.034
+
+## s2-05-err50  (120 s, measured last 90 s)
+  requests by outcome: outcome=ok: 2.118; outcome=error: 0.000; outcome=degraded: 447.882
+  special calls by outcome: outcome=ok: 21.176; outcome=timeout: 0.000; outcome=rejected_open: 1341.529; outcome=connection_error: 30.706
+  special calls per request: -: 3.096
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 2.118; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 9.529; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 7.412; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 2.118
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1341.529
+  max in flight: -: 2.000
+  avg in flight: -: 1.389
+  server mean latency s: -: 0.270
+  server p99 s: -: 0.598
+  k6 responses by status: status=200: 449.927
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.528
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.297
+  special attempt p99 s: -: 0.024
+
+## s3-06-intermittent  (200 s, measured last 170 s)
+  requests by outcome: outcome=ok: 437.124; outcome=error: 0.000; outcome=degraded: 414.443
+  special calls by outcome: outcome=ok: 2125.825; outcome=timeout: 0.000; outcome=rejected_open: 1313.434; outcome=connection_error: 45.362
+  special calls per request: -: 4.092
+  retries by dependency: dependency=special: 37.114
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 4.124; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 8.248; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 4.124; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 4.124
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1313.434
+  max in flight: -: 2.000
+  avg in flight: -: 1.382
+  server mean latency s: -: 0.269
+  server p99 s: -: 0.591
+  k6 responses by status: status=200: 842.740
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.525
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.301
+  special attempt p99 s: -: 0.030
+
+## s3-06-uncapped  (200 s, measured last 170 s)
+  requests by outcome: outcome=ok: 428.606; outcome=error: 0.000; outcome=degraded: 421.394
+  special calls by outcome: outcome=ok: 2059.576; outcome=timeout: 0.000; outcome=rejected_open: 1323.939; outcome=connection_error: 45.333
+  special calls per request: -: 4.034
+  retries by dependency: dependency=special: 34.000
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 4.121; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 8.242; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 4.121; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 4.121
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1323.939
+  max in flight: -: 2.000
+  avg in flight: -: 1.382
+  server mean latency s: -: 0.263
+  server p99 s: -: 0.544
+  k6 responses by status: status=200: 849.176
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 0.524
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.298
+  special attempt p99 s: -: 0.031
+
+## s3-00-fast  (201 s, measured last 171 s)
+  requests by outcome: outcome=ok: 443.124; outcome=error: 416.015; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 2104.057; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 416.015
+  special calls per request: -: 2.933
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 2.000
+  avg in flight: -: 0.971
+  server mean latency s: -: 0.150
+  server p99 s: -: 0.485
+  k6 responses by status: status=200: 456.505; status=500: 415.789
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 6.401
+  k6 max VUs: -: 1.000
+  generator cpu cores avg: -: 0.214
+  special attempt p99 s: -: 0.025
+
+## s3-00-hang  (201 s, measured last 171 s)
+  requests by outcome: outcome=ok: 825.609; outcome=error: 33.358; outcome=degraded: 0.000
+  special calls by outcome: outcome=ok: 3966.465; outcome=timeout: 0.000; outcome=rejected_open: 0.000; outcome=connection_error: 33.358
+  special calls per request: -: 4.657
+  retries by dependency: dependency=special: 0.000
+  breaker transitions: (none)
+  breaker rejections: (none)
+  max in flight: -: 8.000
+  avg in flight: -: 5.676
+  server mean latency s: -: 1.178
+  server p99 s: -: 10.000
+  k6 responses by status: status=200: 543.006; status=0: 308.267
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 10.003
+  k6 max VUs: -: 50.000
+  generator cpu cores avg: -: 0.279
+  special attempt p99 s: -: 0.096
+
+## s3-06-hang-capped  (201 s, measured last 171 s)
+  requests by outcome: outcome=ok: 427.591; outcome=error: 0.000; outcome=degraded: 432.806
+  special calls by outcome: outcome=ok: 2091.026; outcome=timeout: 54.231; outcome=rejected_open: 1329.705; outcome=connection_error: 0.000
+  special calls per request: -: 4.039
+  retries by dependency: dependency=special: 42.759
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 4.172; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 8.343; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 4.172; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 4.172
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1325.533; circuit_breaker=generator-special,reason=half_open_full: 4.172
+  max in flight: -: 2.000
+  avg in flight: -: 1.324
+  server mean latency s: -: 0.254
+  server p99 s: -: 0.702
+  k6 responses by status: status=200: 853.520
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 5.684
+  k6 max VUs: -: 2.000
+  generator cpu cores avg: -: 0.308
+  special attempt p99 s: -: 0.191
+
+## s3-06-hang-uncapped  (201 s, measured last 171 s)
+  requests by outcome: outcome=ok: 439.146; outcome=error: 0.000; outcome=degraded: 420.933
+  special calls by outcome: outcome=ok: 2191.685; outcome=timeout: 48.569; outcome=rejected_open: 1304.285; outcome=connection_error: 0.000
+  special calls per request: -: 4.121
+  retries by dependency: dependency=special: 37.439
+  breaker transitions: circuit_breaker=generator-special,from_state=CLOSED,to_state=OPEN: 4.047; circuit_breaker=generator-special,from_state=OPEN,to_state=HALF_OPEN: 8.095; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=OPEN: 4.047; circuit_breaker=generator-special,from_state=HALF_OPEN,to_state=CLOSED: 4.047
+  breaker rejections: circuit_breaker=generator-special,reason=open: 1304.285
+  max in flight: -: 4.000
+  avg in flight: -: 1.514
+  server mean latency s: -: 0.254
+  server p99 s: -: 0.728
+  k6 responses by status: status=200: 853.763
+  k6 dropped iterations: (none)
+  k6 p99 max: -: 5.408
+  k6 max VUs: -: 3.000
+  generator cpu cores avg: -: 0.305
+  special attempt p99 s: -: 0.181
+
