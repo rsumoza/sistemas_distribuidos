@@ -35,7 +35,7 @@
 \node[box] (di) at (7.6,-0.5) {\texttt{digit}};
 \node[proxy] (tox) at (5.6,-1.6) {Toxiproxy};
 \node[box] (sp) at (7.6,-1.6) {\texttt{special}};
-\draw[flow] (k6) -- node[above]{5 pedidos/s} (gen); % TODO calibrar
+\draw[flow] (k6) -- node[above]{5 pedidos/s} (gen);
 \draw[flow] (gen) -- (up.west);
 \draw[flow] (gen) -- (lo.west);
 \draw[flow] (gen) -- (di.west);
@@ -44,6 +44,19 @@
 #1
 \end{tikzpicture}
 \end{center}
+}
+
+% Captura de la demo a todo el ancho. #1: archivo en assets/11.
+\newcommand{\capturademo}[1]{%
+\begin{center}
+\includegraphics[width=\textwidth,height=4.7cm,keepaspectratio]{assets/11/#1}
+\end{center}
+\vspace{-0.6em}
+}
+
+% Línea con la configuración del experimento. #1: escenario; #2: preset.
+\newcommand{\experimento}[2]{%
+{\scriptsize\color{UAIngMuted}Escenario: \texttt{#1} \quad·\quad Preset: \texttt{#2}}\par\vspace{-0.3em}
 }
 
 \UASectionSlide{Apertura: de la observación a la contención}
@@ -57,367 +70,511 @@ La clase pasada terminó con la cascada de cuatro pasos:
 \item El borde empieza a devolver HTTP 504.
 \end{enumerate}
 
-\pause
-
-Ya sabemos \emph{ver} esa cascada. Hoy: qué hace el sistema \textbf{mientras} ocurre.
-
-\pause
+Ya sabemos \emph{ver} esa cascada. Esta clase: qué hace el sistema \textbf{mientras} ocurre.
 
 \begin{alertblock}{El retry}
 En clases anteriores era la solución a un mensaje perdido. Frente a una dependencia saturada, es el combustible.
 \end{alertblock}
 \end{frame}
 
-\begin{frame}{La pregunta de hoy}
-Vamos a trabajar sobre un sistema real que corre acá, en vivo: un \textbf{generador de contraseñas}.
-
-\pause
-
-\begin{block}{Pregunta}
-Si \texttt{special} (el servicio de caracteres especiales) se pone lenta: ¿qué le pasa al Generator? ¿Y al usuario?
-\end{block}
-
-\pause
-
-Anoten una predicción. La vamos a contrastar con lo que muestre la demo.
-\end{frame}
-
-\begin{frame}{La idea central: contener, no evitar}
-\begin{itemize}
-\item Una \textbf{falta} (\emph{fault}) crea un estado incorrecto; se vuelve un \textbf{error} (comportamiento visiblemente incorrecto); el error provoca una \textbf{falla} (el sistema no responde).
-\pause
-\item Las dependencias \textbf{van} a fallar. No se puede evitar toda falla.
-\pause
-\item Lo que se diseña es \textbf{dónde se corta la propagación}: los \emph{crackstoppers}, como las zonas de deformación de un auto.
-\end{itemize}
-
-\pause
-
-\begin{block}{Pregunta correcta}
-No ``¿cómo hago para que nunca falle?'', sino ``¿cómo hago para que falle de forma contenida, comprensible y recuperable?''
-\end{block}
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~3.}
-\end{frame}
-
-\UASectionSlide{La arquitectura del sistema}
-
-\begin{frame}{El sistema que vamos a romper}
-\archdiagram{}
+\begin{frame}{Falta, error y falla}
+\begin{center}
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=3.2cm, minimum height=0.8cm, font=\small\bfseries},
+  ex/.style={text width=3.6cm, text=UAIngMuted},
+  flow/.style={-{Stealth[length=1.8mm]}, draw=UAIngNavy, thick}
+]
+\node[st] (f) at (0,0) {Falta (\emph{fault})};
+\node[st] (e) at (4.6,0) {Error};
+\node[st, draw=UAIngOrange] (x) at (9.2,0) {Falla (\emph{failure})};
+\draw[flow] (f) -- (e);
+\draw[flow] (e) -- (x);
+\node[ex, anchor=north] at (0,-0.6) {estado interno incorrecto:\\una conexión no vuelve al pool};
+\node[ex, anchor=north] at (4.6,-0.6) {comportamiento visible:\\llegan excepciones en vez\\de vuelos};
+\node[ex, anchor=north] at (9.2,-0.6) {el sistema no responde:\\pool agotado, quioscos\\de \emph{check-in} parados};
+\node[text=UAIngOrange] at (2.3,0.75) {\emph{crackstopper}};
+\node[text=UAIngOrange] at (6.9,0.75) {\emph{crackstopper}};
+\draw[UAIngOrange, line width=1.2pt] (2.3,0.45) -- (2.3,-0.35);
+\draw[UAIngOrange, line width=1.2pt] (6.9,0.45) -- (6.9,-0.35);
+\end{tikzpicture}
+\end{center}
 
 \begin{itemize}
-\item \textbf{k6} manda carga a \textbf{ritmo fijo}: sigue mandando aunque el sistema se ponga lento.
-\item El \textbf{Generator} arma cada contraseña llamando a cuatro servicios hijos. Atiende con un \textbf{pool finito de hilos} (8).  % TODO calibrar
-\item \textbf{Toxiproxy} está delante de \texttt{special}: ahí inyectamos las fallas, sin tocar el código de \texttt{special}.
-\end{itemize}
-\end{frame}
-
-\begin{frame}{¿Qué falta en este diagrama?}
-\archdiagram{\only<2>{\draw[-{Stealth[length=1.6mm]}, draw=UAIngOrange, dashed, line width=1pt] (lo.south) -- (di.north);}}
-
-\pause
-
-\begin{alertblock}{Dependencia oculta}
-\texttt{lower} llama por dentro a \texttt{digit}. No figuraba en el diagrama original. Si \texttt{digit} se pone lenta, también se pone lenta \texttt{lower}. Guárdense esto para la elección de timeouts.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Fan-out: cada pedido llama muchas veces}
-Para armar una contraseña de 8 a 25 caracteres, el Generator itera: en cada vuelta pide unos caracteres de cada tipo.
-
-\pause
-
-\begin{itemize}
-\item Cada pedido hace unas \textbf{4 a 5 llamadas} a cada servicio hijo (promedio 4,4).  % TODO calibrar
-\item A 5 pedidos por segundo, son unas \textbf{22 llamadas por segundo} a \texttt{special}.  % TODO calibrar
+\item La \emph{grieta} avanza de un eslabón al siguiente; el acoplamiento la acelera.
+\item Las dependencias \textbf{van} a fallar. Lo que se diseña es \textbf{dónde se corta}, como las zonas de deformación de un auto.
+\item ``Failure is in the eye of the beholder'': para un monitoreo que solo mira una página de estado, un servicio con todos los hilos bloqueados está sano.
 \end{itemize}
 
-\pause
-
-\begin{block}{Por qué importa}
-Cualquier política que apliquemos \emph{por llamada} (un timeout, un reintento, un breaker) se \textbf{multiplica por pedido}.
-\end{block}
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~3. Ejemplos del caso de la aerolínea (cap.~2). Apunte: sección ``Introducción''.}
 \end{frame}
 
-\begin{frame}{Qué vamos a mirar}
-\begin{description}
-\item[Grafana A:] ``Class 11 · Saturation and protection''. Pedidos en vuelo contra tamaño del pool, estado de cada breaker (\texttt{generator-special}, \ldots), tasa de error, reintentos.
-\item[Grafana B:] ``Class 11 · Latencies to calibrate timeouts''. p50, p95 y p99 por dependencia: de acá sale el timeout de cada una.
-\item[Jaeger:] una traza individual: dónde se fue el tiempo en un pedido concreto.
-\end{description}
+\UASectionSlide{Anatomía de una\\falla en cascada}
 
-\pause
-
-{\small Las anotaciones de Grafana marcan en cada gráfico cuándo cambiamos de escenario o de preset.}
-\end{frame}
-
-\UASectionSlide{Demo 1: una dependencia lenta}
-
-\begin{frame}{Predicción: ¿qué pasa?}
-\begin{block}{Escenario: \texttt{latency} (2 s en \texttt{special}) · Preset: \texttt{00-no-protection}}  % TODO calibrar
-Sin timeouts, sin reintentos, sin breaker. \texttt{special} responde bien, pero tarda 2 segundos.
-\end{block}
-
-Anoten: ¿qué le pasa a\ldots
-\begin{enumerate}
-\item la latencia que ve el usuario?
-\item el pool de hilos del Generator?
-\item la CPU del Generator?
-\end{enumerate}
-
-\pause
-
-{\small \textbf{Nadie se cayó}: alcanza con que una dependencia se ponga lenta.}
-\end{frame}
-
-\begin{frame}{Ley de Little: una peluquería}
-\[
-L = \lambda \cdot W
-\]
-
-\begin{itemize}
-\item $\lambda$: cuántos \textbf{clientes llegan} por hora.
-\item $W$: cuántas horas \textbf{se queda} cada uno.
-\item $L$: cuántos clientes hay \textbf{adentro a la vez}.
-\end{itemize}
-
-\pause
-
-Llegan 2 clientes por hora y cada uno se queda 1,5 horas: $L = 2 \times 1{,}5 = \mathbf{3}$ clientes adentro.
-
-\pause
-
-\begin{alertblock}{Si la peluquería tiene 2 sillas}
-No da abasto, aunque nadie esté ``roto''. Y si cada corte tarda más, $W$ sube y $L$ sube, \textbf{sin que llegue un solo cliente más}.
-\end{alertblock}
-
-\pause
-
-{\small \textbf{Peluquería $\to$ Generator:} clientes = pedidos · sillas = hilos del pool · tiempo en la peluquería = tiempo que un pedido ocupa un hilo.}
-
-{\scriptsize\color{UAIngMuted}Little (1961). La analogía es de la cátedra.}
-\end{frame}
-
-\begin{frame}{La cuenta con el sistema de la demo}
-$\lambda = 5$ pedidos por segundo (k6) · pool de \textbf{8} hilos.  % TODO calibrar
-
-\pause
-
-\begin{itemize}
-\item \textbf{\texttt{special} sana:} un pedido tarda decenas de ms, $W \approx 0{,}05$ s: $L \approx 5 \times 0{,}05 \approx 0{,}25$ hilos.  % TODO calibrar
-\pause
-\item \textbf{\texttt{special} con 2 s por llamada:} cada pedido hace 4--5 llamadas una tras otra, $W \approx 9$ s.  % TODO calibrar
-\item $L = 5 \times 9 \approx \mathbf{45}$ pedidos simultáneos. El pool tiene \textbf{8}.  % TODO calibrar
-\end{itemize}
-
-\pause
-
-\begin{alertblock}{Consecuencia}
-Sostenemos $8/9 \approx 0{,}9$ pedidos por segundo, no 5. El resto se acumula en una cola. Cambió $W$, no $\lambda$.
-\end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Little (1961); Nygard, \emph{Release It!} (2018), cap.~9.}
-\end{frame}
-
-\begin{frame}{Qué mirar en el dashboard}
-\begin{enumerate}
-\item \textbf{Pedidos en vuelo contra capacidad del pool}: se pegan al techo (8).
-\pause
-\item \textbf{CPU del Generator}: baja. Los hilos esperan E/S, no calculan. El sistema ``parece ocioso'' pero está bloqueado.
-\pause
-\item \textbf{Latencia del cliente (k6) contra latencia del servidor}: el cliente ve mucho más. La diferencia es el \textbf{tiempo en cola}, que los spans del servidor no muestran.
-\pause
-\item \textbf{Iteraciones descartadas de k6}: el cliente no da abasto.
-\end{enumerate}
-
-\pause
-
-{\small \emph{Tiempo de residencia} = tiempo en cola + tiempo de procesamiento. Medir solo el segundo es la trampa.}
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~9, \emph{Demand Control}.}
-\end{frame}
-
-\begin{frame}{Una respuesta lenta es peor que ninguna}
-\begin{columns}[T,onlytextwidth]
-\begin{column}{0.48\textwidth}
-\textbf{Falla rápida}
-
-Conexión rechazada: vuelve en milisegundos. El hilo se libera.
-\end{column}
-\begin{column}{0.48\textwidth}
-\textbf{Falla lenta}
-
-Un paquete que no llega: el hilo queda bloqueado durante minutos. El pool se agota.
-\end{column}
-\end{columns}
-
-\pause
+\begin{frame}{Falla rápida y falla lenta}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\node[anchor=east, text=UAIngNavy] at (-0.2,1.2) {\textbf{Conexión rechazada}};
+\fill[UAIngOrange] (0,1.0) rectangle (0.25,1.4);
+\fill[UAIngNavy!25] (0.25,1.0) rectangle (9.5,1.4);
+\node[anchor=west] at (0.35,1.2) {el hilo vuelve en milisegundos y atiende otros pedidos};
+\node[anchor=east, text=UAIngNavy] at (-0.2,0.2) {\textbf{Respuesta que no llega}};
+\fill[UAIngOrange] (0,0.0) rectangle (9.5,0.4);
+\node[anchor=west, text=white] at (0.15,0.2) {\textbf{el hilo queda bloqueado esperando}};
+\draw[-{Stealth[length=1.6mm]}, UAIngMuted] (0,-0.25) -- (9.7,-0.25) node[anchor=north east] {tiempo};
+\end{tikzpicture}
+\end{center}
 
 \begin{block}{Nygard, cap.~4}
 ``Clearly, a slow response is a lot worse than no response.''
 \end{block}
 
-\pause
-
 Una dependencia \textbf{lenta} es más peligrosa que una \textbf{caída}: la caída libera los recursos del llamante; la lentitud los retiene.
 
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~4.}
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~4. Apunte: ``Falla rápida y falla lenta''.}
 \end{frame}
 
-\begin{frame}{Concepto: el timeout}
-Dejar de esperar cuando se estima que la respuesta no va a llegar. \emph{``Hope is not a design method.''}
+\begin{frame}{Hilos bloqueados: el pool se agota}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\foreach \i in {0,...,7} {\fill[UAIngOrange] (\i*0.62,0) rectangle ++(0.5,0.5);}
+\draw[UAIngNavy, rounded corners] (-0.15,-0.15) rectangle (4.99,0.65);
+\node[anchor=south, text=UAIngNavy] at (2.42,0.7) {\textbf{pool de 8 hilos: todos esperando a una dependencia}};
+\foreach \i in {0,...,5} {\draw[UAIngNavy] (-1.0-\i*0.45,0.05) rectangle ++(0.35,0.4);}
+\node[anchor=north, text=UAIngMuted] at (-2.1,-0.15) {pedidos en cola};
+\draw[-{Stealth[length=1.6mm]}, UAIngNavy] (-0.55,0.25) -- (-0.2,0.25);
+\node[anchor=west, text=UAIngMuted, align=left] at (5.4,0.25) {CPU: casi nula\\(nadie calcula, todos esperan)};
+\end{tikzpicture}
+\end{center}
 
-\pause
+\begin{itemize}
+\item Casi ninguna caída real es un proceso que termina: es un proceso vivo con todos sus hilos esperando. El sistema no ``se cayó'', \textbf{se colgó}.
+\item Con el sistema saturado la \textbf{CPU está baja}. La saturación se mide sobre el recurso que se agota: hilos ocupados contra hilos disponibles.
+\end{itemize}
 
-\begin{description}
-\item[Timeout de conexión:] acota establecer la conexión. Dentro del mismo datacenter, puede ser muy corto.
-\item[Timeout de lectura:] acota esperar la respuesta, una vez conectado. Refleja cuánto tarda la dependencia en operación normal.
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~4, \emph{Blocked Threads}. Apunte: ``Hilos bloqueados y pools agotados''.}
+\end{frame}
+
+\begin{frame}{Reacciones en cadena y capacidades desbalanceadas}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize},
+  srv/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=1.1cm, minimum height=0.6cm}]
+\foreach \i in {0,...,4} {\node[srv] at (\i*1.3,0) {20\,\%};}
+\node[anchor=east, text=UAIngNavy] at (-0.8,0) {\textbf{antes}};
+\foreach \i in {1,...,4} {\node[srv, draw=UAIngOrange] at (\i*1.3,-1.1) {25\,\%};}
+\node[srv, draw=UAIngMuted, text=UAIngMuted] (x) at (0,-1.1) {caído};
+\draw[UAIngOrange, thick] (x.south west) -- (x.north east);
+\node[anchor=east, text=UAIngNavy] at (-0.8,-1.1) {\textbf{después}};
+\node[anchor=west, align=left, text=UAIngMuted] at (6.1,-0.55) {cada sobreviviente carga\\un 25\,\% más ($25/20$)};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Reacción en cadena:} si la causa era una condición de carga, los sobrevivientes ahora son más propensos a fallar, y cada baja recarga a los demás. Como el defecto está en todos, solo se detiene corrigiéndolo.
+\item \textbf{Capacidades desbalanceadas:} un \emph{front end} con 3000 hilos frente a un servicio con 450. Una promoción que lleve tráfico a ese camino lo desborda.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~4 (el ejemplo original usa ocho servidores). Apunte: ``Reacciones en cadena''.}
+\end{frame}
+
+\begin{frame}{Ley de Little: una peluquería}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.48\textwidth}
+\small
+\[
+L = \lambda \cdot W
+\]
+\begin{itemize}
+\item $\lambda$: cuántos clientes \textbf{llegan} por hora.
+\item $W$: cuántas horas \textbf{se queda} cada uno.
+\item $L$: cuántos hay \textbf{adentro a la vez}.
+\end{itemize}
+
+Llegan 2 por hora y cada uno se queda 1,5 horas: $L = 2 \times 1{,}5 = \mathbf{3}$.
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[UAIngNavy, rounded corners] (0,0) rectangle (4.2,2.4);
+\node[anchor=north west, text=UAIngNavy] at (0.1,2.35) {\textbf{peluquería}};
+\foreach \x in {0.9,2.4} {\draw[UAIngNavy, fill=UAIngNavy!15] (\x,0.4) rectangle ++(0.8,0.6); \fill[UAIngOrange] (\x+0.4,1.3) circle (0.18);}
+\node[text=UAIngMuted] at (2.1,0.2) {2 sillas};
+\fill[UAIngOrange] (4.8,1.3) circle (0.18);
+\node[text=UAIngOrange, anchor=north] at (4.8,1.05) {espera};
+\end{tikzpicture}
+\end{center}
+{\small Clientes = pedidos · sillas = hilos del pool · tiempo adentro = tiempo que un pedido ocupa un hilo.}
+\end{column}
+\end{columns}
+
+{\color{UAIngOrange}\textbf{Con solo 2 sillas}} no da abasto, aunque nada esté ``roto''. Si cada corte se alarga, $W$ sube y $L$ sube \textbf{sin que llegue un solo cliente más}.
+
+{\scriptsize\color{UAIngMuted}Little (1961). La analogía es de la cátedra. Apunte: ``La ley de Little aplicada al pool de hilos''.}
+\end{frame}
+
+\begin{frame}{La cuenta con un pool de hilos}
+Un servicio recibe $\lambda = 5$ pedidos por segundo y atiende con \textbf{8} hilos. Cada pedido hace 5 llamadas seguidas a una dependencia.
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+ & $W$ (por pedido) & $L = \lambda W$ & ¿Alcanzan 8 hilos? \\
+\midrule
+Dependencia sana & $0{,}05$ s & $0{,}25$ & sobran \\
+Dependencia con 2 s por llamada & $5 \times 2 = 10$ s & $\mathbf{50}$ & no: satura \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{alertblock}{Consecuencia}
+Saturado, el servicio sostiene $8/10 = 0{,}8$ pedidos por segundo, no 5. El resto espera en una cola. \textbf{Cambió $W$, no $\lambda$}: nadie se cayó.
+\end{alertblock}
+
+{\small El cliente ve \emph{tiempo de residencia} = tiempo en cola + tiempo de procesamiento. Medir solo el segundo es la trampa.}
+
+{\scriptsize\color{UAIngMuted}Little (1961); Nygard, \emph{Release It!} (2018), cap.~9, \emph{Demand Control}.}
+\end{frame}
+
+\UASectionSlide{Resiliencia y sus herramientas}
+
+\begin{frame}{Dónde corta cada herramienta}
+\textbf{Resiliencia}: seguir funcionando ante fallas parciales, aunque sea degradado. No es que nada falle: es \textbf{contener} la propagación.
+
+\begin{center}
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.4cm, minimum height=0.8cm},
+  tool/.style={text=UAIngOrange, font=\scriptsize\bfseries},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}
+]
+\node[st] (a) at (0,0) {dependencia\\lenta o caída};
+\node[st] (b) at (3.4,0) {hilos\\bloqueados};
+\node[st] (c) at (6.8,0) {pool\\agotado};
+\node[st, draw=UAIngOrange] (d) at (10.2,0) {error\\al usuario};
+\draw[flow] (a) -- (b); \draw[flow] (b) -- (c); \draw[flow] (c) -- (d);
+\node[tool] at (1.7,0.85) {timeout};
+\node[tool] at (1.7,-0.85) {circuit breaker};
+\node[tool] at (5.1,0.85) {bulkhead};
+\node[tool] at (5.1,-0.85) {reintentos (con cuidado)};
+\node[tool] at (8.5,0.85) {fallback};
+\node[tool] at (8.5,-0.85) {backpressure,\\load shedding};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}
+\item \textbf{Timeout:} corta la espera indefinida. \textbf{Reintento:} recupera lo transitorio, a costa de más carga. \textbf{Breaker:} deja de insistir contra una dependencia enferma.
+\item \textbf{Fallback:} responde algo útil en vez del error. \textbf{Bulkhead:} una parte no agota los recursos de las demás. \textbf{Backpressure y load shedding:} demanda mayor que la capacidad.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Apunte: ``Resiliencia y sus herramientas''.}
+\end{frame}
+
+\UASectionSlide{El sistema de la demo}
+
+\begin{frame}{Un generador de contraseñas}
+\archdiagram{\draw[-{Stealth[length=1.6mm]}, draw=UAIngOrange, dashed, line width=1pt] (lo.south) -- (di.north);}
+
+\begin{itemize}
+\item \textbf{k6} manda 5 pedidos por segundo a \textbf{ritmo fijo}: sigue mandando aunque el sistema se ponga lento. Corta cada pedido a los 10 s.
+\item El \textbf{Generator} arma cada contraseña llamando a cuatro servicios hijos, con un \textbf{pool de 8 hilos}.
+\item \textbf{Toxiproxy}, delante de \texttt{special}, inyecta las fallas sin tocar su código.
+\item \textbf{Dependencia oculta} (punteada): \texttt{lower} llama por dentro a \texttt{digit}.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Cómo se corrieron los experimentos}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.46\textwidth}
+\textbf{Escenarios} (fallas en \texttt{special})
+\begin{description}\small
+\item[\texttt{latency}:] 2 s por llamada.
+\item[\texttt{errors}:] conexiones cortadas al 10\,\% o al 50\,\% de las llamadas.
+\item[\texttt{intermittent}:] 20 s caída, 20 s arriba, 5 veces. \texttt{fast}: conexión rechazada; \texttt{hang}: no responde.
 \end{description}
+\end{column}
+\begin{column}{0.50\textwidth}
+\textbf{Presets} (protección del Generator)
+\begin{description}\small
+\item[\texttt{00}:] sin protección.
+\item[\texttt{01}:] solo timeouts.
+\item[\texttt{02}, \texttt{03}:] timeouts + reintentos (inmediatos / backoff con jitter).
+\item[\texttt{04}, \texttt{04b}, \texttt{05}:] timeouts + breaker + fallback.
+\item[\texttt{06}:] todo junto. \texttt{07}: breaker sin fallback.
+\end{description}
+\end{column}
+\end{columns}
 
-\pause
-
-\begin{block}{Para qué}
-Aislar la falla: el problema de otro servicio no tiene por qué ser el tuyo. Un timeout transforma un hilo bloqueado en un error rápido.
-\end{block}
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5, \emph{Timeouts}.}
+\vspace{0.5em}
+{\small Todas las capturas salen de una misma corrida, de 3 a 4 minutos por experimento. Los números de cada slide se midieron en Prometheus sobre la ventana del experimento. Las líneas amarillas punteadas marcan los cambios de escenario o de preset.}
 \end{frame}
 
-\begin{frame}{Cómo elegir el valor: no a ojo}
-\begin{itemize}
-\item Se mide la \textbf{distribución} de latencia en condiciones normales, \textbf{del lado del cliente}.
-\item Timeout $\approx$ \textbf{p99 de la línea de base + un margen}. No la media (cortaría llamadas normales) ni el máximo (nunca actuaría).
-\pause
-\item Eso es lo que muestra el Grafana B: una fila por dependencia con p50, p95 y p99.
-\end{itemize}
+\begin{frame}{Fan-out: una traza de la línea de base}
+\capturademo{e0-trace.png}
 
-\pause
-
-\begin{alertblock}{La cadena \texttt{lower} $\to$ \texttt{digit}}
-El timeout de \texttt{lower} tiene que cubrir lo que tarda \texttt{digit} \emph{más} su propio procesamiento. Un valor que ``parece razonable'' para \texttt{lower} sola puede cortarla aunque nada esté roto.
-\end{alertblock}
-
-\pause
-
-{\small Con reintentos: $T_{\max} = (1+r)\,t + \sum e_i$. Ese total tiene que caber en el timeout del llamante.}
-
-{\scriptsize\color{UAIngMuted}Percentiles aproximados (salen de buckets de histograma): alcanzan para calibrar. Clase 10.}
+{\small Cada vuelta del Generator pide caracteres a \texttt{upper}, \texttt{lower}, \texttt{digit} y \texttt{special}, \textbf{uno después del otro}. En la línea de base, cada pedido hizo en promedio \textbf{4,9 llamadas} a cada servicio hijo: toda política \emph{por llamada} se multiplica por pedido.}
 \end{frame}
 
-\begin{frame}{Prueba: solo timeouts}
-\begin{block}{Escenario: \texttt{latency} (2 s) · Preset: \texttt{01-timeout-only}}  % TODO calibrar
-Timeout por dependencia. Sin reintentos, sin breaker, sin fallback.
-\end{block}
+\begin{frame}{Línea de base: latencia de cada dependencia}
+\capturademo{e0-latency-table.png}
 
-\textbf{Predicción:} ¿se resuelve?
+\begin{itemize}\small
+\item El p99 de \texttt{upper}, \texttt{digit} y \texttt{special} ronda los 40 ms. Es el dato para elegir los timeouts.
+\item \texttt{lower} tiene un p99 de 97 ms porque \textbf{incluye} la llamada interna a \texttt{digit}: medida desde el llamante, la cadena ya está adentro.
+\end{itemize}
+\end{frame}
 
-\pause
+\UASectionSlide{Experimento:\\una dependencia lenta}
 
-\begin{itemize}
-\item Ya \textbf{no satura}: cada llamada a \texttt{special} se corta en su timeout y el hilo se libera.
-\item Pero \textbf{todos los pedidos fallan} (HTTP 500), rápido.
+\begin{frame}{Sin protección: el pool se llena}
+\experimento{latency 2000}{00-no-protection}
+\capturademo{s1-00-inflight.png}
+
+{\small A los pocos segundos de la línea amarilla, los \textbf{8 hilos} quedan ocupados y no se liberan. Ley de Little con lo medido: cada pedido tardó $W \approx 10{,}4$ s, así que harían falta $L = 5 \times 10{,}4 \approx 52$ hilos. Se completaron 163 pedidos en 210 s: $0{,}78$ por segundo, que es $8 / 10{,}4$.}
+\end{frame}
+
+\begin{frame}{Sin protección: el usuario espera hasta rendirse}
+\experimento{latency 2000}{00-no-protection}
+\capturademo{s1-00-client-latency.png}
+
+{\small La latencia que ve k6 sube hasta \textbf{10 s}, que es su propio timeout: en la ventana medida, \textbf{todos} los pedidos del cliente terminaron por timeout. La lentitud de una dependencia se volvió la falla del servicio entero.}
+\end{frame}
+
+\begin{frame}{Sin protección: la CPU baja}
+\experimento{latency 2000}{00-no-protection}
+\capturademo{s1-00-cpu.png}
+
+{\small La CPU del Generator cae de 0,27 a 0,06 núcleos justo cuando el servicio deja de atender. Los hilos esperan, no calculan: un panel de CPU ``en verde'' es compatible con un servicio bloqueado.}
+\end{frame}
+
+\begin{frame}{Una respuesta lenta es peor que ninguna}
+\experimento{intermittent fast, luego intermittent hang}{00-no-protection}
+\capturademo{s3-fasthang-inflight.png}
+
+{\small Las dos variantes tiran \texttt{special} 20 s de cada 40. Con \texttt{fast} (conexión rechazada, hasta las 14:04) el 48\,\% de los pedidos falla, pero rápido: el pool casi no se usa. Con \texttt{hang} (no responde) el pool \textbf{se llena en cada caída} y el 36\,\% de los pedidos termina por timeout del cliente.}
+\end{frame}
+
+\UASectionSlide{Timeouts}
+
+\begin{frame}{Timeout de conexión y timeout de lectura}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}]
+\node[text=UAIngNavy] at (0,3.2) {\textbf{cliente}};
+\node[text=UAIngNavy] at (5,3.2) {\textbf{servidor}};
+\draw[UAIngMuted] (0,3.0) -- (0,0); \draw[UAIngMuted] (5,3.0) -- (5,0);
+\draw[flow] (0,2.7) -- node[above, sloped]{abrir conexión} (5,2.4);
+\draw[flow] (5,2.4) -- (0,2.1);
+\draw[flow] (0,1.8) -- node[above, sloped]{pedido} (5,1.5);
+\draw[flow] (5,0.6) -- node[above, sloped]{respuesta} (0,0.3);
+\draw[UAIngOrange, thick] (-0.3,2.7) -- (-0.3,2.1);
+\node[anchor=east, text=UAIngOrange, align=right] at (-0.4,2.4) {timeout de conexión};
+\draw[UAIngOrange, thick] (-0.3,1.8) -- (-0.3,0.3);
+\node[anchor=east, text=UAIngOrange, align=right] at (-0.4,1.05) {timeout de lectura\\(\emph{read} o \emph{socket timeout}):\\espera entre datos recibidos};
+\node[anchor=west, text=UAIngMuted] at (5.2,1.05) {el servidor trabaja};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item ``Hope is not a design method'': el timeout \textbf{no viene puesto}. \texttt{requests} (Python) no corta nunca sin el parámetro \texttt{timeout}; en Java, \texttt{URLConnection} con 0 espera para siempre.
+\item El de lectura mide el tiempo \emph{entre} datos, no el total: para acotar el total hace falta un plazo global (\emph{deadline}).
 \end{itemize}
 
-\pause
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5. Documentación de \texttt{requests} y de \texttt{java.net.URLConnection}. Apunte: ``Timeouts''.}
+\end{frame}
 
-\begin{alertblock}{Fallar rápido no es funcionar}
-El timeout protege al \emph{llamante}. Quién protege al \emph{usuario} es lo que viene: reintentos, breaker y fallback.
-\end{alertblock}
+\begin{frame}{Cómo elegir el valor: p99 + margen}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\draw[-{Stealth[length=1.6mm]}, UAIngMuted] (0,0) -- (9.5,0) node[anchor=north east] {latencia de la dependencia (medida desde el llamante)};
+\fill[UAIngNavy!20] (0.3,0) -- plot[domain=0.3:9, samples=60] (\x, {2.2*exp(-((ln(\x)-0.7)^2)/0.5)}) -- (9,0) -- cycle;
+\draw[UAIngNavy, thick] plot[domain=0.3:9, samples=60] (\x, {2.2*exp(-((ln(\x)-0.7)^2)/0.5)});
+\draw[UAIngNavy, dashed] (2.0,0) -- (2.0,2.3) node[above] {p50};
+\draw[UAIngNavy, dashed] (5.2,0) -- (5.2,1.3) node[above] {p99};
+\draw[UAIngOrange, thick] (6.4,0) -- (6.4,1.9) node[above, align=center] {\textbf{timeout}};
+\draw[{Stealth[length=1.3mm]}-{Stealth[length=1.3mm]}, UAIngOrange] (5.2,0.5) -- node[above]{margen} (6.4,0.5);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item Con la \textbf{media}, el timeout cortaría muchas llamadas normales; con el \textbf{máximo}, casi nunca actuaría.
+\item En la demo: p99 de \texttt{special} $\approx 41$ ms en la línea de base; los presets usan un timeout de lectura de \textbf{100 ms}.
+\item El percentil sale de buckets de histograma: es aproximado. Alcanza para calibrar, con margen.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Apunte: ``Cómo elegir el valor''. Clase 10: percentiles.}
+\end{frame}
+
+\begin{frame}{Timeouts en una cadena de llamadas}
+Con reintentos, una llamada lógica puede tardar
+\[
+T_{\max} = (1+r)\cdot t + \textstyle\sum_{i=1}^{r} e_i
+\]
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\fill[UAIngNavy!25] (0,0) rectangle (2.5,0.5); \node at (1.25,0.25) {intento 500 ms};
+\fill[UAIngMuted!25] (2.5,0) rectangle (3.0,0.5); \node[anchor=north] at (2.75,-0.05) {100};
+\fill[UAIngNavy!25] (3.0,0) rectangle (5.5,0.5); \node at (4.25,0.25) {intento 500 ms};
+\fill[UAIngMuted!25] (5.5,0) rectangle (6.5,0.5); \node[anchor=north] at (6.0,-0.05) {200};
+\fill[UAIngNavy!25] (6.5,0) rectangle (9.0,0.5); \node at (7.75,0.25) {intento 500 ms};
+\draw[UAIngOrange, thick] (0,0.8) -- (9.0,0.8);
+\draw[UAIngOrange, thick] (0,0.7) -- (0,0.9); \draw[UAIngOrange, thick] (9.0,0.7) -- (9.0,0.9);
+\node[above, text=UAIngOrange] at (4.5,0.85) {$T_{\max} = 3 \times 500 + 300 = 1800$ ms: tiene que caber en el timeout del llamante};
+\node[anchor=north, text=UAIngMuted] at (4.5,-0.35) {esperas entre intentos (backoff)};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item Para el valor de partida no hace falta conocer la cadena: el p99 de B medido desde A ya incluye lo que B espera a C.
+\item Lo que la línea de base no muestra es el \textbf{peor caso interno}. Si el timeout de A es menor que el $T_{\max}$ de B, A abandona mientras B sigue trabajando.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Apunte: ``Timeouts en una cadena de llamadas''.}
+\end{frame}
+
+\begin{frame}{Experimento: solo timeouts}
+\experimento{latency 2000}{00-no-protection, luego 01-timeout-only}
+\capturademo{s1-01-inflight.png}
+
+{\small Al aplicar \texttt{01} (segunda línea amarilla), cada llamada a \texttt{special} se corta a los 100 ms y el hilo se libera: el pool baja de 8 a un promedio de 1,5 hilos ocupados. \textbf{Se terminó la saturación.}}
+\end{frame}
+
+\begin{frame}{Experimento: solo timeouts, pero todo falla}
+\experimento{latency 2000}{01-timeout-only}
+\capturademo{s1-01-outcomes.png}
+
+{\small El \textbf{98\,\%} de los pedidos responde HTTP 500, ahora rápido (200 ms de media). Solo se salvan los pocos que no llegaron a pedir caracteres especiales. \textbf{Fallar rápido no es funcionar}: el timeout protege al llamante; al usuario lo protegen los mecanismos que siguen.}
 \end{frame}
 
 \UASectionSlide{Reintentos}
 
-\begin{frame}{La cuenta de la amplificación}
-Un pedido hace $n$ llamadas; cada una falla con probabilidad $p$.
-\[
-P(\text{falla del pedido}) = 1 - (1-p)^n
-\]
-
-\pause
-
-\begin{itemize}
-\item $p = 10\,\%$ y $n = 4{,}4$: $1 - 0{,}9^{4{,}4} \approx \mathbf{37\,\%}$.  % TODO calibrar
-\item Con \textbf{un reintento}, la llamada solo falla si fallan \textbf{los dos intentos}: $p \cdot p = p^2 = 0{,}1 \times 0{,}1 = 1\,\%$.
-\item Entonces el pedido falla con $1 - 0{,}99^{4{,}4} \approx \mathbf{4\,\%}$.
-\end{itemize}
-
-\pause
-
-\begin{alertblock}{El costo}
-Cada llamada pasa a ser $1+p$ intentos (hasta dos reintentos: $1+p+p^2$). Si la causa es una caída o saturación, $p \to 1$ y cada llamada pasa a ser $1+r$: el reintento \textbf{multiplica} la carga justo donde no hay capacidad.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Reintentos en capas}
-Cada capa reintenta: los factores \textbf{se multiplican}.
-
-\pause
-
-\begin{itemize}
-\item Tres capas, dos retries por capa (3 intentos): hasta $3^3 = 27$ llamadas por pedido.
-\item Con 3 retries (4 intentos) en tres capas: $4^3 = 64$ intentos sobre la base de datos.
-\end{itemize}
-
-\pause
-
-\begin{block}{Reglas}
-Solo operaciones \textbf{idempotentes} · limitar los reintentos por pedido · \textbf{presupuesto} de reintentos por proceso (ej.: 60 por minuto) · no reintentar en todas las capas · \textbf{nunca} reintentar un rechazo del breaker.
-\end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al., \emph{Site Reliability Engineering} (2016), cap.~22. El presupuesto debe ser extremo a extremo: limitar localmente no alcanza.}
-\end{frame}
-
-\begin{frame}{Backoff exponencial y jitter}
-Esperar entre intentos: $d_n = \min(\text{tope},\ \text{base}\cdot 2^{n})$. Pero si todos esperan lo mismo, \textbf{reintentan juntos}.
-
-\begin{columns}[T,onlytextwidth]
-\begin{column}{0.48\textwidth}
+\begin{frame}{Cuándo destruyen: la retroalimentación}
 \begin{center}
-\begin{tikzpicture}[scale=0.80, transform shape, every node/.style={font=\scriptsize}]
-\node[text=UAIngNavy] at (2.0,1.55) {\textbf{Sin jitter}};
-\draw[draw=UAIngMuted] (0,0) -- (4.2,0);
-\foreach \x in {0.3,0.9,2.1} {\foreach \y in {0.3,0.65,1.0} {\fill[UAIngNavy] (\x,\y) circle (0.06);}}
-\foreach \y in {0.3,0.65,1.0} {\fill[UAIngOrange] (0,\y) circle (0.06);}
-\node[text=UAIngMuted, anchor=north] at (2.1,-0.05) {tiempo $\rightarrow$};
-\node[text=UAIngOrange, anchor=west] at (2.5,0.65) {picos};
+\begin{tikzpicture}[every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.6cm, minimum height=0.7cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngOrange, thick}]
+\node[st] (a) at (0,1.2) {más carga};
+\node[st] (b) at (4.5,1.2) {respuestas más lentas};
+\node[st] (c) at (4.5,0) {timeouts del llamante};
+\node[st] (d) at (0,0) {reintentos};
+\draw[flow] (a) -- (b); \draw[flow] (b) -- (c); \draw[flow] (c) -- (d); \draw[flow] (d) -- (a);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item El llamante abandona y reintenta ``exactly when it hurts the worst''.
+\item Un \emph{backend} atiende 10\,000 consultas por segundo y recibe 10\,100: rechaza 100, que vuelven como reintentos (10\,200), luego 300 rechazos\ldots{} Bajar la carga al nivel previo puede no alcanzar para salir.
+\item Ayudan frente a fallas \textbf{transitorias}. Solo operaciones \textbf{idempotentes}, y solo errores reintentables (timeouts, conexión, 5xx; no 4xx).
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), caps.~5 y 9; Beyer et al., \emph{Site Reliability Engineering} (2016), cap.~22.}
+\end{frame}
+
+\begin{frame}{La cuenta de la amplificación}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.52\textwidth}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}, x=0.45cm, y=4.5cm]
+\draw[-{Stealth[length=1.4mm]}, UAIngMuted] (0,0) -- (10.6,0);
+\node[anchor=north, text=UAIngMuted] at (5.3,-0.07) {llamadas por pedido ($n$)};
+\draw[-{Stealth[length=1.4mm]}, UAIngMuted] (0,0) -- (0,0.72) node[anchor=south] {pedidos que fallan};
+\foreach \y/\l in {0.2/20,0.4/40,0.6/60} {\draw[UAIngMuted] (-0.15,\y) -- (0,\y) node[anchor=east] {\l\,\%};}
+\foreach \x in {1,5,10} {\draw[UAIngMuted] (\x,0) -- (\x,-0.02) node[anchor=north] {\x};}
+\draw[UAIngOrange, thick] plot[domain=0:10, samples=40] (\x, {1-0.9^\x});
+\draw[UAIngNavy, thick] plot[domain=0:10, samples=40] (\x, {1-0.99^\x});
+\fill[UAIngOrange] (5,0.41) circle (0.08cm) node[anchor=south east] {41\,\%};
+\fill[UAIngNavy] (5,0.049) circle (0.08cm) node[anchor=south] {4,9\,\%};
+\node[anchor=west, text=UAIngOrange] at (6.8,0.42) {sin reintento};
+\node[anchor=west, text=UAIngNavy] at (6.3,0.15) {con 1 reintento};
 \end{tikzpicture}
 \end{center}
 \end{column}
-\begin{column}{0.48\textwidth}
-\begin{center}
-\begin{tikzpicture}[scale=0.80, transform shape, every node/.style={font=\scriptsize}]
-\node[text=UAIngNavy] at (2.0,1.55) {\textbf{Con jitter}};
-\draw[draw=UAIngMuted] (0,0) -- (4.2,0);
-\foreach \x/\y in {0.2/0.3,0.5/0.3,1.3/0.3,0.35/0.65,1.1/0.65,2.6/0.65,0.7/1.0,1.7/1.0,3.2/1.0} {\fill[UAIngNavy] (\x,\y) circle (0.06);}
-\foreach \y in {0.3,0.65,1.0} {\fill[UAIngOrange] (0,\y) circle (0.06);}
-\node[text=UAIngMuted, anchor=north] at (2.1,-0.05) {tiempo $\rightarrow$};
-\end{tikzpicture}
-\end{center}
+\begin{column}{0.46\textwidth}
+\small
+Cada llamada falla con $p = 10\,\%$:
+\[
+P(\text{falla del pedido}) = 1-(1-p)^n
+\]
+\begin{itemize}
+\item $n = 5$: $1 - 0{,}9^{5} \approx \mathbf{41\,\%}$.
+\item Con un reintento la llamada falla si fallan \textbf{los dos} intentos: $p^2 = 1\,\%$, y el pedido, $1 - 0{,}99^{5} \approx \mathbf{4{,}9\,\%}$.
+\item Costo: $1 + p = 1{,}1$ intentos por llamada. Pero ante una caída, $p \to 1$ y cada llamada pasa a ser $1+r$ intentos.
+\end{itemize}
 \end{column}
 \end{columns}
 
-\pause
+{\scriptsize\color{UAIngMuted}Apunte: ``La cuenta de la amplificación''.}
+\end{frame}
 
-\begin{itemize}
-\item \textbf{Full jitter:} $e_n \sim U(0,\, d_n)$.
-\item \textbf{Equal jitter:} $e_n = d_n/2 + U(0,\, d_n/2)$.
+\begin{frame}{Reintentos en capas}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize},
+  lvl/.style={anchor=east, text=UAIngNavy}]
+\fill[UAIngOrange] (6,3) circle (0.12);
+\node[lvl] at (-0.3,3) {pedido del usuario: 1};
+\foreach \i in {0,1,2} {\fill[UAIngNavy] (4+\i*2,2) circle (0.1); \draw[UAIngMuted] (6,3) -- (4+\i*2,2);}
+\node[lvl] at (-0.3,2) {capa 1: 3 intentos};
+\foreach \i in {0,...,8} {\fill[UAIngNavy] (2+\i*1,1) circle (0.08); \draw[UAIngMuted] ({4+floor(\i/3)*2},2) -- (2+\i*1,1);}
+\node[lvl] at (-0.3,1) {capa 2: 9};
+\foreach \i in {0,...,26} {\fill[UAIngOrange] (0.4+\i*0.42,0) circle (0.06); \draw[UAIngMuted!60] ({2+floor(\i/3)*1},1) -- (0.4+\i*0.42,0);}
+\node[lvl] at (-0.3,0) {capa 3: \textbf{27}};
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item Cada capa reintenta y los factores \textbf{se multiplican}: $3^3 = 27$ llamadas por pedido. Con 3 reintentos (4 intentos) en tres capas, $4^3 = 64$ intentos sobre la base de datos.
+\item Decidir \textbf{en qué capa} se reintenta. Y un rechazo del breaker \textbf{nunca} se reintenta.
 \end{itemize}
 
+{\scriptsize\color{UAIngMuted}Beyer et al., \emph{Site Reliability Engineering} (2016), cap.~22.}
+\end{frame}
+
+\begin{frame}{Backoff exponencial y jitter}
+$d_n = \min(\text{tope},\ \text{base}\cdot m^{n})$. Base 100 ms, $m = 2$: el primer reintento espera 100 ms, el segundo 200 ms. Pero si todos esperan lo mismo, \textbf{reintentan juntos}.
+
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}, x=0.036cm]
+\foreach \y/\lab in {2/sin jitter, 1/full jitter, 0/equal jitter} {\draw[UAIngMuted] (0,\y*0.7) -- (210,\y*0.7); \node[anchor=east, text=UAIngNavy] at (-3,\y*0.7) {\textbf{\lab}};}
+\foreach \x in {0,100,200} {\draw[UAIngMuted] (\x,-0.15) -- (\x,1.55); \node[anchor=north, text=UAIngMuted] at (\x,-0.15) {\x\ ms};}
+\foreach \d in {-0.12,0,0.12} {\fill[UAIngOrange] (200,1.4+\d) circle (0.07);}
+\foreach \x in {30,120,190} {\fill[UAIngNavy] (\x,0.7) circle (0.07);}
+\foreach \x in {110,160,195} {\fill[UAIngNavy] (\x,0) circle (0.07);}
+\node[anchor=west, text=UAIngMuted] at (215,1.4) {los tres a los 200 ms};
+\node[anchor=west, text=UAIngMuted] at (215,0.7) {$e \sim U(0,\,d)$: 30, 120, 190};
+\node[anchor=west, text=UAIngMuted] at (215,0) {$e = d/2 + U(0,\,d/2)$: 110, 160, 195};
+\end{tikzpicture}
+\end{center}
+
+{\small Tres clientes fallan a la vez y esperan su segundo reintento ($d = 200$ ms). \emph{Full jitter} dispersa más; \emph{equal jitter} garantiza una espera mínima. El efecto solo se nota con \textbf{muchos} clientes.}
+
 {\scriptsize\color{UAIngMuted}Brooker, \emph{Exponential Backoff and Jitter}, AWS Architecture Blog (2015). Nygard (2018), cap.~4, \emph{Dogpile}.}
+\end{frame}
+
+\begin{frame}{Presupuesto de reintentos}
+Limitar los intentos \emph{por pedido} no alcanza: si la dependencia entera está sobrecargada, todos los pedidos agotan sus intentos y la carga casi se triplica.
+
+\begin{block}{Dos límites (Google)}
+\begin{itemize}
+\item \textbf{Por pedido:} como máximo 3 intentos.
+\item \textbf{Por cliente:} reintentar solo mientras los reintentos sean menos del 10\,\% de los pedidos que envía.
+\end{itemize}
+\end{block}
+
+\begin{itemize}\small
+\item Solo con el primero, los pedidos crecen hasta algo menos del triple; con los dos, en el caso general, 1,1 veces.
+\item El segundo se ajusta solo: si fallan muchos pedidos, el problema no es transitorio y se deja de reintentar.
+\item Variante simple: un tope por proceso, por ejemplo 60 reintentos por minuto.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Beyer et al., \emph{Site Reliability Engineering} (2016), caps.~21 y 22. Apunte: ``Presupuesto de reintentos''.}
 \end{frame}
 
 \begin{frame}{Caso Pokémon GO}
 \begin{itemize}
 \item Se probó la carga hasta 5 veces la estimación más optimista. El lanzamiento real tuvo \textbf{casi 50 veces} esa estimación.
-\pause
 \item La app reintentaba con ``a single immediate retry, followed by constant backoff''.
-\pause
 \item Los \emph{backends} devolvían errores rápidos: eso \textbf{sincronizó} los reintentos. Picos de hasta \textbf{20 veces} el máximo global anterior (\emph{thundering herd}).
-\pause
 \item Mitigación de fondo: \textbf{jitter} y \emph{backoff} exponencial truncado en los clientes.
 \end{itemize}
-
-\pause
 
 \begin{block}{Lección}
 Muchos clientes independientes, con reintentos sin dispersión, se vuelven \textbf{una sola ola}.
@@ -426,28 +583,21 @@ Muchos clientes independientes, con reintentos sin dispersión, se vuelven \text
 {\scriptsize\color{UAIngMuted}Bethea et al., en Beyer et al., \emph{The Site Reliability Workbook} (2018), cap.~11.}
 \end{frame}
 
-\begin{frame}{Prueba sugerida: reintentos ingenuos contra backoff con jitter}
-\begin{block}{Escenario: \texttt{errors} 10\,\% · Presets: \texttt{02-timeout-retry-naive} y \texttt{03-timeout-retry-backoff-jitter}}
-\texttt{02}: 3 reintentos inmediatos. \texttt{03}: 2 reintentos con backoff exponencial y full jitter.
-\end{block}
+\begin{frame}{Experimento: reintentos contra 10\,\% de errores}
+\experimento{errors 0.1}{00-no-protection $\to$ 02-timeout-retry-naive $\to$ 03-\ldots-jitter}
+\capturademo{s2-0203-error-rate.png}
 
-\textbf{Qué mirar:} tasa de error de los pedidos y llamadas a \texttt{special} por pedido.
-
-\pause
-
-\begin{itemize}
-\item Los reintentos bajan los errores de $\approx 37\,\%$ a $\approx 4\,\%$ o menos.  % TODO calibrar
-\item Las llamadas a \texttt{special} por pedido suben de $\approx 4{,}4$ a $\approx 4{,}9$.  % TODO calibrar
-\end{itemize}
-
-\pause
-
-\begin{alertblock}{Aclaración}
-A esta escala \textbf{no se ve diferencia} entre \texttt{02} y \texttt{03}: con pocos clientes no hay sincronización que romper. El jitter importa con miles de clientes.
-\end{alertblock}
+{\small Sin protección falla el \textbf{36,8\,\%} de los pedidos (la cuenta con $n = 4{,}9$ da 40\,\%; como $n$ varía de pedido en pedido, se mide algo menos). Con 3 reintentos inmediatos (\texttt{02}) falla el \textbf{0,14\,\%}; con 2 reintentos con backoff y jitter (\texttt{03}), el \textbf{0,55\,\%}.}
 \end{frame}
 
-\UASectionSlide{Configurar un circuit breaker}
+\begin{frame}{Experimento: el costo de los reintentos}
+\experimento{errors 0.1}{00-no-protection $\to$ 02-timeout-retry-naive $\to$ 03-\ldots-jitter}
+\capturademo{s2-0203-amplification.png}
+
+{\small Con reintentos, cada pedido hace \textbf{5,4 llamadas} a \texttt{special}, contra 4,9 en la línea de base: un 10\,\% más, el $1 + p$ de la cuenta (sin protección son 3,9: el pedido se corta en la primera falla). Entre \texttt{02} y \texttt{03} \textbf{no hay diferencia visible}: con un solo cliente no hay sincronización que romper.}
+\end{frame}
+
+\UASectionSlide{Circuit breaker}
 
 \begin{frame}{La máquina de estados}
 \begin{center}
@@ -473,8 +623,6 @@ A esta escala \textbf{no se ve diferencia} entre \texttt{02} y \texttt{03}: con 
 \end{tikzpicture}
 \end{center}
 
-\pause
-
 \begin{block}{Qué es}
 Un componente que ``falla primero'' para que el sistema no falle: existe para \textbf{prevenir} operaciones, no para reejecutarlas.
 \end{block}
@@ -486,18 +634,49 @@ Un componente que ``falla primero'' para que el sistema no falle: existe para \t
 \small
 \begin{description}
 \item[Qué cuenta como falla:] timeouts, errores de conexión y 5xx. \textbf{No} los 4xx ni los errores de validación.
+\item[Con timeouts:] sin timeout, la llamada lenta no termina y el breaker \textbf{no ve} la falla más peligrosa.
 \item[Cuándo abrir:] fallas consecutivas o tasa de fallas en ventana (siguientes slides).
 \item[Cuánto tiempo abierto:] muy corto, muchas pruebas fallidas; muy largo, degradación de más.
-\item[Half-open:] cuántas pruebas a la vez y cuántos éxitos para cerrar (riesgo de abrir y cerrar en bucle).
-\item[Alcance:] un breaker \textbf{por dependencia}, dentro de un proceso, sin compartir estado entre procesos (en la demo: \texttt{generator-upper}, \texttt{generator-lower}, \texttt{generator-digit}, \texttt{generator-special}).
-\item[Con timeouts y reintentos:] sin timeout el breaker no ve la falla lenta; cada intento cuenta; \textbf{un rechazo no se reintenta}.
-\item[Fallback y observabilidad:] qué recibe el usuario si está abierto; los cambios de estado se registran y se grafican.
+\item[Half-open:] cuántas pruebas a la vez y cuántos éxitos para cerrar.
+\item[Alcance:] un breaker \textbf{por dependencia} y por proceso (en la demo, \texttt{generator-special} y los otros tres).
+\item[Con reintentos:] cada intento cuenta; \textbf{un rechazo no se reintenta}.
+\item[Implementación:] \emph{thread-safe}, con el \emph{lock} solo sobre el estado, \textbf{nunca} sobre la llamada de red: si no, serializa todas las llamadas.
+\item[Observabilidad:] los cambios de estado se registran y se grafican.
 \end{description}
 
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5.}
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5. Apunte: ``Circuit breaker''.}
 \end{frame}
 
-\begin{frame}{El dilema: fallas consecutivas}
+\begin{frame}{Cuándo abrir: dos políticas, paso a paso}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize},
+  ok/.style={draw=UAIngNavy, fill=UAIngNavy!15, minimum size=0.55cm},
+  ko/.style={draw=UAIngOrange, fill=UAIngOrange!30, minimum size=0.55cm}]
+\node[anchor=west, text=UAIngMuted] at (6.6,2.8) {\tikz\node[ko, minimum size=0.25cm]{}; falla \quad \tikz\node[ok, minimum size=0.25cm]{}; éxito};
+\node[anchor=west, text=UAIngNavy] at (-0.4,2.1) {\textbf{Fallas consecutivas} ($k = 3$): cualquier éxito reinicia la cuenta};
+\foreach \i/\r/\c in {1/ok/0,2/ko/1,3/ko/2,4/ok/0,5/ko/1,6/ko/2,7/ko/3} {
+  \node[\r] at (\i*0.8,1.4) {\i};
+  \node[text=UAIngMuted] at (\i*0.8,0.85) {\c};
+}
+\node[anchor=east, text=UAIngMuted] at (0.4,0.85) {seguidas:};
+\node[anchor=west, text=UAIngOrange] at (6.0,1.4) {\textbf{abre}};
+\node[anchor=west, text=UAIngNavy] at (-0.4,0.15) {\textbf{Tasa en ventana} (últimas 10, mínimo 5, umbral 50\,\%)};
+\foreach \i/\r/\c in {1/ko/{100\,\%},2/ok/{50\,\%},3/ko/{67\,\%},4/ko/{75\,\%},5/ok/{60\,\%}} {
+  \node[\r] at (\i*0.8,-0.55) {\i};
+  \node[text=UAIngMuted] at (\i*0.8,-1.1) {\c};
+}
+\node[anchor=east, text=UAIngMuted] at (0.4,-1.1) {tasa:};
+\node[anchor=west, text=UAIngOrange, align=left] at (4.4,-0.55) {\textbf{abre}: llegó al mínimo\\con 60\,\%};
+\node[anchor=west, text=UAIngMuted, align=left] at (4.4,-1.25) {antes no decide, aunque la tasa\\supere el umbral};
+\end{tikzpicture}
+\end{center}
+
+{\small En los dos casos, abierto se rechaza todo durante el tiempo de espera; después, en \emph{half-open}, una llamada de prueba decide si cierra o vuelve a abrir.}
+
+{\scriptsize\color{UAIngMuted}Apunte: ``Cuándo abrir: fallas consecutivas contra tasa de fallas'' (tablas paso a paso).}
+\end{frame}
+
+\begin{frame}{El dilema de las fallas consecutivas}
 Con probabilidad de falla $p$, llamadas esperadas hasta ver $k$ fallas seguidas:
 \[
 E(k,p) = \frac{1 - p^{k}}{(1-p)\,p^{k}}
@@ -509,178 +688,151 @@ E(k,p) = \frac{1 - p^{k}}{(1-p)\,p^{k}}
  & $p = 10\,\%$ & $p = 50\,\%$ \\
 \midrule
 $k = 3$  & $\approx 1110$ llamadas & $14$ llamadas \\
-$k = 10$ & nunca (en la práctica) & $\approx 2046$ llamadas \\
+$k = 10$ & $\approx 1{,}1 \times 10^{10}$ (nunca) & $\approx 2046$ llamadas \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\pause
-
 \begin{alertblock}{Ningún $k$ sirve para las dos cosas}
-Tolerar el 10\,\% y detectar rápido el 50\,\%. Las fallas consecutivas \textbf{mezclan tasa de error con volumen de tráfico}: a alto tráfico, con $k=3$ abre con un 10\,\% y degrada el 100\,\% del tráfico.
+Tolerar el 10\,\% y detectar rápido el 50\,\%. Las fallas consecutivas \textbf{mezclan tasa de error con volumen de tráfico}: a 100 llamadas por segundo, con $k = 3$ y 10 s abierto, el breaker abre cada $\approx 11$ s y está abierto cerca del 47\,\% del tiempo con un 10\,\% de errores.
 \end{alertblock}
 
-{\scriptsize\color{UAIngMuted}Cuenta propia (rachas en ensayos independientes). A $\approx 22$ llamadas por segundo, 1110 llamadas son $\approx 50$ s.}  % TODO calibrar
+{\scriptsize\color{UAIngMuted}Cuenta propia (rachas en ensayos independientes de Bernoulli). Apunte: ``El dilema''.}
 \end{frame}
 
 \begin{frame}{La solución: tasa de fallas en una ventana}
-Se mantiene una \textbf{ventana deslizante} con las últimas $N$ llamadas y se abre cuando la \textbf{proporción} de fallas llega al umbral, pero \textbf{solo tras un mínimo} de llamadas.
-
-\pause
+Ventana deslizante con las últimas $N$ llamadas: abre cuando la \textbf{proporción} de fallas llega al umbral, pero \textbf{solo tras un mínimo} de llamadas.
 
 \begin{itemize}
-\item Ejemplo del preset \texttt{05-cb-rate}: ventana 50, mínimo 20, umbral 50\,\%.
-\item Con $p=10\,\%$: abrir exige $\ge 25$ fallas en 50. Probabilidad $\sim 10^{-12}$: \textbf{no abre}.
-\item Con $p=50\,\%$: abre apenas junta el mínimo (en decenas de llamadas, sin importar el volumen).
+\item Preset \texttt{05-cb-rate}: ventana 50, mínimo 20, umbral 50\,\%.
+\item Con $p = 10\,\%$: abrir exige 25 o más fallas en 50. Probabilidad del orden de $10^{-12}$: \textbf{no abre}.
+\item Con $p = 50\,\%$: la primera evaluación, con 20 llamadas, ya tiene cerca de un 59\,\% de probabilidad de ver 10 o más fallas. Abre en decenas de llamadas, \textbf{sin importar el volumen}.
 \end{itemize}
 
-\pause
-
-\begin{block}{Variante}
-Umbral de \textbf{llamadas lentas}: si una proporción grande supera una duración dada, la dependencia está degradada aunque no falle formalmente.
+\begin{block}{Compromiso}
+Ventana chica: rápida pero ruidosa. Ventana grande: estable pero lenta. Variante: abrir también por \textbf{llamadas lentas}.
 \end{block}
 
-{\scriptsize\color{UAIngMuted}Modelo de resilience4j, módulo \emph{CircuitBreaker}. Ventana chica: rápida pero ruidosa; ventana grande: estable pero lenta.}
+{\scriptsize\color{UAIngMuted}Cuenta propia (distribución binomial). Apunte: ``Política de tasa de fallas en ventana''.}
 \end{frame}
 
-\UASectionSlide{Pausa}
+\begin{frame}{Experimento: breaker y fallback contra la dependencia lenta}
+\experimento{latency 2000}{00-no-protection $\to$ 01-timeout-only $\to$ 06-complete}
+\capturademo{s1-06-server-latency.png}
 
-\begin{frame}{Pausa}
+{\small La latencia cae con \texttt{01} y sigue baja con \texttt{06} (p99 del cliente: \textbf{0,67 s}). La diferencia es el resultado: con \texttt{06} el breaker se abre, las llamadas se rechazan sin esperar y hay \textbf{cero errores}; el 98\,\% de las contraseñas sale sin caracteres especiales (\texttt{degraded}).}
+\end{frame}
+
+\begin{frame}{Experimento: el mismo breaker, sin fallback}
+\experimento{latency 2000}{06-complete, luego 07-cb-no-fallback}
+\capturademo{s1-07-outcomes.png}
+
+{\small Con \texttt{06} los pedidos salen degradados (amarillo); con \texttt{07} el breaker abre igual, pero sin fallback salen como \textbf{error} (rojo): el 98\,\%. El breaker protege al \emph{sistema}; que el usuario reciba algo útil es una decisión de producto, el \emph{fallback}.}
+\end{frame}
+
+\begin{frame}{Experimento: 10\,\% de errores con fallas consecutivas}
+\experimento{errors 0.1}{04-cb-consecutive-fragile ($k = 3$)}
+\capturademo{s2-04-err10-outcomes.png}
+
+{\small Un 10\,\% de errores que el sistema toleraba abrió el breaker \textbf{5 veces en 210 s} (la cuenta da una racha de 3 fallas cada $\approx 1110$ llamadas, cerca de un minuto a este ritmo). Cada apertura degrada \textbf{todo} el tráfico a \texttt{special} por 10 s: salió degradado el \textbf{53\,\%} de los pedidos.}
+\end{frame}
+
+\begin{frame}{Experimento: 10\,\% de errores con tasa en ventana}
+\experimento{errors 0.1}{05-cb-rate}
+\capturademo{s2-05-err10-breaker.png}
+
+{\small El breaker de \texttt{special} \textbf{no abre nunca}: la tasa (10\,\%) está lejos del umbral (50\,\%). Las llamadas que fallan van una por una al fallback (este preset no reintenta): sale degradado el 38\,\% de los pedidos, los que tuvieron alguna falla, y no todo el tráfico.}
+\end{frame}
+
+\begin{frame}{Experimento: 50\,\% de errores, las tres configuraciones}
+\experimento{errors 0.5}{04-cb-consecutive-fragile, 04b-cb-consecutive-tolerant, 05-cb-rate}
+\capturademo{s2-err50-breaker.png}
+
+{\small \texttt{04} ($k = 3$, desde 13:42) abre enseguida. \texttt{04b} ($k = 10$, desde 13:44) tarda \textbf{más de 2 minutos} en abrir por primera vez y deja pasar \textbf{1867} llamadas fallidas en 210 s. \texttt{05} (tasa, desde 13:48) abre enseguida: 31 llamadas fallidas en 90 s, igual que \texttt{04}. \textbf{El dilema, medido}.}
+\end{frame}
+
+\begin{frame}{Experimento: caída intermitente}
+\experimento{intermittent fast}{06-complete}
+\capturademo{s3-06-breaker.png}
+
+{\small El breaker de \texttt{special} se abre en cada caída y se cierra cuando \texttt{special} vuelve. Hubo \textbf{0 errores}: durante las caídas los pedidos salieron degradados (49\,\%). El estado \emph{half-open} dura lo que tarda una prueba (milisegundos) y no llega a verse con el muestreo del panel, cada 5 s.}
+\end{frame}
+
+\UASectionSlide{Degradación, bulkheads\\y control de la demanda}
+
+\begin{frame}{Degradación elegante (graceful degradation)}
 \begin{center}
-{\Large 10 minutos}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\node[draw=UAIngNavy, rounded corners, fill=white, align=left, font=\scriptsize\ttfamily] (a) at (0,0) {\{"password": "k7\#Qa2!mXp",\\\ "degraded": []\}};
+\node[draw=UAIngOrange, rounded corners, fill=white, align=left, font=\scriptsize\ttfamily] (b) at (6.2,0) {\{"password": "k7aQa2mXpR",\\\ "degraded": ["special"]\}};
+\node[anchor=south, text=UAIngNavy] at (a.north) {\textbf{normal}};
+\node[anchor=south, text=UAIngOrange] at (b.north) {\textbf{sin \texttt{special}: HTTP 200, degradada}};
+\end{tikzpicture}
 \end{center}
 
-\vspace{1em}
+\begin{itemize}\small
+\item El \emph{fallback} es una \textbf{decisión de producto}: caché, respuesta genérica, servicio secundario. Se decide con los interesados, de antemano.
+\item Tiene que ser \textbf{explícito} (el campo \texttt{degraded}) y \textbf{más barato} que el camino normal.
+\item A veces no es aceptable: una contraseña sin caracteres especiales puede violar la política de contraseñas. Degradar pasa a ser responder algo incorrecto; corresponde fallar explícito.
+\end{itemize}
 
-Piensen mientras tanto: ¿qué timeout le pondrían a cada servicio? ¿Qué breaker?
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5. Apunte: ``Degradación elegante''.}
 \end{frame}
 
-\UASectionSlide{Taller: diseñen la protección}
+\begin{frame}{Bulkheads: compartimentos estancos}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\node[anchor=south, text=UAIngNavy] at (2.0,0.75) {\textbf{un pool compartido}};
+\foreach \i in {0,...,7} {\fill[UAIngOrange] (\i*0.5,0) rectangle ++(0.4,0.5);}
+\node[anchor=north, text=UAIngMuted] at (2.0,-0.1) {\texttt{special} lenta bloquea los 8 hilos};
+\node[anchor=south, text=UAIngNavy] at (8.0,0.75) {\textbf{un pool por dependencia}};
+\foreach \i in {0,1} {\fill[UAIngOrange] (6.0+\i*0.5,0) rectangle ++(0.4,0.5);}
+\draw[UAIngNavy, thick] (6.95,-0.05) -- (6.95,0.55);
+\foreach \i in {0,...,5} {\draw[UAIngNavy, fill=UAIngNavy!15] (7.1+\i*0.5,0) rectangle ++(0.4,0.5);}
+\node[anchor=north, text=UAIngMuted, align=center] at (8.0,-0.1) {\texttt{special} agota solo su parte;\\las demás siguen atendiendo};
+\end{tikzpicture}
+\end{center}
 
-\begin{frame}{Consigna para los equipos}
-Para el generador de contraseñas, cada equipo entrega:
-\begin{enumerate}
-\item Un \textbf{timeout por dependencia} (\texttt{upper}, \texttt{lower}, \texttt{digit}, \texttt{special}), justificado con el \textbf{p99} del Grafana B y con la cadena \texttt{lower} $\to$ \texttt{digit}.
-\item La \textbf{política de reintentos}: cuántos, con qué espera, con o sin jitter.
-\item La \textbf{configuración del breaker}: política (consecutiva o tasa), umbrales, tiempo abierto, pruebas en half-open.
-\item La \textbf{decisión de fallback}: ¿qué respuesta recibe el usuario si \texttt{special} no está? ¿Es aceptable?
-\item Una \textbf{predicción} para cada escenario: \texttt{latency}, \texttt{errors} 10\,\% y 50\,\%, \texttt{intermittent}.
-\end{enumerate}
+\begin{itemize}\small
+\item Como los mamparos de un barco: el agua inunda un compartimento y el barco no se hunde. ``Salvar parte del barco''.
+\item Formas: hilos por dependencia (y un pool reservado para administración), procesadores, instancias dedicadas a clientes críticos, zonas y regiones.
+\item \textbf{Costo}: capacidad ociosa. Hay que buscar los límites naturales donde la partición conviene.
+\end{itemize}
 
-\pause
-
-{\small Los datos para trabajar están en la \textbf{ficha técnica} que reparte el docente (percentiles por dependencia, llamadas por pedido, tasa de entrada, tamaño del pool).}
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5, \emph{Bulkheads}. Apunte: ``Bulkheads''.}
 \end{frame}
 
-\UASectionSlide{Pruebas en vivo}
+\begin{frame}{Backpressure y load shedding}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=1.8cm, minimum height=0.7cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}]
+\node[st] (p) at (0,0) {productor};
+\foreach \i in {0,...,4} {\draw[UAIngNavy, fill=UAIngNavy!15] (2.4+\i*0.4,-0.3) rectangle ++(0.35,0.6);}
+\node[anchor=south, text=UAIngMuted] at (3.35,0.35) {cola acotada (llena)};
+\node[st] (c) at (6.2,0) {consumidor};
+\draw[flow] (p) -- (2.35,0);
+\draw[flow] (4.4,0) -- (c);
+\draw[-{Stealth[length=1.6mm]}, UAIngOrange, thick] (2.6,-0.45) to[bend left=25] node[below]{\textbf{backpressure}: frenar al productor} (0,-0.45);
+\draw[-{Stealth[length=1.6mm]}, UAIngOrange, thick] (1.4,0.15) -- (1.9,1.0) node[above]{\textbf{load shedding}: rechazar (503)};
+\end{tikzpicture}
+\end{center}
 
-\begin{frame}{Prueba 1: errores 10\,\% con breaker de fallas consecutivas frágil}
-\begin{block}{Escenario: \texttt{errors} 10\,\% · Preset: \texttt{04-cb-consecutive-fragile}}
-Timeout + breaker consecutivo con \texttt{fail\_max} 3 + fallback.
-\end{block}
+\begin{itemize}\small
+\item ``Every performance problem starts with a queue backing up somewhere.'' Sin límite, la cola crece y, por Little, también el tiempo de respuesta.
+\item \textbf{Backpressure} desacelera al productor (TCP lo hace con su ventana). Sirve con productores conocidos.
+\item \textbf{Load shedding} rechaza lo que no se va a completar a tiempo, lo antes posible: un rechazo rápido es mejor que un timeout lento. Ejemplo: un servicio de video en vivo descarta los cuadros que ya llegarían tarde (ejemplo de la cátedra).
+\end{itemize}
 
-\textbf{Para votar:} ¿abre el breaker \texttt{generator-special}? ¿Con qué frecuencia?
-
-\textbf{Qué mirar:} el \emph{state timeline} de los breakers y las contraseñas \texttt{degraded}.
-
-\pause
-
-\textbf{Hipótesis:} $\approx 1110$ llamadas hasta 3 fallas seguidas, es decir, abre cada $\approx 50$ s  % TODO calibrar
-y degrada el 100\,\% del tráfico a \texttt{special} mientras está abierto.
-\end{frame}
-
-\begin{frame}{Prueba 2: errores 50\,\% con breaker consecutivo tolerante}
-\begin{block}{Escenario: \texttt{errors} 50\,\% · Preset: \texttt{04b-cb-consecutive-tolerant}}
-Igual que \texttt{04}, con \texttt{fail\_max} 10.
-\end{block}
-
-\textbf{Para votar:} ¿cuánto tarda en abrir? ¿Y con \texttt{04} (\texttt{fail\_max} 3)?
-
-\textbf{Qué mirar:} el momento en que el breaker pasa a abierto, contra la tasa de error del Generator.
-
-\pause
-
-\textbf{Hipótesis:} \texttt{04} abre en menos de 1 s ($\approx 14$ llamadas); \texttt{04b} necesita $\approx 2046$ llamadas, cerca de 1,5 minutos.  % TODO calibrar
-
-\begin{alertblock}{El dilema, en vivo}
-Ningún \texttt{fail\_max} sirve para el 10\,\% y el 50\,\% a la vez.
-\end{alertblock}
-\end{frame}
-
-\begin{frame}{Prueba 3: tasa de fallas en ventana}
-\begin{block}{Escenario: \texttt{errors} 10\,\% y luego 50\,\% · Preset: \texttt{05-cb-rate}}
-Timeout + breaker por tasa (ventana 50, mínimo 20, umbral 50\,\%) + fallback.
-\end{block}
-
-\textbf{Para votar:} ¿abre con el 10\,\%? ¿Y con el 50\,\%?
-
-\textbf{Qué mirar:} estado de \texttt{generator-special} en los dos casos, y rechazos por segundo.
-
-\pause
-
-\textbf{Hipótesis:} con 10\,\% no abre nunca; con 50\,\% abre en uno o dos segundos. Resuelve el dilema.  % TODO calibrar
-\end{frame}
-
-\begin{frame}{Prueba 4: caída intermitente y half-open}
-\begin{block}{Escenario: \texttt{intermittent} · Preset: \texttt{06-complete}}
-Timeout + reintentos con backoff y jitter + breaker por tasa + fallback. \texttt{special} se cae unos segundos, vuelve, se cae.
-\end{block}
-
-\textbf{Qué mirar:} el ciclo del breaker: \texttt{OPEN} durante la caída, \texttt{HALF\_OPEN} cada \texttt{reset\_timeout\_s}, \texttt{CLOSED} al volver.
-
-\pause
-
-\textbf{Comparación:} \texttt{half\_open\_max\_calls} \textbf{1} contra \textbf{0} (sin tope): sin tope, al pasar a half-open salen hasta 8 pruebas a la vez (una por hilo).  % TODO calibrar
-
-\pause
-
-{\small Compromiso del \texttt{reset\_timeout\_s}: muy corto, muchas pruebas fallidas; muy largo, degradación innecesaria después de que \texttt{special} volvió.}
-\end{frame}
-
-\begin{frame}{Prueba 5: breaker sin fallback}
-\begin{block}{Escenario: \texttt{latency} (2 s) · Preset: \texttt{07-cb-no-fallback}}  % TODO calibrar
-Timeout + breaker por tasa, \textbf{sin} fallback.
-\end{block}
-
-\textbf{Para votar:} ¿el breaker alcanza para que el usuario no vea errores?
-
-\pause
-
-\textbf{Hipótesis:} el breaker abre y las llamadas a \texttt{special} se rechazan en $\sim 0$ ms: no hay saturación. Pero \textbf{todos los pedidos fallan}, rápido.
-
-\begin{alertblock}{Fallar rápido no es funcionar}
-El breaker protege al sistema. Que el usuario reciba algo útil es una decisión de producto: el \emph{fallback}. Y no siempre es aceptable: una contraseña sin caracteres especiales puede violar la política de contraseñas.
-\end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5: involucrar a los interesados en la decisión de fallback.}
-\end{frame}
-
-\UASectionSlide{Cierre}
-
-\begin{frame}{Lo que no probamos}
-\begin{description}
-\item[Bulkheads:] partir recursos (un pool por dependencia, instancias reservadas) para \emph{salvar parte del barco}. Costo: capacidad ociosa.
-\item[Backpressure:] desacelerar al productor cuando la cola se llena. ``Every performance problem starts with a queue backing up somewhere.''
-\item[Load shedding:] rechazar, lo antes posible, el trabajo que no se va a poder completar a tiempo; un rechazo rápido es mejor que un timeout lento.
-\end{description}
-
-\pause
-
-Backpressure desacelera al productor; load shedding rechaza trabajo que ya no puede procesarse dentro del deadline. Ambos protegen estabilidad, pero ofrecen semánticas distintas al cliente.
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), caps.~5 y 9. Los apuntes los desarrollan completos.}
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), caps.~5 y 9. Apunte: ``Backpressure y load shedding''.}
 \end{frame}
 
 \begin{frame}{Dos mecanismos sanos que interactúan mal: Dressy}
 \begin{itemize}
-\item Caso ilustrativo (ficticio) del Workbook: tres regiones, cada una a 90 RPS.
-\pause
-\item Se activó \emph{load shedding} por CPU. Una región (A) rechaza 10\,\%, 20\,\%, 50\,\% de los pedidos; la CPU queda constante.
-\pause
-\item El balanceador estima el costo por pedido con la CPU: ve la región A como diez veces más eficiente y le manda más tráfico (400 RPS contra 40 en B y C).
+\item Caso ilustrativo (ficticio) del Workbook: tres regiones detrás de un balanceador.
+\item Se activó \emph{load shedding} por CPU. La región A empieza a rechazar 10\,\%, 20\,\%, 50\,\% de los pedidos; su CPU queda constante.
+\item El balanceador estima el costo por pedido con la CPU: ve la región A como diez veces más eficiente y le manda más tráfico (400 pedidos por segundo contra 40 en B y C).
 \end{itemize}
-
-\pause
 
 \begin{alertblock}{Lección}
 ``The load balancer didn't know that the `efficient' requests were errors.'' Cada mecanismo debe examinarse junto con los demás, no por separado.
@@ -688,6 +840,59 @@ Backpressure desacelera al productor; load shedding rechaza trabajo que ya no pu
 
 {\scriptsize\color{UAIngMuted}Bethea et al., \emph{The Site Reliability Workbook} (2018), cap.~11.}
 \end{frame}
+
+\UASectionSlide{Combinar mecanismos}
+
+\begin{frame}{El orden dentro de una llamada}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize, align=center},
+  st/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=1.9cm, minimum height=0.8cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}]
+\node[st] (b) at (0,0) {bulkhead\\¿hay lugar?};
+\node[st] (c) at (2.6,0) {breaker\\¿está sana?};
+\node[st] (t) at (5.2,0) {timeout\\intento acotado};
+\node[st] (r) at (7.8,0) {reintento\\backoff + jitter};
+\node[st, draw=UAIngOrange] (f) at (10.4,0) {fallback};
+\draw[flow] (b) -- (c); \draw[flow] (c) -- (t); \draw[flow] (t) -- (r); \draw[flow] (r) -- (f);
+\draw[flow, draw=UAIngOrange] (r.north) to[bend right=30] node[above]{vuelve a pasar por el breaker} (c.north);
+\draw[flow, draw=UAIngMuted] (b.south) to[bend right=15] node[below]{rechazo} (f.south);
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item Cada mecanismo ahorra recursos al siguiente: bulkhead y breaker evitan intentos inútiles, el timeout acota los que se hacen, los reintentos recuperan lo transitorio sin saltarse las protecciones, el fallback decide qué hacer con el resto.
+\item Más patrones no es mejor: ``Count of patterns applied'' nunca es una buena métrica. Cada uno agrega configuración y modos de falla propios.
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~5. Apunte: ``Combinar mecanismos''.}
+\end{frame}
+
+\begin{frame}{Caso: la excepción que dejó en tierra a una aerolínea}
+\begin{center}
+\begin{tikzpicture}[every node/.style={font=\scriptsize, align=center}]
+\draw[-{Stealth[length=1.6mm]}, UAIngMuted] (0,0) -- (12.2,0);
+\foreach \x/\h/\t in {0.3/23\,h/conmutación\\de la base, 2.2/0:30/se da por\\terminada, 4.6/2:30/caen los\\quioscos, 6.6/5:30 este/hora pico\\de \emph{check-in}, 11.4/$\approx$ 15\,h/termina\\el atraso} {
+  \fill[UAIngOrange] (\x,0) circle (0.08);
+  \node[anchor=south, text=UAIngNavy] at (\x,0.12) {\textbf{\h}};
+  \node[anchor=north, text=UAIngMuted] at (\x,-0.12) {\t};
+}
+\end{tikzpicture}
+\end{center}
+
+\begin{itemize}\small
+\item Una excepción al cerrar la consulta impedía devolver la conexión al pool. Tras unas cuarenta llamadas, el pool se agotó.
+\item Todos los hilos de CF quedaron esperando una conexión; los 40 hilos de cada servidor de quioscos, esperando a CF (RMI, sin timeout).
+\item El monitoreo solo miraba una página de estado: CF parecía sano.
+\end{itemize}
+
+\begin{block}{Dónde se cortaba}
+Timeout en el pool y en el cliente · breaker en el cliente · bulkheads en CF · fallback decidido con el negocio · medir desde el cliente.
+\end{block}
+
+{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), caps.~2 y 3. Apunte: ``Caso de estudio'' (relato completo).}
+\end{frame}
+
+\UASectionSlide{Cierre}
 
 \begin{frame}{Modelo del Curso: Resiliencia en $D = (P, F, G, S, T)$}
 \begin{description}
@@ -704,22 +909,16 @@ Backpressure desacelera al productor; load shedding rechaza trabajo que ya no pu
 La resiliencia distribuida es control de propagación de falla, no negación de la falla.
 \end{block}
 
-\pause
+\begin{itemize}
+\item Sin protección, una dependencia lenta saturó el pool y tumbó el servicio entero.
+\item Los timeouts cortaron la saturación; los reintentos recuperaron lo transitorio; el breaker con fallback convirtió errores en respuestas degradadas.
+\item La política del breaker importa: con fallas consecutivas, ningún umbral sirve para el 10\,\% y el 50\,\% a la vez.
+\end{itemize}
 
 \begin{alertblock}{Hacia la próxima clase}
-Hoy inyectamos las fallas a mano y mirando qué pasaba. ¿Cómo se convierte eso en un \textbf{experimento con hipótesis}?
+En esta clase las fallas se inyectaron a mano. ¿Cómo se convierte eso en un \textbf{experimento con hipótesis}?
 \end{alertblock}
 $\rightarrow$ \textbf{Clase 12: Chaos Engineering y validación bajo falla.}
-\end{frame}
-
-\begin{frame}{Ticket de salida}
-En una hoja, por equipo:
-\begin{enumerate}
-\item La \textbf{propiedad principal} que su diseño protege.
-\item El \textbf{supuesto decisivo} sobre la falla (tasa de error, latencia, volumen).
-\item El \textbf{costo} que aceptan.
-\item La \textbf{condición} bajo la cual cambiarían el diseño.
-\end{enumerate}
 \end{frame}
 
 \end{document}
