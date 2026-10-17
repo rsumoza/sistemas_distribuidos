@@ -12,6 +12,8 @@
 
 \begin{document}
 \sloppy
+% Remisión al caso de la aerolínea, usada en las notas al pie.
+\newcommand{\historiaaerolinea}{La historia completa está en la sección~\ref{sec:aerolinea}, ``Caso de estudio: la excepción que dejó en tierra a una aerolínea'' (pág.~\pageref{sec:aerolinea}).}
 \maketitle
 
 \section{Introducción}
@@ -20,14 +22,14 @@ En un sistema distribuido la falla parcial no es una anomalía: es la condición
 
 \subsection{Falta, error y falla}
 
-Para hablar con precisión de la cadena que lleva de un defecto a una caída conviene distinguir tres términos.\footnote{Nygard (2018), cap.~3.} Los ejemplos de cada uno salen del caso de la aerolínea que se analiza completo en la sección~\ref{sec:aerolinea}.
+Para hablar con precisión de la cadena que lleva de un defecto a una caída conviene distinguir tres términos.\footnote{Nygard (2018), cap.~3.} Los ejemplos de cada uno salen del caso de una aerolínea.\footnote{\historiaaerolinea}
 \begin{description}
 \item[\emph{Fault} (falta):] condición que crea un estado interno incorrecto en el software. Puede deberse a un defecto latente que se dispara o a una condición no controlada en una frontera con otro sistema. \emph{Ejemplo:} tras una conmutación de la base de datos, cerrar una consulta lanza una excepción que el código no maneja, y la conexión a la base no se devuelve al pool. Nadie lo ve todavía, pero el pool pierde una conexión en cada llamada.
 \item[\emph{Error}:] comportamiento visiblemente incorrecto. \emph{Ejemplo:} los primeros llamantes del servicio de búsqueda de vuelos empiezan a recibir excepciones en lugar de resultados.
 \item[\emph{Failure} (falla):] un sistema que no responde. \emph{Ejemplo:} agotado el pool, el servicio de búsqueda de vuelos deja de responder, y con él los quioscos de \emph{check-in} que lo llaman.
 \end{description}
 
-\paragraph{La falla depende de quién mira.} Nygard agrega que ``Failure is in the eye of the beholder'': una computadora puede estar encendida y no responder ningún pedido.\footnote{Nygard (2018), cap.~3.} Que algo ``falló'' no es una propiedad del servidor sino del observador. Para un monitoreo que solo verifica que el proceso esté vivo o que una página de estado responda, el servidor está sano; para el usuario que no recibe respuesta, el sistema falló. En el caso de la aerolínea ocurrió exactamente esto: el monitoreo del servicio de vuelos consultaba solo una página de estado y lo mostraba sano mientras todos sus hilos estaban bloqueados.\footnote{La historia completa está en la sección~\ref{sec:aerolinea}, ``Caso de estudio: la excepción que dejó en tierra a una aerolínea'' (pág.~\pageref{sec:aerolinea}). Fuente: Nygard (2018), cap.~2.} La consecuencia práctica es que la salud de un servicio debe medirse desde el punto de vista de quien lo usa (la clase 10 lo llamó medir desde el cliente).
+\paragraph{La falla depende de quién mira.} Nygard agrega que ``Failure is in the eye of the beholder'': una computadora puede estar encendida y no responder ningún pedido.\footnote{Nygard (2018), cap.~3.} Que algo ``falló'' no es una propiedad del servidor sino del observador. Para un monitoreo que solo verifica que el proceso esté vivo o que una página de estado responda, el servidor está sano; para el usuario que no recibe respuesta, el sistema falló. En el caso de la aerolínea ocurrió exactamente esto: el monitoreo del servicio de vuelos consultaba solo una página de estado y lo mostraba sano mientras todos sus hilos estaban bloqueados.\footnote{\historiaaerolinea{} Fuente: Nygard (2018), cap.~2.} La consecuencia práctica es que la salud de un servicio debe medirse desde el punto de vista de quien lo usa (la clase 10 lo llamó medir desde el cliente).
 
 \paragraph{La grieta.} Una falta se convierte en error y un error provoca una falla; así avanza una \emph{grieta} (\emph{crack}). En cada eslabón la grieta puede acelerar, frenar o detenerse. El acoplamiento fuerte la acelera: cuantas más vías de propagación existen, más oportunidades hay de que una falta menor termine en una caída total. El conjunto formado por el disparador original, el modo en que la grieta se propaga y el daño resultante se denomina \emph{modo de falla} (\emph{failure mode}).\footnote{Nygard (2018), cap.~3.}
 
@@ -124,7 +126,7 @@ El \emph{timeout} no viene puesto: hay que configurarlo. Muchas librerías de cl
 \item En Python, la librería \texttt{requests} no corta nunca un pedido si no se le pasa el parámetro \texttt{timeout}: sin él, el código puede quedar colgado minutos o más.\footnote{Documentación de \texttt{requests}, sección \emph{Timeouts}: ``By default, requests do not time out unless a timeout value is set explicitly.''}
 \item En Java, \texttt{URLConnection} interpreta un \emph{timeout} de 0 como espera infinita, tanto para conectar como para leer.\footnote{Documentación de Java, \texttt{java.net.URLConnection}, métodos \texttt{setConnectTimeout} y \texttt{setReadTimeout}.}
 \end{itemize}
-Lo mismo vale para los recursos internos de un servicio: todo pool que bloquea al hilo que pide un recurso (una conexión a la base, por ejemplo) debe tener un plazo máximo de espera, y toda primitiva de sincronización debe usarse en su forma con plazo.\footnote{Nygard (2018), cap.~5.} En el caso de la aerolínea (sección~\ref{sec:aerolinea}), el pool de conexiones bloqueaba sin límite.
+Lo mismo vale para los recursos internos de un servicio: todo pool que bloquea al hilo que pide un recurso (una conexión a la base, por ejemplo) debe tener un plazo máximo de espera, y toda primitiva de sincronización debe usarse en su forma con plazo.\footnote{Nygard (2018), cap.~5.} En el caso de la aerolínea, el pool de conexiones bloqueaba sin límite.\footnote{\historiaaerolinea}
 
 \subsection{Timeout de conexión y timeout de lectura}
 
@@ -425,7 +427,7 @@ El \emph{bulkhead} tiene un precio: capacidad ociosa. Una partición reservada p
 
 \subsection{Un caso}
 
-En el caso de la aerolínea (sección~\ref{sec:aerolinea}), el servidor del servicio de vuelos usaba pools de hilos separados para las llamadas remotas y para las peticiones HTTP. Por eso podía seguir respondiendo a la aplicación de monitoreo aun en medio de la caída, y el diagnóstico posterior fue posible.\footnote{Nygard (2018), cap.~2.} Esa partición, sin embargo, no protegió a los demás sistemas: el recurso que se agotó (el pool de conexiones a la base) estaba dentro de la partición que atendía los pedidos de los clientes. Partir los servidores del servicio de vuelos en grupos dedicados a distintos clientes habría permitido seguir atendiendo el \emph{check-in} de pasajeros aunque otros consumidores no pudieran consultar vuelos.\footnote{Nygard (2018), cap.~5.}
+En el caso de la aerolínea, el servidor del servicio de vuelos usaba pools de hilos separados para las llamadas remotas y para las peticiones HTTP. Por eso podía seguir respondiendo a la aplicación de monitoreo aun en medio de la caída, y el diagnóstico posterior fue posible.\footnote{\historiaaerolinea{} Fuente: Nygard (2018), cap.~2.} Esa partición, sin embargo, no protegió a los demás sistemas: el recurso que se agotó (el pool de conexiones a la base) estaba dentro de la partición que atendía los pedidos de los clientes. Partir los servidores del servicio de vuelos en grupos dedicados a distintos clientes habría permitido seguir atendiendo el \emph{check-in} de pasajeros aunque otros consumidores no pudieran consultar vuelos.\footnote{Nygard (2018), cap.~5.}
 
 \section{Backpressure y load shedding}\label{sec:backpressure}
 
