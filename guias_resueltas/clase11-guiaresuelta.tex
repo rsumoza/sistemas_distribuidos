@@ -25,15 +25,6 @@ Las resoluciones son modelos de razonamiento. Deben verificarse contra los supue
 
 \section{Ejercicios y resoluciones completas}
 \begin{uaexercise}
-Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída. Base la explicación en lo que le pasa al pool de hilos del servicio que la llama.
-\end{uaexercise}
-\begin{uaanswer}
-Una dependencia caída suele fallar rápido: la conexión se rechaza en milisegundos, el hilo del llamante recibe un error y queda libre para atender otro pedido. Una dependencia lenta, en cambio, retiene al hilo mientras dura la espera. Por la ley de Little, la cantidad de hilos ocupados es $L = \lambda \cdot W$: si $W$ crece, $L$ crece sin que llegue un solo pedido más, y cuando supera el tamaño del pool los pedidos nuevos se acumulan en una cola. A partir de ahí el servicio deja de atender todo, no solo lo que usa la dependencia lenta: el proceso sigue vivo, pero para todo fin práctico está caído. Nygard lo resume así: ``Clearly, a slow response is a lot worse than no response'' (cap.~4).
-
-Además, la falla lenta es más difícil de ver. Los hilos bloqueados esperan entrada/salida y no consumen CPU, y un monitoreo que solo verifica que el proceso esté vivo lo muestra sano. La falla rápida, en cambio, produce errores inmediatos que el llamante puede contar y a los que puede reaccionar.
-\end{uaanswer}
-
-\begin{uaexercise}
 En el caso de la aerolínea (apunte, sección del caso de estudio), identifique cuál fue la falta (\emph{fault}), cuál el error y cuál la falla (\emph{failure}). ¿Por qué el monitoreo del servicio de búsqueda de vuelos lo mostraba sano durante la caída?
 \end{uaexercise}
 \begin{uaanswer}
@@ -44,15 +35,6 @@ En el caso de la aerolínea (apunte, sección del caso de estudio), identifique 
 \end{itemize}
 
 El monitoreo solo consultaba una página de estado, y esa página seguía respondiendo: el servidor de CF usaba pools de hilos separados para las llamadas remotas y para las peticiones HTTP, de modo que el pool que atendía al monitoreo no estaba bloqueado. Es el ejemplo de que la falla depende de quién mira (Nygard, cap.~3): para el monitoreo CF estaba sano; para los quioscos, no respondía. La salud de un servicio debe medirse desde el punto de vista de quien lo usa (clase 10).
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué la resiliencia distribuida no consiste en ``hacer más reintentos''.
-\end{uaexercise}
-\begin{uaanswer}
-Porque el retry solo ayuda si la causa es transitoria. Si la causa es saturación o degradación persistente, reintentar agrega más trabajo sobre el componente degradado y empeora la situación. En esos casos, el retry amplifica la falla en vez de tolerarla.
-
-Además, los reintentos se multiplican con el \emph{fan-out} y con la cantidad de capas que reintentan, y no sirven contra la falla lenta: sin un \emph{timeout} la llamada no termina y no hay nada que reintentar. La resiliencia consiste en \emph{contener} la propagación: acotar la espera (\emph{timeout}), dejar de insistir contra una dependencia enferma (\emph{circuit breaker}), responder algo útil en lugar del error (\emph{fallback}), aislar recursos (\emph{bulkhead}) y controlar la demanda (\emph{backpressure} y \emph{load shedding}). El reintento es una herramienta más, útil solo frente a fallas transitorias y acotada por un presupuesto.
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -110,14 +92,12 @@ La figura muestra la latencia de cada dependencia del generador de contraseñas 
 \begin{enumerate}
 \item ¿Por qué el valor sale del p99 más un margen, y no de la media ni del máximo?
 \item ¿Qué pasaría con un \emph{timeout} de 30\,ms? Tenga en cuenta que cada pedido hace unas 5 llamadas a \texttt{special}.
-\item El p99 de \texttt{lower} es de 97\,ms, más alto que el de las demás. ¿Por qué? Para elegir su \emph{timeout}, ¿hace falta saber que \texttt{lower} llama internamente a \texttt{digit}?
 \end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
 \begin{enumerate}
 \item El \emph{timeout} tiene que dejar pasar la variabilidad normal y cortar lo anormal. Con la media cortaría una fracción grande de las llamadas normales; con el máximo observado casi nunca actuaría. El p99 deja afuera solo el 1\,\% más lento de la operación normal, y el margen absorbe la variabilidad. Además, el percentil sale de histogramas con cubos de ancho fijo: es aproximado, lo que es otra razón para dejar margen. Debe medirse desde el llamante, porque esa latencia incluye la red y el encolamiento.
 \item 30\,ms está por debajo del p99, así que cortaría más del 1\,\% de las llamadas normales (cuánto más depende de la forma de la distribución, que la tabla no muestra). Con unas 5 llamadas por pedido, en condiciones normales tendría al menos $1 - 0{,}99^5 \approx 5\,\%$ de pedidos con alguna llamada cortada. La variabilidad normal se convertiría en errores, en reintentos que suman carga y hasta en aperturas del \emph{breaker} sin motivo.
-\item Porque \texttt{lower} llama a \texttt{digit}: medida desde el Generator, su latencia ya incluye esa consulta interna. Para el valor de partida no hace falta saberlo, porque el p99 medido desde el llamante ya contiene la cadena. Sí hace falta conocerla para verificar el peor caso: si \texttt{lower} tuviera \emph{timeout} y reintentos hacia \texttt{digit}, su $T_{\max}$ tendría que caber en el \emph{timeout} del Generator hacia \texttt{lower}. En los presets de la demo, el \emph{timeout} de lectura hacia \texttt{lower} es de 300\,ms y hacia \texttt{digit}, de 150\,ms.
 \end{enumerate}
 \end{uaanswer}
 
@@ -260,7 +240,7 @@ Con un \emph{bulkhead}, cada ruta tiene su porción del pool, o un tope de concu
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación? ¿Qué pasa con un \emph{circuit breaker} sin \emph{fallback}?
+Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación?
 \end{uaexercise}
 \begin{uaanswer}
 La degradación elegante consiste en responder algo útil, aunque incompleto, cuando una dependencia no está disponible, en lugar de devolver un error: la última respuesta buena o un valor en caché, una respuesta genérica en vez de una personalizada, o el resultado de un servicio secundario. En una caída total, la falla de una dependencia se convierte en un error para el usuario; con degradación, el sistema pierde una parte de su funcionalidad y sigue prestando el resto.
@@ -271,12 +251,10 @@ Una buena degradación es:
 \item \textbf{definida de antemano} junto con los interesados, no improvisada en la excepción;
 \item \textbf{más barata} que el camino normal; si cuesta lo mismo que la operación completa, no contiene nada.
 \end{itemize}
-
-Un \emph{breaker} sin \emph{fallback} falla rápido, pero sigue fallando: el llamante libera recursos y no se satura, pero el usuario recibe errores. En la demo, con la dependencia lenta, el preset \texttt{06} (con \emph{fallback}) no dio errores y el \texttt{07} (el mismo \emph{breaker}, sin \emph{fallback}) dio un 98\,\% de errores. El \emph{breaker} protege al sistema; el \emph{fallback} protege la experiencia del usuario.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe tres degradaciones concretas para una plataforma de comercio electrónico. Indique, además, una operación en la que degradar no sea aceptable.
+Diseñe tres degradaciones concretas para una plataforma de comercio electrónico.
 \end{uaexercise}
 \begin{uaanswer}
 Tres ejemplos, cada uno con su marca explícita:
@@ -286,8 +264,6 @@ Tres ejemplos, cada uno con su marca explícita:
 \item \textbf{Cálculo de envío no disponible:} permitir seguir con la compra e informar que el costo de envío se calculará antes de confirmar el pago.
 \end{itemize}
 Las tres son más baratas que el camino normal y se pueden acordar de antemano con el negocio.
-
-No es aceptable degradar el cobro: confirmar como pagada una compra cuyo pago no se verificó presenta como hecho algo que no ocurrió. Las opciones razonables son fallar de forma explícita y rápida, o tomar la orden como pendiente de pago, avisando al cliente, si el negocio acepta ese riesgo. Si se acepta o no una orden sin confirmar el stock es una decisión de producto, no técnica (Nygard, cap.~5).
 \end{uaanswer}
 
 \begin{uaexercise}
@@ -300,15 +276,6 @@ Aun marcada, para un generador real no es aceptable como respuesta por defecto. 
 \end{uaanswer}
 
 \section{Nivel 5: cálculo y casos integradores}
-\begin{uaexercise}
-Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 segundos. Usando la ley de Little, calcule cuántos hilos necesita para sostener esa tasa. Si el pool tiene 40 hilos, ¿qué ocurre y qué tasa puede sostener como máximo?
-\end{uaexercise}
-\begin{uaanswer}
-Por la ley de Little, $L = \lambda \cdot W = 20 \times 3 = 60$ hilos ocupados en promedio. Con un pool de 40 hilos el servicio no puede sostener la demanda: los 40 hilos quedan ocupados todo el tiempo y los pedidos sobrantes se acumulan en una cola, de modo que la latencia que ve el cliente crece sin límite mientras la del servidor parece estable (la diferencia es el tiempo en cola). La tasa máxima sostenible es $\lambda_{\max} = L_{\max} / W = 40 / 3 \approx 13{,}3$ pedidos por segundo.
-
-Las salidas posibles son reducir $W$ (un \emph{timeout} que corte la espera a una dependencia lenta, si esa es la causa), aumentar el pool (si el recurso que limita son los hilos y no otra cosa) o rechazar a tiempo el exceso (\emph{load shedding}). Agregar CPU no ayuda si los hilos están esperando E/S.
-\end{uaanswer}
-
 \begin{uaexercise}
 El servicio A llama a B y B llama internamente a C. El percentil 99 de B, medido desde A en condiciones normales, es de 150\,ms.
 \begin{enumerate}
@@ -364,15 +331,6 @@ Un \emph{circuit breaker} por fallas consecutivas está configurado con $k = 3$ 
 El número esperado de llamadas hasta ver 3 fallas seguidas con $p = 0{,}1$ es $E = (1 - p^3)/((1 - p)\,p^3) = 0{,}999 / 0{,}0009 \approx 1110$. A 100 llamadas por segundo, abre en promedio cada $\approx 11{,}1$\,s. Cada ciclo dura unos $11{,}1 + 10 = 21{,}1$\,s, de los cuales está abierto 10: cerca del 47\,\% del tiempo.
 
 No es aceptable: durante casi la mitad del tiempo se degrada el 100\,\% del tráfico hacia una dependencia que funcionaba normalmente (un 10\,\% de error era su comportamiento habitual). El problema es que la política mezcla tasa de error con volumen: con el mismo $k$ y menos tráfico, abriría mucho menos seguido.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué ningún valor de $k$ en un \emph{breaker} por fallas consecutivas permite a la vez tolerar un 10\,\% de errores y detectar rápido un 50\,\%. ¿Qué resuelve un \emph{breaker} por tasa de fallas en ventana y qué nuevo compromiso introduce?
-\end{uaexercise}
-\begin{uaanswer}
-Con $k = 3$ se detecta un 50\,\% en unas 14 llamadas, pero un 10\,\% produce rachas de 3 fallas cada $\approx 1110$ llamadas, que a alto tráfico ocurren cada pocos segundos. Con $k = 10$ un 10\,\% prácticamente nunca produce una racha, pero un 50\,\% necesita $\approx 2046$ llamadas. Las rachas dependen de la tasa \emph{y} del volumen: a más tráfico, más rachas por unidad de tiempo con la misma tasa.
-
-El \emph{breaker} por ventana mide la proporción de fallas sobre las últimas $N$ llamadas y abre cuando supera un umbral, una vez alcanzado un mínimo de llamadas. Mide la tasa directamente, sin importar el volumen: con 10\,\% no abre y con 50\,\% abre apenas junta el mínimo. El compromiso pasa al tamaño de la ventana y al mínimo: una ventana chica reacciona rápido pero es ruidosa (falsos positivos cerca del umbral); una grande es estable pero lenta, y el mínimo impide decidir en las primeras llamadas.
 \end{uaanswer}
 
 \begin{uaexercise}

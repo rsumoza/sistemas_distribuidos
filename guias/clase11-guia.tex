@@ -25,15 +25,7 @@ Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trad
 
 \section{Nivel 1: fundamentos y reconocimiento}
 \begin{uaexercise}
-Explique por qué una dependencia lenta puede ser más peligrosa que una dependencia completamente caída. Base la explicación en lo que le pasa al pool de hilos del servicio que la llama.
-\end{uaexercise}
-
-\begin{uaexercise}
 En el caso de la aerolínea (apunte, sección del caso de estudio), identifique cuál fue la falta (\emph{fault}), cuál el error y cuál la falla (\emph{failure}). ¿Por qué el monitoreo del servicio de búsqueda de vuelos lo mostraba sano durante la caída?
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué la resiliencia distribuida no consiste en ``hacer más reintentos''.
 \end{uaexercise}
 
 \begin{uaexercise}
@@ -61,7 +53,6 @@ La figura muestra la latencia de cada dependencia del generador de contraseñas 
 \begin{enumerate}
 \item ¿Por qué el valor sale del p99 más un margen, y no de la media ni del máximo?
 \item ¿Qué pasaría con un \emph{timeout} de 30\,ms? Tenga en cuenta que cada pedido hace unas 5 llamadas a \texttt{special}.
-\item El p99 de \texttt{lower} es de 97\,ms, más alto que el de las demás. ¿Por qué? Para elegir su \emph{timeout}, ¿hace falta saber que \texttt{lower} llama internamente a \texttt{digit}?
 \end{enumerate}
 \end{uaexercise}
 
@@ -113,11 +104,11 @@ Un servicio de comercio electrónico atiende con un único pool de 200 hilos tre
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación? ¿Qué pasa con un \emph{circuit breaker} sin \emph{fallback}?
+Defina degradación elegante y compárela con la caída total. ¿Qué condiciones debe cumplir una buena degradación?
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe tres degradaciones concretas para una plataforma de comercio electrónico. Indique, además, una operación en la que degradar no sea aceptable.
+Diseñe tres degradaciones concretas para una plataforma de comercio electrónico.
 \end{uaexercise}
 
 \begin{uaexercise}
@@ -125,10 +116,6 @@ En la demo, cuando falla la llamada a \texttt{special}, el \emph{fallback} arma 
 \end{uaexercise}
 
 \section{Nivel 5: cálculo y casos integradores}
-\begin{uaexercise}
-Un servicio recibe 20 pedidos por segundo y cada pedido ocupa un hilo durante 3 segundos. Usando la ley de Little, calcule cuántos hilos necesita para sostener esa tasa. Si el pool tiene 40 hilos, ¿qué ocurre y qué tasa puede sostener como máximo?
-\end{uaexercise}
-
 \begin{uaexercise}
 El servicio A llama a B y B llama internamente a C. El percentil 99 de B, medido desde A en condiciones normales, es de 150\,ms.
 \begin{enumerate}
@@ -157,10 +144,6 @@ Explique por qué un \emph{circuit breaker} no sirve sin \emph{timeouts}.
 
 \begin{uaexercise}
 Un \emph{circuit breaker} por fallas consecutivas está configurado con $k = 3$ y permanece abierto 10\,s cada vez. La dependencia tiene una tasa de error normal del 10\,\% y recibe 100 llamadas por segundo. ¿Cada cuánto abre en promedio? ¿Qué fracción del tiempo está abierto? ¿Es aceptable?
-\end{uaexercise}
-
-\begin{uaexercise}
-Explique por qué ningún valor de $k$ en un \emph{breaker} por fallas consecutivas permite a la vez tolerar un 10\,\% de errores y detectar rápido un 50\,\%. ¿Qué resuelve un \emph{breaker} por tasa de fallas en ventana y qué nuevo compromiso introduce?
 \end{uaexercise}
 
 \begin{uaexercise}
