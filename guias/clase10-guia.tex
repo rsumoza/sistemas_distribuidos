@@ -90,17 +90,34 @@ Aplique el modelo del curso $D=(P,F,G,S,T)$ al problema de la observabilidad dis
 \end{uaexercise}
 
 
-% ===== TBD: 3 ejercicios pendientes de redacción =====
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+El servicio \texttt{checkout} invoca por HTTP al servicio \texttt{payments}. En una traza, el span \texttt{CLIENT} emitido por \texttt{checkout} dura 480\,ms y el span \texttt{SERVER} emitido por \texttt{payments} dura 120\,ms. Los relojes de ambos hosts tienen un desfase de 300\,ms.
+\begin{enumerate}
+\item ¿Qué representan los 360\,ms de diferencia? ¿Es posible separar cuánto corresponde a la red de ida, a la red de vuelta y al encolamiento?
+\item ¿Por qué la resta es válida pese al desfase de 300\,ms entre relojes?
+\item Construya una ejecución en la que el span \texttt{SERVER} termine \emph{después} que el span \texttt{CLIENT} y explique qué revela.
+\item Compare este modelo con el span único de dos hosts de Dapper.
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+Una librería online está compuesta por cuatro servicios: \texttt{frontend} (API HTTP pública), \texttt{catalog} (búsqueda y ficha de libros, con base de datos propia), \texttt{stock} (reserva de ejemplares por depósito) y \texttt{payments} (cobro a través de un proveedor externo). Tras confirmar el pago, \texttt{frontend} publica un evento \texttt{order.confirmed} en una cola para que otro servicio prepare el envío. El flujo de compra es: el usuario busca un libro, abre su ficha y confirma la compra.
+\begin{enumerate}
+\item Enumere los spans que esperaría ver en la traza de \texttt{POST /checkout}, indicando para cada uno su nombre, su \texttt{SpanKind} y su span padre.
+\item Indique cuáles de esos spans genera la auto-instrumentación (Capa 1) y cuáles debe crear el desarrollador a mano (Capa 2).
+\item Proponga los atributos de dominio que agregaría a cada span. Para cada atributo, justifique qué pregunta de diagnóstico permite responder.
+\item Indique qué datos \textbf{no} deben incluirse en los spans ni en sus nombres, y por qué.
+\item De los atributos propuestos, ¿cuáles podrían usarse también como etiquetas de una métrica de latencia de \texttt{/checkout} y cuáles no?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+El percentil p99 de latencia de \texttt{/checkout} salta de 300\,ms a 4\,s, pero los dashboards de cada servicio downstream se muestran en verde. El equipo dispone de métricas con \emph{exemplars}, logs JSON con \texttt{trace\_id} y eventos anchos con los atributos \texttt{tenant.id}, \texttt{cart.items} y \texttt{availability\_zone}.
+\begin{enumerate}
+\item Recorra el Core Analysis Loop indicando, en cada paso, si se apoya en \emph{hard context} o en \emph{soft context} y qué mecanismo de correlación interviene (exemplar, correlación log--traza o análisis diferencial).
+\item El análisis diferencial muestra que \texttt{tenant.id=acme} concentra el 95\,\% de las solicitudes lentas, con carritos de alrededor de 30\,000 ítems. Explique por qué ningún servicio individual disparó una alerta.
+\item Indique qué parte del diagnóstico se pierde si \texttt{tenant.id} no está en los spans (hard context sin soft context) y qué parte se pierde si falta \texttt{trace\_id} (soft context sin hard context).
+\end{enumerate}
 \end{uaexercise}
 
 \end{document}

@@ -363,26 +363,97 @@ La formalización del problema de observabilidad distribuida bajo la tupla $D=(P
 \end{uaanswer}
 
 
-% ===== TBD: 3 ejercicios pendientes de redacción =====
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+El servicio \texttt{checkout} invoca por HTTP al servicio \texttt{payments}. En una traza, el span \texttt{CLIENT} emitido por \texttt{checkout} dura 480\,ms y el span \texttt{SERVER} emitido por \texttt{payments} dura 120\,ms. Los relojes de ambos hosts tienen un desfase de 300\,ms.
+\begin{enumerate}
+\item ¿Qué representan los 360\,ms de diferencia? ¿Es posible separar cuánto corresponde a la red de ida, a la red de vuelta y al encolamiento?
+\item ¿Por qué la resta es válida pese al desfase de 300\,ms entre relojes?
+\item Construya una ejecución en la que el span \texttt{SERVER} termine \emph{después} que el span \texttt{CLIENT} y explique qué revela.
+\item Compare este modelo con el span único de dos hosts de Dapper.
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-\textbf{[TBD]} Respuesta pendiente de redacción.
+\begin{enumerate}
+\item \textbf{Qué representa la diferencia.} $\text{duración}(\texttt{CLIENT}) - \text{duración}(\texttt{SERVER}) = 480 - 120 = 360$\,ms acota el tiempo que \textbf{no} transcurrió dentro del handler de \texttt{payments}: red de ida, red de vuelta y encolamiento previo a que el handler tome la solicitud (buffers de socket, cola del balanceador, pool de workers). Es una \emph{suma} de los tres componentes; la resta no permite separarlos. Para distinguirlos haría falta instrumentación adicional (por ejemplo, un span del proxy o del balanceador intermedio).
+\item \textbf{Por qué el desfase no la invalida.} Cada duración se mide contra un único reloj local: el span \texttt{CLIENT} con el reloj de \texttt{checkout} y el span \texttt{SERVER} con el de \texttt{payments}. El desfase de 300\,ms afecta a los \emph{timestamps absolutos} (el span \texttt{SERVER} puede aparecer dibujado fuera de su padre en la vista de la traza), pero no a las \emph{duraciones}, porque estas son diferencias entre dos lecturas del mismo reloj.
+\item \textbf{\texttt{SERVER} que termina después de \texttt{CLIENT}.} \texttt{checkout} configura un timeout de 500\,ms; \texttt{payments} queda bloqueado esperando la base de datos durante 3\,s. A los 500\,ms el llamante abandona y cierra el span \texttt{CLIENT} con error, mientras \texttt{payments} sigue trabajando y cierra su span \texttt{SERVER} mucho después. La relación padre--hijo se mantiene (la causalidad la fija \texttt{parent\_span\_id}), pero la contención temporal no. Revela \textbf{trabajo desperdiciado}: el servidor consume recursos para una respuesta que nadie va a leer, lo que sugiere propagar el \emph{deadline} aguas abajo o cancelar el trabajo cuando el llamante abandona.
+\item \textbf{Comparación con Dapper.} Dapper (Sigelman et al., 2010) usaba un único span por RPC, compartido por ambos hosts: cliente y servidor escribían timestamps de relojes distintos en el mismo registro, y el desfase se trataba por acotación (el cliente siempre envía antes de que el servidor reciba, y el servidor responde antes de que el cliente reciba la respuesta), obteniendo cotas inferior y superior para los timestamps del lado servidor. En OpenTelemetry, el par \texttt{CLIENT}/\texttt{SERVER} hace que cada extremo mida con su propio reloj y difiere la comparación al análisis, que es lo que permite la resta del punto 1 sin sincronizar relojes.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+Una librería online está compuesta por cuatro servicios: \texttt{frontend} (API HTTP pública), \texttt{catalog} (búsqueda y ficha de libros, con base de datos propia), \texttt{stock} (reserva de ejemplares por depósito) y \texttt{payments} (cobro a través de un proveedor externo). Tras confirmar el pago, \texttt{frontend} publica un evento \texttt{order.confirmed} en una cola para que otro servicio prepare el envío. El flujo de compra es: el usuario busca un libro, abre su ficha y confirma la compra.
+\begin{enumerate}
+\item Enumere los spans que esperaría ver en la traza de \texttt{POST /checkout}, indicando para cada uno su nombre, su \texttt{SpanKind} y su span padre.
+\item Indique cuáles de esos spans genera la auto-instrumentación (Capa 1) y cuáles debe crear el desarrollador a mano (Capa 2).
+\item Proponga los atributos de dominio que agregaría a cada span. Para cada atributo, justifique qué pregunta de diagnóstico permite responder.
+\item Indique qué datos \textbf{no} deben incluirse en los spans ni en sus nombres, y por qué.
+\item De los atributos propuestos, ¿cuáles podrían usarse también como etiquetas de una métrica de latencia de \texttt{/checkout} y cuáles no?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-\textbf{[TBD]} Respuesta pendiente de redacción.
+\begin{enumerate}
+\item \textbf{Spans de la traza de \texttt{POST /checkout}.} Una propuesta razonable:
+\begin{itemize}
+\item \texttt{POST /checkout} --- \texttt{SERVER} en \texttt{frontend}. Span raíz.
+\item \texttt{checkout.place\_order} --- \texttt{INTERNAL} en \texttt{frontend}, hijo del raíz. Agrupa la lógica de negocio de la compra.
+\item \texttt{POST /reservations} --- \texttt{CLIENT} en \texttt{frontend} hacia \texttt{stock}; su hijo es el \texttt{SERVER} homónimo en \texttt{stock}, que a su vez tiene un hijo \texttt{CLIENT} \texttt{UPDATE inventory} contra la base de datos.
+\item \texttt{POST /charges} --- \texttt{CLIENT} en \texttt{frontend} hacia \texttt{payments}; su hijo es el \texttt{SERVER} en \texttt{payments}, que tiene un hijo \texttt{CLIENT} hacia el proveedor externo (por ejemplo \texttt{POST /v1/payment\_intents}). El proveedor no está instrumentado: la traza termina en ese span \texttt{CLIENT}, y su duración es todo lo que se sabe de él.
+\item \texttt{order.confirmed publish} --- \texttt{PRODUCER} en \texttt{frontend}. Termina cuando la cola confirma la recepción; el procesamiento del envío queda en un span \texttt{CONSUMER} posterior.
+\end{itemize}
+La búsqueda y la ficha del libro (\texttt{GET /books/\{isbn\}} en \texttt{frontend} y en \texttt{catalog}, con su \texttt{SELECT books}) pertenecen a \emph{otras} trazas, porque son solicitudes HTTP distintas. Si \texttt{checkout} vuelve a consultar el precio en \texttt{catalog}, ese par \texttt{CLIENT}/\texttt{SERVER} sí aparece en esta traza.
+
+Los nombres siguen la convención de OpenTelemetry: \textbf{baja cardinalidad} y describen la \emph{clase} de operación (\texttt{\{método\} \{ruta\}} para HTTP, \texttt{\{operación\} \{tabla\}} para bases de datos), nunca la instancia. \texttt{GET /books/\{isbn\}} es un buen nombre; \texttt{GET /books/978-0-13-468599-1} no lo es, porque genera un nombre distinto por libro e impide agrupar.
+
+\item \textbf{Capa 1 vs. Capa 2.}
+\begin{itemize}
+\item \emph{Capa 1 (auto-instrumentación):} todos los spans \texttt{SERVER} y \texttt{CLIENT} HTTP, los de base de datos y, si la biblioteca de mensajería tiene instrumentación, el \texttt{PRODUCER}. Incluyen los atributos semánticos estándar (\texttt{http.request.method}, \texttt{http.route}, \texttt{http.response.status\_code}, \texttt{db.system}, \texttt{db.operation.name}) y propagan \texttt{traceparent} sin tocar el código de negocio.
+\item \emph{Capa 2 (manual):} el span \texttt{checkout.place\_order} y, sobre todo, los atributos de dominio del punto siguiente. La auto-instrumentación sabe que hubo un \texttt{POST}, pero no sabe qué libro, cuántos ejemplares ni con qué medio de pago.
+\end{itemize}
+
+\item \textbf{Atributos de dominio y pregunta que responden.}
+\begin{itemize}
+\item En el span raíz o en \texttt{checkout.place\_order}: \texttt{order.id} (localizar la traza de un pedido que reclama un cliente), \texttt{customer.tier} o \texttt{tenant.id} (¿la lentitud afecta a un segmento de clientes?), \texttt{cart.items\_count} y \texttt{cart.total\_amount} (¿los carritos grandes son los lentos? Es el caso del ``Cliente Elefante''), \texttt{app.version} (¿empezó con el último despliegue?).
+\item En \texttt{stock}: \texttt{book.isbn} (¿el problema se concentra en un título?), \texttt{stock.warehouse} (¿un depósito en particular?), \texttt{stock.reservation\_result} con valores \texttt{reserved}, \texttt{out\_of\_stock}, \texttt{partial} (distinguir un error técnico de un resultado de negocio legítimo).
+\item En \texttt{payments}: \texttt{payment.method} y \texttt{payment.provider} (¿falla una tarjeta o un proveedor?), \texttt{payment.attempt} (¿hay reintentos que amplifican la carga?), \texttt{payment.decline\_reason} (separar rechazos del banco de fallas del sistema).
+\end{itemize}
+Estos atributos son el \emph{soft context} que hace posible el paso 2 del Core Analysis Loop: sin ellos, el análisis diferencial no tiene dimensiones por las cuales cortar.
+
+\item \textbf{Qué no incluir.}
+\begin{itemize}
+\item \emph{Datos sensibles:} número de tarjeta, CVV, credenciales, tokens de sesión. La telemetría se replica a backends con otros controles de acceso y otra retención; exponer estos datos ahí es una fuga. Datos personales (email, dirección, nombre) tampoco: si hace falta correlacionar por cliente, se usa un identificador opaco.
+\item \emph{Identificadores en el nombre del span:} \texttt{order.id}, \texttt{isbn} o \texttt{user\_id} van como atributos, no en el nombre, para que los spans de la misma operación se puedan agrupar.
+\item \emph{Payloads completos:} el cuerpo entero del carrito o de la respuesta del proveedor infla el costo de almacenamiento sin aportar dimensiones útiles; alcanza con atributos resumidos (\texttt{cart.items\_count}).
+\end{itemize}
+
+\item \textbf{Atributos como etiquetas de métrica.} Sirven los de \textbf{baja cardinalidad finita}: \texttt{http.route}, \texttt{http.response.status\_code}, \texttt{payment.method}, \texttt{payment.provider}, \texttt{stock.warehouse}, \texttt{customer.tier}, \texttt{stock.reservation\_result}. No sirven \texttt{order.id}, \texttt{book.isbn} ni \texttt{cart.total\_amount}: cada valor distinto crea una serie temporal nueva en la TSDB y produce explosión de cardinalidad. Esos atributos se quedan en los spans y en los eventos anchos, y se llega a ellos desde la métrica a través de un \emph{exemplar}.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-\textbf{[TBD]} Ejercicio pendiente de redacción.
+El percentil p99 de latencia de \texttt{/checkout} salta de 300\,ms a 4\,s, pero los dashboards de cada servicio downstream se muestran en verde. El equipo dispone de métricas con \emph{exemplars}, logs JSON con \texttt{trace\_id} y eventos anchos con los atributos \texttt{tenant.id}, \texttt{cart.items} y \texttt{availability\_zone}.
+\begin{enumerate}
+\item Recorra el Core Analysis Loop indicando, en cada paso, si se apoya en \emph{hard context} o en \emph{soft context} y qué mecanismo de correlación interviene (exemplar, correlación log--traza o análisis diferencial).
+\item El análisis diferencial muestra que \texttt{tenant.id=acme} concentra el 95\,\% de las solicitudes lentas, con carritos de alrededor de 30\,000 ítems. Explique por qué ningún servicio individual disparó una alerta.
+\item Indique qué parte del diagnóstico se pierde si \texttt{tenant.id} no está en los spans (hard context sin soft context) y qué parte se pierde si falta \texttt{trace\_id} (soft context sin hard context).
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-\textbf{[TBD]} Respuesta pendiente de redacción.
+\begin{enumerate}
+\item \textbf{Core Analysis Loop sobre el incidente.}
+\begin{itemize}
+\item \emph{Paso 1, observar la anomalía agregada (métrica):} el histograma de latencia de \texttt{/checkout} muestra el salto del p99. Un \textbf{exemplar} asociado a un bucket alto entrega el \texttt{trace\_id} de una solicitud lenta real: es un enlace de \emph{hard context} desde la métrica hacia la traza.
+\item \emph{Paso 2, diferenciar dimensiones (eventos anchos):} el \textbf{análisis diferencial} compara la distribución de atributos entre solicitudes lentas y la línea base. Este paso es \emph{soft context}: \texttt{tenant.id}, \texttt{cart.items} y \texttt{availability\_zone} son las dimensiones por las que se corta la telemetría.
+\item \emph{Paso 3, confirmar con una traza individual (tracing):} se abre una traza representativa de \texttt{tenant.id=acme}. El DAG armado por \texttt{parent\_span\_id} (\emph{hard context}) muestra en qué spans se acumula el tiempo, y la \textbf{correlación log--traza} por \texttt{trace\_id}/\texttt{span\_id} trae los logs emitidos dentro de cada span.
+\end{itemize}
+Si \texttt{tenant.id} no explicara toda la anomalía, se filtra por ese atributo y se vuelve al paso 2.
+\item \textbf{Por qué nadie alertó.} Es el caso del ``Cliente Elefante'': un carrito de 30\,000 ítems genera micro-demoras en \emph{cada} servicio downstream (validación de stock, precios, impuestos, persistencia). Cada servicio agrega unas decenas o cientos de milisegundos, por debajo de su propio umbral; además, \texttt{acme} es una fracción pequeña del tráfico, de modo que sus solicitudes apenas mueven el p99 local de cada servicio. La falla está en la \textbf{suma a lo largo de la cadena}, que solo es visible en el borde (el API Gateway), donde la latencia acumulada supera el timeout.
+\item \textbf{Qué se pierde sin cada tipo de contexto.}
+\begin{itemize}
+\item \emph{Sin \texttt{tenant.id} (hard context sin soft context):} las trazas siguen conectadas y una traza lenta muestra muchos spans algo lentos, pero no hay dimensión que separe las solicitudes anómalas de las normales. El paso 2 no se puede ejecutar; el equipo ve \emph{dónde} se acumula el tiempo pero no \emph{a quién} le pasa ni por qué.
+\item \emph{Sin \texttt{trace\_id} (soft context sin hard context):} se puede descubrir que \texttt{acme} concentra la lentitud en cada servicio por separado, pero no se pueden encadenar los eventos de una misma solicitud a través de los servicios. Las micro-demoras no se pueden sumar por solicitud, los exemplars no apuntan a ninguna traza y el operador vuelve a alinear timestamps a ojo entre nodos con relojes desfasados.
+\end{itemize}
+\end{enumerate}
 \end{uaanswer}
 
 \end{document}
