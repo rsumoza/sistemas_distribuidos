@@ -881,19 +881,22 @@ Las piezas dependen unas de otras: sin SLI no hay \emph{steady state} para exper
 Una organización madura no se define por no tener incidentes, sino por medir con objetivos explícitos, validar sus supuestos antes de que la realidad lo haga y aprender de manera sistemática cuando algo falla. La confiabilidad es una propiedad del sistema y también de la organización que lo opera.
 \end{uakeybox}
 
-\section{Aplicación al Trabajo Final Integrador}
+\section{Aplicación al trabajo práctico}
 
-La entrega final pide tres evidencias que salen directamente de esta clase: un experimento de falla con hipótesis, línea de base, perturbación, métricas y conclusión; SLI, SLO, error budget, burn rate y alertas; y un runbook breve con un ejemplo de postmortem.
+El trabajo práctico (Asteria Online) pide construir tuplas $D = (P, F, G, S, T)$ en tres entregas, a nivel de mecanismo y sin implementar. No pide SLOs, experimentos ni postmortems como entregables, pero varias ideas de esta clase sirven para escribir mejor las soluciones (S) y los trade-offs (T).
 
-\begin{description}
-\item[SLIs y SLOs.] Para el camino crítico del sistema, definir al menos un SLI de disponibilidad y uno de latencia, cada uno con su especificación y su implementación (dónde y cómo se mide), qué eventos son válidos y qué cuenta como bueno. Fijar el SLO y la ventana, y justificar el valor por lo que necesita el usuario, no por lo que el prototipo logra hoy.
-\item[Error budget y política.] Calcular el presupuesto en tiempo y en eventos para el tráfico esperado, y escribir la política: qué cambia a medida que se consume y quién decide.
-\item[Alertas.] Calcular los umbrales de burn rate para al menos una alerta inmediata y una de ticket, con sus ventanas larga y corta, y el tiempo de detección esperado para una caída total y para una degradación parcial. Si el tráfico del prototipo es bajo, explicar cuál de las estrategias de la sección~\ref{sec:burn} se usa.
-\item[Experimento.] Usar el \emph{template} de la sección~\ref{sec:template-experimento}: el \emph{steady state} es uno de los SLIs anteriores, la hipótesis tiene que poder refutarse, y el criterio de aborto se expresa en burn rate. Reportar el resultado aunque refute la hipótesis: un experimento que encuentra una debilidad es un experimento exitoso.
-\item[Runbook y postmortem.] Una ficha del servicio y una entrada por cada alerta definida. El postmortem puede ser del propio experimento (si salió algo inesperado) o de un incidente ficticio, con la estructura del apéndice D, sin culpables, con factores contribuyentes y con acciones verificables y con dueño.
-\end{description}
+\paragraph{La garantía no lleva números; la solución, sí.} El enunciado pide que las garantías no tengan promesas absolutas (``nunca'', ``siempre'') ni números concretos (``en menos de 2 segundos''): esos compromisos son un atributo de la solución, no del interés que se protege. Es la misma separación de esta clase. La garantía describe qué le importa al jugador, como la especificación de un SLI (sección~\ref{sec:sli}). El SLO, en cambio, es el grado con que una solución concreta sostiene esa garantía, y por eso pertenece a S y a T. Por ejemplo, para la garantía ``el jugador no debe perder el oro pagado por un combate que no llegó a resolverse'', una solución podría declarar como SLI la proporción de entradas pagadas a combates no resueltos en las que el oro volvió al jugador, y un SLO sobre ese SLI. Otra solución para la misma garantía podría declarar un SLO distinto.
 
-La decisión principal se documenta en un ADR breve, con: contexto (el servicio y su usuario), dos alternativas (por ejemplo, SLI medido en el servidor contra en el balanceador, o una ventana de alerta contra varias), supuesto decisivo, garantía elegida, \emph{trade-off} aceptado, evidencia pendiente y fecha de revisión. Cuando un valor todavía no puede medirse, se registra como hipótesis junto con la medición que lo confirmaría.
+\paragraph{La brecha parcial, cuantificada.} En la Entrega 3, cuando una solución sostiene su garantía solo de forma parcial, hay que explicitar la brecha: bajo qué condiciones el interés queda expuesto. El error budget da una forma de medirla y de comparar dos soluciones con el mismo criterio. Por ejemplo, con un SLO de 99,9\,\% de disponibilidad de las instancias de combate en 30 días (43,2 minutos de presupuesto):
+\begin{itemize}
+\item una solución A, que ante la caída de un datacenter reubica las instancias en otro en 15 minutos, y
+\item una solución B, que mantiene réplicas listas y las reubica en 1 minuto.
+\end{itemize}
+Si en el datacenter caído corre un tercio de las instancias, la caída con la solución A equivale a 5 minutos de caída total (un tercio de 15) y consume el 12\,\% del presupuesto; con la solución B, unos 20 segundos y menos del 1\,\%. Los números son ilustrativos, pero muestran la forma de la comparación objetiva que pide la Entrega 3: el mismo SLI, el mismo presupuesto y cuánto consume cada solución ante la misma falla, frente al costo de cada una.
+
+\paragraph{Un SLI por subsistema y por tipo de jugador.} El enunciado prevé fallas parciales (la caída del directorio de zonas, de los combates o de los pagos) y exige que, ante picos de demanda, el juego priorice a quienes ya están jugando por sobre quienes intentan ingresar. Un SLI global esconde las dos cosas: una caída de los pagos se diluye en el promedio de todo el juego. Conviene pensar un SLI por subsistema, y separar el de los jugadores que ya están en una partida del de los que intentan ingresar, con objetivos distintos. El \emph{load shedding} de la clase 11 es, en esos términos, una decisión explícita de gastar el presupuesto del ingreso para proteger el de los jugadores que ya están jugando.
+
+\paragraph{Cómo se validaría una solución.} Aunque no se implemente, una solución se defiende mejor si se puede decir cómo se comprobaría que funciona. Los campos del \emph{template} de experimento (sección~\ref{sec:template-experimento}) sirven para eso: qué falla se inyectaría (por ejemplo, aislar Zurich de los otros dos datacenters), qué se observaría (el SLI del directorio de zonas en cada datacenter), qué resultado sostendría la decisión CAP elegida y qué resultado la refutaría. Pensarlo así suele revelar trade-offs que no aparecen al describir la solución en abstracto.
 
 \section{Bibliografía guiada y ruta de profundización}
 

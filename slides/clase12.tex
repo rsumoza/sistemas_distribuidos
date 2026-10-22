@@ -43,7 +43,7 @@
 \end{center}
 }
 
-\UASectionSlide{Apertura: ¿cuándo anda\\suficientemente bien?}
+\UASectionSlide{¿Cuándo anda\\suficientemente bien?}
 
 \begin{frame}{Dónde nos quedamos}
 \begin{itemize}
@@ -80,8 +80,8 @@ Sin una respuesta explícita, cada discusión se resuelve por intuición, por je
 
 \pause
 
-\begin{alertblock}{Para el TFI}
-La entrega final pide un experimento de falla; SLI, SLO, error budget, burn rate y alertas; y un runbook con un postmortem. Todo sale de esta clase.
+\begin{alertblock}{Para el trabajo práctico}
+En Asteria Online la garantía no lleva números. Los números de hoy (SLO, error budget) van en la \textbf{solución} y en su \textbf{trade-off}. Lo vemos al final.
 \end{alertblock}
 \end{frame}
 
@@ -684,12 +684,6 @@ La alerta de 1 h suena cuando el promedio de la hora llega a 1,44\,\%. Con \emph
 \item Bajar el SLO o agrandar la ventana: decisión de producto.
 \end{itemize}
 
-\pause
-
-\begin{alertblock}{Para el TFI}
-Los prototipos tienen poco tráfico. Hay que decir cuál de estas estrategias se usa.
-\end{alertblock}
-
 {\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~5. Apunte: sección 4.3.3.}
 \end{frame}
 
@@ -934,7 +928,7 @@ Resultado & Qué se observó, si la hipótesis se sostuvo, qué acciones siguen.
 \end{tabular}
 \end{center}
 
-{\scriptsize\color{UAIngMuted}Apunte: sección 5.3.5. Es lo que pide el punto 19 del TFI.}
+{\scriptsize\color{UAIngMuted}Apunte: sección 5.3.5.}
 \end{frame}
 
 \begin{frame}{Un experimento sobre el generador}
@@ -1231,6 +1225,29 @@ Revisarlo, compartirlo, leerlo en grupo, reconocer a quien manejó bien el incid
 
 \UASectionSlide{Cierre}
 
+\begin{frame}{Aplicación al trabajo práctico: Asteria Online}
+\begin{block}{La garantía no lleva números; la solución, sí}
+G: ``el jugador no debe perder el oro pagado por un combate que no llegó a resolverse''. El SLI y el SLO de cuánto lo logra son de cada \textbf{solución}: van en S y en T.
+\end{block}
+
+\pause
+
+\textbf{La brecha de la Entrega 3, en error budget.} SLO de 99,9\,\% para las instancias de combate (43,2 min en 30 días). Cae un datacenter con un tercio de las instancias:
+\begin{itemize}\small
+\item Solución A, reubica en 15 min: equivale a 5 min de caída total, \textbf{12\,\%} del presupuesto.
+\item Solución B, réplicas listas, 1 min: unos 20 s, \textbf{menos del 1\,\%}. A cambio, cuesta más.
+\end{itemize}
+
+\pause
+
+\begin{itemize}\small
+\item \textbf{Un SLI por subsistema} (directorio, combate, pagos) y \textbf{por tipo de jugador}: priorizar a quienes ya juegan es gastar el presupuesto del ingreso para proteger el de la partida (\emph{load shedding}, clase 11).
+\item \textbf{Validar sin implementar}: ¿qué falla se inyectaría y qué resultado sostendría la decisión CAP elegida?
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Números ilustrativos. Apunte: sección 10.}
+\end{frame}
+
 \begin{frame}{Modelo del Curso: Confiabilidad en $D = (P, F, G, S, T)$}
 \begin{description}\small
 \item[$P$ (Problema):] Operar con un nivel de servicio explícito, verificar que se cumple bajo falla y aprender cuando no.
@@ -1254,12 +1271,6 @@ Una organización madura no se define por no tener incidentes, sino por medir co
 \item Los experimentos validan la resiliencia de la clase 11, con costo calculado.
 \item Roles claros reducen el daño; el postmortem \emph{blameless} convierte el incidente en acciones.
 \end{itemize}
-
-\pause
-
-\begin{alertblock}{Para el TFI (12/11)}
-\textbf{19}: experimento con el template. \textbf{21}: SLI, SLO, error budget, burn rate y alertas. \textbf{22}: runbook breve y un postmortem.
-\end{alertblock}
 \end{frame}
 
 \end{document}
