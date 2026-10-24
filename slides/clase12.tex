@@ -3,9 +3,9 @@
 \input{../config/course-config}
 
 \UASetClassNumber{12}
-\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetClassTitle{Confiabilidad operativa: objetivos, experimentos e incidentes}
 \title{\UACourse}
-\subtitle{Clase 12 --- Chaos Engineering, fault injection y testing distribuido}
+\subtitle{Clase 12 --- SLOs, error budgets, experimentos bajo falla, incidentes y postmortems}
 
 \author{\UAProfessor}
 \date{\UADate}
@@ -18,230 +18,1129 @@
 \end{frame}
 }
 
-\UASectionSlide{El problema de confiar sin verificar}
+% Arquitectura del generador de contraseñas; el argumento permite agregar elementos.
+\newcommand{\generadordiagram}[1]{%
+\begin{center}
+\begin{tikzpicture}[
+  scale=0.80, transform shape,
+  every node/.style={font=\scriptsize},
+  box/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=1.9cm, minimum height=0.55cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy}
+]
+\node[box] (u) at (0,0) {Usuario};
+\node[box] (g) at (3.4,0) {Generador};
+\node[box] (up) at (7.6,1.5) {\emph{mayúsculas}};
+\node[box] (lo) at (7.6,0.5) {\emph{minúsculas}};
+\node[box] (di) at (7.6,-0.5) {\emph{dígitos}};
+\node[box] (sp) at (7.6,-1.5) {\emph{especiales}};
+\draw[flow] (u) -- node[above]{solicitud} (g);
+\draw[flow] (g) -- (up.west);
+\draw[flow] (g) -- (lo.west);
+\draw[flow] (g) -- (di.west);
+\draw[flow] (g) -- (sp.west);
+#1
+\end{tikzpicture}
+\end{center}
+}
 
-\begin{frame}{Diseñar no alcanza}
-Ya vimos:
+\UASectionSlide{¿Cuándo anda\\suficientemente bien?}
+
+\begin{frame}{Dónde nos quedamos}
 \begin{itemize}
-\item consistencia
-\item resiliencia
-\item observabilidad
+\item Clase 10: cómo \textbf{ver} lo que pasa dentro del sistema.
+\item Clase 11: cómo decidir de antemano de qué manera \textbf{falla}.
 \end{itemize}
 
 \pause
 
-\begin{block}{Pregunta}
-¿Cómo sabemos que el sistema realmente se comporta bien bajo falla?
+\begin{block}{La pregunta que falta}
+¿Cuándo está el sistema funcionando \textbf{suficientemente bien}?
 \end{block}
-\end{frame}
-
-\begin{frame}{La intuición equivocada}
-Muchos equipos asumen:
-\begin{itemize}
-\item “si el código parece correcto, va a resistir”
-\item “si tenemos retries y breakers, alcanza”
-\end{itemize}
 
 \pause
 
-\begin{alertblock}{Problema}
-Los sistemas distribuidos fallan en interacción, no solo en componentes aislados.
-\end{alertblock}
-\end{frame}
-
-\UASectionSlide{Chaos Engineering}
-
-\begin{frame}{Definición}
-\begin{block}{}
-Chaos Engineering = disciplina experimental que estudia cómo responde un sistema ante perturbaciones controladas.
-\end{block}
-\end{frame}
-
-\begin{frame}{Idea central}
-No se trata de romper por romper.
-
-\pause
-
-Se trata de:
-\begin{itemize}
-\item formular hipótesis
-\item introducir una perturbación
-\item observar si el sistema mantiene el comportamiento esperado
+Sin una respuesta explícita, cada discusión se resuelve por intuición, por jerarquía o por quién argumenta mejor:
+\begin{itemize}\small
+\item ¿Liberamos esta versión hoy?
+\item ¿Esta alerta merece despertar a alguien a las 3 AM?
+\item ¿El \emph{circuit breaker} que configuramos alcanza?
+\item ¿El incidente de ayer fue grave?
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Ciclo experimental}
+\begin{frame}{Los seis temas de hoy}
 \begin{enumerate}
-\item definir steady state
-\item formular hipótesis
-\item inyectar falla
-\item medir impacto
-\item aprender / corregir
+\item \textbf{SLI, SLO y SLA}: definir con números qué es ``suficientemente bien''.
+\item \textbf{Error budget}: cuánta falla se tolera, y cómo se usa para decidir.
+\item \textbf{Alertas sobre el objetivo (\emph{burn rate})}: avisar a tiempo, sin falsas alarmas.
+\item \textbf{Experimentos bajo falla (\emph{Chaos Engineering})}: comprobar antes de un incidente real que el sistema se comporta como suponemos.
+\item \textbf{Gestión de incidentes}: responder de forma coordinada.
+\item \textbf{Postmortems}: aprender para que no se repita.
 \end{enumerate}
+
+\pause
+
+\begin{alertblock}{Para el trabajo práctico}
+En Asteria Online la garantía no lleva números. Los números de hoy (SLO, error budget) van en la \textbf{solución} y en su \textbf{trade-off}. Lo vemos al final.
+\end{alertblock}
 \end{frame}
 
-\UASectionSlide{Fault Injection}
-
-\begin{frame}{Tipos de falla inyectable}
+\begin{frame}{La confiabilidad es gestión de riesgo}
+El objetivo podría ser: que el sistema no falle nunca. \pause Pasado cierto punto, más confiabilidad es \textbf{peor}:
 \begin{itemize}
-\item crash de servicio
-\item latencia artificial
-\item pérdida de paquetes
-\item partición de red
-\item saturación de CPU
-\item errores de dependencia
+\item \textbf{El costo no es lineal}: cada mejora puede costar cien veces más que la anterior. Réplicas, capacidad ociosa y, sobre todo, ingenieros que no construyen funcionalidades.
+\item \textbf{El usuario no lo nota}: acostumbrado a un servicio confiable al 99\,\%, nadie distingue un servicio al 99,99\,\% de uno al 99,999\,\%.
+\item \textbf{Compite con la velocidad de cambio}: más estabilidad, menos cambios.
 \end{itemize}
+
+\pause
+
+\begin{block}{El objetivo es mínimo y máximo a la vez}
+Por debajo, los usuarios sufren. Por encima, nadie nota el nueve de más, y ese esfuerzo podría haberse usado en otra cosa.
+\end{block}
 \end{frame}
 
-\begin{frame}{Qué se busca}
+\begin{frame}{Cómo se encadenan los temas}
+\begin{center}
+\begin{tikzpicture}[
+  every node/.style={font=\scriptsize, align=center},
+  box/.style={draw=UAIngNavy, fill=white, rounded corners, minimum width=2.5cm, minimum height=0.95cm},
+  flow/.style={-{Stealth[length=1.6mm]}, draw=UAIngNavy},
+  scale=0.70, transform shape
+]
+\node[box] (m) at (0,2.6) {\textbf{Medir}\\SLI, SLO, error budget};
+\node[box] (a) at (4.6,2.6) {\textbf{Alertar}\\\emph{burn rate}};
+\node[box] (v) at (7.6,0) {\textbf{Validar}\\experimentos bajo falla};
+\node[box] (r) at (3.8,-2.4) {\textbf{Responder}\\gestión de incidentes};
+\node[box, draw=UAIngOrange] (p) at (-0.4,-0.6) {\textbf{Aprender}\\postmortem};
+\draw[flow] (m) -- (a);
+\draw[flow] (a) -- (v);
+\draw[flow] (v) -- (r);
+\draw[flow] (r) -- (p);
+\draw[flow, draw=UAIngOrange] (p) -- (m);
+\node[text=UAIngMuted] at (6.9,1.75) {el SLI es el\\\emph{steady state}};
+\node[text=UAIngMuted] at (8.1,-1.5) {un experimento puede\\volverse incidente};
+\node[text=UAIngMuted] at (-1.6,1.15) {las acciones cambian\\qué se mide y prueba};
+\end{tikzpicture}
+\end{center}
+
+\pause
+
+{\small Medir define ``normal''; alertar lo vigila; validar y responder lo usan como referencia; aprender lo corrige.}
+
+\end{frame}
+
+\begin{frame}{El ejemplo de hoy: el generador de contraseñas}
+\generadordiagram{\draw[-{Stealth[length=1.6mm]}, draw=UAIngOrange, dashed, line width=1pt] (lo.east) to[bend left=50] node[right, text=UAIngOrange]{oculta} (di.east);}
+
+\begin{itemize}\small
+\item Lo de la clase 11: 5 llamadas a cada hijo, \textbf{20 por solicitud}. \emph{minúsculas} llama por dentro a \emph{dígitos}. Una contraseña sin especiales \textbf{no} es una degradación aceptable.
+\item Supuesto para las cuentas: \textbf{5 solicitudes/s} $\Rightarrow$ 18\,000 por hora y unas \textbf{12,96 millones en 30 días} ($5 \times 60 \times 60 \times 24 \times 30$).
+\end{itemize}
+
+\pause
+
+{\small Para quien lo usa, ``funcionar bien'' es: \textbf{recibir una contraseña válida} y \textbf{recibirla rápido}. Todavía vago: hay que convertirlo en números.}
+\end{frame}
+
+\UASectionSlide{Medir: SLI, SLO y SLA}
+
+\begin{frame}{Una promesa implícita}
+Todo servicio lleva una promesa: que responda, rápido, y bien. Mientras sea implícita, cada uno la lee a su manera:
+\begin{itemize}\small
+\item quien desarrolla: ``anda bien si no hay errores en los logs'';
+\item quien lo usa: ``si la página de registro no se traba'';
+\item quien lo vende: ``si nadie se queja''.
+\end{itemize}
+
+\pause
+
+\begin{block}{Un acuerdo explícito tiene tres piezas}
+\begin{enumerate}
+\item \textbf{Qué se mide}: el indicador (SLI).
+\item \textbf{Qué valor es aceptable}: el objetivo (SLO).
+\item \textbf{Qué pasa si no se cumple}: el acuerdo con consecuencias (SLA).
+\end{enumerate}
+\end{block}
+\end{frame}
+
+\begin{frame}{SLI, SLO y SLA}
+Las tres siglas empiezan con \textbf{SL}, \emph{Service Level}: el \textbf{nivel de servicio}, es decir, qué tan bien le funciona el servicio a quien lo usa.
+
 \begin{itemize}
-\item ver si el sistema degrada con gracia
-\item verificar breakers, retries, backpressure
-\item detectar dependencias ocultas
-\item validar hipótesis de operación
+\item \textbf{SLI} (\emph{Service Level Indicator}): una medida cuantitativa del nivel de servicio.
+\item \textbf{SLO} (\emph{Service Level Objective}): un valor objetivo para un SLI: ``SLI $\ge$ objetivo''.
+\item \textbf{SLA} (\emph{Service Level Agreement}): un contrato con consecuencias si no se cumplen sus SLOs.
 \end{itemize}
+
+\pause
+
+\begin{block}{En el generador}
+\begin{itemize}\small
+\item \textbf{SLI}: el porcentaje de solicitudes que reciben una contraseña válida.
+\item \textbf{SLO}: ese porcentaje es al menos \textbf{99,9\,\%} en los últimos 30 días.
+\item \textbf{SLA}: si en un mes queda por debajo de \textbf{99,5\,\%}, el cliente recibe un descuento (ilustrativo).
+\end{itemize}
+\end{block}
 \end{frame}
 
-\UASectionSlide{Steady State}
+\begin{frame}{El SLI como proporción de eventos buenos}
+\[
+\text{SLI} = \frac{\text{eventos buenos}}{\text{eventos válidos}} \times 100\,\%
+\]
 
-\begin{frame}{Steady State}
-\begin{block}{}
-Variable o conjunto de variables que representan comportamiento normal aceptable del sistema.
+\begin{itemize}
+\item Todos los SLIs en la misma escala: de 0\,\% a 100\,\%, donde 100\,\% es lo mejor.
+\item Mide bien las fallas \textbf{parciales}, que en un sistema distribuido son la norma.
+\item Disponibilidad $=$ solicitudes exitosas / válidas: la \textbf{disponibilidad semántica} de la clase 8, no el \emph{uptime} del proceso.
+\end{itemize}
+
+\pause
+
+\begin{alertblock}{``Válidos'' define la población}
+Una solicitud mal formada (4xx) no dice nada sobre la salud del servicio: se excluye.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Especificación e implementación}
+\textbf{Especificación}: lo que le importa al usuario. ``La proporción de solicitudes de generación de contraseña que reciben una contraseña válida''.
+
+\textbf{Implementación}: dónde y cómo se mide.
+
+\pause
+
+\begin{center}
+\footnotesize
+\begin{tabular}{p{0.27\textwidth}p{0.30\textwidth}p{0.33\textwidth}}
+\toprule
+\textbf{Dónde} & \textbf{Ventaja} & \textbf{Limitación} \\
+\midrule
+Logs del generador & Barata, desde el día uno. & No ve lo que nunca llegó al proceso. \\
+Balanceador & Más cerca del usuario. & No sabe si la contraseña cumple la política. \\
+Cliente sintético (\emph{prober}) & Recorrido completo, valida contenido. & Tráfico artificial. \\
+Instrumentación en el cliente & Lo más real. & Cara; mezcla la red del usuario. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\small Regla: medir lo más cerca del usuario que se pueda. Para empezar, lo que cueste poco.}
+\end{frame}
+
+\begin{frame}{Qué medir según el tipo de servicio}
+\begin{center}
+\small
+\begin{tabular}{p{0.28\textwidth}p{0.62\textwidth}}
+\toprule
+\textbf{Tipo de servicio} & \textbf{SLIs habituales} \\
+\midrule
+Atiende solicitudes & Disponibilidad, latencia, calidad (¿estaba degradada?) \\
+Almacenamiento & Latencia, disponibilidad, durabilidad \\
+\emph{Pipeline} de datos & Frescura, corrección, cobertura, \emph{throughput} \\
+Cualquiera & Corrección: ¿la respuesta era la correcta? \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\pause
+
+\begin{alertblock}{La corrección entra en el SLI}
+Si ``bueno'' fuera cualquier HTTP 200, una contraseña sin especiales devuelta por un \emph{fallback} mal decidido contaría como éxito. El evento bueno es: \textbf{200 con una contraseña que cumple la política}.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{SLO: cómo elegir el valor}
+Empezar por lo que le importa al usuario, no por lo que es fácil de medir.
+
+\pause
+
+\begin{itemize}\small
+\item \textbf{No copiar el desempeño actual}: puede atar al equipo a esfuerzos heroicos.
+\item \textbf{Mantenerlo simple}: un ``índice de salud'' que promedia disponibilidad, latencia y CPU puede no moverse aunque todo cambie. Un SLI por propiedad.
+\item \textbf{Evitar absolutos}: ``siempre disponible'' no es un requisito.
+\item \textbf{Pocos SLOs}: si uno nunca sirve para ganar una discusión de prioridades, sobra.
+\item \textbf{La perfección puede esperar}: empezar laxo y ajustar.
+\end{itemize}
+
+\pause
+
+\begin{block}{La ventana}
+Deslizante de \textbf{30 días} (o 4 semanas): se parece a la memoria del usuario. Una ventana fija se reinicia de golpe; una de 90 días permite gastar el 90\,\% del presupuesto en un día y cumplir igual.
+\end{block}
+\end{frame}
+
+\begin{frame}{Margen de seguridad y no sobrecumplir}
+\begin{block}{Margen de seguridad}
+Usar internamente un SLO \textbf{más estricto} que el que se publica: da tiempo a corregir un problema antes de que lo note el usuario.
 \end{block}
 
 \pause
 
-Ejemplos:
-\begin{itemize}
-\item tasa de checkout exitoso
-\item error rate
-\item latencia p95
-\item mensajes procesados por segundo
+\textbf{No sobrecumplir.} Los usuarios construyen sobre lo que el servicio \textbf{realmente} da. Si rinde mucho mejor que su SLO, otros dependen de él \textbf{como si no pudiera fallar}, y cuando falla no saben funcionar sin él.
+
+\pause
+
+\begin{block}{Tres formas de no sobrecumplir}
+\begin{itemize}\small
+\item Diseñarlo para que \textbf{no sea más rápido} cuando tiene poca carga.
+\item \textbf{Rechazar a propósito} una pequeña parte de las solicitudes.
+\item La más drástica: \textbf{apagarlo a propósito} de vez en cuando, si no hubo caídas reales. Se usa en servicios de infraestructura de los que dependen muchos otros.
 \end{itemize}
+\end{block}
 \end{frame}
 
-\begin{frame}{Por qué importa}
-Sin steady state:
-\begin{itemize}
-\item no sabés qué validar
-\item no sabés si el experimento “salió bien”
-\item solo generás ruido
-\end{itemize}
-\end{frame}
+\begin{frame}{SLA: el acuerdo}
+\begin{block}{La prueba}
+¿Qué pasa si no se cumple? Si no hay una consecuencia explícita (reintegro, penalidad), es un SLO.
+\end{block}
 
-\UASectionSlide{Testing distribuido}
-
-\begin{frame}{No todo testing es igual}
 \begin{itemize}
-\item unit tests
-\item integration tests
-\item system tests
-\item failure tests
-\item chaos experiments
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Qué no alcanza}
-\begin{itemize}
-\item testear funciones aisladas
-\item mocks perfectos
-\item escenarios sin latencia ni pérdida
+\item Es una decisión comercial y legal. Al equipo técnico le toca decir cuán difícil es cumplirlo y que sus SLIs se puedan medir sin discusión.
+\item Conviene prometer poco: cuantos más clientes tiene un SLA, más difícil es cambiarlo.
 \end{itemize}
 
 \pause
 
-\begin{alertblock}{Clave}
-Los bugs distribuidos viven en los intersticios: tiempo, orden, concurrencia y fallas parciales.
+\begin{alertblock}{SLA $<$ SLO interno}
+El generador promete 99,5\,\% en el SLA y se exige 99,9\,\% en el SLO. El equipo actúa al apartarse del 99,9\,\%, mucho antes de que se active la penalidad.
+\end{alertblock}
+
+{\small No todo servicio tiene SLA. Con o sin él, se opera con SLIs y SLOs.}
+\end{frame}
+
+\begin{frame}{Los objetivos del generador}
+\textbf{SLI de disponibilidad}, medido en el balanceador:
+\[
+\frac{\text{respuestas 200 con una contraseña que cumple la política}}{\text{todas las solicitudes} - \text{respuestas 4xx}} = \frac{\text{2xx buenas}}{\text{2xx} + \text{5xx}}
+\]
+{\small Las 5xx incluyen los \emph{timeouts} y las conexiones cortadas (502, 504): son las fallas del servicio.}
+
+\pause
+
+\textbf{SLI de latencia}: el p99 de las solicitudes válidas, medido en el balanceador.
+
+\pause
+
+\begin{block}{SLOs}
+Disponibilidad $\ge$ \textbf{99,9\,\%} y p99 de latencia $<$ \textbf{500\,ms}, sobre 30 días deslizantes.
+\end{block}
+
+\end{frame}
+
+\UASectionSlide{Error budget}
+
+\begin{frame}{Error budget: cuánto se puede fallar}
+Si el SLO no es 100\,\%, hay una falla tolerada: el \textbf{error budget} es $1 - \text{SLO}$.
+
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.48\textwidth}
+\begin{center}
+\small
+\begin{tabular}{lr}
+\toprule
+\textbf{SLO} & \textbf{Caída en 30 días} \\
+\midrule
+99\,\% & 7,2 h \\
+99,5\,\% & 3,6 h \\
+99,9\,\% & 43,2 min \\
+99,95\,\% & 21,6 min \\
+99,99\,\% & 4,32 min \\
+99,999\,\% & 25,9 s \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{column}
+\begin{column}{0.48\textwidth}
+\pause
+\begin{itemize}\small
+\item Cada nueve divide el presupuesto por diez.
+\item En solicitudes, el generador (99,9\,\%) puede fallar \textbf{12\,960 solicitudes en 30 días}: el 0,1\,\% de 12,96 millones.
+\item O sea, \textbf{18 por hora} en promedio.
+\end{itemize}
+\end{column}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Para qué sirve: alinear incentivos}
+Desarrollo quiere velocidad; operaciones, estabilidad. ¿Cuánto probar? ¿Cada cuánto desplegar? ¿Cuánto dura el \emph{canary} (clase 9)?
+
+\pause
+
+\begin{enumerate}
+\item Producto define el SLO.
+\item El monitoreo mide la disponibilidad real: un tercero neutral.
+\item La diferencia es el margen de falla que queda.
+\item \textbf{Mientras quede margen, se despliega.}
+\end{enumerate}
+
+\pause
+
+\begin{block}{El efecto}
+El equipo se regula solo: con presupuesto amplio, arriesga; casi agotado, es el propio equipo el que pide más pruebas. Las caídas ajenas (la red, un centro de datos) también lo gastan: la responsabilidad es compartida.
+\end{block}
+\end{frame}
+
+\begin{frame}{La política de error budget}
+Las consecuencias se acuerdan \textbf{antes}, por escrito, con quién decide si hay desacuerdo. Una política posible para el generador:
+
+\begin{center}
+\small
+\begin{tabular}{p{0.20\textwidth}p{0.70\textwidth}}
+\toprule
+\textbf{Presupuesto} & \textbf{Qué se hace} \\
+\midrule
+Más del 50\,\% & Despliegues normales: siempre con \emph{canary} y reversión automática. \\
+Entre 50\,\% y 0\,\% & Despliegues en horarios de poco tráfico, y escalonados: 5\,\% del tráfico, 15 minutos mirando métricas, siguiente escalón. Más lento y tedioso. \\
+Agotado & Se congela todo lo que no sea confiabilidad o seguridad. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+{\small Y una regla más: un incidente que consume más del 20\,\% del presupuesto exige un postmortem.}
+\end{frame}
+
+\begin{frame}{Cómo se gasta el presupuesto}
+\begin{center}
+\begin{tikzpicture}[x=0.30cm, y=0.034cm, every node/.style={font=\scriptsize}]
+\fill<4->[UAIngNavy!7] (0,50) rectangle (30,100);
+\fill<4->[UAIngOrange!14] (0,0) rectangle (30,50);
+\fill<4->[UAIngOrange!38] (0,-14) rectangle (30,0);
+\node<4->[anchor=east, text=UAIngNavy] at (29.7,92) {despliegues normales};
+\node<4->[anchor=west, text=UAIngNavy] at (0.3,8) {despliegues conservadores};
+\node<4->[anchor=east, text=UAIngNavy] at (29.7,-7) {cambios congelados};
+\draw[UAIngMuted] (0,0) -- (30,0);
+\draw[UAIngMuted] (0,-14) -- (0,100);
+\foreach \d in {0,5,...,30} {\draw[UAIngMuted] (\d,0) -- (\d,-2); \node[anchor=north, text=UAIngMuted] at (\d,-14) {\d};}
+\node[anchor=north, text=UAIngMuted] at (15,-22) {días de la ventana};
+\foreach \p in {0,25,50,75,100} {\draw[UAIngMuted] (0,\p) -- (-0.4,\p); \node[anchor=east, text=UAIngMuted] at (-0.4,\p) {\p\,\%};}
+\node[anchor=south west, text=UAIngMuted] at (-3.2,104) {presupuesto restante (100\,\% = 12\,960 fallas)};
+\draw[UAIngMuted, dashed, thick] (0,100) -- (30,0);
+\node[anchor=north east, text=UAIngMuted, align=right] at (9,45) {ritmo permitido:\\llega a 0 el día 30};
+\draw<2->[UAIngNavy, very thick] (0,100) -- (12,88);
+\draw<3->[UAIngOrange, very thick] (12,88) -- (12,68);
+\draw<3->[UAIngNavy, very thick] (12,68) -- (16,52) -- (30,31);
+\fill<2->[UAIngNavy] (0,100) circle (0.12) (12,88) circle (0.12);
+\fill<3->[UAIngNavy] (12,68) circle (0.12) (16,52) circle (0.12) (30,31) circle (0.12);
+\node<2->[anchor=south, text=UAIngNavy, align=center] at (6,97) {consumo normal};
+\node<3->[anchor=west, text=UAIngOrange, align=left] at (12.4,80) {incidente:\\$-20\,\%$ de golpe};
+\node<3->[anchor=south west, text=UAIngNavy, align=left] at (21,56) {sin resolver del todo:\\más empinada};
+\draw<3->[-{Stealth[length=1.4mm]}, UAIngNavy] (20.8,62) -- (14.6,59.5);
+\end{tikzpicture}
+\end{center}
+
+\onslide<3->{\small La \textbf{pendiente} de la línea es el \textbf{burn rate}: cuanto más empinada, más rápido se agota.}
+\onslide<4->{\small Las bandas son la política de error budget de la próxima slide.}
+\end{frame}
+
+\begin{frame}{El costo de cada nueve}
+\textbf{Monetario}: subir de 99,9\,\% a 99,99\,\% en un servicio que factura 1 millón de dólares gana 0,09\,\%: $1\,\text{M} \times 0{,}0009 = 900$ dólares. Si el nueve cuesta más, no conviene.
+
+\pause
+
+\textbf{No monetario}: el usuario ya pierde solicitudes por su propia conexión (su proveedor, el celular, el Wi-Fi). Esa tasa de error de base está entre \textbf{0,01\,\%} y \textbf{1\,\%}. Por debajo, el usuario no distingue los errores del servicio de los de su red.
+
+\pause
+
+\begin{alertblock}{Idea central}
+El SLO no es una aspiración: es una \textbf{frontera de decisión}. El 100\,\% casi nunca es el objetivo correcto: es imposible, es caro y el usuario no lo nota.
 \end{alertblock}
 \end{frame}
 
-\UASectionSlide{Riesgo y seguridad}
+\UASectionSlide{Alertar sobre el SLO}
 
-\begin{frame}{Chaos seguro}
-Buenas prácticas:
+\begin{frame}{Síntomas, no causas}
+El monitoreo tradicional alerta sobre lo fácil de medir: CPU $>$ 80\,\%, memoria, disco. Son causas \emph{posibles}.
+
+\pause
+
+\begin{itemize}\small
+\item La CPU sube por un \emph{backup} o el \emph{garbage collector}: falsos positivos.
+\item Una alarma que suena seguido sin consecuencias se ignora: \textbf{fatiga de alertas} (\emph{alert fatigue}). El día que importa, nadie la mira.
+\end{itemize}
+
+\pause
+
+\begin{block}{Una alerta útil}
+\begin{enumerate}\small
+\item Cuando suena, los usuarios \textbf{realmente} tienen un problema.
+\item Quien la recibe \textbf{puede hacer algo}.
+\end{enumerate}
+\end{block}
+
+{\small La del SLO cumple la 1 porque vigila el SLI: si cae, hay usuarios afectados, aunque la CPU esté baja. Dice \emph{qué} pasa, no \emph{por qué}: para eso, trazas, métricas y logs (clase 10).}
+
+\pause
+
+{\small \textbf{Excepción}: alertar por una causa \textbf{segura e inminente}, aunque el usuario todavía no lo note: disco casi lleno, certificado por vencer, servicio sin redundancia. Muchas veces, como ticket.}
+\end{frame}
+
+\begin{frame}{¿Qué vigila una alerta sobre el SLO?}
+El SLO del generador: 99,9\,\% en 30 días. Presupuesto: 12\,960 fallas. ¿Cuándo suena la alerta?
+
+\begin{enumerate}
+\item \textbf{Cuando el SLO ya no se cumple.} \pause{\color{UAIngOrange} Llega tarde: no queda nada que proteger.}
+\pause
+\item \textbf{Cuando el saldo baja de un umbral} (queda menos del 30\,\%). \pause{\color{UAIngOrange} Tosca: no distingue gastar el 70\,\% en tres semanas de gastarlo en una hora; el umbral se vuelve un nuevo cero.}
+\pause
+\item \textbf{Según la velocidad de consumo}: con las fallas de la última hora, ¿a qué ritmo se gasta? Si lo agotaría mucho antes de 30 días, actuar ya.
+\end{enumerate}
+
+\pause
+
+\begin{block}{La recomendada es la 3}
+El SLO define qué es falla y cuánto presupuesto hay; la alerta mide \textbf{a qué velocidad se gasta}. Urgencia proporcional al daño.
+\end{block}
+\end{frame}
+
+\begin{frame}{La alerta del generador, concreta}
+\textbf{Tasa de error en una ventana $w$} $=$ solicitudes fallidas en $w$ / solicitudes válidas en $w$.
+
+\begin{block}{Alerta inmediata}
+\begin{center}
+tasa de error de la \textbf{última hora} $> 1{,}44\,\%$\\
+\textbf{y}\\
+tasa de error de los \textbf{últimos 5 minutos} $> 1{,}44\,\%$
+\end{center}
+\end{block}
+
+\pause
+
+{\small Ejemplo: última hora, 300 fallidas de 18\,000 (1,67\,\%); últimos 5 minutos, 30 de 1\,500 (2\,\%). Suena. A 300 fallas por hora, el presupuesto (12\,960) dura \textbf{43 horas}.}
+
+\pause
+
+\begin{itemize}\small
+\item \textbf{Alerta inmediata} (\emph{page}): despierta a la persona de guardia (\emph{on-call}). No puede esperar.
+\item \textbf{Ticket}: tarea para el día hábil siguiente. Se gasta rápido de más, pero no tanto.
+\end{itemize}
+
+{\small ¿De dónde sale el 1,44\,\%? ¿Para qué la segunda ventana? Siguientes slides.}
+\end{frame}
+
+\begin{frame}[t]{Burn rate}
+\vspace{-0.8em}
+\begin{uakeybox}
+\vspace{-0.5em}
+\[
+b = \frac{e}{1 - s} \qquad\qquad \text{se agota en } \frac{T}{b}
+\]
+\vspace{-0.3em}
+\end{uakeybox}
+\vspace{0.2em}
+{\small $e$: tasa de error · $s$: objetivo del SLO · $T$: ventana. Con $b = 1$ se gasta justo el presupuesto.}
+
+\pause
+
+{\small Generador: $s = 0{,}999$, $1 - s = 0{,}001$, $T = 720$\,h $\Rightarrow$ $b = e / 0{,}001$; se agota en $720 / b$ horas.}
+
+\begin{center}
+\footnotesize
+\begin{tabular}{rrrl}
+\toprule
+\textbf{Tasa de error ($e$)} & \textbf{Burn rate} & \textbf{Se agota en} & \textbf{Situación} \\
+\midrule
+0,1\,\% & 1 & 30 días & justo en el límite \\
+0,6\,\% & 6 & 5 días & degradación sostenida \\
+1,44\,\% & 14,4 & 50 h & degradación seria \\
+4,9\,\% & 49 & 14,7 h & \emph{especiales} al 10\,\%, un reintento \\
+41\,\% & 410 & 1,8 h & \emph{especiales} al 10\,\%, sin reintentos \\
+100\,\% & 1000 & 43 min & caída total \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Elegir la ventana y el umbral}
+Cuatro propiedades: \textbf{precisión} (si suena, hay problema), \textbf{cobertura} (todo problema serio suena), \textbf{tiempo de detección} y \textbf{tiempo de reinicio} (cuánto sigue sonando después de resuelto).
+
+\pause
+
+\begin{itemize}\small
+\item \textbf{Una sola ventana no alcanza.} Corta (5 min): rápida pero ruidosa, un pico breve la dispara. Larga (un día): precisa, pero detecta tarde y sigue sonando horas después de resuelto.
+\pause
+\item \textbf{Un solo umbral tampoco.} Si suena solo con $b > 14{,}4$, un consumo sostenido a $b = 10$ nunca la dispara, y agota el presupuesto en \textbf{3 días}.
+\end{itemize}
+
+\pause
+
+\begin{block}{La solución}
+\textbf{Varios umbrales}: los rápidos despiertan a alguien, los lentos generan un ticket. Y cada uno exige \textbf{dos ventanas a la vez}: la larga confirma que es significativo; la corta, que sigue ocurriendo. La corta apaga la alerta minutos después de resuelto.
+\end{block}
+\end{frame}
+
+\begin{frame}{Varias ventanas, varios umbrales}
+\begin{center}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Severidad} & \textbf{Ventana larga} & \textbf{Ventana corta} & \textbf{Burn rate} & \textbf{Consumido} \\
+\midrule
+\emph{page} & 1 h & 5 min & 14,4 & 2\,\% \\
+\emph{page} & 6 h & 30 min & 6 & 5\,\% \\
+Ticket & 3 días & 6 h & 1 & 10\,\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\pause
+
+{\small Si un burn rate $b$ dura un tiempo $t$ (acá, la ventana larga), se consume $b \cdot t / T$: $\;14{,}4 \times 1 / 720 = 2\,\%$, $\;6 \times 6 / 720 = 5\,\%$, $\;1 \times 72 / 720 = 10\,\%$. La ventana corta mide la duodécima parte de la larga.}
+
+\pause
+
+\begin{block}{Tiempo de detección}
+La alerta de 1 h suena cuando el promedio de la hora llega a 1,44\,\%. Con \emph{especiales} al 10\,\% sin reintentos ($e = 41\,\%$): \textbf{unos 2 minutos}. Caída total: \textbf{menos de 1 minuto}.
+\end{block}
+\end{frame}
+
+\begin{frame}{Servicios con poco tráfico}
+10 solicitudes por hora con SLO de 99,9\,\%: el presupuesto es de \textbf{unas 7 fallas en 30 días}. Una sola falla en una hora es un 10\,\% de error, burn rate 100, y gasta el \textbf{13,9\,\%} del mes.
+
+\pause
+
 \begin{itemize}
-\item experiments pequeños
-\item blast radius controlado
-\item rollback claro
-\item observabilidad fuerte
-\item horario / entorno adecuados
+\item Generar tráfico artificial para tener más señal.
+\item Medir juntos servicios que fallan juntos (comparten una base de datos).
+\item Cambiar el producto: reintentos del cliente con \emph{backoff} y \emph{jitter}, alternativas.
+\item Bajar el SLO o agrandar la ventana: decisión de producto.
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Nunca hacer}
-\begin{itemize}
-\item experimentos sin hipótesis
-\item experimentos sin métricas
-\item experimentos en producción sin límites
-\item experimentos sin plan de abortar
+\begin{frame}{Contar minutos o contar solicitudes}
+\begin{center}
+\footnotesize
+\begin{tabular}{p{0.30\textwidth}p{0.29\textwidth}p{0.29\textwidth}}
+\toprule
+\textbf{Qué pasa} & \textbf{Contando solicitudes}\newline{\scriptsize presupuesto: 12\,960 fallas} & \textbf{Contando minutos}\newline{\scriptsize malo si falla el 0,1\,\% o más; presupuesto: 43,2 minutos} \\
+\midrule
+Durante 1 hora falla el 1\,\%: 180 de 18\,000. & $180 / 12\,960 \approx$ \textbf{1,4\,\%} del presupuesto. & Los 60 minutos son malos: \textbf{se agota}. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\pause
+
+{\small Contar minutos \textbf{exagera} algunos problemas y \textbf{oculta} otros. En un sistema distribuido lo habitual es la degradación parcial (\emph{brownout}).}
+
+\begin{itemize}\footnotesize
+\item \textbf{Solicitudes}: para operar el servicio y calcular el burn rate, sobre todo con SLOs de 99,9\,\% o más.
+\item \textbf{Minutos}: para un SLA o una página de estado (``12 minutos caído este mes''), con mucho tráfico y umbrales pensados para caídas.
 \end{itemize}
 \end{frame}
 
-\UASectionSlide{Ejemplo}
+\begin{frame}{Caso: la alerta que nadie creía}
+Honeycomb: servicio de ingesta de datos de clientes, SLO de \textbf{99,995\,\%}, con alerta de consumo del presupuesto. El equipo todavía \textbf{no le creía}.
 
-\begin{frame}{Ejemplo: checkout}
-Hipótesis:
-\begin{quote}
-Si Payments responde con alta latencia, el sistema mantiene disponibilidad parcial y no colapsa por retries.
-\end{quote}
+\pause
 
-Perturbación:
-\begin{itemize}
-\item +800 ms en Payments
+\begin{itemize}\small
+\item Una madrugada falla el 1,5\,\% durante 20 minutos: consumo \textbf{300 veces} más rápido que el permitido. Suena a la 1:29.
+\item La guardia ve el servicio recuperado: ``un pico''. Recién a la cuarta alerta, a las 9:55, se declara un incidente.
+\item El monitoreo tradicional (sondas fallidas seguidas) \textbf{nunca vio nada}.
 \end{itemize}
 
-Validación:
-\begin{itemize}
-\item breaker abre
-\item p95 sube controladamente
-\item checkout no derrumba todo el sitio
+\pause
+
+\begin{block}{La causa y la lección}
+Una pérdida de memoria: las máquinas caían y se reiniciaban casi juntas. Quedarse sin memoria era normal; lo anómalo era el efecto sobre los usuarios. Gastaron más de cinco veces el presupuesto, y para ellos la alerta del SLO pasó a ser \textbf{la principal}. El SRE Book es más prudente: conserva las alertas por causas inminentes.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Validar:\\experimentos bajo falla}
+
+\begin{frame}{Por qué no alcanza con probar los componentes}
+La clase 11 configuró \emph{timeouts}, reintentos y \emph{breakers}. ¿Cómo sabemos que funcionan?
+
+\pause
+
+\begin{block}{La seguridad no se compone}
+Un cliente con \emph{timeout} de 50\,ms llama a dos proveedores: 20\,ms en promedio, casi nunca más de 30\,ms. Cada uno, solo, es seguro. Los dos en secuencia cumplen \emph{en promedio} (40\,ms), pero cuando los dos se demoran un poco a la vez, la suma pasa los 50\,ms.
+\end{block}
+
+{\small El generador hace \textbf{20 llamadas} por solicitud, cada una razonable por separado.}
+
+\pause
+
+\begin{itemize}\small
+\item Las pruebas unitarias y de integración suponen tiempos ideales y \emph{mocks} limpios.
+\item \emph{Staging} nunca es producción: menos servidores, menos tráfico, red sin congestión.
 \end{itemize}
+\end{frame}
+
+\begin{frame}{Chaos Engineering}
+\begin{block}{Definición}
+Hacer experimentos sobre un sistema para ganar confianza en que soporta condiciones turbulentas en producción. No deduce qué \emph{debería} pasar: provoca la falla de forma controlada y observa qué \emph{pasa}.
+\end{block}
+
+\pause
+
+\textbf{¿Por qué provocar fallas a propósito?}
+\begin{itemize}\small
+\item \textbf{Los sistemas pierden margen sin que nadie lo decida}: cada optimización consume holgura. Un pool justo para 5 solicitudes/s anda bien hasta que \emph{especiales} se pone lento.
+\item \textbf{Lo que nunca falla no se sabe manejar}: nadie sabe cómo se comporta el resto sin ese componente.
+\item \textbf{La falla pequeña y frecuente se vuelve rutina}: como un simulacro de evacuación.
+\end{itemize}
+
+\pause
+
+{\small \textbf{Chaos Monkey} (Netflix): apaga al azar un servidor de un servicio. Si el servicio no sigue con los demás, el equipo lo corrige.}
+\end{frame}
+
+\begin{frame}{Un experimento tiene cuatro pasos}
+\begin{enumerate}
+\item Definir el \textbf{\emph{steady state}}: una salida medible que indica comportamiento normal.
+\item Formular la \textbf{hipótesis}: el \emph{steady state} se mantiene en un grupo de control y en uno experimental.
+\item \textbf{Inyectar fallas} (\emph{fault injection}) que reflejen eventos reales.
+\item Intentar \textbf{refutar} la hipótesis: buscar una diferencia entre los grupos.
+\end{enumerate}
+
+\pause
+
+\begin{alertblock}{El steady state es el SLI}
+Es exactamente lo que construimos al medir. Sin SLIs no hay qué observar. Por eso primero medimos.
+\end{alertblock}
+
+\pause
+
+{\small Además: hipótesis sobre lo que se ve desde afuera · fallas que ocurren en la realidad · en producción cuando sea seguro · automatizado · con el daño acotado (\emph{blast radius}).}
+\end{frame}
+
+\begin{frame}{La hipótesis}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.48\textwidth}
+\begin{alertblock}{Mala}
+``Queremos ver si aguanta.''
+\end{alertblock}
+{\small No dice qué observar ni qué resultado la refuta.}
+\end{column}
+\begin{column}{0.48\textwidth}
+\begin{block}{Buena}
+``Si \emph{especiales} se pone lenta, las solicitudes afectadas fallan rápido y las demás mantienen su SLI.''
+\end{block}
+{\small Observable desde afuera. Refutable.}
+\end{column}
+\end{columns}
+
+\pause
+
+\vspace{0.6em}
+\textbf{Dos preguntas antes de empezar:}
+\begin{itemize}\small
+\item \textbf{¿Se puede medir hoy el \emph{steady state}?} Si el SLI saliera solo de los logs del generador, un experimento que lo tumba no mostraría ninguna falla.
+\item \textbf{¿Qué resultado la refutaría?} Siempre hay fallas por la red del usuario: lo que importa es la \textbf{diferencia} con el grupo de control.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Qué inyectar}
+\begin{description}\small
+\item[\textbf{Apagar servidores.}] ¿El servicio sigue con los que quedan?
+\item[\textbf{Agregar latencia.}] Encuentra lo que apagar no muestra: servicios sin alternativa ante un \emph{timeout}, errores que aparecen cuando las respuestas llegan en otro orden.
+\item[\textbf{Hacer fallar una llamada.}] La solicitud se marca al entrar (``cuando el generador llame a \emph{especiales}, fallar'') y la marca viaja como el contexto de una traza (clase 10). Permite afectar una sola llamada, para pocas solicitudes.
+\end{description}
+
+\pause
+
+{\small Y también: pérdida de paquetes, particiones, CPU, disco.}
+
+\begin{alertblock}{Probar las dos: rápida y lenta}
+Una caída es una falla rápida; la latencia, una lenta. Muchos sistemas toleran que una dependencia desaparezca y \textbf{muy mal} que se ponga lenta (clase 11).
+\end{alertblock}
+
+{\small Al principio, al azar. Después, mirar el árbol de llamadas de una traza y preguntar qué pasa si se quita cada una.}
+\end{frame}
+
+\begin{frame}{Seguridad del experimento}
+\begin{itemize}\small
+\item Si cada solicitud fallida es irrecuperable (un pago, un dato médico), \textbf{no} se experimenta en producción.
+\item \textbf{Acotar el \emph{blast radius}}: empezar por ``falla una de cada 10\,000 solicitudes''.
+\item Poder \textbf{seguir una solicitud} entre servicios y conocer la \textbf{línea de base} del SLI.
+\item Tener un \textbf{plan de recuperación}: apagar la perturbación no siempre alcanza.
+\item Escalera: local $\to$ integración $\to$ poco tráfico real $\to$ producción.
+\end{itemize}
+
+\pause
+
+\begin{block}{El experimento consume presupuesto}
+Perturbar el 1\,\% del tráfico, y que todo eso falle, es burn rate 10. Treinta minutos: $10 \times 0{,}5 / 720 \approx$ \textbf{0,7\,\%} del mes. Con poco presupuesto, la política puede \textbf{postergar} el experimento.
+\end{block}
+
+{\small \textbf{Criterio de aborto} en el idioma de las alertas: se detiene si el burn rate de la ventana corta supera lo esperado.}
+\end{frame}
+
+\begin{frame}{Dos advertencias}
+\begin{block}{Una prueba de Google que se salió de control}
+Bloquearon el acceso a \textbf{una} base de datos de prueba entre cien. En minutos, usuarios internos y externos perdieron acceso a sistemas clave. Abortaron, pero la \textbf{reversión falló}: nunca se había probado.
+\end{block}
+
+\pause
+
+\begin{block}{``Si nadie responde, empiezo''}
+Avisó por correo que iba a experimentar en el entorno de pruebas. Casi nadie respondió. El entorno quedó inutilizable \textbf{una semana}.
+\end{block}
+
+\pause
+
+\begin{alertblock}{Lección}
+Probar la reversión antes. El silencio no es consentimiento. Los primeros experimentos, chicos y acordados.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Automatizar y repetir}
+En el mejor caso, un experimento es \textbf{aburrido}: se inyecta la falla y el sistema sigue igual.
+
+\pause
+
+\begin{itemize}
+\item Si encuentra una debilidad: corregirla y buscar el mismo tipo de problema en otras partes.
+\item Después, automatizarlo para que corra periódicamente. Con límites: no apagar el último servidor; no hacer fallar a la vez una dependencia y su alternativa.
+\end{itemize}
+
+\pause
+
+\begin{block}{Las personas también fallan}
+Simulacros en los que parte del equipo queda ``fuera'' un día: aparecen los procesos que dependen de una sola persona. Google los hace periódicamente con el nombre \textbf{DiRT} (\emph{Disaster Recovery Testing}), e incluye la práctica de la gestión de incidentes. Siempre con una palabra clave para abortar.
+\end{block}
+\end{frame}
+
+\begin{frame}{Template del experimento}
+Escribir el diseño \textbf{antes}: obliga a decidir lo que se improvisaría mal, se comparte con los equipos afectados y termina siendo el informe.
+
+\begin{center}
+\scriptsize
+\begin{tabular}{p{0.22\textwidth}p{0.70\textwidth}}
+\toprule
+\textbf{Campo} & \textbf{Contenido} \\
+\midrule
+Pregunta & Qué mecanismo o supuesto se valida. \\
+\emph{Steady state} & SLI usado y su valor en la línea de base. \\
+Hipótesis & Qué se espera, escrito de forma refutable. \\
+Perturbación & Qué se inyecta, dónde, cuánto y por cuánto tiempo. \\
+Grupos & Qué tráfico es control y cuál experimental. \\
+\emph{Blast radius} & Qué porcentaje del tráfico y qué componentes. \\
+Costo esperado & Cuánto error budget se consume. \\
+Criterio de aborto & Qué señal lo detiene y quién lo detiene. \\
+Recuperación & Qué reiniciar, revertir o limpiar. \\
+Resultado & Qué se observó, si la hipótesis se sostuvo, qué acciones siguen. \\
+\bottomrule
+\end{tabular}
+\end{center}
+\end{frame}
+
+\begin{frame}{Un experimento sobre el generador}
+\small
+\begin{description}
+\item[Pregunta:] ¿los \emph{timeouts} y el \emph{breaker} de la clase 11 contienen una dependencia lenta?
+\item[\emph{Steady state}:] SLIs de disponibilidad y latencia, en el balanceador.
+\item[Hipótesis:] si las llamadas a \emph{especiales} del 1\,\% de las solicitudes tardan 2\,s más, esas fallan rápido y con error explícito, y el resto mantiene sus SLIs.
+\item[Grupos:] latencia solo en las solicitudes marcadas (1\,\%); el resto es control. 30 minutos.
+\item[Costo:] burn rate $\approx 10$; $\approx 0{,}7\,\%$ del presupuesto.
+\item[Aborto:] burn rate de 5 minutos $> 14{,}4$, o el grupo de control fuera de su línea de base.
+\end{description}
+
+\pause
+
+\begin{alertblock}{Qué la refutaría}
+Que suba la latencia del grupo de control: los hilos se comparten (falta un \emph{bulkhead} o el \emph{timeout} es largo). Que las marcadas tarden 2\,s en fallar: el \emph{timeout} no está activo.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Lo que no se esperaba}
+Mismo diseño sobre \emph{dígitos}. Hipótesis: ``solo se ven afectadas las llamadas a \emph{dígitos}''.
+
+\pause
+
+\generadordiagram{\draw[-{Stealth[length=1.6mm]}, draw=UAIngOrange, dashed, line width=1pt] (lo.east) to[bend left=50] node[right, text=UAIngOrange]{!} (di.east);
+\node[draw=UAIngOrange, thick, rounded corners, minimum width=2.1cm, minimum height=0.75cm] at (7.6,-0.5) {};}
+
+\pause
+
+{\small \textbf{Se refuta}: las llamadas a \emph{minúsculas} también se vuelven lentas, porque \emph{minúsculas} consulta a \emph{dígitos} por dentro. El experimento descubre la dependencia que no estaba en el diagrama.}
+
+{\small \textbf{Acción}: documentarla y revisar que el \emph{timeout} de \emph{minúsculas} contemple el de \emph{dígitos} (clase 11).}
+\end{frame}
+
+\UASectionSlide{Responder:\\gestión de incidentes}
+
+\begin{frame}{Qué es un incidente y cuándo declararlo}
+Un evento que degrada o amenaza el servicio y requiere una \textbf{respuesta coordinada}. Una solicitud fallida aislada no lo es.
+
+\pause
+
+\begin{block}{Condiciones claras, fijadas de antemano}
+Es un incidente si:
+\begin{itemize}
+\item hace falta involucrar a un \textbf{segundo equipo};
+\item la caída es \textbf{visible para los clientes};
+\item sigue sin resolverse tras \textbf{una hora} de análisis concentrado.
+\end{itemize}
+\end{block}
+
+\pause
+
+{\small Con SLOs: una alerta de burn rate \emph{page} suele ser el comienzo de un incidente. Mejor declararlo temprano y cerrarlo rápido que tarde.}
+\end{frame}
+
+\begin{frame}{El incidente no gestionado}
+Cae un centro de datos, después otro y otro. La guardia revierte sin éxito, llama a quien escribió el código (3:30 AM en su zona), otros ``miran'' desde sus terminales, los directivos piden fechas. Alguien despliega una optimización que se le ocurrió en el momento. \textbf{Los servidores mueren.}
+
+\pause
+
+\begin{description}
+\item[\textbf{Foco exclusivo en lo técnico:}] quien sabe arreglar no puede ver el cuadro general.
+\item[\textbf{Mala comunicación:}] nadie sabe qué hacen los demás.
+\item[\textbf{Trabajo por cuenta propia:}] cambios con buena intención, sin coordinar.
+\end{description}
+
+\pause
+
+{\small Todos hacían su trabajo como lo entendían. Falta un \textbf{proceso}.}
+\end{frame}
+
+\begin{frame}{Roles}
+Tomado de los servicios de emergencia (bomberos, defensa civil): muchas personas que no trabajan juntas a diario.
+
+\begin{center}
+\small
+\begin{tabular}{p{0.24\textwidth}p{0.66\textwidth}}
+\toprule
+\textbf{Rol} & \textbf{Responsabilidad} \\
+\midrule
+\emph{Incident commander} & Estado general, asigna tareas, remueve obstáculos. Tiene los roles que no delegó. \\
+Operaciones & Aplica los cambios. \textbf{Único} grupo que toca el sistema. \\
+Comunicación & Actualiza periódicamente al equipo y a los interesados. \\
+Planificación & Lo de largo plazo: registrar, relevos, qué revertir al final. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\pause
+
+{\small Cada uno sabe su rol y no invade el ajeno: eso da \textbf{más} autonomía. En un equipo chico, una persona tiene varios roles, pero \textbf{explícitos}.}
+\end{frame}
+
+\begin{frame}{Documento vivo, traspaso y prioridades}
+\begin{itemize}\small
+\item \textbf{Puesto de mando}: un lugar o canal donde encontrar al \emph{incident commander}.
+\item \textbf{Documento vivo}: resumen, estado, roles, tareas, línea de tiempo y \textbf{criterios de salida}: ``dentro de los SLOs durante más de 30 minutos''.
+\item \textbf{Traspaso explícito}: ``ahora sos el \emph{incident commander}, ¿de acuerdo?''.
+\end{itemize}
+
+\pause
+
+\begin{block}{El orden}
+\textbf{Detener el daño, restablecer el servicio y conservar la evidencia.} Primero se mitiga, después se entiende. Durante el incidente no se discuten culpas.
+\end{block}
+
+\pause
+
+\begin{alertblock}{La mitigación más frecuente: revertir}
+En Google, cerca del \textbf{70\,\%} de las caídas viene de un cambio. Un cambio de configuración aplicado a todos los servidores a la vez los hizo caer en bucle; se revirtió en cinco minutos. No había pasado un \emph{canary} completo porque ``no era riesgoso''.
+\end{alertblock}
+\end{frame}
+
+\begin{frame}{Runbooks}
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.48\textwidth}
+\textbf{A favor}
+
+{\small En Google, tener los pasos escritos reduce a un tercio el tiempo de recuperación. Se combina con ensayar incidentes pasados.}
+\end{column}
+\begin{column}{0.48\textwidth}
+\textbf{En contra}
+
+{\small Un documento con todos los errores posibles envejece rápido. Uno equivocado es peor que ninguno.}
+\end{column}
+\end{columns}
+
+\pause
+
+\vspace{0.4em}
+\begin{block}{Runbook breve del generador}
+\scriptsize
+\textbf{Dueño}, guardia, escalamiento. \textbf{Depende de}: \emph{mayúsculas}, \emph{minúsculas} (que depende de \emph{dígitos}), \emph{dígitos}, \emph{especiales}. \textbf{Dashboards}: SLIs, latencia por dependencia, \emph{breakers}.\\[3pt]
+\textbf{Alerta ``burn rate alto, 1 h''}: se gastó el 2\,\% del mes en una hora. Confirmar en el \emph{dashboard}; mirar latencia y errores por dependencia. \textbf{Seguro}: revertir el último cambio. \textbf{No}: deshabilitar \emph{timeouts}, ni un \emph{fallback} sin especiales. Escalar al dueño de la dependencia.
+\end{block}
+\end{frame}
+
+\UASectionSlide{Aprender: postmortems}
+
+\begin{frame}{Postmortem}
+Registro escrito del incidente: impacto, cómo se mitigó, causas y \textbf{acciones para que no se repita}. No es un castigo.
+
+\pause
+
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.44\textwidth}
+\textbf{Cuándo es obligatorio}
+\begin{itemize}\footnotesize
+\item caída visible sobre un umbral;
+\item pérdida de datos;
+\item intervención de la guardia;
+\item resolución lenta;
+\item falla del monitoreo;
+\item más del 20\,\% del presupuesto.
+\end{itemize}
+\end{column}
+\begin{column}{0.54\textwidth}
+\textbf{Qué contiene}
+\begin{itemize}\footnotesize
+\item resumen e \textbf{impacto} (con error budget);
+\item \textbf{disparador} y \textbf{condiciones};
+\item resolución y detección;
+\item \textbf{acciones} con dueño;
+\item qué salió bien, mal, y \textbf{dónde hubo suerte};
+\item línea de tiempo.
+\end{itemize}
+\end{column}
+\end{columns}
+
+\pause
+
+\vspace{0.4em}
+{\small ``Dónde hubo suerte'': lo que salió bien sin que nadie lo garantizara. La próxima vez puede no estar.}
+\end{frame}
+
+\begin{frame}{Blameless}
+Buscar las causas \textbf{sin acusar} a personas ni equipos. Se supone que todos actuaron con buena intención y con la información que tenían.
+
+\pause
+
+\begin{itemize}\small
+\item Con culpa, los problemas se esconden.
+\item Viene de la salud y la aviación: cada error fortalece el sistema.
+\item No se puede ``arreglar'' a las personas; sí los sistemas que las ayudan a decidir.
+\end{itemize}
+
+\pause
+
+\begin{block}{La pregunta útil}
+No ``¿por qué se equivocó?'', sino ``¿qué información, presiones y herramientas hicieron que esa decisión pareciera razonable?''. Después, todo parece obvio: \textbf{sesgo retrospectivo} (\emph{hindsight bias}).
+\end{block}
+
+{\small \emph{Blameless} no es sin responsabilidad: igual señala qué mejorar, apoyado en el sistema.}
+\end{frame}
+
+\begin{frame}{Disparador y condiciones}
+\textbf{Disparador}: el evento que lo inició. \textbf{Condiciones}: defectos y decisiones previas que esperaban ese evento. Para que un sistema caiga suelen fallar varias defensas a la vez: buscar ``la'' causa raíz (\emph{root cause}) corrige un solo eslabón.
+
+\pause
+
+\begin{block}{Incidente ficticio en el generador}
+\small
+Un despliegue cambia la biblioteca HTTP y el \emph{timeout} hacia \emph{especiales} pasa a ser el por defecto: \textbf{esperar para siempre}. Días después, \emph{especiales} tiene pausas de \emph{garbage collection}: hilos bloqueados, pool agotado. La alerta suena en 2 minutos; mitigar lleva 25.
+\end{block}
+
+\pause
+
+\begin{itemize}\footnotesize
+\item \textbf{Disparador}: las pausas de \emph{especiales}.
+\item \textbf{Latente}: un \emph{timeout} que dependía del valor por defecto.
+\item \textbf{Validación}: el cambio ``no era riesgoso'', sin \emph{canary}; ningún experimento periódico de latencia.
+\item \textbf{Diagnóstico}: el \emph{dashboard} no mostraba latencia por dependencia.
+\item \textbf{Mitigación}: varios cambios juntos, difíciles de revertir.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Acciones que cambian el sistema}
+Un postmortem vale lo que valen sus acciones: \textbf{un dueño} cada una, \textbf{registradas}, \textbf{verificables}, que \textbf{prevengan} y no solo mitiguen. Cambiar el sistema es más confiable que pedirle a la gente que cambie.
+
+\pause
+
+\begin{columns}[T,onlytextwidth]
+\begin{column}{0.46\textwidth}
+\begin{alertblock}{Malas}
+\small
+``Tener más cuidado al desplegar.''\\
+``Mejorar el monitoreo.''\\
+Una lista sin dueños ni fechas.
+\end{alertblock}
+\end{column}
+\begin{column}{0.50\textwidth}
+\begin{block}{Buenas (generador)}
+\footnotesize
+\textbf{Prevenir}: el despliegue falla si falta el \emph{timeout} de una dependencia.\\
+\textbf{Detectar}: experimento semanal de latencia por dependencia.\\
+\textbf{Detectar}: panel de latencia por dependencia.\\
+\textbf{Mitigar}: un solo cambio por despliegue en bibliotecas de red.
+\end{block}
+\end{column}
+\end{columns}
+
+\pause
+
+{\small Y al revés: las acciones propuestas en caliente suelen ser exageradas. Revisarlas con calma.}
+\end{frame}
+
+\begin{frame}{Un postmortem malo y uno bueno}
+\begin{center}
+\small
+\begin{tabular}{p{0.44\textwidth}p{0.46\textwidth}}
+\toprule
+\textbf{Malo} & \textbf{Bueno} \\
+\midrule
+Términos internos sin explicar. & Lo entiende alguien de otro equipo. \\
+``Afectó a muchos usuarios.'' & Impacto medido, con su fuente. \\
+Acciones vagas, sin dueño, misma prioridad. & Dueño, prioridad, estado final verificable. \\
+Señala personas, tono dramático. & Qué falló en el sistema, no quién. \\
+Meses después, solo en el equipo. & En pocos días, compartido. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\pause
+
+\begin{block}{Un postmortem que nadie revisa es como si no existiera}
+Revisarlo, compartirlo, leerlo en grupo, reconocer a quien manejó bien el incidente. Y una señal de alarma: \textbf{incidentes que se repiten}.
+\end{block}
 \end{frame}
 
 \UASectionSlide{Cierre}
 
-\begin{frame}{Idea central}
-\begin{block}{}
-La resiliencia no debe suponerse: debe validarse experimentalmente.
+\begin{frame}{Aplicación al trabajo práctico: Asteria Online}
+\begin{block}{La garantía no lleva números; la solución, sí}
+G: ``el jugador no debe perder el oro pagado por un combate que no llegó a resolverse''. El SLI y el SLO de cuánto lo logra son de cada \textbf{solución}: van en S y en T.
 \end{block}
-\end{frame}
 
+\pause
 
-\begin{frame}{Caso de diseño: decidir antes de nombrar tecnología}
-\small
-\begin{block}{Escenario}Un servicio crítico debe seguir operando ante latencia variable y fallas parciales. El equipo propone ``agregar más infraestructura'' sin declarar qué propiedad necesita preservar.\end{block}
-\begin{enumerate}
-\item ¿Cuál es el invariante o garantía que realmente importa?
-\item ¿Qué falla concreta amenaza esa garantía?
-\item ¿Qué mecanismo de Chaos Engineering y validación bajo falla es pertinente y cuál sería sobreingeniería?
-\item ¿Qué métrica permitiría comprobar el costo de la decisión?
-\end{enumerate}
-\end{frame}
-\begin{frame}{Checkpoint de comprensión}
-\small
-Al terminar esta clase deberías poder:
-\begin{itemize}
-\item explicar el problema sin apoyarte en nombres de productos;
-\item identificar el supuesto de falla más importante;
-\item distinguir una propiedad de seguridad de una de progreso;
-\item construir un escenario donde la solución deja de ser suficiente;
-\item defender el trade-off ante una objeción técnica.
+\textbf{La brecha de la Entrega 3, en error budget.} SLO de 99,9\,\% para las instancias de combate (43,2 min en 30 días). Cae un datacenter con un tercio de las instancias:
+\begin{itemize}\small
+\item Solución A, reubica en 15 min: equivale a 5 min de caída total, \textbf{12\,\%} del presupuesto.
+\item Solución B, réplicas listas, 1 min: unos 20 s, \textbf{menos del 1\,\%}. A cambio, cuesta más.
 \end{itemize}
+
+\pause
+
+\begin{itemize}\small
+\item \textbf{Un SLI por subsistema} (directorio, combate, pagos) y \textbf{por tipo de jugador}: priorizar a quienes ya juegan es gastar el presupuesto del ingreso para proteger el de la partida (\emph{load shedding}, clase 11).
+\item \textbf{Validar sin implementar}: ¿qué falla se inyectaría y qué resultado sostendría la decisión CAP elegida?
+\end{itemize}
+
+{\scriptsize\color{UAIngMuted}Números ilustrativos.}
 \end{frame}
 
-\begin{frame}{Experimento, no espectáculo}
-Un experimento válido conecta hipótesis, perturbación, steady state y criterio de aborto. ``Apagar cosas y mirar'' no produce evidencia reproducible.
+\begin{frame}{Modelo del Curso: Confiabilidad en $D = (P, F, G, S, T)$}
+\begin{description}\small
+\item[$P$ (Problema):] Operar con un nivel de servicio explícito, verificar que se cumple bajo falla y aprender cuando no.
+\item[$F$ (Factores):] Fallas parciales, propiedades emergentes, cambios frecuentes, mediciones imperfectas, poco tráfico, decisiones bajo presión.
+\item[$G$ (Garantías):] SLOs medidos desde el usuario, alertas proporcionales a la gravedad, hipótesis validadas, respuesta coordinada, acciones que reducen la repetición.
+\item[$S$ (Solución):] SLI como cociente + SLO de 30 días + error budget con política + burn rate con varias ventanas + experimentos con criterio de aborto + roles + runbooks + postmortems \emph{blameless}.
+\item[$T$ (Trade-offs):] Cada nueve cuesta más; los experimentos gastan presupuesto; precisión contra detección; la documentación envejece.
+\end{description}
 \end{frame}
-\begin{frame}{Escalera de seguridad}
-\begin{enumerate}
-\item test determinista local;
-\item entorno de integración;
-\item porcentaje pequeño de tráfico;
-\item producción con blast radius y abort automático.
-\end{enumerate}
-\end{frame}
-\begin{frame}{Checkpoint experimental}
-Escriba antes de ejecutar: qué espera observar, qué resultado refuta la hipótesis y qué mecanismo de resiliencia está realmente evaluando.
+
+\begin{frame}{Cierre}
+\begin{block}{Idea central de cátedra}
+Una organización madura no se define por no tener incidentes, sino por medir con objetivos explícitos, validar sus supuestos antes de que lo haga la realidad y aprender cada vez que algo falla.
+\end{block}
+
+\pause
+
+\begin{itemize}\small
+\item El SLO convierte ``anda bien'' en un número; el error budget, en una regla para decidir.
+\item El burn rate avisa con urgencia proporcional al daño.
+\item Los experimentos validan la resiliencia de la clase 11, con costo calculado.
+\item Roles claros reducen el daño; el postmortem \emph{blameless} convierte el incidente en acciones.
+\end{itemize}
 \end{frame}
 
 \end{document}
