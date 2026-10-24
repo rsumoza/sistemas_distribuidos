@@ -149,21 +149,13 @@ La forma de cociente tiene dos ventajas. Primero, todos los SLIs quedan en la mi
 
 La palabra \emph{válidos} no es un detalle: define la población. Una solicitud mal formada que el servicio rechaza con un error 4xx no dice nada sobre la salud del servicio y normalmente se excluye, del mismo modo que en la clase 11 el \emph{circuit breaker} no contaba los 4xx como fallas de la dependencia.
 
-\paragraph{Disponibilidad: por tiempo o por solicitudes.} Hay dos formas habituales de medirla.\footnote{Beyer et al. (2016), cap.~3, ecuaciones 3-1 y 3-2.}
-\begin{itemize}
-\item \textbf{Por tiempo (\emph{uptime}):}
-\[
-\text{disponibilidad} = \frac{\text{tiempo arriba}}{\text{tiempo arriba} + \text{tiempo caído}}
-\]
-Si en 30 días (43\,200 minutos) el servicio estuvo caído 40 minutos, su disponibilidad fue $43\,160 / 43\,200 \approx 99{,}907\,\%$. Es la forma más difundida en la industria: es fácil de explicar y coincide con lo que muestran las páginas de estado. Tiene dos debilidades. La primera es que alguien tiene que decidir qué cuenta como ``caído'', por ejemplo, que un chequeo de salud falle durante un minuto. La segunda es que una falla parcial no cuenta: si el 10\,\% de las solicitudes falla durante una hora pero el chequeo de salud sigue respondiendo, para esta métrica el servicio estuvo arriba todo el tiempo.
-\item \textbf{Por solicitudes:}
+\paragraph{Disponibilidad.} La clase 8 distinguió el \emph{uptime}, la fracción del tiempo en que un proceso estuvo levantado y alcanzable, de la disponibilidad semántica, la fracción de intentos válidos que cumplen la promesa de negocio. Un SLI de disponibilidad mide la segunda:
 \[
 \text{disponibilidad} = \frac{\text{solicitudes exitosas}}{\text{solicitudes válidas}}
 \]
-Si en un día el generador recibió 432\,000 solicitudes válidas y 300 fallaron, su disponibilidad fue $431\,700 / 432\,000 \approx 99{,}93\,\%$. Esta forma sí cuenta las fallas parciales. Es la que prefiere Google, porque un servicio replicado en varias regiones casi nunca está completamente caído: casi siempre atiende al menos una parte del tráfico en algún lugar. Con esta definición, un sistema que atiende 2{,}5 millones de solicitudes por día con un objetivo diario de 99,99\,\% puede devolver hasta 250 errores ese día y seguir dentro del objetivo. Se aplica también a sistemas que no atienden usuarios, como un proceso por lotes, contando registros procesados con y sin éxito.
-\end{itemize}
+Así cuenta también las fallas parciales: un proceso puede estar levantado, y responder a un chequeo de salud (\emph{health check}), mientras una parte de las solicitudes falla.\footnote{Beyer et al. (2016), cap.~3.}
 
-\paragraph{Latencia: un percentil o una proporción.} También hay dos formas, que la sección~\ref{sec:latencia} compara:
+\paragraph{Latencia: un percentil o una proporción.} Hay dos formas, que la sección~\ref{sec:latencia} compara:
 \begin{itemize}
 \item ``el p99 de la latencia es menor que 300\,ms'', evaluado en cada ventana de 5 minutos. Es la forma habitual en los \emph{dashboards}.
 \item ``la proporción de solicitudes respondidas en menos de 300\,ms''. Si en una ventana hubo 1\,500 solicitudes y 1\,488 tardaron menos de 300\,ms, el SLI vale $1\,488/1\,500 = 99{,}2\,\%$.
@@ -259,7 +251,7 @@ Dos tácticas ayudan a fijar expectativas realistas.\footnote{Beyer et al. (2016
 
 \paragraph{El caso de Chubby.} Chubby es el servicio de \emph{locks} distribuido de Google. Usa Paxos (clase 8) para mantener los \emph{locks} de forma consistente entre centros de datos, y otros servicios lo usan para elegir líder (de cinco réplicas de un trabajo, decide cuál hace el trabajo real) y para guardar datos que deben ser consistentes, como la tabla que traduce nombres de servicios a direcciones IP y puertos.\footnote{Beyer et al. (2016), cap.~2.} Su instancia global tiene una réplica en cada región geográfica, y las caídas reales de esa instancia eran tan poco frecuentes que los equipos empezaron a agregar dependencias suponiendo que nunca se caería. Esa confiabilidad daba una falsa sensación de seguridad: cuando Chubby global finalmente fallaba, los servicios que dependían de él no sabían funcionar sin él, y sus fallas terminaban siendo visibles para los usuarios finales.\footnote{Beyer et al. (2016), cap.~4, recuadro \emph{The Global Chubby Planned Outage}.}
 
-La solución fue asegurar que Chubby global cumpla su SLO, pero sin superarlo demasiado. Si en un trimestre ninguna falla real bajó la disponibilidad hasta el objetivo, se provoca una caída controlada, apagando el sistema a propósito. Así, las dependencias irrazonables aparecen poco después de agregarse, cuando todavía son fáciles de corregir, y no años más tarde en medio de una caída real; los dueños de los servicios dependientes se ven obligados a enfrentar temprano la realidad de los sistemas distribuidos: todo componente remoto puede fallar. Hay otras formas de no sobrecumplir: rechazar a propósito una parte de las solicitudes, o diseñar el sistema para que no sea más rápido cuando tiene poca carga. La caída provocada de Chubby es, de hecho, un experimento bajo falla (sección~\ref{sec:chaos}) motivado por un SLO.
+La solución fue asegurar que Chubby global cumpla su SLO, pero sin superarlo demasiado. Si en un trimestre ninguna falla real bajó la disponibilidad hasta el objetivo, se provoca una caída controlada, apagando el sistema a propósito. Así, las dependencias irrazonables aparecen poco después de agregarse, cuando todavía son fáciles de corregir, y no años más tarde en medio de una caída real; los dueños de los servicios dependientes se ven obligados a enfrentar temprano la realidad de los sistemas distribuidos: todo componente remoto puede fallar. Hay otras formas de no sobrecumplir: rechazar a propósito una parte de las solicitudes, o diseñar el sistema para que no sea más rápido cuando tiene poca carga. La caída provocada de Chubby se parece a un experimento bajo falla (sección~\ref{sec:chaos}), aunque su propósito es otro: no busca validar cómo se comporta el sistema, sino fijar expectativas en quienes dependen de él.\footnote{Beyer et al. (2016), cap.~4, nota~3.}
 
 \subsubsection{La ventana}
 
@@ -379,6 +371,38 @@ Además del esquema ``todo o nada'' (se despliega o no se despliega), hay varian
 \end{itemize}
 \end{uainfo}
 
+La figura muestra cómo podría gastarse el presupuesto del generador en una ventana de 30 días (los números son ilustrativos). La diagonal punteada es el ritmo permitido: si el presupuesto se gastara exactamente a ese ritmo, llegaría a cero justo el día 30. Los primeros días el consumo es normal y la línea real baja más despacio que la diagonal. El día 12, un incidente gasta el 20\,\% de golpe; como el problema no queda resuelto del todo, la línea sigue bajando más empinada hasta el día 16. Poco después cruza el 50\,\% y la política pasa a pedir despliegues conservadores. La pendiente de la línea en cada momento es el \emph{burn rate} que se usa para alertar (sección~\ref{sec:burn-rate}).
+
+\begin{center}
+\begin{tikzpicture}[x=0.30cm, y=0.034cm, every node/.style={font=\scriptsize}]
+\fill[UAIngNavy!7] (0,50) rectangle (30,100);
+\fill[UAIngOrange!14] (0,0) rectangle (30,50);
+\fill[UAIngOrange!38] (0,-14) rectangle (30,0);
+\node[anchor=east, text=UAIngNavy] at (29.7,92) {despliegues normales};
+\node[anchor=west, text=UAIngNavy] at (0.3,8) {despliegues conservadores};
+\node[anchor=east, text=UAIngNavy] at (29.7,-7) {cambios congelados};
+\draw[UAIngMuted] (0,0) -- (30,0);
+\draw[UAIngMuted] (0,-14) -- (0,100);
+\foreach \d in {0,5,...,30} {\draw[UAIngMuted] (\d,0) -- (\d,-2); \node[anchor=north, text=UAIngMuted] at (\d,-14) {\d};}
+\node[anchor=north, text=UAIngMuted] at (15,-22) {días de la ventana};
+\foreach \p in {0,25,50,75,100} {\draw[UAIngMuted] (0,\p) -- (-0.4,\p); \node[anchor=east, text=UAIngMuted] at (-0.4,\p) {\p\,\%};}
+\node[anchor=south west, text=UAIngMuted] at (-3.2,104) {presupuesto restante (100\,\% = 12\,960 fallas)};
+\draw[UAIngMuted, dashed, thick] (0,100) -- (30,0);
+\node[anchor=north east, text=UAIngMuted, align=right] at (9,45) {ritmo permitido:\\llega a 0 el día 30};
+\draw[UAIngNavy, very thick] (0,100) -- (12,88);
+\draw[UAIngOrange, very thick] (12,88) -- (12,68);
+\draw[UAIngNavy, very thick] (12,68) -- (16,52) -- (30,31);
+\fill[UAIngNavy] (0,100) circle (0.12) (12,88) circle (0.12);
+\fill[UAIngNavy] (12,68) circle (0.12) (16,52) circle (0.12) (30,31) circle (0.12);
+\node[anchor=south, text=UAIngNavy, align=center] at (6,97) {consumo normal};
+\node[anchor=west, text=UAIngOrange, align=left] at (12.4,80) {incidente:\\$-20\,\%$ de golpe};
+\node[anchor=south west, text=UAIngNavy, align=left] at (21,56) {sin resolver del todo:\\más empinada};
+\draw[-{Stealth[length=1.4mm]}, UAIngNavy] (20.8,62) -- (14.6,59.5);
+\end{tikzpicture}
+\end{center}
+
+Con una ventana deslizante el dibujo es algo distinto: además de gastarse, el presupuesto se recupera a medida que las fallas viejas salen de la ventana.
+
 \subsubsection{El costo de cada nueve}
 
 El presupuesto también hace visible el costo de los objetivos demasiado altos. Cuando cada solicitud vale lo mismo, el cálculo puede ser directo. Por ejemplo, subir el objetivo de 99,9\,\% a 99,99\,\% en un servicio que factura 1 millón de dólares aumenta la disponibilidad en 0,09\,\%, que vale $1\,\text{M} \times 0{,}0009 = 900$ dólares; si alcanzar el nueve adicional cuesta más que eso, no conviene.\footnote{Beyer et al. (2016), cap.~3.}
@@ -391,13 +415,15 @@ El SLO no es una aspiración sino una frontera de decisión. Mientras quede erro
 
 \section{Alertar sobre el SLO: burn rate}\label{sec:burn}
 
-\subsection{Síntomas, no causas}
+\subsection{Síntomas, no causas}\label{sec:sintomas}
 
 El monitoreo tradicional alerta sobre lo que es fácil de medir: CPU por encima del 80\,\%, memoria disponible por debajo del 10\,\%, disco casi lleno. Esas son causas \emph{posibles} de un problema, y por eso producen muchos falsos positivos: la CPU puede subir porque corre un \emph{backup} o el recolector de basura (\emph{garbage collector}). Cuando una alarma suena seguido sin que pase nada grave, los equipos aprenden a ignorarla (``esa alerta no importa, el proceso se queda sin memoria cada tanto''), y lo que al principio era una excepción empieza a parecer normal. El resultado es la \emph{fatiga de alertas} (\emph{alert fatigue}): se presta cada vez menos atención a todas, porque la mayoría son falsas alarmas, y el día que una alerta importa, nadie la mira.\footnote{Majors et al. (2022), cap.~12.}
 
 Una alerta es útil si cumple dos condiciones: cuando suena, es porque los usuarios realmente están teniendo un problema; y quien la recibe puede hacer algo al respecto.\footnote{Majors et al. (2022), cap.~12.} Una alerta por CPU alta no cumple la primera: la CPU del generador puede estar al 90\,\% mientras todos los usuarios reciben sus contraseñas sin problemas. Una alerta basada en el SLO sí la cumple, y no por casualidad. Vigila el SLI, que se definió justamente como la proporción de solicitudes en las que el usuario recibió lo que esperaba (sección~\ref{sec:sli}). Si ese número cae, hay usuarios afectados; si no cae, no los hay, aunque la CPU esté alta.
 
 Lo que la alerta basada en el SLO no dice es \emph{por qué} los usuarios están afectados: dice \emph{qué} pasa (las solicitudes están fallando), no la causa. Para cumplir la segunda condición, quien recibe la alerta necesita poder investigar la causa, y para eso están las trazas, las métricas y los logs de la clase 10.
+
+\paragraph{Las alertas por causa no desaparecen.} Nada de esto significa eliminar toda alerta sobre causas. La regla es poner mucho más esfuerzo en detectar síntomas que causas, y alertar por una causa solo cuando es segura e inminente.\footnote{Beyer et al. (2016), cap.~6, sección \emph{Tying These Principles Together}.} Un disco casi lleno, un certificado a punto de vencer o un servicio que se quedó sin redundancia (una sola réplica, sin repuesto) todavía no afectan al usuario, pero lo van a afectar con seguridad, y una alerta por síntoma recién sonaría cuando ya es tarde. Esas alertas siguen teniendo sentido, muchas veces como ticket y no como aviso inmediato. Lo que conviene evitar son las alertas por causas que pueden tener o no efecto sobre el usuario, como la CPU alta. Por la misma razón, el monitoreo interno del sistema sigue siendo necesario: sirve para detectar los problemas inminentes y para investigar la causa cuando suena una alerta por síntoma.
 
 \subsection{Qué vigila una alerta sobre el SLO}\label{sec:alerta-slo}
 
@@ -490,7 +516,7 @@ Con poco tráfico, una sola solicitud fallida parece una catástrofe. Por ejempl
 
 \subsubsection{Contar minutos o contar solicitudes}
 
-La sección~\ref{sec:sli} mostró dos formas de escribir un SLI: por tiempo o por eventos. La diferencia parecía de forma, pero cambia cuánto presupuesto se descuenta, y por lo tanto cuándo suenan las alertas.\footnote{Majors et al. (2022), cap.~13.} Con el SLO de disponibilidad del generador (99,9\,\% en 30 días), las dos formas quedan así:
+Un SLI se puede calcular contando solicitudes, como el de la sección~\ref{sec:sli}, o contando minutos: cada minuto se marca como bueno o malo según cómo les fue a sus solicitudes, y se cuentan los minutos malos. La segunda forma es la que permite informar que un servicio ``estuvo caído 12 minutos''. La diferencia parece de forma, pero cambia cuánto presupuesto se descuenta y, por lo tanto, cuándo suenan las alertas.\footnote{Majors et al. (2022), cap.~13.} Con el SLO de disponibilidad del generador (99,9\,\% en 30 días), las dos formas quedan así:
 
 \begin{itemize}
 \item \textbf{Por tiempo:} cada minuto se marca como bueno o malo. Un minuto es malo si en él falló el 0,1\,\% o más de las solicitudes. El presupuesto es de 43,2 minutos malos en 30 días.
@@ -523,7 +549,7 @@ En Honeycomb, una empresa de herramientas de observabilidad, el servicio que rec
 
 Una madrugada, el servicio tuvo una degradación parcial: durante 20 minutos falló alrededor del 1,5\,\% de los datos entrantes. Con un presupuesto de apenas 0,005\,\%, eso es un consumo 300 veces más rápido que el permitido, y la alerta del SLO sonó a la 1:29. La persona de guardia vio que el servicio parecía recuperado y lo tomó como un pico pasajero. La degradación se repitió, y recién cuando la alerta sonó por cuarta vez, a las 9:55, se declaró un incidente. El monitoreo tradicional, que necesitaba varias sondas fallidas seguidas, nunca detectó nada.
 
-La causa era una pérdida de memoria introducida en un despliegue: las máquinas del clúster se quedaban sin memoria, caían y se reiniciaban casi al mismo tiempo. Ninguna alerta por memoria la habría detectado, porque en ese sistema quedarse sin memoria de vez en cuando era normal; lo anómalo era el efecto sobre los usuarios, y eso es lo que mide el SLO. Al cerrarse el incidente, el cumplimiento había caído a 99,97\,\% contra un objetivo de 99,995\,\%: se había gastado más de cinco veces el presupuesto del período. Después de este caso, el equipo pasó a usar las alertas de consumo del presupuesto como su alerta principal y eliminó buena parte de las tradicionales.
+La causa era una pérdida de memoria introducida en un despliegue: las máquinas del clúster se quedaban sin memoria, caían y se reiniciaban casi al mismo tiempo. Ninguna alerta por memoria la habría detectado, porque en ese sistema quedarse sin memoria de vez en cuando era normal; lo anómalo era el efecto sobre los usuarios, y eso es lo que mide el SLO. Al cerrarse el incidente, el cumplimiento había caído a 99,97\,\% contra un objetivo de 99,995\,\%: se había gastado más de cinco veces el presupuesto del período. Después de este caso, el equipo pasó a usar las alertas de consumo del presupuesto como su alerta principal y eliminó buena parte de las tradicionales. Es la experiencia de una empresa de herramientas de observabilidad, que defiende esa práctica; el SRE Book es más prudente y conserva las alertas por causas seguras e inminentes (sección~\ref{sec:sintomas}).
 
 \subsection{Qué hacer cuando suena}
 

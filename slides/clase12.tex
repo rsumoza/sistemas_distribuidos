@@ -86,10 +86,10 @@ En Asteria Online la garantía no lleva números. Los números de hoy (SLO, erro
 \end{frame}
 
 \begin{frame}{La confiabilidad es gestión de riesgo}
-La intuición: que el sistema no falle nunca. \pause Pasado cierto punto, más confiabilidad es \textbf{peor}:
+El objetivo podría ser: que el sistema no falle nunca. \pause Pasado cierto punto, más confiabilidad es \textbf{peor}:
 \begin{itemize}
 \item \textbf{El costo no es lineal}: cada mejora puede costar cien veces más que la anterior. Réplicas, capacidad ociosa y, sobre todo, ingenieros que no construyen funcionalidades.
-\item \textbf{El usuario no lo nota}: con un teléfono confiable al 99\,\%, nadie distingue un servicio al 99,99\,\% de uno al 99,999\,\%.
+\item \textbf{El usuario no lo nota}: acostumbrado a un servicio confiable al 99\,\%, nadie distingue un servicio al 99,99\,\% de uno al 99,999\,\%.
 \item \textbf{Compite con la velocidad de cambio}: más estabilidad, menos cambios.
 \end{itemize}
 
@@ -98,8 +98,6 @@ La intuición: que el sistema no falle nunca. \pause Pasado cierto punto, más c
 \begin{block}{El objetivo es mínimo y máximo a la vez}
 Por debajo, los usuarios sufren. Por encima, nadie nota el nueve de más, y ese esfuerzo podría haberse usado en otra cosa.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al., \emph{Site Reliability Engineering} (2016), cap.~3. Apunte: sección 1.1.}
 \end{frame}
 
 \begin{frame}{Cómo se encadenan los temas}
@@ -128,9 +126,8 @@ Por debajo, los usuarios sufren. Por encima, nadie nota el nueve de más, y ese 
 
 \pause
 
-{\small Medir define ``normal''; alertar lo vigila; validar y responder lo usan como referencia; aprender lo corrige. \textbf{La esperanza no es una estrategia.}}
+{\small Medir define ``normal''; alertar lo vigila; validar y responder lo usan como referencia; aprender lo corrige.}
 
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~3 (``Hope is not a strategy''). Apunte: sección 1.2.}
 \end{frame}
 
 \begin{frame}{El ejemplo de hoy: el generador de contraseñas}
@@ -165,16 +162,16 @@ Todo servicio lleva una promesa: que responda, rápido, y bien. Mientras sea imp
 \item \textbf{Qué pasa si no se cumple}: el acuerdo con consecuencias (SLA).
 \end{enumerate}
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 2.}
 \end{frame}
 
 \begin{frame}{SLI, SLO y SLA}
-\begin{description}
-\item[SLI (\emph{indicator})] Una medida cuantitativa, cuidadosamente definida, del nivel de servicio.
-\item[SLO (\emph{objective})] Un valor objetivo para un SLI: ``SLI $\ge$ objetivo''.
-\item[SLA (\emph{agreement})] Un contrato que incluye consecuencias si no se cumplen sus SLOs.
-\end{description}
+Las tres siglas empiezan con \textbf{SL}, \emph{Service Level}: el \textbf{nivel de servicio}, es decir, qué tan bien le funciona el servicio a quien lo usa.
+
+\begin{itemize}
+\item \textbf{SLI} (\emph{Service Level Indicator}): una medida cuantitativa del nivel de servicio.
+\item \textbf{SLO} (\emph{Service Level Objective}): un valor objetivo para un SLI: ``SLI $\ge$ objetivo''.
+\item \textbf{SLA} (\emph{Service Level Agreement}): un contrato con consecuencias si no se cumplen sus SLOs.
+\end{itemize}
 
 \pause
 
@@ -185,8 +182,6 @@ Todo servicio lleva una promesa: que responda, rápido, y bien. Mientras sea imp
 \item \textbf{SLA}: si en un mes queda por debajo de \textbf{99,5\,\%}, el cliente recibe un descuento (ilustrativo).
 \end{itemize}
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~4. Apunte: sección 2.1.}
 \end{frame}
 
 \begin{frame}{El SLI como proporción de eventos buenos}
@@ -197,69 +192,14 @@ Todo servicio lleva una promesa: que responda, rápido, y bien. Mientras sea imp
 \begin{itemize}
 \item Todos los SLIs en la misma escala: de 0\,\% a 100\,\%, donde 100\,\% es lo mejor.
 \item Mide bien las fallas \textbf{parciales}, que en un sistema distribuido son la norma.
+\item Disponibilidad $=$ solicitudes exitosas / válidas: la \textbf{disponibilidad semántica} de la clase 8, no el \emph{uptime} del proceso.
 \end{itemize}
 
 \pause
 
 \begin{alertblock}{``Válidos'' define la población}
-Una solicitud mal formada (4xx) no dice nada sobre la salud del servicio: se excluye. Igual que el \emph{circuit breaker} de la clase 11 no contaba los 4xx.
+Una solicitud mal formada (4xx) no dice nada sobre la salud del servicio: se excluye.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Beyer et al., \emph{The Site Reliability Workbook} (2018), cap.~2. Apunte: sección 2.2.1.}
-\end{frame}
-
-\begin{frame}{Disponibilidad: por tiempo o por solicitudes}
-\begin{columns}[T,onlytextwidth]
-\begin{column}{0.48\textwidth}
-\textbf{Por tiempo (\emph{uptime})}
-\[
-\frac{\text{tiempo arriba}}{\text{arriba} + \text{caído}}
-\]
-{\small 40 minutos caído en 30 días (43\,200 min): $43\,160 / 43\,200 \approx 99{,}907\,\%$.}
-
-\pause
-
-{\small\color{UAIngOrange} ¿Qué cuenta como ``caído''? Y si falla el 10\,\% de las solicitudes pero el \emph{health check} responde, el servicio estuvo ``arriba''.}
-\end{column}
-\begin{column}{0.48\textwidth}
-\pause
-\textbf{Por solicitudes}
-\[
-\frac{\text{solicitudes exitosas}}{\text{solicitudes válidas}}
-\]
-{\small 432\,000 en un día y 300 fallidas: $431\,700 / 432\,000 \approx 99{,}93\,\%$.}
-
-\pause
-
-{\small\color{UAIngNavy} Cuenta las fallas parciales. Un servicio en varias regiones casi nunca está \emph{todo} caído.}
-\end{column}
-\end{columns}
-
-\vspace{0.6em}
-{\small \emph{Uptime} es lo más difundido en la industria: fácil de explicar, coincide con las páginas de estado.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~3, ecuaciones 3-1 y 3-2. Apunte: sección 2.2.1.}
-\end{frame}
-
-\begin{frame}{Latencia: distribuciones, no promedios}
-Recordatorio de la clase 10: el promedio no describe a nadie. Dos formas de escribir un SLI de latencia:
-\begin{itemize}
-\item \textbf{Un percentil}: ``el p99 es menor que 300\,ms en cada ventana de 5 minutos''. Habitual en \emph{dashboards}.
-\item \textbf{Una proporción}: ``el porcentaje de solicitudes respondidas en menos de 300\,ms''. 1\,488 de 1\,500 $\Rightarrow$ 99,2\,\%.
-\end{itemize}
-
-\pause
-
-{\small La segunda tiene forma de cociente, como la disponibilidad. Más adelante vamos a ver por qué esa diferencia importa al gastar el presupuesto.}
-
-\pause
-
-\begin{block}{Otros SLIs}
-\small
-Tasa de error (1 $-$ disponibilidad) · \emph{throughput} (útil para mirar, rara vez como objetivo: la carga la deciden los usuarios) · frescura de un \emph{pipeline} · durabilidad del almacenamiento.
-\end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~4; Majors et al., \emph{Observability Engineering} (2022), cap.~12. Apunte: secciones 2.2.1 y 2.2.4.}
 \end{frame}
 
 \begin{frame}{Especificación e implementación}
@@ -284,8 +224,6 @@ Instrumentación en el cliente & Lo más real. & Cara; mezcla la red del usuario
 \end{center}
 
 {\small Regla: medir lo más cerca del usuario que se pueda. Para empezar, lo que cueste poco.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~2. Apunte: sección 2.2.2.}
 \end{frame}
 
 \begin{frame}{Qué medir según el tipo de servicio}
@@ -308,8 +246,6 @@ Cualquiera & Corrección: ¿la respuesta era la correcta? \\
 \begin{alertblock}{La corrección entra en el SLI}
 Si ``bueno'' fuera cualquier HTTP 200, una contraseña sin especiales devuelta por un \emph{fallback} mal decidido contaría como éxito. El evento bueno es: \textbf{200 con una contraseña que cumple la política}.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~4; Beyer et al. (2018), cap.~2. Apunte: sección 2.2.3.}
 \end{frame}
 
 \begin{frame}{SLO: cómo elegir el valor}
@@ -330,29 +266,26 @@ Empezar por lo que le importa al usuario, no por lo que es fácil de medir.
 \begin{block}{La ventana}
 Deslizante de \textbf{30 días} (o 4 semanas): se parece a la memoria del usuario. Una ventana fija se reinicia de golpe; una de 90 días permite gastar el 90\,\% del presupuesto en un día y cumplir igual.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~4; Beyer et al. (2018), cap.~2; Majors et al. (2022), cap.~13. Apunte: secciones 2.3.2 y 2.3.4.}
 \end{frame}
 
-\begin{frame}{No sobrecumplir: el caso Chubby}
-\textbf{Chubby}: el servicio de \emph{locks} de Google. Usa Paxos (clase 8); otros servicios lo usan para elegir líder y para guardar la tabla de nombres a direcciones IP.
+\begin{frame}{Margen de seguridad y no sobrecumplir}
+\begin{block}{Margen de seguridad}
+Usar internamente un SLO \textbf{más estricto} que el que se publica: da tiempo a corregir un problema antes de que lo note el usuario.
+\end{block}
 
 \pause
 
-\begin{itemize}
-\item Su instancia global casi nunca fallaba. Los equipos empezaron a depender de ella \textbf{como si no pudiera fallar}.
-\item Cuando fallaba, los servicios dependientes no sabían funcionar sin ella: caídas visibles para los usuarios.
+\textbf{No sobrecumplir.} Los usuarios construyen sobre lo que el servicio \textbf{realmente} da. Si rinde mucho mejor que su SLO, otros dependen de él \textbf{como si no pudiera fallar}, y cuando falla no saben funcionar sin él.
+
+\pause
+
+\begin{block}{Tres formas de no sobrecumplir}
+\begin{itemize}\small
+\item Diseñarlo para que \textbf{no sea más rápido} cuando tiene poca carga.
+\item \textbf{Rechazar a propósito} una pequeña parte de las solicitudes.
+\item La más drástica: \textbf{apagarlo a propósito} de vez en cuando, si no hubo caídas reales. Se usa en servicios de infraestructura de los que dependen muchos otros.
 \end{itemize}
-
-\pause
-
-\begin{alertblock}{La solución}
-Que Chubby cumpla su SLO, pero sin superarlo demasiado. Si en un trimestre no hubo caídas reales, \textbf{se apaga a propósito}. Las dependencias irrazonables aparecen cuando todavía son fáciles de corregir.
-\end{alertblock}
-
-{\small Es un experimento bajo falla motivado por un SLO. Lo vamos a retomar.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), caps.~2 y 4. Apunte: sección 2.3.3.}
+\end{block}
 \end{frame}
 
 \begin{frame}{SLA: el acuerdo}
@@ -372,8 +305,6 @@ El generador promete 99,5\,\% en el SLA y se exige 99,9\,\% en el SLO. El equipo
 \end{alertblock}
 
 {\small No todo servicio tiene SLA. Con o sin él, se opera con SLIs y SLOs.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), caps.~3 y 4. Apunte: sección 2.4.}
 \end{frame}
 
 \begin{frame}{Los objetivos del generador}
@@ -385,17 +316,14 @@ El generador promete 99,5\,\% en el SLA y se exige 99,9\,\% en el SLO. El equipo
 
 \pause
 
-\textbf{SLI de latencia}: proporción de solicitudes válidas respondidas en menos de 500\,ms.
+\textbf{SLI de latencia}: el p99 de las solicitudes válidas, medido en el balanceador.
 
 \pause
 
 \begin{block}{SLOs}
-Disponibilidad $\ge$ \textbf{99,9\,\%} y latencia $\ge$ \textbf{99\,\%}, sobre 30 días deslizantes.
+Disponibilidad $\ge$ \textbf{99,9\,\%} y p99 de latencia $<$ \textbf{500\,ms}, sobre 30 días deslizantes.
 \end{block}
 
-{\small Son decisiones, no datos: hipótesis hasta tener una línea de base (\emph{baseline}).}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 2.5.}
 \end{frame}
 
 \UASectionSlide{Error budget}
@@ -430,39 +358,6 @@ Si el SLO no es 100\,\%, hay una falla tolerada: el \textbf{error budget} es $1 
 \end{itemize}
 \end{column}
 \end{columns}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~3 y apéndice A. Apunte: sección 3.1.}
-\end{frame}
-
-\begin{frame}{¿Alcanza la resiliencia de la clase 11?}
-\emph{especiales} falla en el 10\,\% de las llamadas; cada solicitud la llama 5 veces.
-
-\pause
-
-\begin{enumerate}\small
-\item Sin reintentos, la solicitud sale bien si salen las 5: $0{,}9^5 \approx 0{,}59$. Falla el \textbf{41\,\%}.
-\item De 18\,000 por hora, fallan \textbf{7\,380}.
-\item El presupuesto de 30 días (12\,960) se agota en $12\,960 / 7\,380 \approx$ \textbf{1,8 horas}.
-\end{enumerate}
-
-\pause
-
-\begin{center}
-\small
-\begin{tabular}{lrrr}
-\toprule
-\textbf{Configuración} & \textbf{Fallan} & \textbf{Por hora} & \textbf{El presupuesto dura} \\
-\midrule
-Sin reintentos & 41\,\% & 7\,380 & 1,8 h \\
-Con un reintento & 4,9\,\% & 882 & 14,7 h \\
-Lo que admite el SLO & 0,1\,\% & 18 & 30 días \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\begin{alertblock}{El SLO dice lo que la clase 11 no podía}
-El reintento mejoró ocho veces, pero \textbf{no alcanza}. ``Está mejor'' pasa a ser ``está dentro'' o ``está fuera''.
-\end{alertblock}
 \end{frame}
 
 \begin{frame}{Para qué sirve: alinear incentivos}
@@ -482,8 +377,6 @@ Desarrollo quiere velocidad; operaciones, estabilidad. ¿Cuánto probar? ¿Cada 
 \begin{block}{El efecto}
 El equipo se regula solo: con presupuesto amplio, arriesga; casi agotado, es el propio equipo el que pide más pruebas. Las caídas ajenas (la red, un centro de datos) también lo gastan: la responsabilidad es compartida.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~3. Apunte: sección 3.2.1.}
 \end{frame}
 
 \begin{frame}{La política de error budget}
@@ -503,24 +396,53 @@ Agotado & Se congela todo lo que no sea confiabilidad o seguridad. \\
 \end{center}
 
 {\small Y una regla más: un incidente que consume más del 20\,\% del presupuesto exige un postmortem.}
+\end{frame}
 
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~2. Política ilustrativa de la cátedra. Apunte: sección 3.2.2.}
+\begin{frame}{Cómo se gasta el presupuesto}
+\begin{center}
+\begin{tikzpicture}[x=0.30cm, y=0.034cm, every node/.style={font=\scriptsize}]
+\fill<4->[UAIngNavy!7] (0,50) rectangle (30,100);
+\fill<4->[UAIngOrange!14] (0,0) rectangle (30,50);
+\fill<4->[UAIngOrange!38] (0,-14) rectangle (30,0);
+\node<4->[anchor=east, text=UAIngNavy] at (29.7,92) {despliegues normales};
+\node<4->[anchor=west, text=UAIngNavy] at (0.3,8) {despliegues conservadores};
+\node<4->[anchor=east, text=UAIngNavy] at (29.7,-7) {cambios congelados};
+\draw[UAIngMuted] (0,0) -- (30,0);
+\draw[UAIngMuted] (0,-14) -- (0,100);
+\foreach \d in {0,5,...,30} {\draw[UAIngMuted] (\d,0) -- (\d,-2); \node[anchor=north, text=UAIngMuted] at (\d,-14) {\d};}
+\node[anchor=north, text=UAIngMuted] at (15,-22) {días de la ventana};
+\foreach \p in {0,25,50,75,100} {\draw[UAIngMuted] (0,\p) -- (-0.4,\p); \node[anchor=east, text=UAIngMuted] at (-0.4,\p) {\p\,\%};}
+\node[anchor=south west, text=UAIngMuted] at (-3.2,104) {presupuesto restante (100\,\% = 12\,960 fallas)};
+\draw[UAIngMuted, dashed, thick] (0,100) -- (30,0);
+\node[anchor=north east, text=UAIngMuted, align=right] at (9,45) {ritmo permitido:\\llega a 0 el día 30};
+\draw<2->[UAIngNavy, very thick] (0,100) -- (12,88);
+\draw<3->[UAIngOrange, very thick] (12,88) -- (12,68);
+\draw<3->[UAIngNavy, very thick] (12,68) -- (16,52) -- (30,31);
+\fill<2->[UAIngNavy] (0,100) circle (0.12) (12,88) circle (0.12);
+\fill<3->[UAIngNavy] (12,68) circle (0.12) (16,52) circle (0.12) (30,31) circle (0.12);
+\node<2->[anchor=south, text=UAIngNavy, align=center] at (6,97) {consumo normal};
+\node<3->[anchor=west, text=UAIngOrange, align=left] at (12.4,80) {incidente:\\$-20\,\%$ de golpe};
+\node<3->[anchor=south west, text=UAIngNavy, align=left] at (21,56) {sin resolver del todo:\\más empinada};
+\draw<3->[-{Stealth[length=1.4mm]}, UAIngNavy] (20.8,62) -- (14.6,59.5);
+\end{tikzpicture}
+\end{center}
+
+\onslide<3->{\small La \textbf{pendiente} de la línea es el \textbf{burn rate}: cuanto más empinada, más rápido se agota.}
+\onslide<4->{\small Las bandas son la política de error budget de la próxima slide.}
 \end{frame}
 
 \begin{frame}{El costo de cada nueve}
-\textbf{Con dinero}: subir de 99,9\,\% a 99,99\,\% en un servicio que factura 1 millón de dólares gana 0,09\,\%: $1\,\text{M} \times 0{,}0009 = 900$ dólares. Si el nueve cuesta más, no conviene.
+\textbf{Monetario}: subir de 99,9\,\% a 99,99\,\% en un servicio que factura 1 millón de dólares gana 0,09\,\%: $1\,\text{M} \times 0{,}0009 = 900$ dólares. Si el nueve cuesta más, no conviene.
 
 \pause
 
-\textbf{Sin dinero}: el usuario ya pierde solicitudes por su propia conexión (su proveedor, el celular, el Wi-Fi). Esa tasa de error de base está entre \textbf{0,01\,\%} y \textbf{1\,\%}. Por debajo, el usuario no distingue los errores del servicio de los de su red.
+\textbf{No monetario}: el usuario ya pierde solicitudes por su propia conexión (su proveedor, el celular, el Wi-Fi). Esa tasa de error de base está entre \textbf{0,01\,\%} y \textbf{1\,\%}. Por debajo, el usuario no distingue los errores del servicio de los de su red.
 
 \pause
 
 \begin{alertblock}{Idea central}
 El SLO no es una aspiración: es una \textbf{frontera de decisión}. El 100\,\% casi nunca es el objetivo correcto: es imposible, es caro y el usuario no lo nota.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~3. Apunte: sección 3.2.3.}
 \end{frame}
 
 \UASectionSlide{Alertar sobre el SLO}
@@ -546,7 +468,9 @@ El monitoreo tradicional alerta sobre lo fácil de medir: CPU $>$ 80\,\%, memori
 
 {\small La del SLO cumple la 1 porque vigila el SLI: si cae, hay usuarios afectados, aunque la CPU esté baja. Dice \emph{qué} pasa, no \emph{por qué}: para eso, trazas, métricas y logs (clase 10).}
 
-{\scriptsize\color{UAIngMuted}Majors et al. (2022), cap.~12. Apunte: sección 4.1.}
+\pause
+
+{\small \textbf{Excepción}: alertar por una causa \textbf{segura e inminente}, aunque el usuario todavía no lo note: disco casi lleno, certificado por vencer, servicio sin redundancia. Muchas veces, como ticket.}
 \end{frame}
 
 \begin{frame}{¿Qué vigila una alerta sobre el SLO?}
@@ -565,8 +489,6 @@ El SLO del generador: 99,9\,\% en 30 días. Presupuesto: 12\,960 fallas. ¿Cuán
 \begin{block}{La recomendada es la 3}
 El SLO define qué es falla y cuánto presupuesto hay; la alerta mide \textbf{a qué velocidad se gasta}. Urgencia proporcional al daño.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Majors et al. (2022), cap.~13. Apunte: sección 4.2.}
 \end{frame}
 
 \begin{frame}{La alerta del generador, concreta}
@@ -592,14 +514,18 @@ tasa de error de los \textbf{últimos 5 minutos} $> 1{,}44\,\%$
 \end{itemize}
 
 {\small ¿De dónde sale el 1,44\,\%? ¿Para qué la segunda ventana? Siguientes slides.}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 4.2.}
 \end{frame}
 
-\begin{frame}{Burn rate}
+\begin{frame}[t]{Burn rate}
+\vspace{-0.8em}
+\begin{uakeybox}
+\vspace{-0.5em}
 \[
-b = \frac{e}{1 - s} \qquad \text{se agota en } \frac{T}{b}
+b = \frac{e}{1 - s} \qquad\qquad \text{se agota en } \frac{T}{b}
 \]
+\vspace{-0.3em}
+\end{uakeybox}
+\vspace{0.2em}
 {\small $e$: tasa de error · $s$: objetivo del SLO · $T$: ventana. Con $b = 1$ se gasta justo el presupuesto.}
 
 \pause
@@ -607,7 +533,7 @@ b = \frac{e}{1 - s} \qquad \text{se agota en } \frac{T}{b}
 {\small Generador: $s = 0{,}999$, $1 - s = 0{,}001$, $T = 720$\,h $\Rightarrow$ $b = e / 0{,}001$; se agota en $720 / b$ horas.}
 
 \begin{center}
-\small
+\footnotesize
 \begin{tabular}{rrrl}
 \toprule
 \textbf{Tasa de error ($e$)} & \textbf{Burn rate} & \textbf{Se agota en} & \textbf{Situación} \\
@@ -621,8 +547,6 @@ b = \frac{e}{1 - s} \qquad \text{se agota en } \frac{T}{b}
 \bottomrule
 \end{tabular}
 \end{center}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~5. Apunte: sección 4.3.1.}
 \end{frame}
 
 \begin{frame}{Elegir la ventana y el umbral}
@@ -641,8 +565,6 @@ Cuatro propiedades: \textbf{precisión} (si suena, hay problema), \textbf{cobert
 \begin{block}{La solución}
 \textbf{Varios umbrales}: los rápidos despiertan a alguien, los lentos generan un ticket. Y cada uno exige \textbf{dos ventanas a la vez}: la larga confirma que es significativo; la corta, que sigue ocurriendo. La corta apaga la alerta minutos después de resuelto.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~5. Apunte: sección 4.3.2.}
 \end{frame}
 
 \begin{frame}{Varias ventanas, varios umbrales}
@@ -668,8 +590,6 @@ Ticket & 3 días & 6 h & 1 & 10\,\% \\
 \begin{block}{Tiempo de detección}
 La alerta de 1 h suena cuando el promedio de la hora llega a 1,44\,\%. Con \emph{especiales} al 10\,\% sin reintentos ($e = 41\,\%$): \textbf{unos 2 minutos}. Caída total: \textbf{menos de 1 minuto}.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~5, tabla 5-8. Apunte: sección 4.3.2.}
 \end{frame}
 
 \begin{frame}{Servicios con poco tráfico}
@@ -683,8 +603,6 @@ La alerta de 1 h suena cuando el promedio de la hora llega a 1,44\,\%. Con \emph
 \item Cambiar el producto: reintentos del cliente con \emph{backoff} y \emph{jitter}, alternativas.
 \item Bajar el SLO o agrandar la ventana: decisión de producto.
 \end{itemize}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~5. Apunte: sección 4.3.3.}
 \end{frame}
 
 \begin{frame}{Contar minutos o contar solicitudes}
@@ -695,8 +613,6 @@ La alerta de 1 h suena cuando el promedio de la hora llega a 1,44\,\%. Con \emph
 \textbf{Qué pasa} & \textbf{Contando solicitudes}\newline{\scriptsize presupuesto: 12\,960 fallas} & \textbf{Contando minutos}\newline{\scriptsize malo si falla el 0,1\,\% o más; presupuesto: 43,2 minutos} \\
 \midrule
 Durante 1 hora falla el 1\,\%: 180 de 18\,000. & $180 / 12\,960 \approx$ \textbf{1,4\,\%} del presupuesto. & Los 60 minutos son malos: \textbf{se agota}. \\
-\midrule
-30 días con el 4\,\% de solicitudes más lentas que 500\,ms (SLO de latencia: 1\,\% de presupuesto). & 4 veces lo permitido: \textbf{se agota en 7,5 días}. & El p95 de cada minuto sigue por debajo de 500\,ms: \textbf{no ve nada}. \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -709,8 +625,6 @@ Durante 1 hora falla el 1\,\%: 180 de 18\,000. & $180 / 12\,960 \approx$ \textbf
 \item \textbf{Solicitudes}: para operar el servicio y calcular el burn rate, sobre todo con SLOs de 99,9\,\% o más.
 \item \textbf{Minutos}: para un SLA o una página de estado (``12 minutos caído este mes''), con mucho tráfico y umbrales pensados para caídas.
 \end{itemize}
-
-{\scriptsize\color{UAIngMuted}Majors et al. (2022), cap.~13. Apunte: sección 4.3.4.}
 \end{frame}
 
 \begin{frame}{Caso: la alerta que nadie creía}
@@ -727,10 +641,8 @@ Honeycomb: servicio de ingesta de datos de clientes, SLO de \textbf{99,995\,\%},
 \pause
 
 \begin{block}{La causa y la lección}
-Una pérdida de memoria: las máquinas caían y se reiniciaban casi juntas. Quedarse sin memoria era normal; lo anómalo era el efecto sobre los usuarios. Gastaron más de cinco veces el presupuesto, y la alerta del SLO pasó a ser \textbf{la principal}.
+Una pérdida de memoria: las máquinas caían y se reiniciaban casi juntas. Quedarse sin memoria era normal; lo anómalo era el efecto sobre los usuarios. Gastaron más de cinco veces el presupuesto, y para ellos la alerta del SLO pasó a ser \textbf{la principal}. El SRE Book es más prudente: conserva las alertas por causas inminentes.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Majors et al. (2022), cap.~12, \emph{Changing Culture Toward SLO-Based Alerts: A Case Study}, págs.~135--137. Apunte: sección 4.3.5.}
 \end{frame}
 
 \UASectionSlide{Validar:\\experimentos bajo falla}
@@ -752,8 +664,6 @@ Un cliente con \emph{timeout} de 50\,ms llama a dos proveedores: 20\,ms en prome
 \item Las pruebas unitarias y de integración suponen tiempos ideales y \emph{mocks} limpios.
 \item \emph{Staging} nunca es producción: menos servidores, menos tráfico, red sin congestión.
 \end{itemize}
-
-{\scriptsize\color{UAIngMuted}Nygard, \emph{Release It!} (2018), cap.~17. Apunte: sección 5.1.}
 \end{frame}
 
 \begin{frame}{Chaos Engineering}
@@ -766,15 +676,13 @@ Hacer experimentos sobre un sistema para ganar confianza en que soporta condicio
 \textbf{¿Por qué provocar fallas a propósito?}
 \begin{itemize}\small
 \item \textbf{Los sistemas pierden margen sin que nadie lo decida}: cada optimización consume holgura. Un pool justo para 5 solicitudes/s anda bien hasta que \emph{especiales} se pone lento.
-\item \textbf{Lo que nunca falla no se sabe manejar}: como Chubby.
+\item \textbf{Lo que nunca falla no se sabe manejar}: nadie sabe cómo se comporta el resto sin ese componente.
 \item \textbf{La falla pequeña y frecuente se vuelve rutina}: como un simulacro de evacuación.
 \end{itemize}
 
 \pause
 
 {\small \textbf{Chaos Monkey} (Netflix): apaga al azar un servidor de un servicio. Si el servicio no sigue con los demás, el equipo lo corrige.}
-
-{\scriptsize\color{UAIngMuted}\emph{Principles of Chaos Engineering} (2019); Nygard (2018), cap.~17. Apunte: sección 5.2.}
 \end{frame}
 
 \begin{frame}{Un experimento tiene cuatro pasos}
@@ -794,8 +702,6 @@ Es exactamente lo que construimos al medir. Sin SLIs no hay qué observar. Por e
 \pause
 
 {\small Además: hipótesis sobre lo que se ve desde afuera · fallas que ocurren en la realidad · en producción cuando sea seguro · automatizado · con el daño acotado (\emph{blast radius}).}
-
-{\scriptsize\color{UAIngMuted}\emph{Principles of Chaos Engineering} (2019). Apunte: sección 5.2.3.}
 \end{frame}
 
 \begin{frame}{La hipótesis}
@@ -822,8 +728,6 @@ Es exactamente lo que construimos al medir. Sin SLIs no hay qué observar. Por e
 \item \textbf{¿Se puede medir hoy el \emph{steady state}?} Si el SLI saliera solo de los logs del generador, un experimento que lo tumba no mostraría ninguna falla.
 \item \textbf{¿Qué resultado la refutaría?} Siempre hay fallas por la red del usuario: lo que importa es la \textbf{diferencia} con el grupo de control.
 \end{itemize}
-
-{\scriptsize\color{UAIngMuted}Nygard (2018), cap.~17. Apunte: sección 5.3.1.}
 \end{frame}
 
 \begin{frame}{Qué inyectar}
@@ -842,8 +746,6 @@ Una caída es una falla rápida; la latencia, una lenta. Muchos sistemas toleran
 \end{alertblock}
 
 {\small Al principio, al azar. Después, mirar el árbol de llamadas de una traza y preguntar qué pasa si se quita cada una.}
-
-{\scriptsize\color{UAIngMuted}Nygard (2018), cap.~17. Apunte: sección 5.3.2.}
 \end{frame}
 
 \begin{frame}{Seguridad del experimento}
@@ -862,8 +764,6 @@ Perturbar el 1\,\% del tráfico, y que todo eso falle, es burn rate 10. Treinta 
 \end{block}
 
 {\small \textbf{Criterio de aborto} en el idioma de las alertas: se detiene si el burn rate de la ventana corta supera lo esperado.}
-
-{\scriptsize\color{UAIngMuted}Nygard (2018), cap.~17. Apunte: sección 5.3.3.}
 \end{frame}
 
 \begin{frame}{Dos advertencias}
@@ -882,8 +782,6 @@ Avisó por correo que iba a experimentar en el entorno de pruebas. Casi nadie re
 \begin{alertblock}{Lección}
 Probar la reversión antes. El silencio no es consentimiento. Los primeros experimentos, chicos y acordados.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~13; Nygard (2018), cap.~17. Apunte: sección 5.3.3.}
 \end{frame}
 
 \begin{frame}{Automatizar y repetir}
@@ -901,8 +799,6 @@ En el mejor caso, un experimento es \textbf{aburrido}: se inyecta la falla y el 
 \begin{block}{Las personas también fallan}
 Simulacros en los que parte del equipo queda ``fuera'' un día: aparecen los procesos que dependen de una sola persona. Google los hace periódicamente con el nombre \textbf{DiRT} (\emph{Disaster Recovery Testing}), e incluye la práctica de la gestión de incidentes. Siempre con una palabra clave para abortar.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Nygard (2018), cap.~17; Beyer et al. (2016), caps.~13 y 14. Apunte: sección 5.3.4.}
 \end{frame}
 
 \begin{frame}{Template del experimento}
@@ -927,8 +823,6 @@ Resultado & Qué se observó, si la hipótesis se sostuvo, qué acciones siguen.
 \bottomrule
 \end{tabular}
 \end{center}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 5.3.5.}
 \end{frame}
 
 \begin{frame}{Un experimento sobre el generador}
@@ -947,8 +841,6 @@ Resultado & Qué se observó, si la hipótesis se sostuvo, qué acciones siguen.
 \begin{alertblock}{Qué la refutaría}
 Que suba la latencia del grupo de control: los hilos se comparten (falta un \emph{bulkhead} o el \emph{timeout} es largo). Que las marcadas tarden 2\,s en fallar: el \emph{timeout} no está activo.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 5.4.}
 \end{frame}
 
 \begin{frame}{Lo que no se esperaba}
@@ -964,8 +856,6 @@ Mismo diseño sobre \emph{dígitos}. Hipótesis: ``solo se ven afectadas las lla
 {\small \textbf{Se refuta}: las llamadas a \emph{minúsculas} también se vuelven lentas, porque \emph{minúsculas} consulta a \emph{dígitos} por dentro. El experimento descubre la dependencia que no estaba en el diagrama.}
 
 {\small \textbf{Acción}: documentarla y revisar que el \emph{timeout} de \emph{minúsculas} contemple el de \emph{dígitos} (clase 11).}
-
-{\scriptsize\color{UAIngMuted}Apunte: sección 5.4.}
 \end{frame}
 
 \UASectionSlide{Responder:\\gestión de incidentes}
@@ -987,8 +877,6 @@ Es un incidente si:
 \pause
 
 {\small Con SLOs: una alerta de burn rate \emph{page} suele ser el comienzo de un incidente. Mejor declararlo temprano y cerrarlo rápido que tarde.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~14. Apunte: sección 6.1.}
 \end{frame}
 
 \begin{frame}{El incidente no gestionado}
@@ -1005,8 +893,6 @@ Cae un centro de datos, después otro y otro. La guardia revierte sin éxito, ll
 \pause
 
 {\small Todos hacían su trabajo como lo entendían. Falta un \textbf{proceso}.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~14. Apunte: sección 6.2.}
 \end{frame}
 
 \begin{frame}{Roles}
@@ -1029,8 +915,6 @@ Planificación & Lo de largo plazo: registrar, relevos, qué revertir al final. 
 \pause
 
 {\small Cada uno sabe su rol y no invade el ajeno: eso da \textbf{más} autonomía. En un equipo chico, una persona tiene varios roles, pero \textbf{explícitos}.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~14 (\emph{Incident Command System}). Apunte: sección 6.3.1.}
 \end{frame}
 
 \begin{frame}{Documento vivo, traspaso y prioridades}
@@ -1051,8 +935,6 @@ Planificación & Lo de largo plazo: registrar, relevos, qué revertir al final. 
 \begin{alertblock}{La mitigación más frecuente: revertir}
 En Google, cerca del \textbf{70\,\%} de las caídas viene de un cambio. Un cambio de configuración aplicado a todos los servidores a la vez los hizo caer en bucle; se revirtió en cinco minutos. No había pasado un \emph{canary} completo porque ``no era riesgoso''.
 \end{alertblock}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), caps.~1, 13 y 14. Apunte: secciones 6.3.2 y 6.3.3.}
 \end{frame}
 
 \begin{frame}{Runbooks}
@@ -1077,8 +959,6 @@ En Google, cerca del \textbf{70\,\%} de las caídas viene de un cambio. Un cambi
 \textbf{Dueño}, guardia, escalamiento. \textbf{Depende de}: \emph{mayúsculas}, \emph{minúsculas} (que depende de \emph{dígitos}), \emph{dígitos}, \emph{especiales}. \textbf{Dashboards}: SLIs, latencia por dependencia, \emph{breakers}.\\[3pt]
 \textbf{Alerta ``burn rate alto, 1 h''}: se gastó el 2\,\% del mes en una hora. Confirmar en el \emph{dashboard}; mirar latencia y errores por dependencia. \textbf{Seguro}: revertir el último cambio. \textbf{No}: deshabilitar \emph{timeouts}, ni un \emph{fallback} sin especiales. Escalar al dueño de la dependencia.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), caps.~1 y 15; Majors et al. (2022), cap.~8. Apunte: sección 6.4.}
 \end{frame}
 
 \UASectionSlide{Aprender: postmortems}
@@ -1117,8 +997,6 @@ Registro escrito del incidente: impacto, cómo se mitigó, causas y \textbf{acci
 
 \vspace{0.4em}
 {\small ``Dónde hubo suerte'': lo que salió bien sin que nadie lo garantizara. La próxima vez puede no estar.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~15 y apéndice D. Apunte: secciones 7.1 y 7.2.1.}
 \end{frame}
 
 \begin{frame}{Blameless}
@@ -1139,8 +1017,6 @@ No ``¿por qué se equivocó?'', sino ``¿qué información, presiones y herrami
 \end{block}
 
 {\small \emph{Blameless} no es sin responsabilidad: igual señala qué mejorar, apoyado en el sistema.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2016), cap.~15; Cook, \emph{How Complex Systems Fail} (2000), punto 8. Apunte: sección 7.2.2.}
 \end{frame}
 
 \begin{frame}{Disparador y condiciones}
@@ -1162,8 +1038,6 @@ Un despliegue cambia la biblioteca HTTP y el \emph{timeout} hacia \emph{especial
 \item \textbf{Diagnóstico}: el \emph{dashboard} no mostraba latencia por dependencia.
 \item \textbf{Mitigación}: varios cambios juntos, difíciles de revertir.
 \end{itemize}
-
-{\scriptsize\color{UAIngMuted}Cook (2000), puntos 3, 4, 7 y 16. Apunte: sección 7.2.3.}
 \end{frame}
 
 \begin{frame}{Acciones que cambian el sistema}
@@ -1194,8 +1068,6 @@ Una lista sin dueños ni fechas.
 \pause
 
 {\small Y al revés: las acciones propuestas en caliente suelen ser exageradas. Revisarlas con calma.}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~10; Beyer et al. (2016), apéndice D. Apunte: sección 7.2.4.}
 \end{frame}
 
 \begin{frame}{Un postmortem malo y uno bueno}
@@ -1219,8 +1091,6 @@ Meses después, solo en el equipo. & En pocos días, compartido. \\
 \begin{block}{Un postmortem que nadie revisa es como si no existiera}
 Revisarlo, compartirlo, leerlo en grupo, reconocer a quien manejó bien el incidente. Y una señal de alarma: \textbf{incidentes que se repiten}.
 \end{block}
-
-{\scriptsize\color{UAIngMuted}Beyer et al. (2018), cap.~10; Beyer et al. (2016), cap.~15. Apunte: secciones 7.2.5 y 7.3.}
 \end{frame}
 
 \UASectionSlide{Cierre}
@@ -1245,7 +1115,7 @@ G: ``el jugador no debe perder el oro pagado por un combate que no llegó a reso
 \item \textbf{Validar sin implementar}: ¿qué falla se inyectaría y qué resultado sostendría la decisión CAP elegida?
 \end{itemize}
 
-{\scriptsize\color{UAIngMuted}Números ilustrativos. Apunte: sección 10.}
+{\scriptsize\color{UAIngMuted}Números ilustrativos.}
 \end{frame}
 
 \begin{frame}{Modelo del Curso: Confiabilidad en $D = (P, F, G, S, T)$}
