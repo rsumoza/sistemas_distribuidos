@@ -3,7 +3,7 @@
 \input{../config/course-config}
 
 \UASetClassNumber{12}
-\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetClassTitle{Confiabilidad operativa: objetivos, experimentos e incidentes}
 \UASetDocKind{Guía de ejercicios}
 
 \title{Clase 12 --- Guía de ejercicios}
@@ -15,92 +15,235 @@
 \section{Indicaciones generales}
 Resuelva cada ejercicio declarando supuestos, modelo de fallas, garantía y trade-off. Cuando corresponda, construya una ejecución verificable y vincule la respuesta con evidencia observable.
 
-\section{Nivel 1: fundamentos y reconocimiento}
+Los ejercicios siguen el orden del apunte. Los que usan el generador de contraseñas parten de los supuestos de la sección 1.3: 5 solicitudes por segundo (18\,000 por hora y unas 12,96 millones en 30 días) y 5 llamadas a cada servicio hijo por solicitud.
+
+\section{Medir: SLI, SLO y SLA}
 \begin{uaexercise}
-Explique por qué testing clásico no alcanza para validar propiedades distribuidas bajo falla.
+Indique si cada frase describe un SLI, un SLO, un SLA o ninguno de los tres. Justifique.
+\begin{enumerate}
+\item ``El porcentaje de solicitudes de búsqueda respondidas en menos de 300\,ms.''
+\item ``El 99,9\,\% de las compras se completa con éxito en los últimos 30 días.''
+\item ``Si la disponibilidad mensual queda por debajo de 99,5\,\%, se reintegra al cliente el 10\,\% de la factura.''
+\item ``La CPU promedio del clúster.''
+\item ``El p99 de la latencia del \emph{checkout} en los últimos 30 días es menor que 800\,ms.''
+\item ``La cantidad de solicitudes por segundo que recibe la API.''
+\item ``Si en un mes se agota el error budget, el equipo congela los despliegues que no sean de confiabilidad.''
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina Chaos Engineering y explique por qué no debe confundirse con “romper sistemas al azar”.
+El SLI de disponibilidad del generador se mide en el balanceador como
+\[
+\frac{\text{respuestas 200 con una contraseña que cumple la política}}{\text{todas las solicitudes} - \text{respuestas 4xx}}
+\]
+\begin{enumerate}
+\item Para cada caso, indique si la solicitud suma al numerador, solo al denominador o a ninguno: (a) un 400 porque el cliente pidió una longitud de contraseña inválida; (b) un 503 del generador porque el \emph{circuit breaker} de \emph{especiales} está abierto y no hay \emph{fallback}; (c) un 504 del balanceador porque el generador no respondió a tiempo; (d) un 200 con una contraseña sin caracteres especiales; (e) un 200 con una contraseña válida que tardó 2\,s.
+\item El proceso del generador se cae durante 10 minutos. ¿Qué registra en ese lapso cada implementación posible del SLI: los logs del propio generador, las métricas del balanceador y un cliente sintético (\emph{prober}) que pide una contraseña por minuto? ¿Qué conclusión saca sobre dónde medir?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué es un steady state y por qué es indispensable para formular un experimento.
+Un equipo propone el SLO de latencia ``la latencia promedio es menor que 200\,ms''. Muestre con un ejemplo numérico cómo puede cumplirse mientras una parte de los usuarios espera varios segundos, y reescríbalo.
 \end{uaexercise}
 
 \begin{uaexercise}
-Construya un ejemplo de steady state para un sistema de checkout.
+Un servicio tiene un SLA de 99,5\,\% de disponibilidad mensual. En los últimos meses logró 99,999\,\%.
+\begin{enumerate}
+\item Proponga un SLO interno y justifique el margen respecto del SLA en términos de tiempo de caída tolerado por mes.
+\item ¿Qué riesgo trae seguir logrando 99,999\,\%? ¿Qué haría al respecto?
+\end{enumerate}
+\end{uaexercise}
+
+
+\section{Error budget}
+\begin{uaexercise}
+Un servicio tiene un SLO de disponibilidad de 99,95\,\% sobre 30 días y recibe 2 millones de solicitudes por día, repartidas de forma pareja.
+\begin{enumerate}
+\item Calcule el error budget en minutos de caída total y en solicitudes fallidas.
+\item ¿Qué porcentaje del presupuesto consume una caída total de 20 minutos? ¿Y una degradación en la que falla el 3\,\% de las solicitudes durante 2 horas?
+\item Si en el mes no hubo otras fallas, ¿se cumplió el SLO?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina fault injection y explique qué tipos de fallas pueden inyectarse de forma controlada.
-\end{uaexercise}
-
-
-\section{Nivel 2: ejecuciones y fallas}
-\begin{uaexercise}
-Diseñe un experimento de latencia artificial sobre una dependencia crítica.
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe un experimento de crash de servicio y explique qué propiedad del sistema intentaría validar.
+Una dependencia falla en el 5\,\% de las llamadas, de forma independiente, y cada solicitud de un servicio la llama 4 veces. La solicitud solo tiene éxito si salen bien las 4 llamadas. El servicio tiene un SLO de disponibilidad de 99,9\,\% sobre 30 días.
+\begin{enumerate}
+\item ¿Qué porcentaje de las solicitudes falla sin reintentos? ¿Y con un reintento por llamada?
+\item En cada caso, ¿en cuánto tiempo se agotaría el presupuesto de 30 días si la situación se sostuviera?
+\item ¿Alcanzaría con dos reintentos por llamada? ¿Qué costo tiene esa decisión si la dependencia se cae por completo?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué diferencias hay entre inyectar una falla de latencia y una de caída total.
+El generador usa la política de error budget del apunte (sección 3.2.2): con más del 50\,\% de presupuesto, despliegues normales; entre 50\,\% y 0\,\%, despliegues conservadores; agotado, se congelan los cambios que no sean de confiabilidad o seguridad; un incidente que consume más del 20\,\% exige un postmortem.
+\begin{enumerate}
+\item Es el día 10 de la ventana y ya se consumió el 70\,\% del presupuesto. Producto quiere lanzar hoy una funcionalidad grande. ¿Qué dice la política? Si el consumo siguiera al mismo ritmo, ¿cuándo se agotaría el presupuesto?
+\item El 50\,\% de ese consumo lo causó, en un solo incidente, una caída del proveedor de la nube. Un integrante del equipo propone no contarlo, porque ``no fue culpa nuestra''. ¿Qué responde? ¿Corresponde un postmortem?
+\item Producto propone bajar el SLO a 99,5\,\% para poder seguir lanzando. ¿Es una decisión legítima? ¿Bajo qué condiciones?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Formule una hipótesis experimental correcta para un servicio de pagos.
+La figura muestra el presupuesto restante del generador (SLO de 99,9\,\% en 30 días) a lo largo de una ventana; es la del apunte, sección 3.2.2. El día 12 hubo un incidente.
+\begin{center}
+\begin{tikzpicture}[x=0.30cm, y=0.034cm, every node/.style={font=\scriptsize}]
+\fill[UAIngNavy!7] (0,50) rectangle (30,100);
+\fill[UAIngOrange!14] (0,0) rectangle (30,50);
+\fill[UAIngOrange!38] (0,-14) rectangle (30,0);
+\node[anchor=east, text=UAIngNavy] at (29.7,92) {despliegues normales};
+\node[anchor=west, text=UAIngNavy] at (0.3,8) {despliegues conservadores};
+\node[anchor=east, text=UAIngNavy] at (29.7,-7) {cambios congelados};
+\draw[UAIngMuted] (0,0) -- (30,0);
+\draw[UAIngMuted] (0,-14) -- (0,100);
+\foreach \d in {0,5,...,30} {\draw[UAIngMuted] (\d,0) -- (\d,-2); \node[anchor=north, text=UAIngMuted] at (\d,-14) {\d};}
+\node[anchor=north, text=UAIngMuted] at (15,-22) {días de la ventana};
+\foreach \p in {0,25,50,75,100} {\draw[UAIngMuted] (0,\p) -- (-0.4,\p); \node[anchor=east, text=UAIngMuted] at (-0.4,\p) {\p\,\%};}
+\node[anchor=south west, text=UAIngMuted] at (-3.2,104) {presupuesto restante (100\,\% = 12\,960 fallas)};
+\draw[UAIngMuted, dashed, thick] (0,100) -- (30,0);
+\node[anchor=north east, text=UAIngMuted, align=right] at (9,45) {ritmo permitido:\\llega a 0 el día 30};
+\draw[UAIngNavy, very thick] (0,100) -- (12,88);
+\draw[UAIngOrange, very thick] (12,88) -- (12,68);
+\draw[UAIngNavy, very thick] (12,68) -- (16,52) -- (30,31);
+\fill[UAIngNavy] (0,100) circle (0.12) (12,88) circle (0.12);
+\fill[UAIngNavy] (12,68) circle (0.12) (16,52) circle (0.12) (30,31) circle (0.12);
+\node[anchor=east, text=UAIngNavy] at (11.8,90) {88\,\%};
+\node[anchor=north east, text=UAIngNavy] at (11.8,68) {68\,\%};
+\node[anchor=south west, text=UAIngNavy] at (16.2,53) {52\,\%};
+\node[anchor=south, text=UAIngNavy] at (29.4,33) {31\,\%};
+\end{tikzpicture}
+\end{center}
+\begin{enumerate}
+\item Calcule el burn rate de cada tramo: días 0 a 12, 12 a 16 y 16 a 30.
+\item El incidente del día 12 duró una hora. ¿Cuál fue el burn rate durante esa hora? ¿Se habría disparado la alerta inmediata de la ventana de 1 hora?
+\item Si a partir del día 16 el consumo hubiera seguido al ritmo del tramo 12 a 16, ¿qué día se habría agotado el presupuesto?
+\item ¿Qué día pasa el servicio a la zona de despliegues conservadores?
+\end{enumerate}
+\end{uaexercise}
+
+
+\section{Alertar sobre el SLO}
+\begin{uaexercise}
+Clasifique cada alerta como aviso inmediato (\emph{page}), ticket o ``eliminar o pasar a un \emph{dashboard}''. Justifique.
+\begin{enumerate}
+\item La CPU del generador supera el 80\,\% durante 5 minutos.
+\item El disco de la base de datos está al 95\,\% y crece un 2\,\% por día.
+\item El certificado TLS del balanceador vence en 3 días.
+\item El burn rate de la última hora y el de los últimos 5 minutos superan 14,4.
+\item El servicio de pagos quedó con una sola réplica de las tres que tiene normalmente.
+\item La memoria de un proceso llega al 90\,\%, en un sistema donde el recolector de basura la libera cada pocos minutos.
+\item El burn rate de los últimos 3 días y el de las últimas 6 horas superan 1.
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué una hipótesis vaga como “queremos ver si aguanta” no es suficiente.
-\end{uaexercise}
-
-
-\section{Nivel 3: diseño y comparación}
-\begin{uaexercise}
-Diseñe un experimento que valide si un circuit breaker abre cuando corresponde.
-\end{uaexercise}
-
-\begin{uaexercise}
-Diseñe un experimento para verificar si retries correctamente acotados no producen tormenta de tráfico.
+Para un SLO de disponibilidad de 99,9\,\% sobre 30 días, y para cada tasa de error sostenida (0,3\,\%, 2\,\%, 15\,\% y 100\,\%):
+\begin{enumerate}
+\item calcule el burn rate y en cuánto tiempo se agota el presupuesto;
+\item indique qué alerta de la tabla del apunte (aviso de 1\,h con 14,4; aviso de 6\,h con 6; ticket de 3 días con 1) se dispara primero, y aproximadamente cuánto tarda en hacerlo.
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Defina blast radius y explique por qué debe controlarse explícitamente.
+El generador (SLO de 99,9\,\%) tiene una caída total de 10 minutos y después se recupera por completo.
+\begin{enumerate}
+\item Si la única alerta fuera ``burn rate de la última hora $> 14{,}4$'', ¿cuánto tardaría en sonar? ¿Hasta cuándo seguiría sonando después de resuelto el problema?
+\item ¿Qué cambia si además se exige que el burn rate de los últimos 5 minutos supere 14,4?
+\item Otro día, la tasa de error se queda fija en 1\,\% (burn rate 10). ¿Se dispara la alerta de la ventana de 1 hora? ¿En cuánto se agota el presupuesto? ¿Qué alerta de la tabla lo detecta?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe una estrategia para limitar el blast radius de un experimento en producción.
+Al generador llegan 300 solicitudes por minuto y su SLO de disponibilidad es 99,9\,\% en 30 días (12\,960 fallas permitidas). Compare dos formas de contar el presupuesto: por solicitudes, o por minutos, marcando un minuto como malo si en él falló el 0,1\,\% o más de las solicitudes (43,2 minutos malos permitidos).
+\begin{enumerate}
+\item Durante 2 horas falla una solicitud cada 2 minutos. ¿Qué porcentaje del presupuesto se consume con cada forma de contar?
+\item Otro día, el servicio se cae por completo durante 3 minutos. Repita la cuenta.
+\item ¿Qué concluye? ¿Para qué usaría cada forma de contar?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué condiciones mínimas deberían cumplirse antes de correr un experimento de chaos en producción.
+Un servicio interno de administración recibe 12 solicitudes por hora y tiene un SLO de disponibilidad de 99,9\,\% en 30 días.
+\begin{enumerate}
+\item ¿Cuántas fallas admite el presupuesto?
+\item Una sola solicitud falla en una hora. ¿Cuál es el burn rate de esa hora? ¿Qué porcentaje del presupuesto consume? ¿Se dispararía el aviso de 1 hora?
+\item ¿Qué haría? Proponga al menos dos estrategias.
+\end{enumerate}
 \end{uaexercise}
 
 
-\section{Nivel 4: integración y defensa}
+\section{Validar: experimentos bajo falla}
 \begin{uaexercise}
-Describa un caso donde un experimento sin rollback claro sería irresponsable.
+Critique cada hipótesis de experimento y reescríbala para que sea observable desde afuera y refutable.
+\begin{enumerate}
+\item ``Queremos ver si el sistema aguanta una caída de la base de datos.''
+\item ``El generador es resiliente.''
+\item ``Si apagamos una réplica de la base de datos, el uso de CPU de las otras réplicas sube menos del 30\,\%.''
+\item ``Si a las llamadas a \emph{dígitos} del 2\,\% de las solicitudes se les agregan 500\,ms, esas solicitudes siguen respondiendo en menos de 1\,s y el resto mantiene su SLI.'' ¿Qué le falta para poder ejecutarse?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué observabilidad y Chaos Engineering están fuertemente conectados.
+Para cada mecanismo de resiliencia de la clase 11, indique qué falla inyectaría para validarlo y qué observaría para dar el mecanismo por validado: \emph{timeout}, \emph{circuit breaker}, \emph{fallback}, \emph{bulkhead} y conmutación a una réplica. Después, explique por qué un plan de experimentos que solo apaga servidores no alcanza.
 \end{uaexercise}
 
 \begin{uaexercise}
-Diseñe las métricas mínimas necesarias para evaluar un experimento sobre un pipeline de procesamiento de eventos.
+Diseñe un experimento completo, con el \emph{template} del apunte (sección 5.3.5), para responder: ``¿qué pasa si \emph{minúsculas} se pone lenta?''. Suponga que la línea de base del generador es una disponibilidad de 99,97\,\% y un p99 de 380\,ms, que la perturbación agrega 1\,s a las llamadas a \emph{minúsculas} del 2\,\% de las solicitudes y que dura 20 minutos.
+\begin{enumerate}
+\item Complete los campos del \emph{template}. Estime el costo en error budget suponiendo que todas las solicitudes afectadas fallan.
+\item Proponga un criterio de aborto en términos de burn rate.
+\item Recuerde que \emph{minúsculas} consulta internamente a \emph{dígitos}. ¿Puede este experimento descubrir esa dependencia? ¿Qué experimento la descubriría?
+\end{enumerate}
+\end{uaexercise}
+
+
+\section{Responder y aprender: incidentes y postmortems}
+\begin{uaexercise}
+Lea el relato de un incidente en una tienda en línea.
+\begin{itemize}[leftmargin=3.6em, labelsep=0.6em]
+\item[20:55] Se despliega una versión nueva del servicio de \emph{checkout}.
+\item[21:10] Suena la alerta de burn rate de 1 hora del \emph{checkout}. La persona de guardia empieza a investigar sola.
+\item[21:25] Pide ayuda al equipo de pagos, que abre su propio canal de chat para investigar.
+\item[21:30] Alguien del equipo de pagos reinicia las réplicas de su base de datos sin avisar. La latencia empeora.
+\item[21:35] La gerenta de producto llama a la persona de guardia cada pocos minutos para preguntar cuándo se resuelve.
+\item[22:00] Un desarrollador nota el despliegue de las 20:55.
+\item[22:05] Se revierte el despliegue. A las 22:15 el SLI vuelve a su objetivo.
+\end{itemize}
+\begin{enumerate}
+\item Identifique en el relato los tres peligros de un incidente no gestionado.
+\item ¿Cuándo debió declararse el incidente, y por qué criterio?
+\item Asigne los roles de gestión y explique qué habría cambiado.
+\item ¿Cuál debió ser la primera hipótesis y la primera mitigación? ¿Cuál es un buen criterio de salida?
+\end{enumerate}
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique qué rol jugarían las trazas en un experimento de degradación por latencia.
+Escriba el runbook breve de un servicio de \emph{checkout} que depende de una base de datos propia, de un servicio de \emph{stock} y de un proveedor externo de pagos. Incluya la ficha del servicio y la entrada de la alerta ``burn rate alto, 1 hora''. Para la alerta, indique al menos dos mitigaciones seguras y dos que no deberían hacerse durante el incidente, y explique por qué.
 \end{uaexercise}
 
 \begin{uaexercise}
-Explique por qué un experimento sin instrumentación suficiente produce más ruido que conocimiento.
+Lea el relato y el borrador de postmortem de un incidente.
+
+Un viernes a las 18:00, un ingeniero cambió la configuración del servicio de notificaciones y, por un error de tipeo, el tamaño del pool de conexiones a la base de datos pasó de 50 a 5. El cambio no pasó por una prueba \emph{canary} porque era ``solo configuración''. A las 20:00, con el pico de tráfico, el pool se agotó y las notificaciones empezaron a fallar. La CPU estaba baja y ninguna alerta sonó: un cliente avisó a las 20:40. La guardia no pudo revertir la configuración, porque la herramienta exigía la aprobación de una persona que no estaba de turno. El servicio se recuperó a las 21:30.
+
+El borrador dice: ``El incidente fue causado por el descuido de Juan, que escribió 5 en vez de 50''. Y propone estas acciones: (a) Juan debe revisar mejor sus cambios; (b) mejorar el monitoreo; (c) prohibir los despliegues los viernes; (d) que la herramienta de configuración rechace bajar el tamaño de un pool más de un 50\,\% sin una segunda aprobación; (e) una alerta de burn rate sobre el SLI de notificaciones entregadas; (f) permitir que la guardia revierta configuración sin aprobación durante un incidente declarado.
+\begin{enumerate}
+\item Separe el disparador de las condiciones que hicieron posible el incidente.
+\item Reescriba la frase del borrador sin culpar a una persona.
+\item Evalúe cada acción propuesta: ¿es buena? ¿De qué tipo es (prevenir, detectar, mitigar)?
+\item ¿Por qué este incidente exige un postmortem, aunque nadie lo haya pedido?
+\end{enumerate}
 \end{uaexercise}
 
+
+\section{Integración con el trabajo práctico}
+\begin{uaexercise}
+En Asteria Online, un grupo escribe la garantía: ``el jugador no debe perder el oro pagado por un combate que no llegó a resolverse''.
+\begin{enumerate}
+\item Otro grupo propone escribirla así: ``el jugador nunca pierde el oro, y se le devuelve en menos de 5 minutos''. Según el enunciado, ¿por qué no es una garantía válida? ¿Dónde van ese ``nunca'' y esos 5 minutos?
+\item Proponga la especificación de un SLI que permita medir cuánto sostiene una solución esa garantía.
+\item Para la disponibilidad de las instancias de combate se fija un SLO de 99,9\,\% en 30 días. Ante la caída de un datacenter en el que corre un tercio de las instancias, la solución A las reubica en 20 minutos y la solución B, que mantiene réplicas listas, en 2 minutos. ¿Qué porcentaje del presupuesto consume cada una por caída? Si se esperan dos caídas por mes, ¿cuál elegiría y qué costo aceptaría?
+\item ¿Por qué un único SLI de disponibilidad para todo el juego sería un mal indicador? Tenga en cuenta las fallas parciales del enunciado y el requisito de priorizar a quienes ya están jugando.
+\end{enumerate}
+\end{uaexercise}
 
 \end{document}
