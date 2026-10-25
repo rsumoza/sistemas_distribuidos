@@ -3,7 +3,7 @@
 \input{../config/course-config}
 
 \UASetClassNumber{12}
-\UASetClassTitle{Chaos Engineering y validación bajo falla}
+\UASetClassTitle{Confiabilidad operativa: objetivos, experimentos e incidentes}
 \UASetDocKind{Guía resuelta}
 
 \title{Clase 12 --- Guía resuelta}
@@ -15,225 +15,481 @@
 \section{Criterio de lectura}
 Las resoluciones son modelos de razonamiento. Deben verificarse contra los supuestos del caso y no memorizarse como recetas independientes del dominio.
 
-\section{Ejercicios y resoluciones completas}
+\section{Medir: SLI, SLO y SLA}
 \begin{uaexercise}
-Explique por qué testing clásico no alcanza para validar propiedades distribuidas bajo falla.
+Indique si cada frase describe un SLI, un SLO, un SLA o ninguno de los tres. Justifique.
+\begin{enumerate}
+\item ``El porcentaje de solicitudes de búsqueda respondidas en menos de 300\,ms.''
+\item ``El 99,9\,\% de las compras se completa con éxito en los últimos 30 días.''
+\item ``Si la disponibilidad mensual queda por debajo de 99,5\,\%, se reintegra al cliente el 10\,\% de la factura.''
+\item ``La CPU promedio del clúster.''
+\item ``El p99 de la latencia del \emph{checkout} en los últimos 30 días es menor que 800\,ms.''
+\item ``La cantidad de solicitudes por segundo que recibe la API.''
+\item ``Si en un mes se agota el error budget, el equipo congela los despliegues que no sean de confiabilidad.''
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-Porque los errores distribuidos suelen emerger de interacción, sincronización, latencia variable y fallas parciales. Los tests clásicos tienden a validar lógica local o integración idealizada, pero no siempre reproducen:
-\begin{itemize}
-\item timeouts;
-\item reorder;
-\item retry storms;
-\item colapso de colas;
-\item particiones parciales.
+\begin{enumerate}
+\item \textbf{SLI.} Es una medida del nivel de servicio, con forma de proporción de eventos buenos sobre eventos válidos. No fija ningún objetivo.
+\item \textbf{SLO.} Fija un valor objetivo (99,9\,\%) para un SLI (proporción de compras exitosas) sobre una ventana (30 días).
+\item \textbf{SLA.} Tiene una consecuencia explícita frente al cliente: el reintegro. La prueba es preguntar qué pasa si no se cumple; acá hay una respuesta contractual.
+\item \textbf{Ninguno.} Es una métrica de infraestructura, una causa posible de problemas, no algo que viva el usuario: la CPU puede estar alta con todos los usuarios bien atendidos. Puede ser útil en un \emph{dashboard}, pero no es un buen SLI.
+\item \textbf{SLO.} El SLI es el p99 de la latencia y el objetivo es que sea menor que 800\,ms en la ventana. Sobre la ventana completa equivale a decir que al menos el 99\,\% de las solicitudes tarda menos de 800\,ms.
+\item \textbf{Un indicador, pero rara vez un SLO.} El \emph{throughput} se puede medir y mirar, pero no tiene sentido fijarle un objetivo: la cantidad de solicitudes la deciden los usuarios, no el servicio.
+\item \textbf{Ninguno de los tres: es una política de error budget.} Tiene una consecuencia, pero es interna, para el equipo, no frente a un cliente. Que una frase tenga consecuencias no la convierte en SLA: el SLA es un contrato con quien usa el servicio.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+El SLI de disponibilidad del generador se mide en el balanceador como
+\[
+\frac{\text{respuestas 200 con una contraseña que cumple la política}}{\text{todas las solicitudes} - \text{respuestas 4xx}}
+\]
+\begin{enumerate}
+\item Para cada caso, indique si la solicitud suma al numerador, solo al denominador o a ninguno: (a) un 400 porque el cliente pidió una longitud de contraseña inválida; (b) un 503 del generador porque el \emph{circuit breaker} de \emph{especiales} está abierto y no hay \emph{fallback}; (c) un 504 del balanceador porque el generador no respondió a tiempo; (d) un 200 con una contraseña sin caracteres especiales; (e) un 200 con una contraseña válida que tardó 2\,s.
+\item El proceso del generador se cae durante 10 minutos. ¿Qué registra en ese lapso cada implementación posible del SLI: los logs del propio generador, las métricas del balanceador y un cliente sintético (\emph{prober}) que pide una contraseña por minuto? ¿Qué conclusión saca sobre dónde medir?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item \begin{itemize}
+\item[(a)] \textbf{Ninguno.} Es un error del cliente: no dice nada sobre la salud del servicio y queda fuera de la población de solicitudes válidas.
+\item[(b)] \textbf{Solo denominador.} Es una solicitud válida que el servicio no pudo atender: es una falla, aunque haya sido rápida. El \emph{breaker} protegió al servicio, pero el usuario no recibió su contraseña.
+\item[(c)] \textbf{Solo denominador.} Desde el usuario es una falla del servicio. Que el código lo emita el balanceador y no el generador no cambia nada: por eso conviene medir en el balanceador.
+\item[(d)] \textbf{Solo denominador.} Es un 200, pero la respuesta es incorrecta: viola la política de contraseñas. El evento bueno se definió como ``200 con una contraseña que cumple la política'', justamente para no contar como éxito una degradación inaceptable.
+\item[(e)] \textbf{Numerador} del SLI de disponibilidad: el usuario recibió una contraseña válida. Pero en el SLI de latencia esa solicitud cuenta como lenta. Las dos propiedades se miden con dos SLIs distintos, no en uno solo.
 \end{itemize}
-Por eso un sistema puede pasar tests convencionales y aun así degradar muy mal en producción.
+\item \begin{itemize}
+\item \textbf{Logs del generador:} no registran nada, porque el proceso no está. El SLI calculado con ellos no muestra fallas: o da 100\,\%, o no hay datos.
+\item \textbf{Balanceador:} registra las solicitudes que llegaron y no pudieron atenderse (502, 503 o 504). El SLI cae como debe.
+\item \textbf{\emph{Prober}:} sus 10 solicitudes fallan, así que detecta la caída. Pero mide tráfico artificial: con una solicitud por minuto no sabe a cuántos usuarios reales afectó.
+\end{itemize}
+Conclusión: conviene medir lo más cerca del usuario que se pueda. Medir dentro del propio servicio no ve justamente las fallas más graves, las que impiden que la solicitud llegue al proceso.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina Chaos Engineering y explique por qué no debe confundirse con “romper sistemas al azar”.
+Un equipo propone el SLO de latencia ``la latencia promedio es menor que 200\,ms''. Muestre con un ejemplo numérico cómo puede cumplirse mientras una parte de los usuarios espera varios segundos, y reescríbalo.
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+Si 99 de cada 100 solicitudes tardan 100\,ms y una tarda 5\,s, el promedio es $(99 \times 100 + 5000)/100 = 149$\,ms: el SLO se cumple, pero el 1\,\% de los usuarios espera 5\,s. El promedio no describe a nadie y esconde la cola, que es justamente lo que los usuarios notan. Una versión mejor: ``el p99 de las solicitudes válidas de los últimos 30 días es menor que 500\,ms'', que equivale a pedir que al menos el 99\,\% de las solicitudes tarde menos de 500\,ms. El valor (500\,ms) es una decisión que tiene que justificarse con lo que necesita el usuario.
 \end{uaanswer}
 
 \begin{uaexercise}
-Explique qué es un steady state y por qué es indispensable para formular un experimento.
+Un servicio tiene un SLA de 99,5\,\% de disponibilidad mensual. En los últimos meses logró 99,999\,\%.
+\begin{enumerate}
+\item Proponga un SLO interno y justifique el margen respecto del SLA en términos de tiempo de caída tolerado por mes.
+\item ¿Qué riesgo trae seguir logrando 99,999\,\%? ¿Qué haría al respecto?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
+\begin{enumerate}
+\item Por ejemplo, un SLO interno de 99,9\,\%. En 30 días, el SLA tolera 3,6\,h de caída total ($43\,200 \times 0{,}005 = 216$ minutos) y el SLO interno, 43,2 minutos. Entre los dos quedan casi 3 horas de margen: el equipo empieza a actuar cuando se aparta del 99,9\,\%, mucho antes de que se active la penalidad del contrato. El valor exacto depende de cuánto tarda el equipo en detectar y corregir un problema; lo importante es que el SLO interno sea más estricto que lo prometido.
+\item Quienes usan el servicio construyen sobre lo que realmente reciben, no sobre lo que se promete. Con 99,999\,\% (unos 26 segundos de caída por mes), otros servicios empiezan a depender de él como si no pudiera fallar, y cuando falle no van a saber funcionar sin él. Además, ese nivel probablemente cuesta esfuerzo que nadie nota. Opciones: mantenerlo cerca de su SLO, por ejemplo, diseñándolo para que no responda más rápido con poca carga o rechazando a propósito una pequeña parte de las solicitudes; usar el presupuesto que sobra para desplegar más rápido; y, en un servicio de infraestructura del que dependen muchos otros, apagarlo a propósito de vez en cuando si no hubo caídas reales.
+\end{enumerate}
+\end{uaanswer}
 
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
 
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\section{Error budget}
+\begin{uaexercise}
+Un servicio tiene un SLO de disponibilidad de 99,95\,\% sobre 30 días y recibe 2 millones de solicitudes por día, repartidas de forma pareja.
+\begin{enumerate}
+\item Calcule el error budget en minutos de caída total y en solicitudes fallidas.
+\item ¿Qué porcentaje del presupuesto consume una caída total de 20 minutos? ¿Y una degradación en la que falla el 3\,\% de las solicitudes durante 2 horas?
+\item Si en el mes no hubo otras fallas, ¿se cumplió el SLO?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item En tiempo: $43\,200 \times 0{,}0005 = 21{,}6$ minutos. En solicitudes: $2\,000\,000 \times 30 \times 0{,}0005 = 30\,000$ solicitudes fallidas.
+\item \begin{itemize}
+\item \textbf{Caída total de 20 minutos:} $20 / 21{,}6 \approx 92{,}6\,\%$ del presupuesto. Contado en solicitudes: en 20 minutos llegan unas $2\,000\,000 / 1440 \times 20 \approx 27\,800$, todas fallidas, y $27\,800 / 30\,000 \approx 92{,}6\,\%$.
+\item \textbf{Degradación del 3\,\% durante 2 horas:} en 2 horas llegan $2\,000\,000 / 12 \approx 166\,700$ solicitudes; fallan el 3\,\%, unas 5\,000. Consumen $5\,000 / 30\,000 \approx 16{,}7\,\%$. Equivale a 3,6 minutos de caída total.
+\end{itemize}
+\item No. Juntas consumen alrededor del 109\,\% del presupuesto. Una caída corta pero total gastó casi todo; la degradación larga y parcial gastó bastante menos, aunque duró seis veces más. Contar solicitudes permite comparar los dos incidentes en la misma unidad.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-Construya un ejemplo de steady state para un sistema de checkout.
+Una dependencia falla en el 5\,\% de las llamadas, de forma independiente, y cada solicitud de un servicio la llama 4 veces. La solicitud solo tiene éxito si salen bien las 4 llamadas. El servicio tiene un SLO de disponibilidad de 99,9\,\% sobre 30 días.
+\begin{enumerate}
+\item ¿Qué porcentaje de las solicitudes falla sin reintentos? ¿Y con un reintento por llamada?
+\item En cada caso, ¿en cuánto tiempo se agotaría el presupuesto de 30 días si la situación se sostuviera?
+\item ¿Alcanzaría con dos reintentos por llamada? ¿Qué costo tiene esa decisión si la dependencia se cae por completo?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{enumerate}
+\item Sin reintentos: $1 - 0{,}95^4 = 1 - 0{,}8145 \approx 18{,}5\,\%$. Con un reintento, una llamada falla solo si fallan los dos intentos: $0{,}05^2 = 0{,}25\,\%$; la solicitud falla con $1 - 0{,}9975^4 \approx 1{,}0\,\%$.
+\item El presupuesto es el 0,1\,\%. Sin reintentos, se gasta $18{,}5 / 0{,}1 \approx 185$ veces más rápido de lo permitido: dura $720\,\text{h} / 185 \approx 3{,}9$ horas. Con un reintento, unas 10 veces más rápido: dura $720 / 10 \approx 72$ horas, unos 3 días. El reintento mejoró la situación casi veinte veces, pero el SLO dice que no alcanza.
+\item Con dos reintentos, una llamada falla con $0{,}05^3 = 0{,}0125\,\%$ y la solicitud con $1 - (1 - 0{,}000125)^4 \approx 0{,}05\,\%$: la mitad del presupuesto. Alcanza, y en condiciones normales cuesta poco: cada llamada hace en promedio $1 + 0{,}05 + 0{,}05^2 \approx 1{,}05$ intentos. El costo aparece si la dependencia se cae: cada llamada pasa a ser 3 intentos y la carga sobre la dependencia se triplica justo cuando está mal (clase 11). Por eso los reintentos se combinan con \emph{backoff}, \emph{jitter}, un presupuesto de reintentos y un \emph{circuit breaker}.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-Defina fault injection y explique qué tipos de fallas pueden inyectarse de forma controlada.
+El generador usa la política de error budget del apunte (sección 3.2.2): con más del 50\,\% de presupuesto, despliegues normales; entre 50\,\% y 0\,\%, despliegues conservadores; agotado, se congelan los cambios que no sean de confiabilidad o seguridad; un incidente que consume más del 20\,\% exige un postmortem.
+\begin{enumerate}
+\item Es el día 10 de la ventana y ya se consumió el 70\,\% del presupuesto. Producto quiere lanzar hoy una funcionalidad grande. ¿Qué dice la política? Si el consumo siguiera al mismo ritmo, ¿cuándo se agotaría el presupuesto?
+\item El 50\,\% de ese consumo lo causó, en un solo incidente, una caída del proveedor de la nube. Un integrante del equipo propone no contarlo, porque ``no fue culpa nuestra''. ¿Qué responde? ¿Corresponde un postmortem?
+\item Producto propone bajar el SLO a 99,5\,\% para poder seguir lanzando. ¿Es una decisión legítima? ¿Bajo qué condiciones?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{enumerate}
+\item Queda el 30\,\%: el servicio está en la zona de despliegues conservadores. El lanzamiento no está prohibido, pero debe hacerse en un horario de poco tráfico y de forma escalonada (una fracción pequeña del tráfico, observar las métricas, ampliar), y los errores de confiabilidad tienen prioridad sobre las funcionalidades nuevas. El ritmo actual es preocupante: 70\,\% en 10 días es un burn rate de $0{,}70 / (10/30) = 2{,}1$. A ese ritmo (7\,\% por día), el 30\,\% restante dura unos 4 días: el presupuesto se agotaría alrededor del día 14.
+\item Se cuenta. El presupuesto mide lo que vivieron los usuarios, y a ellos les da igual de quién fue la falla. Además, la responsabilidad por la disponibilidad es compartida: depender de un solo proveedor es una decisión de diseño del equipo. Sí corresponde un postmortem, porque el incidente consumió más del 20\,\%. Sus acciones no van a ser ``arreglar al proveedor'', sino reducir la dependencia: otra zona o región, un \emph{fallback}, una mejor detección.
+\item Puede ser legítima: el SLO es una decisión de producto, y si los usuarios toleran 99,5\,\%, mantener 99,9\,\% puede ser un costo innecesario. Pero tiene que decidirse por lo que necesitan los usuarios, no como atajo para seguir desplegando en medio de una mala racha. Y hay que mirar el SLA: si el contrato promete 99,5\,\%, un SLO interno igual al SLA elimina el margen de seguridad.
+\end{enumerate}
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un experimento de latencia artificial sobre una dependencia crítica.
+La figura muestra el presupuesto restante del generador (SLO de 99,9\,\% en 30 días) a lo largo de una ventana; es la del apunte, sección 3.2.2. El día 12 hubo un incidente.
+\begin{center}
+\begin{tikzpicture}[x=0.30cm, y=0.034cm, every node/.style={font=\scriptsize}]
+\fill[UAIngNavy!7] (0,50) rectangle (30,100);
+\fill[UAIngOrange!14] (0,0) rectangle (30,50);
+\fill[UAIngOrange!38] (0,-14) rectangle (30,0);
+\node[anchor=east, text=UAIngNavy] at (29.7,92) {despliegues normales};
+\node[anchor=west, text=UAIngNavy] at (0.3,8) {despliegues conservadores};
+\node[anchor=east, text=UAIngNavy] at (29.7,-7) {cambios congelados};
+\draw[UAIngMuted] (0,0) -- (30,0);
+\draw[UAIngMuted] (0,-14) -- (0,100);
+\foreach \d in {0,5,...,30} {\draw[UAIngMuted] (\d,0) -- (\d,-2); \node[anchor=north, text=UAIngMuted] at (\d,-14) {\d};}
+\node[anchor=north, text=UAIngMuted] at (15,-22) {días de la ventana};
+\foreach \p in {0,25,50,75,100} {\draw[UAIngMuted] (0,\p) -- (-0.4,\p); \node[anchor=east, text=UAIngMuted] at (-0.4,\p) {\p\,\%};}
+\node[anchor=south west, text=UAIngMuted] at (-3.2,104) {presupuesto restante (100\,\% = 12\,960 fallas)};
+\draw[UAIngMuted, dashed, thick] (0,100) -- (30,0);
+\node[anchor=north east, text=UAIngMuted, align=right] at (9,45) {ritmo permitido:\\llega a 0 el día 30};
+\draw[UAIngNavy, very thick] (0,100) -- (12,88);
+\draw[UAIngOrange, very thick] (12,88) -- (12,68);
+\draw[UAIngNavy, very thick] (12,68) -- (16,52) -- (30,31);
+\fill[UAIngNavy] (0,100) circle (0.12) (12,88) circle (0.12);
+\fill[UAIngNavy] (12,68) circle (0.12) (16,52) circle (0.12) (30,31) circle (0.12);
+\node[anchor=east, text=UAIngNavy] at (11.8,90) {88\,\%};
+\node[anchor=north east, text=UAIngNavy] at (11.8,68) {68\,\%};
+\node[anchor=south west, text=UAIngNavy] at (16.2,53) {52\,\%};
+\node[anchor=south, text=UAIngNavy] at (29.4,33) {31\,\%};
+\end{tikzpicture}
+\end{center}
+\begin{enumerate}
+\item Calcule el burn rate de cada tramo: días 0 a 12, 12 a 16 y 16 a 30.
+\item El incidente del día 12 duró una hora. ¿Cuál fue el burn rate durante esa hora? ¿Se habría disparado la alerta inmediata de la ventana de 1 hora?
+\item Si a partir del día 16 el consumo hubiera seguido al ritmo del tramo 12 a 16, ¿qué día se habría agotado el presupuesto?
+\item ¿Qué día pasa el servicio a la zona de despliegues conservadores?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-Ejemplo:
+\begin{enumerate}
+\item El ritmo permitido es $100\,\% / 30 \approx 3{,}33\,\%$ por día; el burn rate es el ritmo real dividido por ese.
 \begin{itemize}
-\item dependencia: Payments;
-\item perturbación: +800 ms artificiales;
-\item steady state observado: tasa de checkout exitoso, latencia p95, error rate;
-\item hipótesis: el sistema degrada parcialmente, el breaker abre y no hay colapso general.
+\item Días 0 a 12: se gastó el 12\,\% en 12 días, 1\,\% por día: $b = 1 / 3{,}33 = 0{,}3$.
+\item Días 12 a 16 (sin contar el escalón): el 16\,\% en 4 días, 4\,\% por día: $b = 1{,}2$.
+\item Días 16 a 30: el 21\,\% en 14 días, 1,5\,\% por día: $b = 0{,}45$.
+\end{itemize}
+\item El 20\,\% del presupuesto en una hora: $b = 0{,}20 \times 720\,\text{h} / 1\,\text{h} = 144$. Supera con holgura el umbral de 14,4, así que la alerta de la ventana de 1 hora se habría disparado en pocos minutos.
+\item Desde el 52\,\% a 4\,\% por día: $52 / 4 = 13$ días más, el día 29. Con $b = 1{,}2$ el presupuesto no dura toda la ventana. La alerta de ticket ($b > 1$ en 3 días) habría avisado durante ese tramo.
+\item Cruza el 50\,\% en el tramo de 1,5\,\% por día: desde el 52\,\% del día 16 hacen falta $2 / 1{,}5 \approx 1{,}3$ días, o sea, alrededor del día 17.
+\end{enumerate}
+\end{uaanswer}
+
+
+\section{Alertar sobre el SLO}
+\begin{uaexercise}
+Clasifique cada alerta como aviso inmediato (\emph{page}), ticket o ``eliminar o pasar a un \emph{dashboard}''. Justifique.
+\begin{enumerate}
+\item La CPU del generador supera el 80\,\% durante 5 minutos.
+\item El disco de la base de datos está al 95\,\% y crece un 2\,\% por día.
+\item El certificado TLS del balanceador vence en 3 días.
+\item El burn rate de la última hora y el de los últimos 5 minutos superan 14,4.
+\item El servicio de pagos quedó con una sola réplica de las tres que tiene normalmente.
+\item La memoria de un proceso llega al 90\,\%, en un sistema donde el recolector de basura la libera cada pocos minutos.
+\item El burn rate de los últimos 3 días y el de las últimas 6 horas superan 1.
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item \textbf{Eliminar o pasar a un \emph{dashboard}.} Es una causa posible, no un síntoma: la CPU puede subir por un \emph{backup} o el recolector de basura sin que ningún usuario se vea afectado. Sirve para investigar, no para despertar a alguien.
+\item \textbf{Ticket.} Es una causa segura e inminente: en unos 2 días y medio el disco se llena y el servicio falla. Una alerta por síntoma recién sonaría cuando ya es tarde. Hay tiempo para resolverlo en horario laboral; si creciera mucho más rápido, sería un aviso inmediato.
+\item \textbf{Ticket.} También es seguro e inminente: cuando venza, los usuarios no van a poder conectarse. Tres días alcanzan para renovarlo sin despertar a nadie.
+\item \textbf{Aviso inmediato.} Es la alerta de síntoma por excelencia: se está gastando el presupuesto a un ritmo que lo agota en unas 50 horas, y sigue ocurriendo ahora.
+\item \textbf{Ticket urgente, o aviso inmediato según el contexto.} Los usuarios todavía no lo notan, pero el servicio quedó sin redundancia: una falla más y se cae. Es el ejemplo de causa inminente. Si reponer las réplicas lleva horas y se acerca un pico de tráfico, conviene un aviso inmediato.
+\item \textbf{Eliminar.} En ese sistema es comportamiento normal: es la alerta que todos aprenden a ignorar y que produce fatiga de alertas.
+\item \textbf{Ticket.} Es la alerta lenta de la tabla: el presupuesto se gasta más rápido de lo debido, pero no tanto como para actuar de noche.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Para un SLO de disponibilidad de 99,9\,\% sobre 30 días, y para cada tasa de error sostenida (0,3\,\%, 2\,\%, 15\,\% y 100\,\%):
+\begin{enumerate}
+\item calcule el burn rate y en cuánto tiempo se agota el presupuesto;
+\item indique qué alerta de la tabla del apunte (aviso de 1\,h con 14,4; aviso de 6\,h con 6; ticket de 3 días con 1) se dispara primero, y aproximadamente cuánto tarda en hacerlo.
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+Con $1 - s = 0{,}001$ y $T = 720$\,h: $b = e / 0{,}001$ y el presupuesto se agota en $720 / b$ horas. Una alerta con ventana $W$ y umbral $b_0$ se dispara cuando el promedio de la ventana llega a $b_0 \times 0{,}1\,\%$, es decir, después de $W \times b_0 \times 0{,}1\,\% / e$ (si la tasa empezó de golpe).
+
+\begin{center}
+\small
+\begin{tabular}{rrrl}
+\toprule
+\textbf{Tasa de error} & \textbf{Burn rate} & \textbf{Se agota en} & \textbf{Primera alerta} \\
+\midrule
+0,3\,\% & 3 & 240\,h (10 días) & ticket, a las $\approx 24$\,h \\
+2\,\% & 20 & 36\,h & aviso de 1\,h, a los $\approx 43$\,min \\
+15\,\% & 150 & 4,8\,h & aviso de 1\,h, a los $\approx 6$\,min \\
+100\,\% & 1000 & 43\,min & aviso de 1\,h, en menos de 1\,min \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Detalle de los tiempos:
+\begin{itemize}
+\item \textbf{0,3\,\%:} no supera 6 ni 14,4, así que ningún aviso inmediato se dispara. El ticket necesita que el promedio de 3 días llegue a 0,1\,\%: $72\,\text{h} \times 0{,}1 / 0{,}3 = 24$\,h.
+\item \textbf{2\,\%:} la ventana de 1 hora llega a 1,44\,\% después de $60 \times 1{,}44 / 2 \approx 43$ minutos. La de 6 horas llegaría a 0,6\,\% después de $6 \times 0{,}6 / 2 = 1{,}8$ horas: el aviso de 1 hora llega antes.
+\item \textbf{15\,\%:} $60 \times 1{,}44 / 15 \approx 5{,}8$ minutos.
+\item \textbf{100\,\%:} $60 \times 1{,}44 / 100 \approx 0{,}86$ minutos, unos 52 segundos.
+\end{itemize}
+En todos los casos la ventana corta llega al umbral antes que la larga, así que es la larga la que decide el momento. La urgencia queda proporcional al daño: cuanto más rápido se gasta el presupuesto, antes suena la alerta.
+\end{uaanswer}
+
+\begin{uaexercise}
+El generador (SLO de 99,9\,\%) tiene una caída total de 10 minutos y después se recupera por completo.
+\begin{enumerate}
+\item Si la única alerta fuera ``burn rate de la última hora $> 14{,}4$'', ¿cuánto tardaría en sonar? ¿Hasta cuándo seguiría sonando después de resuelto el problema?
+\item ¿Qué cambia si además se exige que el burn rate de los últimos 5 minutos supere 14,4?
+\item Otro día, la tasa de error se queda fija en 1\,\% (burn rate 10). ¿Se dispara la alerta de la ventana de 1 hora? ¿En cuánto se agota el presupuesto? ¿Qué alerta de la tabla lo detecta?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item El umbral es una tasa de error de $14{,}4 \times 0{,}1\,\% = 1{,}44\,\%$ en la última hora, es decir, 0,86 minutos de caída total dentro de la ventana. Con el servicio caído, eso se alcanza a los 52 segundos. Después de resuelto, la ventana de 1 hora sigue conteniendo los minutos de caída: el promedio recién baja de 1,44\,\% cuando quedan menos de 0,86 minutos de caída dentro de la ventana, alrededor de 69 minutos después del comienzo. O sea, la alerta sigue sonando casi una hora después de resuelto el problema, y la guardia no puede saber si el problema volvió.
+\item La condición pasa a exigir que \emph{las dos} ventanas superen el umbral. La de 5 minutos se vacía de fallas cinco minutos después de resuelto el problema, y desde ese momento la condición deja de cumplirse: la alerta se apaga unos 5 minutos después de la recuperación. La detección no empeora, porque durante la caída las dos ventanas superan el umbral enseguida.
+\item No: el promedio de la hora queda en 1\,\%, por debajo de 1,44\,\%, aunque dure días. Y sin embargo el presupuesto se agota en $720 / 10 = 72$ horas. Lo detecta la alerta de 6 horas con umbral 6 (0,6\,\%): el promedio de 6 horas llega a 0,6\,\% después de $6 \times 0{,}6 / 1 = 3{,}6$ horas, cuando se gastó el $10 \times 3{,}6 / 720 = 5\,\%$ del presupuesto. Por eso se usan varios umbrales.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Al generador llegan 300 solicitudes por minuto y su SLO de disponibilidad es 99,9\,\% en 30 días (12\,960 fallas permitidas). Compare dos formas de contar el presupuesto: por solicitudes, o por minutos, marcando un minuto como malo si en él falló el 0,1\,\% o más de las solicitudes (43,2 minutos malos permitidos).
+\begin{enumerate}
+\item Durante 2 horas falla una solicitud cada 2 minutos. ¿Qué porcentaje del presupuesto se consume con cada forma de contar?
+\item Otro día, el servicio se cae por completo durante 3 minutos. Repita la cuenta.
+\item ¿Qué concluye? ¿Para qué usaría cada forma de contar?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Fallan 60 solicitudes de 36\,000 (0,17\,\%).
+\begin{itemize}
+\item Por solicitudes: $60 / 12\,960 \approx 0{,}46\,\%$ del presupuesto. Un problema menor.
+\item Por minutos: cada minuto con una falla tiene $1/300 \approx 0{,}33\,\%$ de fallas, que supera el 0,1\,\%. Hay 60 minutos malos y $60 / 43{,}2 \approx 139\,\%$: el presupuesto se agota.
+\end{itemize}
+\item Fallan las $3 \times 300 = 900$ solicitudes de esos minutos.
+\begin{itemize}
+\item Por solicitudes: $900 / 12\,960 \approx 6{,}9\,\%$.
+\item Por minutos: 3 minutos malos, $3 / 43{,}2 \approx 6{,}9\,\%$. Las dos formas coinciden.
+\end{itemize}
+\item Ante una caída total, las dos formas dan lo mismo. Ante fallas dispersas, contar minutos trata cada minuto con una falla como si hubieran fallado todas sus solicitudes, y exagera el problema. (También puede ocultarlo: si el umbral del minuto fuera alto, una degradación pareja que no lo alcanza nunca contaría.) En un sistema distribuido lo habitual son las degradaciones parciales, por eso para operar el servicio y calcular el burn rate conviene contar solicitudes. Contar minutos sirve para un SLA o una página de estado (``estuvo caído 12 minutos este mes''), con mucho tráfico por minuto y un umbral pensado para detectar caídas.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Un servicio interno de administración recibe 12 solicitudes por hora y tiene un SLO de disponibilidad de 99,9\,\% en 30 días.
+\begin{enumerate}
+\item ¿Cuántas fallas admite el presupuesto?
+\item Una sola solicitud falla en una hora. ¿Cuál es el burn rate de esa hora? ¿Qué porcentaje del presupuesto consume? ¿Se dispararía el aviso de 1 hora?
+\item ¿Qué haría? Proponga al menos dos estrategias.
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item En 30 días llegan $12 \times 720 = 8\,640$ solicitudes; el 0,1\,\% son unas 8 fallas.
+\item La tasa de error de esa hora es $1/12 \approx 8{,}3\,\%$, un burn rate de 83, y la falla consume $1 / 8{,}64 \approx 11{,}6\,\%$ del presupuesto. El aviso de 1 hora se dispararía: una sola solicitud fallida despierta a alguien. Con tan poco tráfico, las alertas basadas en el SLO son puro ruido.
+\item Algunas opciones, que se pueden combinar:
+\begin{itemize}
+\item \textbf{Tráfico sintético:} un \emph{prober} que haga, por ejemplo, una solicitud por minuto. Suma 60 solicitudes por hora y da más señal, a costa de medir tráfico artificial.
+\item \textbf{Agrupar servicios} pequeños que fallan juntos (por ejemplo, porque comparten la base de datos) y medirlos con un SLI común.
+\item \textbf{Cambiar el producto} para que una falla aislada tenga menos impacto: reintentos del cliente con \emph{backoff} y \emph{jitter}, o un camino alternativo.
+\item \textbf{Bajar el SLO o agrandar la ventana}: es una decisión de producto, y para un servicio interno de administración puede ser razonable.
+\end{itemize}
+\end{enumerate}
+\end{uaanswer}
+
+
+\section{Validar: experimentos bajo falla}
+\begin{uaexercise}
+Critique cada hipótesis de experimento y reescríbala para que sea observable desde afuera y refutable.
+\begin{enumerate}
+\item ``Queremos ver si el sistema aguanta una caída de la base de datos.''
+\item ``El generador es resiliente.''
+\item ``Si apagamos una réplica de la base de datos, el uso de CPU de las otras réplicas sube menos del 30\,\%.''
+\item ``Si a las llamadas a \emph{dígitos} del 2\,\% de las solicitudes se les agregan 500\,ms, esas solicitudes siguen respondiendo en menos de 1\,s y el resto mantiene su SLI.'' ¿Qué le falta para poder ejecutarse?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item No dice qué observar ni qué resultado la refuta: cualquier resultado puede leerse como ``aguantó'' o ``no aguantó''. Reescrita: ``Si se cae la réplica primaria de la base de datos, el SLI de disponibilidad del servicio se mantiene sobre 99,9\,\% y la conmutación a otra réplica termina en menos de 30 segundos''.
+\item No es una hipótesis: no menciona ninguna falla ni ningún resultado observable. Hay que elegir una falla concreta y una propiedad medible: ``Si \emph{especiales} deja de responder durante 2 minutos, las solicitudes afectadas fallan en menos de 300\,ms con un error explícito y el SLI de latencia de las demás no cambia''.
+\item Es refutable, pero mide algo interno, no lo que vive el usuario: la CPU puede subir un 50\,\% sin que nadie lo note, o subir un 10\,\% mientras las solicitudes fallan. El \emph{steady state} tiene que ser un SLI: ``Si se apaga una réplica de la base de datos, los SLIs de disponibilidad y de latencia del servicio se mantienen dentro de su línea de base''. La CPU puede registrarse como dato de apoyo.
+\item Es observable y refutable. Le faltan los elementos para ejecutarla con seguridad: el valor de la línea de base de los SLIs, el grupo de control (el 98\,\% restante), el criterio de aborto (por ejemplo, el burn rate de 5 minutos o la latencia del grupo de control), la duración, el costo esperado en presupuesto y el plan de recuperación.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Para cada mecanismo de resiliencia de la clase 11, indique qué falla inyectaría para validarlo y qué observaría para dar el mecanismo por validado: \emph{timeout}, \emph{circuit breaker}, \emph{fallback}, \emph{bulkhead} y conmutación a una réplica. Después, explique por qué un plan de experimentos que solo apaga servidores no alcanza.
+\end{uaexercise}
+\begin{uaanswer}
+\begin{itemize}
+\item \textbf{\emph{Timeout}:} agregar latencia mayor que el \emph{timeout} a la dependencia. Se espera que las llamadas se corten en el valor configurado y que los hilos se liberen: el pool no se llena.
+\item \textbf{\emph{Circuit breaker}:} hacer fallar una proporción alta de las llamadas (por ejemplo, el 50\,\%), o agregarles latencia. Se espera que el \emph{breaker} se abra, que las llamadas se rechacen sin ejecutarse y que, al quitar la perturbación, vuelva a cerrarse.
+\item \textbf{\emph{Fallback}:} hacer fallar la dependencia. Se espera la respuesta alternativa, marcada como degradada, y que el SLI la cuente como corresponde. Si la degradación no es aceptable, como una contraseña sin especiales, se espera un error explícito.
+\item \textbf{\emph{Bulkhead}:} agregar latencia a una sola dependencia. Se espera que se agote solo su parte de los recursos y que las demás rutas mantengan su SLI.
+\item \textbf{Conmutación a una réplica:} apagar la instancia principal. Se espera que el tráfico pase a otra y que la caída del SLI sea breve y acotada.
+\end{itemize}
+Apagar servidores solo produce fallas rápidas: la conexión se rechaza y el llamante libera sus recursos enseguida. Los mecanismos más importantes de la clase 11 (\emph{timeouts}, \emph{bulkheads}) protegen contra la falla lenta, que retiene los hilos, y solo se ejercitan agregando latencia. Muchos sistemas toleran bien que una dependencia desaparezca y muy mal que se ponga lenta.
+\end{uaanswer}
+
+\begin{uaexercise}
+Diseñe un experimento completo, con el \emph{template} del apunte (sección 5.3.5), para responder: ``¿qué pasa si \emph{minúsculas} se pone lenta?''. Suponga que la línea de base del generador es una disponibilidad de 99,97\,\% y un p99 de 380\,ms, que la perturbación agrega 1\,s a las llamadas a \emph{minúsculas} del 2\,\% de las solicitudes y que dura 20 minutos.
+\begin{enumerate}
+\item Complete los campos del \emph{template}. Estime el costo en error budget suponiendo que todas las solicitudes afectadas fallan.
+\item Proponga un criterio de aborto en términos de burn rate.
+\item Recuerde que \emph{minúsculas} consulta internamente a \emph{dígitos}. ¿Puede este experimento descubrir esa dependencia? ¿Qué experimento la descubriría?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item Una versión posible:
+\begin{itemize}
+\item \textbf{Pregunta:} ¿los \emph{timeouts} y el \emph{breaker} de \emph{minúsculas} contienen su lentitud?
+\item \textbf{\emph{Steady state}:} disponibilidad (99,97\,\% en la línea de base) y p99 de latencia (380\,ms), medidos en el balanceador.
+\item \textbf{Hipótesis:} las solicitudes afectadas fallan rápido, con un error explícito (omitir las minúsculas violaría la política, así que no hay \emph{fallback} aceptable), y las demás mantienen su disponibilidad y su p99 dentro de la línea de base.
+\item \textbf{Perturbación:} 1\,s adicional en las llamadas a \emph{minúsculas} de las solicitudes marcadas, durante 20 minutos.
+\item \textbf{Grupos:} el 2\,\% marcado es el grupo experimental; el resto, el grupo de control.
+\item \textbf{\emph{Blast radius}:} el 2\,\% de las solicitudes y el servicio \emph{minúsculas}.
+\item \textbf{Costo esperado:} si fallan todas las afectadas, la tasa de error es 2\,\%, el burn rate 20, y 20 minutos consumen $20 \times (1/3)\,\text{h} / 720\,\text{h} \approx 0{,}9\,\%$ del presupuesto. Antes de empezar hay que verificar que la política lo permita: con menos del 50\,\% de presupuesto, podría postergarse.
+\item \textbf{Recuperación:} quitar la latencia y verificar que el SLI vuelva a la línea de base y que los \emph{breakers} se cierren.
+\item \textbf{Resultado:} se completa al terminar.
+\end{itemize}
+\item El burn rate esperado es 20. Un criterio razonable: abortar si el burn rate de los últimos 5 minutos supera, por ejemplo, 30, porque indicaría que el daño excede al 2\,\% marcado. También abortar si el p99 del grupo de control sale de su línea de base, señal de que los hilos se comparten (falta un \emph{bulkhead} o el \emph{timeout} es demasiado largo).
+\item No. La dependencia va de \emph{minúsculas} hacia \emph{dígitos}: si se agrega latencia a \emph{minúsculas}, solo se ven lentas las llamadas a \emph{minúsculas}, como se esperaba. Para descubrirla hay que agregar latencia a \emph{dígitos} con la hipótesis ``solo se ven afectadas las llamadas a \emph{dígitos}''. La hipótesis se refuta, porque las llamadas a \emph{minúsculas} también se vuelven lentas, y así aparece la dependencia que no estaba en el diagrama.
+\end{enumerate}
+\end{uaanswer}
+
+
+\section{Responder y aprender: incidentes y postmortems}
+\begin{uaexercise}
+Lea el relato de un incidente en una tienda en línea.
+\begin{itemize}[leftmargin=3.6em, labelsep=0.6em]
+\item[20:55] Se despliega una versión nueva del servicio de \emph{checkout}.
+\item[21:10] Suena la alerta de burn rate de 1 hora del \emph{checkout}. La persona de guardia empieza a investigar sola.
+\item[21:25] Pide ayuda al equipo de pagos, que abre su propio canal de chat para investigar.
+\item[21:30] Alguien del equipo de pagos reinicia las réplicas de su base de datos sin avisar. La latencia empeora.
+\item[21:35] La gerenta de producto llama a la persona de guardia cada pocos minutos para preguntar cuándo se resuelve.
+\item[22:00] Un desarrollador nota el despliegue de las 20:55.
+\item[22:05] Se revierte el despliegue. A las 22:15 el SLI vuelve a su objetivo.
+\end{itemize}
+\begin{enumerate}
+\item Identifique en el relato los tres peligros de un incidente no gestionado.
+\item ¿Cuándo debió declararse el incidente, y por qué criterio?
+\item Asigne los roles de gestión y explique qué habría cambiado.
+\item ¿Cuál debió ser la primera hipótesis y la primera mitigación? ¿Cuál es un buen criterio de salida?
+\end{enumerate}
+\end{uaexercise}
+\begin{uaanswer}
+\begin{enumerate}
+\item \begin{itemize}
+\item \textbf{Foco exclusivo en lo técnico:} la persona de guardia investiga sola durante 15 minutos y nadie mira el cuadro general, por ejemplo, qué cambió recientemente.
+\item \textbf{Mala comunicación:} el equipo de pagos trabaja en un canal propio, y la gerenta interrumpe a quien está arreglando el problema porque no tiene otra fuente de información.
+\item \textbf{Trabajo por cuenta propia:} el reinicio de las réplicas a las 21:30, sin coordinar, empeora la situación.
+\end{itemize}
+\item Desde las 21:10, la degradación ya era visible para los clientes, y a más tardar a las 21:25, cuando hizo falta un segundo equipo. Cualquiera de esos dos criterios alcanza. Es mejor declararlo temprano y cerrarlo rápido que tarde.
+\item \begin{itemize}
+\item \textbf{\emph{Incident commander}:} lleva el estado general, el documento vivo y la coordinación entre equipos, en un solo canal.
+\item \textbf{Operaciones:} la persona de guardia y quien sume pagos; son los únicos que tocan el sistema. El reinicio de las 21:30 no habría ocurrido sin acordarlo.
+\item \textbf{Comunicación:} actualiza periódicamente a la gerenta y a los interesados, para que no interrumpan a operaciones.
+\item \textbf{Planificación:} registra la línea de tiempo y lo que hay que revertir al final.
+\end{itemize}
+\item La mayoría de las caídas viene de un cambio, así que la primera pregunta es qué cambió: el despliegue de las 20:55, quince minutos antes de la alerta. La primera mitigación debió ser revertirlo, a las 21:10 y no a las 22:05. Primero se detiene el daño; la causa se entiende después. Criterio de salida: el SLI de disponibilidad del \emph{checkout} dentro de su objetivo durante un tiempo acordado, por ejemplo, 30 minutos.
+\end{enumerate}
+\end{uaanswer}
+
+\begin{uaexercise}
+Escriba el runbook breve de un servicio de \emph{checkout} que depende de una base de datos propia, de un servicio de \emph{stock} y de un proveedor externo de pagos. Incluya la ficha del servicio y la entrada de la alerta ``burn rate alto, 1 hora''. Para la alerta, indique al menos dos mitigaciones seguras y dos que no deberían hacerse durante el incidente, y explique por qué.
+\end{uaexercise}
+\begin{uaanswer}
+\textbf{Ficha del servicio.} Dueño: equipo de \emph{checkout}. Guardia: rotación y canal del equipo. Escalamiento: dueños de \emph{stock}, de la base de datos y el contacto del proveedor de pagos. Depende de: base de datos, \emph{stock} y proveedor de pagos. Dependen de él: el \emph{frontend} y el servicio de envíos. \emph{Dashboards}: SLIs del \emph{checkout}, latencia y errores por dependencia, estado de los \emph{breakers}.
+
+\textbf{Alerta ``burn rate alto, 1 hora''.} Significa que en la última hora se consumió al menos el 2\,\% del presupuesto mensual, y que sigue ocurriendo. Para confirmarla: mirar el \emph{dashboard} de SLIs; revisar la latencia y los errores por dependencia para ubicar dónde está el problema; revisar los despliegues y cambios de configuración recientes.
+
+\textbf{Mitigaciones seguras:}
+\begin{itemize}
+\item revertir el último despliegue o cambio de configuración;
+\item si falla el proveedor de pagos, activar el \emph{fallback} acordado con el negocio, por ejemplo, aceptar el pedido y cobrarlo después, solo si está definido de antemano.
 \end{itemize}
 
-Lo importante es que la perturbación, la hipótesis y la medición estén explícitamente conectadas.
+\textbf{Lo que no debería hacerse:}
+\begin{itemize}
+\item reintentar cobros sin una clave de idempotencia, porque se puede cobrar dos veces;
+\item desactivar la validación de \emph{stock} para que el \emph{checkout} ``ande'', porque se venderían productos que no hay;
+\item reiniciar la base de datos sin coordinar con quien está a cargo del incidente.
+\end{itemize}
+
+Escalar al dueño de la dependencia identificada. El runbook es breve a propósito: no intenta listar todos los errores posibles, que envejecen rápido, sino orientar a quien recibe la alerta.
 \end{uaanswer}
 
 \begin{uaexercise}
-Diseñe un experimento de crash de servicio y explique qué propiedad del sistema intentaría validar.
+Lea el relato y el borrador de postmortem de un incidente.
+
+Un viernes a las 18:00, un ingeniero cambió la configuración del servicio de notificaciones y, por un error de tipeo, el tamaño del pool de conexiones a la base de datos pasó de 50 a 5. El cambio no pasó por una prueba \emph{canary} porque era ``solo configuración''. A las 20:00, con el pico de tráfico, el pool se agotó y las notificaciones empezaron a fallar. La CPU estaba baja y ninguna alerta sonó: un cliente avisó a las 20:40. La guardia no pudo revertir la configuración, porque la herramienta exigía la aprobación de una persona que no estaba de turno. El servicio se recuperó a las 21:30.
+
+El borrador dice: ``El incidente fue causado por el descuido de Juan, que escribió 5 en vez de 50''. Y propone estas acciones: (a) Juan debe revisar mejor sus cambios; (b) mejorar el monitoreo; (c) prohibir los despliegues los viernes; (d) que la herramienta de configuración rechace bajar el tamaño de un pool más de un 50\,\% sin una segunda aprobación; (e) una alerta de burn rate sobre el SLI de notificaciones entregadas; (f) permitir que la guardia revierta configuración sin aprobación durante un incidente declarado.
+\begin{enumerate}
+\item Separe el disparador de las condiciones que hicieron posible el incidente.
+\item Reescriba la frase del borrador sin culpar a una persona.
+\item Evalúe cada acción propuesta: ¿es buena? ¿De qué tipo es (prevenir, detectar, mitigar)?
+\item ¿Por qué este incidente exige un postmortem, aunque nadie lo haya pedido?
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{enumerate}
+\item \textbf{Disparador:} el pico de tráfico de las 20:00 sobre un pool de 5 conexiones. \textbf{Condiciones:} un valor de configuración crítico que podía cambiarse sin ninguna validación; un proceso que eximía de \emph{canary} a los cambios ``solo de configuración''; un monitoreo que no medía lo que vive el usuario (la CPU baja no decía nada y no había alerta por síntoma); y una reversión que dependía de una persona fuera de turno. El error de tipeo es un evento esperable: lo que lo convirtió en incidente fueron las condiciones.
+\item ``Un cambio de configuración redujo el pool de conexiones de 50 a 5. La herramienta permitió el cambio sin validar el valor, y el proceso no exigía \emph{canary} para cambios de configuración, así que el error llegó a producción sin ser detectado.''
+\item \begin{itemize}
+\item[(a)] \textbf{Mala.} Pide cambiar el comportamiento de una persona y no se puede verificar.
+\item[(b)] \textbf{Mala por vaga.} No tiene un estado final verificable. La versión buena es la (e).
+\item[(c)] \textbf{Dudosa.} Es una acción refleja: reduce el riesgo de un día pero no ataca la condición (cambios sin validar), y frena todos los despliegues por igual. Conviene revisarla con calma antes de adoptarla.
+\item[(d)] \textbf{Buena, de prevención.} Cambia el sistema para que el mismo error no pueda llegar a producción.
+\item[(e)] \textbf{Buena, de detección.} Habría avisado en minutos, sin depender de un cliente.
+\item[(f)] \textbf{Buena, de mitigación.} Habría acortado la recuperación.
+\end{itemize}
+Cada acción buena necesita además un dueño, una prioridad y un registro en el sistema de seguimiento.
+\item Porque cumple varios disparadores habituales: hubo una degradación visible para los usuarios, hubo intervención de la guardia y, sobre todo, falló el monitoreo, ya que el incidente lo descubrió un cliente. Conviene que esos criterios estén fijados de antemano, para que el postmortem no dependa de que alguien lo pida.
+\end{enumerate}
 \end{uaanswer}
 
+
+\section{Integración con el trabajo práctico}
 \begin{uaexercise}
-Explique qué diferencias hay entre inyectar una falla de latencia y una de caída total.
+En Asteria Online, un grupo escribe la garantía: ``el jugador no debe perder el oro pagado por un combate que no llegó a resolverse''.
+\begin{enumerate}
+\item Otro grupo propone escribirla así: ``el jugador nunca pierde el oro, y se le devuelve en menos de 5 minutos''. Según el enunciado, ¿por qué no es una garantía válida? ¿Dónde van ese ``nunca'' y esos 5 minutos?
+\item Proponga la especificación de un SLI que permita medir cuánto sostiene una solución esa garantía.
+\item Para la disponibilidad de las instancias de combate se fija un SLO de 99,9\,\% en 30 días. Ante la caída de un datacenter en el que corre un tercio de las instancias, la solución A las reubica en 20 minutos y la solución B, que mantiene réplicas listas, en 2 minutos. ¿Qué porcentaje del presupuesto consume cada una por caída? Si se esperan dos caídas por mes, ¿cuál elegiría y qué costo aceptaría?
+\item ¿Por qué un único SLI de disponibilidad para todo el juego sería un mal indicador? Tenga en cuenta las fallas parciales del enunciado y el requisito de priorizar a quienes ya están jugando.
+\end{enumerate}
 \end{uaexercise}
 \begin{uaanswer}
-La respuesta debe situarse en testing distribuido, fault injection, steady state, hipótesis, blast radius y diseño experimental. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo perturbación sin hipótesis, blast radius excesivo, señal insuficiente y falso positivo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-La comparación debe usar al menos semántica, latencia, disponibilidad, complejidad operativa y recuperación. La alternativa preferible cambia cuando cambia el costo del error en el dominio; no existe ganador universal.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Formule una hipótesis experimental correcta para un servicio de pagos.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué una hipótesis vaga como “queremos ver si aguanta” no es suficiente.
-\end{uaexercise}
-\begin{uaanswer}
-La respuesta debe situarse en testing distribuido, fault injection, steady state, hipótesis, blast radius y diseño experimental. Se comienza declarando el supuesto decisivo y el comportamiento observable; luego se recorre una ejecución nominal y otra bajo perturbación sin hipótesis, blast radius excesivo, señal insuficiente y falso positivo. El mecanismo elegido debe vincularse con una garantía concreta, evitando afirmar propiedades fuera de su alcance.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe un experimento que valide si un circuit breaker abre cuando corresponde.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe un experimento para verificar si retries correctamente acotados no producen tormenta de tráfico.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Defina blast radius y explique por qué debe controlarse explícitamente.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe una estrategia para limitar el blast radius de un experimento en producción.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique qué condiciones mínimas deberían cumplirse antes de correr un experimento de chaos en producción.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Describa un caso donde un experimento sin rollback claro sería irresponsable.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué observabilidad y Chaos Engineering están fuertemente conectados.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Diseñe las métricas mínimas necesarias para evaluar un experimento sobre un pipeline de procesamiento de eventos.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-Una solución completa organiza la decisión con P-F-G-S-T: define el problema, enumera fallas, fija la garantía, presenta el protocolo y reconoce el trade-off. Debe incluir estados intermedios y qué ve el usuario si la operación no termina.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique qué rol jugarían las trazas en un experimento de degradación por latencia.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
-\end{uaanswer}
-
-\begin{uaexercise}
-Explique por qué un experimento sin instrumentación suficiente produce más ruido que conocimiento.
-\end{uaexercise}
-\begin{uaanswer}
-La idempotencia separa intentos físicos de una operación lógica. Se usa una clave estable, se persiste el resultado junto con el efecto y los reintentos devuelven ese mismo resultado. El costo es estado adicional, política de expiración y coordinación con el almacenamiento.
-
-El argumento debe identificar la hipótesis, construir la cadena lógica o el contraejemplo y concluir exactamente qué propiedad queda demostrada. Una intuición sin secuencia verificable no es suficiente.
-
-La evidencia apropiada sería baseline, perturbación, métricas, criterio de aborto y conclusión reproducible. También debe indicarse una condición que refute la elección o haga preferible una solución más simple.
+\begin{enumerate}
+\item El enunciado pide que las garantías no tengan promesas absolutas (``nunca'') ni números concretos (``5 minutos''): son compromisos de certeza que dependen de la solución elegida y de la falla contra la que responde. La garantía expresa solo el interés que se protege. El grado con que se la sostiene va en la solución (S) y, si es parcial, en su trade-off (T). Es la misma separación que hay entre lo que le importa al usuario y el SLO.
+\item Por ejemplo: ``la proporción de entradas pagadas a combates que no se resolvieron en las que el oro volvió al jugador''. Puede completarse con un SLI de latencia: la proporción de esas devoluciones hechas en menos de cierto tiempo. Cada solución declara su SLO sobre esos SLIs.
+\item El presupuesto es de 43,2 minutos de caída total. Como solo se afecta un tercio de las instancias:
+\begin{itemize}
+\item A: $20 / 3 \approx 6{,}7$ minutos equivalentes, el 15,4\,\% del presupuesto; dos caídas, unos 31\,\%.
+\item B: $2/3 \approx 0{,}67$ minutos, el 1,5\,\%; dos caídas, unos 3\,\%.
+\end{itemize}
+Con dos caídas por mes, A sigue dentro del SLO pero gasta casi un tercio del presupuesto solo en eso, y deja poco margen para despliegues y otras fallas. B casi no lo toca, a costa de mantener réplicas listas, que es capacidad que se paga aunque no se use. La comparación objetiva que pide la Entrega 3 es exactamente esta: el mismo SLI, el mismo presupuesto, cuánto consume cada solución ante la misma falla y cuánto cuesta cada una.
+\item Un SLI global diluye las fallas parciales: si fallan los pagos, que son una fracción pequeña de las solicitudes, el promedio de todo el juego casi no se mueve. Conviene un SLI por subsistema (directorio de zonas, combate, pagos). Además, el requisito de priorizar a quienes ya están jugando pide separar el SLI de los jugadores en partida del de los que intentan ingresar, con objetivos distintos: ante un pico, el \emph{load shedding} de la clase 11 gasta a propósito el presupuesto del ingreso para proteger el de los que ya juegan.
+\end{enumerate}
 \end{uaanswer}
 
 \end{document}
