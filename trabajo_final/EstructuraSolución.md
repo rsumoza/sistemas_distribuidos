@@ -39,7 +39,13 @@ Preguntas:
 - Tampoco definimos si el frontend del DC es un balanceador de carga o es un solo monolito que recibe todo.
   - Tampoco que hacemos si el request llega a un DC "incorrecto". ¿Cómo defino incorrecto? ¿Es el de la instancia o del usuario? ¿Qué pasa si migramos de DC para algo?
 - En _Instancia/SolicitarIngreso_:
-  - me alcanza con un 400 o necesito más detalle de lo que falló?
+  - me alcanza con un 400 o necesito más detalle de lo que falló? hay un montón de motivos de rechazo
+    - el DC es incorrecto
+    - no tengo saldo
+    - conectado a otra batalla
+    - tengo otro intento de ingreso activo????
+    - la instancia no es válida
+    - la instancia está llena???
   - lo mismo con el 503, separamos no disponible de timeout?
 -  ¿Si el cliente por alguna causa tuvo de reinstalar la aplicación en el teléfono, borró toda la data, como recupera sus estados?
   - Como lo definí nos faltaría un método para consultar mis pedidos de ingreso para saber que pasó con cada uno y no repetir.
